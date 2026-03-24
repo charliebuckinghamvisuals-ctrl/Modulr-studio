@@ -182,7 +182,7 @@ export const AboutView: React.FC = () => {
                                     </Button>
                                     <Button 
                                         variant="secondary"
-                                        onClick={() => window.open('https://napc.uk/contact-us/', '_blank')}
+                                        onClick={() => window.open('https://napc.uk/contact/', '_blank')}
                                         icon={<ArrowRight size={16} />}
                                         className="px-8"
                                     >
