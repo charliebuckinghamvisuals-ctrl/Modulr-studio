@@ -63,7 +63,81 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                     </div>
                 </div>
 
-                {/* 3. Dedicated Garden Room AI */}
+                {/* 3. Why Modulr Studio vs General AI */}
+                <div className="w-full py-16 px-10 md:px-16 rounded-[45px] bg-white/95 border border-slate-200 shadow-[0_20px_50px_rgba(0,0,0,0.08)] relative overflow-hidden backdrop-blur-xl">
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-accent/5 blur-[100px] -mr-48 -mt-48 pointer-events-none"></div>
+                    <div className="absolute bottom-0 left-0 w-72 h-72 bg-blue-500/5 blur-[80px] -ml-36 -mb-36 pointer-events-none"></div>
+
+                    <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                        <div className="space-y-8">
+                            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight">
+                                Why Modulr Studio <br />
+                                <span className="text-accent">Beat General AI</span>
+                            </h2>
+                            <p className="text-slate-600 text-lg leading-relaxed max-w-xl">
+                                Don't settle for generic prompt-to-image AI like ChatGPT or Gemini. Those tools guess at architecture; we master it.
+                            </p>
+
+                            <div className="space-y-8">
+                                <div className="flex gap-5">
+                                    <div className="mt-1 bg-accent/10 p-2.5 rounded-2xl text-accent shrink-0 shadow-sm border border-accent/10"><CheckCircle2 size={24} /></div>
+                                    <div>
+                                        <h4 className="text-slate-900 font-bold text-xl mb-2">Granular Material Control</h4>
+                                        <p className="text-slate-600 leading-relaxed">Directly modify specific materials—Siberian Larch, Anthracite Grey, or Cedar Cladding—with zero guesswork. General AI often changes the whole building when you only want to swap one material.</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-5">
+                                    <div className="mt-1 bg-accent/10 p-2.5 rounded-2xl text-accent shrink-0 shadow-sm border border-accent/10"><CheckCircle2 size={24} /></div>
+                                    <div>
+                                        <h4 className="text-slate-900 font-bold text-xl mb-2">Geometry-First Processing</h4>
+                                        <p className="text-slate-600 leading-relaxed">Our AI analyzes your structural line drawings first. It understands your load-bearing pillars, window positions, and roof angles as technical data, not just artistic shapes.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50 border border-slate-100 rounded-[35px] p-10 relative shadow-inner">
+                            <div className="mb-8 pb-6 border-b border-slate-200 flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Feature Comparison</span>
+                                <div className="px-4 py-1.5 bg-accent text-white rounded-full text-[10px] font-black tracking-widest uppercase">THE MODULR ADVANTAGE</div>
+                            </div>
+
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                                        <th className="pb-6 font-bold">Feature</th>
+                                        <th className="pb-6 font-bold text-center">ChatGPT/Gemini</th>
+                                        <th className="pb-6 font-bold text-center text-accent">Modulr Studio</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-sm">
+                                    <tr className="border-b border-slate-100">
+                                        <td className="py-5 text-slate-900 font-bold">Material Specificity</td>
+                                        <td className="py-5 text-center text-slate-400 italic font-medium">Random Guessing</td>
+                                        <td className="py-5 text-center text-accent font-black">100% Control</td>
+                                    </tr>
+                                    <tr className="border-b border-slate-100">
+                                        <td className="py-5 text-slate-900 font-bold">Structural Accuracy</td>
+                                        <td className="py-5 text-center text-slate-400 italic font-medium">Artistic Hallucination</td>
+                                        <td className="py-5 text-center text-accent font-black">CAD Foundation</td>
+                                    </tr>
+                                    <tr className="border-b border-slate-100">
+                                        <td className="py-5 text-slate-900 font-bold">Render Quality</td>
+                                        <td className="py-5 text-center text-slate-400 italic font-medium">Variable (720p-1K)</td>
+                                        <td className="py-5 text-center text-accent font-black">Architectural 4K</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="py-5 text-slate-900 font-bold">Repeatability</td>
+                                        <td className="py-5 text-center text-slate-400 italic font-medium">Always Different</td>
+                                        <td className="py-5 text-center text-accent font-black">Versioned Logic</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 4. Dedicated Garden Room AI */}
                 <div className="w-full flex flex-col items-center text-center py-12 gap-10">
                     <div className="max-w-2xl space-y-6">
                         <div className="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent mx-auto">
