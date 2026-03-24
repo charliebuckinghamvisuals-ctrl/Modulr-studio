@@ -647,14 +647,15 @@ app.post('/api/generatePresentationBoard', async (req, res) => {
 // Serve static files from the Vite build directory
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Fallback for SPA routing: serve index.html for any unknown routes
-app.get('(.*)', (req, res) => {
-    const indexPath = path.join(__dirname, 'dist', 'index.html');
-    if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-    } else {
-        res.status(404).send("Build artifact 'dist/index.html' not found. Please run 'npm run build' first.");
+// Fallback for SPA routing: serve index.html for any unknown GET requests
+app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+        const indexPath = path.join(__dirname, 'dist', 'index.html');
+        if (fs.existsSync(indexPath)) {
+            return res.sendFile(indexPath);
+        }
     }
+    next();
 });
 
 const server = app.listen(port, '0.0.0.0', () => {
