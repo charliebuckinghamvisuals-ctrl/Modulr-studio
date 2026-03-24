@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 420" fill="none">
+  <!-- M letterform matching attached logo -->
+  <path d="M60 80 L60 330 L120 330 L120 190 L200 290 L280 190 L280 330 L340 330 L340 80 L280 80 L200 200 L120 80 Z" fill="currentColor"/>
+  <!-- STUDIO text -->
+  <text x="200" y="390" font-family="'Arial Black', 'Arial', sans-serif" font-size="52" font-weight="900" letter-spacing="8" text-anchor="middle" fill="currentColor">STUDIO</text>
+</svg>
