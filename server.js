@@ -29,8 +29,7 @@ app.use((err, req, res, next) => {
 const apiKey = process.env.VITE_GEMINI_API_KEY;
 
 if (!apiKey) {
-    console.error("CRITICAL: Missing VITE_GEMINI_API_KEY in .env file. The server cannot start.");
-    process.exit(1);
+    console.warn("WARNING: Missing VITE_GEMINI_API_KEY environment variable. AI features will not work.");
 }
 
 // Initialize Gemini Client
