@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from "@google/genai";
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -12,6 +13,22 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = process.env.PORT || 3005;
+
+console.log("--- SERVER STARTUP DEBUG ---");
+console.log("CWD:", process.cwd());
+console.log("DIRNAME:", __dirname);
+console.log("PORT ENV:", process.env.PORT);
+console.log("PORT SELECT:", port);
+console.log("API KEY STATUS:", process.env.VITE_GEMINI_API_KEY ? "EXISTS (SAFE)" : "MISSING");
+
+const distPath = path.join(__dirname, 'dist');
+if (fs.existsSync(distPath)) {
+    console.log("SUCCESS: 'dist' folder found at:", distPath);
+} else {
+    console.warn("WARNING: 'dist' folder NOT found at:", distPath);
+    console.log("LISTING ROOT DIR:", fs.readdirSync(__dirname));
+}
+console.log("----------------------------");
 
 // Middleware
 app.use(cors());
