@@ -648,8 +648,13 @@ app.post('/api/generatePresentationBoard', async (req, res) => {
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // Fallback for SPA routing: serve index.html for any unknown routes
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+app.get('(.*)', (req, res) => {
+    const indexPath = path.join(__dirname, 'dist', 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(404).send("Build artifact 'dist/index.html' not found. Please run 'npm run build' first.");
+    }
 });
 
 const server = app.listen(port, '0.0.0.0', () => {
