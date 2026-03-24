@@ -2,6 +2,8 @@ import React from 'react';
 import { Check, Zap, Sparkles, Building2, Crown, Gem, Wand2, TrendingUp } from 'lucide-react';
 
 export const PricingView: React.FC = () => {
+    const [billingCycle, setBillingCycle] = React.useState<'monthly' | 'yearly'>('monthly');
+
     return (
         <div className="min-h-full bg-background relative overflow-y-auto w-full py-20 px-6 sm:px-12 flex flex-col items-center">
 
@@ -22,10 +24,43 @@ export const PricingView: React.FC = () => {
                         Professional rendering,<br />scaled to your studio.
                     </h1>
 
-                    <p className="text-lg text-secondary leading-relaxed">
+                    <p className="text-lg text-secondary leading-relaxed mb-12">
                         Stop paying thousands for outsourced 3D visualizations.
                         Generate photorealistic concepts instantly, directly from your sketches.
                     </p>
+
+                    {/* Billing Toggle */}
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="flex items-center gap-4 bg-surface/50 p-1.5 rounded-2xl border border-border shadow-inner">
+                            <button
+                                onClick={() => setBillingCycle('monthly')}
+                                className={`px-6 py-2 rounded-xl text-sm font-bold transition-all duration-300 ${billingCycle === 'monthly'
+                                    ? 'bg-white shadow-lg text-primary transform scale-105'
+                                    : 'text-secondary hover:text-primary'
+                                    }`}
+                            >
+                                Monthly
+                            </button>
+                            <button
+                                onClick={() => setBillingCycle('yearly')}
+                                className={`px-6 py-2 rounded-xl text-sm font-bold transition-all duration-300 relative group ${billingCycle === 'yearly'
+                                    ? 'bg-accent shadow-[0_0_20px_rgba(139,92,246,0.5)] text-white transform scale-105'
+                                    : 'text-secondary hover:text-primary'
+                                    }`}
+                            >
+                                Yearly
+                                {billingCycle !== 'yearly' && (
+                                    <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1 bg-green-500 text-[10px] text-white rounded-full font-black animate-bounce shadow-lg whitespace-nowrap">
+                                        Save ~20% 🔥
+                                    </span>
+                                )}
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] font-bold text-secondary uppercase tracking-widest mt-2">
+                             <TrendingUp size={12} className="text-green-500" />
+                            Annual billing includes <span className="text-accent underline decoration-accent/30 decoration-2 underline-offset-4">2 Months FREE</span>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Pricing Cards */}
@@ -69,8 +104,15 @@ export const PricingView: React.FC = () => {
                             <p className="text-sm text-secondary min-h-[40px]">Perfect for smaller projects and high-volume basic visuals.</p>
                         </div>
                         <div className="mb-8">
-                            <span className="text-4xl font-black text-primary dark:text-white">£29</span>
-                            <span className="text-secondary font-medium"> / mo</span>
+                            <span className="text-4xl font-black text-primary dark:text-white">
+                                £{billingCycle === 'monthly' ? '29' : '290'}
+                            </span>
+                            <span className="text-secondary font-medium"> / {billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
+                            {billingCycle === 'yearly' && (
+                                <div className="text-[10px] font-bold text-green-500 uppercase mt-1">
+                                    £24.16 effective monthly
+                                </div>
+                            )}
                         </div>
 
                         <button className="w-full py-3 px-6 rounded-xl bg-surface border border-accent/20 text-primary font-bold hover:bg-accent/10 transition-colors mb-8 shadow-[0_0_20px_rgba(139,92,246,0.1)]">
@@ -107,8 +149,15 @@ export const PricingView: React.FC = () => {
                             <p className="text-sm text-secondary">The complete toolkit for scaling manufacturers.</p>
                         </div>
                         <div className="mb-8 text-white">
-                            <span className="text-5xl font-black text-primary dark:text-white drop-shadow-md">£99</span>
-                            <span className="text-secondary font-medium"> / mo</span>
+                            <span className="text-5xl font-black text-primary dark:text-white drop-shadow-md">
+                                £{billingCycle === 'monthly' ? '99' : '990'}
+                            </span>
+                            <span className="text-secondary font-medium"> / {billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
+                            {billingCycle === 'yearly' && (
+                                <div className="text-xs font-bold text-green-400 uppercase mt-2">
+                                    £82.50 effective monthly
+                                </div>
+                            )}
                         </div>
 
                         <button className="w-full py-4 px-6 rounded-xl bg-accent text-white font-bold hover:brightness-110 transition-all mb-8 shadow-[0_0_25px_rgba(139,92,246,0.5)] active:scale-95">
@@ -161,13 +210,21 @@ export const PricingView: React.FC = () => {
                             <div className="grid grid-cols-2 gap-4 w-full md:w-auto shrink-0">
                                 <div className="p-6 rounded-2xl bg-white border border-border shadow-sm flex flex-col items-center justify-center text-center group-hover:shadow-md transition-all">
                                     <span className="text-xs font-bold text-secondary uppercase mb-1">Traditional Cost</span>
-                                    <span className="text-2xl font-black text-red-500 line-through">£62.5k</span>
-                                    <span className="text-[10px] text-secondary/60">250 Renders</span>
+                                    <span className="text-2xl font-black text-red-500 line-through">
+                                        £{billingCycle === 'monthly' ? '62.5k' : '750k'}
+                                    </span>
+                                    <span className="text-[10px] text-secondary/60">
+                                        {billingCycle === 'monthly' ? '250 Renders' : '3,000 Renders'}
+                                    </span>
                                 </div>
                                 <div className="p-6 rounded-2xl bg-accent text-white shadow-xl flex flex-col items-center justify-center text-center transform scale-110 group-hover:scale-115 transition-all">
                                     <span className="text-xs font-bold opacity-80 uppercase mb-1">Modulr Price</span>
-                                    <span className="text-3xl font-black">£99</span>
-                                    <span className="text-[10px] opacity-80 uppercase font-black">600x Value</span>
+                                    <span className="text-3xl font-black">
+                                        £{billingCycle === 'monthly' ? '99' : '990'}
+                                    </span>
+                                    <span className="text-[10px] opacity-80 uppercase font-black">
+                                        {billingCycle === 'monthly' ? '600x Value' : '750x Value'}
+                                    </span>
                                 </div>
                             </div>
                         </div>
