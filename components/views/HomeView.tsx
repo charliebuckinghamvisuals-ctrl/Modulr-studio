@@ -63,76 +63,52 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                     </div>
                 </div>
 
-                {/* 3. Why Modulr Studio vs General AI */}
-                <div className="w-full py-16 px-10 md:px-16 rounded-[45px] bg-white/95 border border-slate-200 shadow-[0_20px_50px_rgba(0,0,0,0.08)] relative overflow-hidden backdrop-blur-xl">
+                {/* 3. Why Modulr Studio Explanation */}
+                <div className="w-full py-16 px-10 md:px-16 rounded-[45px] bg-white/95 border border-slate-300 shadow-[0_20px_50px_rgba(0,0,0,0.08)] relative overflow-hidden backdrop-blur-xl">
                     <div className="absolute top-0 right-0 w-96 h-96 bg-accent/5 blur-[100px] -mr-48 -mt-48 pointer-events-none"></div>
                     <div className="absolute bottom-0 left-0 w-72 h-72 bg-blue-500/5 blur-[80px] -ml-36 -mb-36 pointer-events-none"></div>
 
-                    <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-                        <div className="space-y-8">
-                            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight">
-                                Why Modulr Studio <br />
-                                <span className="text-accent">Beat General AI</span>
+                    <div className="relative z-10 space-y-16">
+                        <div className="max-w-3xl">
+                            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight mb-6">
+                                Why use Modulr Studio <br />
+                                <span className="text-accent">Instead of General AI?</span>
                             </h2>
-                            <p className="text-slate-600 text-lg leading-relaxed max-w-xl">
-                                Don't settle for generic prompt-to-image AI like ChatGPT or Gemini. Those tools guess at architecture; we master it.
+                            <p className="text-slate-600 text-xl leading-relaxed">
+                                Generic AI models like ChatGPT or Gemini are built for art, not architecture. They "hallucinate" details that don't belong, often compromising the structural integrity of your vision.
                             </p>
-
-                            <div className="space-y-8">
-                                <div className="flex gap-5">
-                                    <div className="mt-1 bg-accent/10 p-2.5 rounded-2xl text-accent shrink-0 shadow-sm border border-accent/10"><CheckCircle2 size={24} /></div>
-                                    <div>
-                                        <h4 className="text-slate-900 font-bold text-xl mb-2">Granular Material Control</h4>
-                                        <p className="text-slate-600 leading-relaxed">Directly modify specific materials—Siberian Larch, Anthracite Grey, or Cedar Cladding—with zero guesswork. General AI often changes the whole building when you only want to swap one material.</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-5">
-                                    <div className="mt-1 bg-accent/10 p-2.5 rounded-2xl text-accent shrink-0 shadow-sm border border-accent/10"><CheckCircle2 size={24} /></div>
-                                    <div>
-                                        <h4 className="text-slate-900 font-bold text-xl mb-2">Geometry-First Processing</h4>
-                                        <p className="text-slate-600 leading-relaxed">Our AI analyzes your structural line drawings first. It understands your load-bearing pillars, window positions, and roof angles as technical data, not just artistic shapes.</p>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
 
-                        <div className="bg-slate-50 border border-slate-100 rounded-[35px] p-10 relative shadow-inner">
-                            <div className="mb-8 pb-6 border-b border-slate-200 flex items-center justify-between">
-                                <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Feature Comparison</span>
-                                <div className="px-4 py-1.5 bg-accent text-white rounded-full text-[10px] font-black tracking-widest uppercase">THE MODULR ADVANTAGE</div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                            <div className="space-y-4">
+                                <div className="bg-accent/10 p-3 rounded-2xl text-accent w-fit border border-accent/10 shadow-sm mb-2">
+                                    <ShieldCheck size={24} />
+                                </div>
+                                <h4 className="text-slate-900 font-bold text-xl">Architectural Logic vs. Art</h4>
+                                <p className="text-slate-600 leading-relaxed text-sm">
+                                    Don't settle for "creative" guesses. While general AI patterns create beautiful images that can't be built, Modulr follows the strict architectural logic of your technical plan.
+                                </p>
                             </div>
 
-                            <table className="w-full text-left">
-                                <thead>
-                                    <tr className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-                                        <th className="pb-6 font-bold">Feature</th>
-                                        <th className="pb-6 font-bold text-center">ChatGPT/Gemini</th>
-                                        <th className="pb-6 font-bold text-center text-accent">Modulr Studio</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="text-sm">
-                                    <tr className="border-b border-slate-100">
-                                        <td className="py-5 text-slate-900 font-bold">Material Specificity</td>
-                                        <td className="py-5 text-center text-slate-400 italic font-medium">Random Guessing</td>
-                                        <td className="py-5 text-center text-accent font-black">100% Control</td>
-                                    </tr>
-                                    <tr className="border-b border-slate-100">
-                                        <td className="py-5 text-slate-900 font-bold">Structural Accuracy</td>
-                                        <td className="py-5 text-center text-slate-400 italic font-medium">Artistic Hallucination</td>
-                                        <td className="py-5 text-center text-accent font-black">CAD Foundation</td>
-                                    </tr>
-                                    <tr className="border-b border-slate-100">
-                                        <td className="py-5 text-slate-900 font-bold">Render Quality</td>
-                                        <td className="py-5 text-center text-slate-400 italic font-medium">Variable (720p-1K)</td>
-                                        <td className="py-5 text-center text-accent font-black">Architectural 4K</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="py-5 text-slate-900 font-bold">Repeatability</td>
-                                        <td className="py-5 text-center text-slate-400 italic font-medium">Always Different</td>
-                                        <td className="py-5 text-center text-accent font-black">Versioned Logic</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                            <div className="space-y-4">
+                                <div className="bg-accent/10 p-3 rounded-2xl text-accent w-fit border border-accent/10 shadow-sm mb-2">
+                                    <Layers size={24} />
+                                </div>
+                                <h4 className="text-slate-900 font-bold text-xl">Surgical Material Control</h4>
+                                <p className="text-slate-600 leading-relaxed text-sm">
+                                    Generic AI changes the whole building when you want one swap. In Modulr, you have surgical control. Change a cladding type or window frame instantly, while the rest of your scene stays perfect.
+                                </p>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="bg-accent/10 p-3 rounded-2xl text-accent w-fit border border-accent/10 shadow-sm mb-2">
+                                    <Zap size={24} />
+                                </div>
+                                <h4 className="text-slate-900 font-bold text-xl">Pro-Grade 4K Visualization</h4>
+                                <p className="text-slate-600 leading-relaxed text-sm">
+                                    Skip the low-res, artistic filters of chat models. Modulr generates high-fidelity, presentation-ready 4K renders designed specifically for clients, brochures, and planning applications.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -143,10 +119,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                         <div className="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent mx-auto">
                             <Box size={24} />
                         </div>
-                        <h2 className="text-4xl font-black tracking-tight text-primary">Dedicated Garden Room AI</h2>
+                        <h2 className="text-4xl font-black tracking-tight text-primary">Dedicated Garden Room Intelligence</h2>
                         <p className="text-secondary text-lg leading-relaxed">
                             Modulr Studio is the only platform purposefully built for the garden room industry.
-                            We don't just render buildings. We understand timber construction, glazing ratios, and specialist cladding systems.
+                            We combine deep AI with an understanding of real-world construction standards.
                         </p>
                     </div>
 
@@ -154,15 +130,15 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                         <div className="flex items-start gap-4">
                             <div className="mt-1 bg-accent/20 p-1.5 rounded-lg text-accent shrink-0"><Maximize size={18} /></div>
                             <div>
-                                <h4 className="text-primary font-bold">Geometry-Led Rendering</h4>
-                                <p className="text-secondary text-sm">We use your structural line drawing as the foundation. Your CAD geometry stays the master, not the AI's interpretation of it.</p>
+                                <h4 className="text-primary font-bold">CAD-Precision Foundation</h4>
+                                <p className="text-secondary text-sm">Your structural drawing is the master. We lock the AI to your specific geometry, ensuring that every pillar and window stays exactly where it was designed to be.</p>
                             </div>
                         </div>
                         <div className="flex items-start gap-4">
-                            <div className="mt-1 bg-accent/20 p-1.5 rounded-lg text-accent shrink-0"><ShieldCheck size={18} /></div>
+                            <div className="mt-1 bg-accent/20 p-1.5 rounded-lg text-accent shrink-0"><Cpu size={18} /></div>
                             <div>
-                                <h4 className="text-primary font-bold">Industry-Trained Materials</h4>
-                                <p className="text-secondary text-sm">Windows, doors, and rooflines are rendered with knowledge of real UK garden room construction standards, not generic AI texture guessing.</p>
+                                <h4 className="text-primary font-bold">Industry-Trained Specifics</h4>
+                                <p className="text-secondary text-sm">Trained on Western Red Cedar, Siberian Larch, and Anthracite Grey profiles. We render with the knowledge of materials used in real-world UK construction projects.</p>
                             </div>
                         </div>
                     </div>
