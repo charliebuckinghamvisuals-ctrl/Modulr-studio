@@ -119,9 +119,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                         <div className="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent mx-auto">
                             <Box size={24} />
                         </div>
-                        <h2 className="text-4xl font-black tracking-tight text-primary">Dedicated Garden Room Intelligence</h2>
+                        <h2 className="text-4xl font-black tracking-tight text-primary">World's First AI Render Engine for Garden Rooms & Annexes</h2>
                         <p className="text-secondary text-lg leading-relaxed">
-                            Modulr Studio is the only platform purposefully built for the garden room industry.
+                            Modulr Studio is the world's first platform purposefully built for the garden room and annexe industry.
                             We combine deep AI with an understanding of real-world construction standards.
                         </p>
                     </div>

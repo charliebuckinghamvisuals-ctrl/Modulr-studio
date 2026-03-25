@@ -20,8 +20,8 @@ export const AboutView: React.FC = () => {
                             Architectural Intelligence
                         </div>
                         <h1 className="text-5xl md:text-7xl font-black text-primary tracking-tight leading-[1.05] max-w-4xl">
-                            The Only Dedicated <br/>
-                            AI CGI Engine for <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#3B82F6]">Garden Buildings</span>
+                            The World's First Dedicated <br/>
+                            AI Render Engine for <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#3B82F6]">Garden Rooms & Annexes</span>
                         </h1>
                         <p className="text-lg md:text-xl text-secondary leading-relaxed max-w-2xl font-medium">
                             We built Modulr Studio to solve a specific problem: making high-end architectural visuals accessible, instant, and affordable for the UK's garden room and annexe specialists.
@@ -59,7 +59,7 @@ export const AboutView: React.FC = () => {
                         <div className="text-center space-y-4">
                             <h2 className="text-3xl font-extrabold text-primary tracking-tight">The AI Edge.</h2>
                             <p className="text-secondary text-base max-w-xl">
-                                We are the UK's only dedicated AI rendering engine built specifically for the outdoor building sector.
+                                We are the world's first dedicated AI render engine built specifically for the garden room and annexe sector.
                             </p>
                         </div>
 

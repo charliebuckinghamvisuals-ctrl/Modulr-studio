@@ -1,5 +1,5 @@
 # Modulr Studio: The Professional Handbook
-*The World’s First Dedicated AI Visualization Engine for Garden Rooms & Studios*
+*The World’s First Dedicated AI Render Engine for Garden Rooms & Annexes*
 
 ---
 
