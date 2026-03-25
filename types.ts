@@ -16,6 +16,7 @@ export interface MaterialConfig {
   windows: string;
   doors: string;
   decking: string;
+  orientation?: string;
 }
 
 export interface WeatherConfig {

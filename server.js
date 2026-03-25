@@ -209,9 +209,61 @@ app.post('/api/analyzeComponents', async (req, res) => {
     }
 });
 
+app.post('/api/analyzeBatchMaterials', async (req, res) => {
+    try {
+        const { base64Images } = req.body;
+        if (!base64Images || !Array.isArray(base64Images)) throw new Error("Expected array of images");
+
+        const parts = base64Images.map(img => fileToGenerativePart(img, "image/jpeg"));
+        const prompt = `
+      ROLE: Expert Architectural Analyst.
+      TASK: You are looking at ${base64Images.length} images of the same building (e.g. a garden room/studio) from different angles.
+      
+      CRITICAL INSTRUCTIONS:
+      1. Identify the spatial orientation of EACH image (e.g., "Front Elevation", "Left Side", "Right Side", "Back", "Angle").
+      2. Analyze the main exterior materials visible in EACH image individually. Building sides often have different cladding (e.g. Cedar on the front, cheap metal on the sides).
+      3. If a component (like decking or doors) is not visible in that specific angle, return "none".
+      
+      Return a JSON array where each object corresponds to an image in the exact order they were provided.
+    `;
+        parts.push({ text: prompt });
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-3.1-pro-preview', // Pro for reasoning across multiple images
+            contents: { parts },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            orientation: { type: Type.STRING },
+                            walls: { type: Type.STRING },
+                            roof: { type: Type.STRING },
+                            windows: { type: Type.STRING },
+                            doors: { type: Type.STRING },
+                            decking: { type: Type.STRING }
+                        }
+                    }
+                }
+            }
+        });
+
+        const text = response.text;
+        if (!text) throw new Error("No analysis returned");
+        const cleanText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        res.json({ result: JSON.parse(cleanText) });
+
+    } catch (error) {
+        console.error("Batch Analysis error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post('/api/renderBuilding', async (req, res) => {
     try {
-        const { base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode } = req.body;
+        const { base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation } = req.body;
         // Changed to jpeg to significantly reduce file size while maintaining quality
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
 
@@ -231,6 +283,7 @@ app.post('/api/renderBuilding', async (req, res) => {
       
       TASK:
       Render the architecture and its environment using the Nano Banana Pro engine.
+      ${orientation ? `\nCRITICAL SPATIAL CONTEXT: You are rendering the [${orientation}] elevation/view of the building. Apply the materials specifically aiming at this visible side.` : ''}
       
       GEOMETRY & CONTEXT RULES:
       - Stick STRICTLY to the geometry provided. No hallucinations.
@@ -243,6 +296,10 @@ app.post('/api/renderBuilding', async (req, res) => {
       ${buildMaterialInstruction('Windows', materials.windows)}
       ${buildMaterialInstruction('Doors', materials.doors)}
       ${buildMaterialInstruction('Decking/Ground', materials.decking)}
+
+      COLOR & LIGHTING PRECISION:
+      - PIGMENT ACCURACY: If a material color like "Black", "Charred", "Anthracite", or "Dark" is specified, ensure it is rendered as a deep, rich, non-reflective pitch-tone. DO NOT allow it to wash out into grey.
+      - CONTRAST: Use high-contrast architectural lighting. Ensure shadows are deep and blacks are absolute, providing strong definition.
 
       SCENE MODIFICATIONS:
       ${additionalPrompt || 'None'}

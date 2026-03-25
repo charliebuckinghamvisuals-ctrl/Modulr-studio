@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { AppStage, MaterialConfig, WeatherConfig, ProcessingState } from '../types';
 import { PRESET_MATERIALS, WEATHER_CONDITIONS, SEASONS } from '../constants';
-import { generateLineDrawing, analyzeComponents, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor } from '../services/geminiService';
+import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor } from '../services/geminiService';
 import { saveToHistory } from '../services/historyService';
 
 export const useAppEngine = () => {
@@ -37,6 +37,11 @@ export const useAppEngine = () => {
     const [lineEnvironmentImage, setLineEnvironmentImage] = useState<string | null>(null);
     const [finalImage, setFinalImage] = useState<string | null>(null);
     const [materialStudioImage, setMaterialStudioImage] = useState<string | null>(null);
+
+    // Batch Rendering State
+    const [batchImages, setBatchImages] = useState<string[]>([]);
+    const [batchRenders, setBatchRenders] = useState<string[]>([]);
+    const [batchMaterials, setBatchMaterials] = useState<MaterialConfig[]>([]);
 
     const [detectedDetails, setDetectedDetails] = useState<string[]>([]);
     const [selectedDetails, setSelectedDetails] = useState<string[]>([]);
@@ -77,6 +82,9 @@ export const useAppEngine = () => {
         setEditorImage(null);
         setFinalImage(null);
         setMaterialStudioImage(null);
+        setBatchImages([]);
+        setBatchRenders([]);
+        setBatchMaterials([]);
         setDetectedDetails([]);
         setSelectedDetails([]);
         setAdditionalPrompt('');
@@ -163,6 +171,48 @@ export const useAppEngine = () => {
             };
             reader.readAsDataURL(file);
             e.target.value = '';
+        }
+    };
+
+    const handleBatchImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []) as File[];
+        if (files.length === 0) return;
+
+        const selectedFiles = files.slice(0, 5);
+        setActiveStage(AppStage.RENDER_ENGINE);
+        setOriginalImage(null); // Clear single image mode
+
+        Promise.all(selectedFiles.map(file => {
+            return new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const result = event.target?.result as string;
+                    resolve(result.split(',')[1]);
+                };
+                reader.readAsDataURL(file);
+            });
+        })).then(base64Array => {
+            setBatchImages(base64Array);
+            setBatchRenders([]);
+            handleAnalyzeBatchMaterials(base64Array);
+        });
+
+        e.target.value = '';
+    };
+
+    const handleAnalyzeBatchMaterials = async (images: string[]) => {
+        setProcessing({ isLoading: true, message: 'Analyzing orientations and materials...' });
+        try {
+            const detectedBatch = await analyzeBatchMaterials(images);
+            setBatchMaterials(detectedBatch);
+            if (detectedBatch.length > 0) {
+                 setMaterials(detectedBatch[0]); // fallback base material
+            }
+        } catch (error) {
+            console.error('Batch analysis error:', error);
+            toast.error('Could not auto-detect batch materials.');
+        } finally {
+            setProcessing({ isLoading: false, message: '' });
         }
     };
 
@@ -325,6 +375,49 @@ export const useAppEngine = () => {
         }
     };
 
+    const handleBatchRender = async () => {
+        if (batchImages.length === 0) return;
+
+        setProcessing({ isLoading: true, message: 'Rendering batch sequence...' });
+        try {
+            const newRenders: string[] = [];
+            for (let i = 0; i < batchImages.length; i++) {
+                const sourceImg = batchImages[i];
+                const matConfig = batchMaterials[i] || materials;
+                
+                setProcessing({ isLoading: true, message: `Rendering angle ${i + 1} of ${batchImages.length}...` });
+                
+                const result = await renderBuilding(
+                    sourceImg, 
+                    matConfig, 
+                    additionalPrompt, 
+                    isHighQuality, 
+                    isProMode,
+                    matConfig.orientation
+                );
+                
+                newRenders.push(result);
+                setBatchRenders([...newRenders]);
+                setRenderedImage(result);
+            }
+            
+            await saveToHistory({
+                stage: AppStage.RENDER_ENGINE,
+                image: newRenders[0],
+                originalImage: batchImages[0],
+                prompt: 'Batch Render: ' + additionalPrompt,
+                settings: materials
+            });
+            window.dispatchEvent(new Event('aiarchviz-history-updated'));
+            
+            toast.success('Batch render complete!');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Batch render failed midway');
+        } finally {
+            setProcessing({ isLoading: false, message: '' });
+        }
+    };
+
     const handleEditImage = async (maskImage?: string | null) => {
         const source = originalImage;
         if (!source) return;
@@ -397,6 +490,7 @@ export const useAppEngine = () => {
     return {
         activeStage, setActiveStage,
         originalImage, setOriginalImage, setOriginalImageForStage, lineImage, setLineImage, lineSourceImage, setLineSourceImage, renderedImage, setRenderedImage, editorImage, setEditorImage, lineEnvironmentImage, setLineEnvironmentImage, finalImage, setFinalImage, materialStudioImage, setMaterialStudioImage,
+        batchImages, setBatchImages, batchRenders, setBatchRenders, batchMaterials, setBatchMaterials,
         detectedDetails, setDetectedDetails, selectedDetails, setSelectedDetails, toggleDetailSelection,
         processing,
         additionalPrompt, setAdditionalPrompt,
@@ -410,10 +504,10 @@ export const useAppEngine = () => {
         materials, setMaterials,
         weather, setWeather,
         fileInputRef, materialInputRef,
-        handleReset, handleImageUpload, handleDownload,
+        handleReset, handleImageUpload, handleBatchImageUpload, handleDownload,
         refinementPrompt, setRefinementPrompt,
         downloadFormat, setDownloadFormat,
-        handleGenerateLineDrawing, handleAnalyzeMaterials, handleRender, handleRefineRender, handleEditImage, handleWeather, handleMaterialStudio, handleAnalyzeForEditor, handleAnalyzeForMaterialStudio,
+        handleGenerateLineDrawing, handleAnalyzeMaterials, handleRender, handleBatchRender, handleRefineRender, handleEditImage, handleWeather, handleMaterialStudio, handleAnalyzeForEditor, handleAnalyzeForMaterialStudio,
         getRenderUrl
     };
 };

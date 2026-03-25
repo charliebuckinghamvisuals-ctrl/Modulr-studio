@@ -21,6 +21,10 @@ interface WorkspaceViewProps {
     customEmptyState?: React.ReactNode;
     extraFooter?: React.ReactNode;
     historyFooter?: React.ReactNode;
+    batchImages?: string[];
+    batchRenders?: string[];
+    selectedBatchIndex?: number;
+    onBatchSelect?: (index: number) => void;
 }
 
 export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
@@ -39,7 +43,11 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     customViewer,
     customEmptyState,
     extraFooter,
-    historyFooter
+    historyFooter,
+    batchImages,
+    batchRenders,
+    selectedBatchIndex = 0,
+    onBatchSelect
 }) => {
 
     const getImageUrl = (img: string | null) => {
@@ -160,6 +168,35 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                         </div>
                     )}
                 </div>
+
+                {/* Batch Filmstrip Gallery */}
+                {batchImages && batchImages.length > 1 && (
+                    <div className="w-full max-w-5xl mx-auto flex gap-3 overflow-x-auto pb-2 custom-scrollbar mt-2">
+                        {batchImages.map((bImage, idx) => {
+                            const isSelected = selectedBatchIndex === idx;
+                            const hasRender = batchRenders && batchRenders[idx];
+                            const thumbUrl = getImageUrl(hasRender ? batchRenders[idx] : bImage);
+                            
+                            return (
+                                <div 
+                                    key={idx} 
+                                    onClick={() => onBatchSelect?.(idx)}
+                                    className={`relative flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-300 ${isSelected ? 'border-accent shadow-[0_0_15px_rgba(139,92,246,0.3)]' : 'border-border opacity-60 hover:opacity-100 hover:border-accent/50'}`}
+                                >
+                                    <img src={thumbUrl} className="w-full h-full object-cover" alt={`Angle ${idx + 1}`} />
+                                    {hasRender && (
+                                        <div className="absolute top-1 right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background flex items-center justify-center shadow-lg">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                        </div>
+                                    )}
+                                    <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] font-bold text-center py-1 backdrop-blur-sm">
+                                        Angle {idx + 1}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
 
                 {extraFooter && (
                     <div className="w-full max-w-5xl mx-auto">

@@ -117,6 +117,31 @@ export const analyzeComponents = async (base64Image: string): Promise<MaterialCo
 };
 
 /**
+ * Analyzes multiple images simultaneously to detect orientation and side-specific materials.
+ */
+export const analyzeBatchMaterials = async (base64Images: string[]): Promise<Array<MaterialConfig & { orientation?: string }>> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/analyzeBatchMaterials`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64Images })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.result;
+
+  } catch (error) {
+    console.error("Batch Analysis error:", error);
+    throw error;
+  }
+};
+
+/**
  * Renders the building with specific materials.
  */
 export const renderBuilding = async (
@@ -124,7 +149,8 @@ export const renderBuilding = async (
   materials: MaterialConfig,
   additionalPrompt?: string,
   isHighQuality: boolean = false,
-  isProMode: boolean = false
+  isProMode: boolean = false,
+  orientation?: string
 ): Promise<string> => {
   try {
     const { ratio } = await getImageDimensions(base64Image);
@@ -132,7 +158,7 @@ export const renderBuilding = async (
     const response = await fetch(`${API_BASE_URL}/renderBuilding`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode })
+      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation })
     });
 
     if (!response.ok) {

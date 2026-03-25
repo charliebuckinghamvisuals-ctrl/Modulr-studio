@@ -23,6 +23,7 @@ const App: React.FC = () => {
     const engine = useAppEngine();
     const [maskImage, setMaskImage] = React.useState<string | null>(null);
     const [isAppLoaded, setIsAppLoaded] = React.useState(false);
+    const [selectedBatchIndex, setSelectedBatchIndex] = React.useState(0);
     const lineEnvInputRef = React.useRef<HTMLInputElement>(null);
 
     const handleLoadHistory = (item: HistoryItem) => {
@@ -98,11 +99,11 @@ const App: React.FC = () => {
             </div>
 
             <button
-                onClick={() => engine.fileInputRef.current?.click()}
+                onClick={() => document.getElementById('batchUploadInput')?.click()}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl glass-panel text-primary hover:text-accent border-border hover:border-accent/40 bg-surface/30 transition-all duration-300 font-semibold text-sm shadow-sm"
             >
                 <Upload size={16} />
-                {engine.originalImage ? 'Change Reference Image' : 'Upload Reference Image'}
+                {engine.batchImages.length > 0 ? 'Upload New Batch' : (engine.originalImage ? 'Change Reference Image' : 'Upload Batch / Reference Images')}
             </button>
 
             <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
@@ -124,6 +125,19 @@ const App: React.FC = () => {
 
             <LightingDirectionPicker value={engine.lightingDirection} onChange={engine.setLightingDirection} />
 
+            {engine.batchMaterials.length > 0 && (
+                <div className="space-y-3 p-3 bg-surface/50 rounded-xl border border-border">
+                    <p className="text-xs font-bold text-white mb-2 tracking-wide">AI Geometry & Mapping detected</p>
+                    {engine.batchMaterials.map((mat, i) => (
+                        <div key={i} className="text-[11px] flex justify-between items-center bg-background/50 p-2 rounded-lg border border-border/50">
+                            <span className="font-bold text-accent px-2 py-0.5 bg-accent/10 rounded">{mat.orientation || `Angle ${i+1}`}</span> 
+                            <span className="text-secondary truncate ml-2 text-right">{mat.walls || 'Auto'} / {mat.roof || 'Auto'}</span>
+                        </div>
+                    ))}
+                    <p className="text-[10px] text-secondary mt-1 leading-relaxed">These materials will be mapped dynamically per angle during batch rendering. Global overrides above will act as universal fallbacks.</p>
+                </div>
+            )}
+
             <div className="space-y-3 pt-6 border-t border-border">
                 <label className="text-xs font-bold uppercase tracking-widest text-secondary flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
@@ -137,9 +151,15 @@ const App: React.FC = () => {
                 />
             </div>
             <div className="mt-auto pt-6">
-                <Button className="w-full" onClick={engine.handleRender} icon={<Wand2 size={16} />} disabled={!engine.originalImage}>
-                    Render Scene
-                </Button>
+                {engine.batchImages.length > 0 ? (
+                    <Button className="w-full" onClick={engine.handleBatchRender} icon={<Wand2 size={16} />} disabled={engine.processing.isLoading}>
+                        Render Batch Sequence ({engine.batchImages.length})
+                    </Button>
+                ) : (
+                    <Button className="w-full" onClick={engine.handleRender} icon={<Wand2 size={16} />} disabled={!engine.originalImage}>
+                        Render Scene
+                    </Button>
+                )}
             </div>
         </>
     );
@@ -612,17 +632,21 @@ const App: React.FC = () => {
                     title="Render Engine"
                     subtitle="Configure exterior materials and lighting."
                     controls={renderEngineControls}
-                    primaryImg={engine.getRenderUrl(engine.renderedImage)}
-                    secondaryImg={engine.getRenderUrl(engine.originalImage)}
+                    primaryImg={engine.batchRenders.length > 0 ? engine.getRenderUrl(engine.batchRenders[selectedBatchIndex]) : engine.getRenderUrl(engine.renderedImage)}
+                    secondaryImg={engine.batchImages.length > 0 ? engine.getRenderUrl(engine.batchImages[selectedBatchIndex]) : engine.getRenderUrl(engine.originalImage)}
+                    batchImages={engine.batchImages}
+                    batchRenders={engine.batchRenders}
+                    selectedBatchIndex={selectedBatchIndex}
+                    onBatchSelect={setSelectedBatchIndex}
                     placeholder="Ready to Render"
                     onDownload={engine.handleDownload}
                     onFormatChange={engine.setDownloadFormat}
                     downloadFormat={engine.downloadFormat}
-                    onInputClick={() => engine.fileInputRef.current?.click()}
+                    onInputClick={() => document.getElementById('batchUploadInput')?.click()}
                     isLoading={engine.activeStage === AppStage.RENDER_ENGINE && engine.processing.isLoading}
                     loadingMessage={engine.processing.message}
-                    customEmptyState={engine.activeStage === AppStage.RENDER_ENGINE && !engine.originalImage ? renderEngineEmptyState : undefined}
-                    extraFooter={engine.renderedImage ? (
+                    customEmptyState={engine.activeStage === AppStage.RENDER_ENGINE && !engine.originalImage && engine.batchImages.length === 0 ? renderEngineEmptyState : undefined}
+                    extraFooter={engine.renderedImage || engine.batchRenders.length > 0 ? (
                         <>
                             {refinementBox}
                             {materialStudioBox}
@@ -689,6 +713,14 @@ const App: React.FC = () => {
                 className="hidden"
                 accept="image/*"
                 onChange={(e) => engine.handleImageUpload(e, AppStage.MATERIAL_STUDIO)}
+            />
+            <input
+                type="file"
+                id="batchUploadInput"
+                className="hidden"
+                multiple
+                accept="image/*"
+                onChange={engine.handleBatchImageUpload}
             />
 
         </AppShell>
