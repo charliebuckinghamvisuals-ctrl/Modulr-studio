@@ -49,7 +49,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
 
             <div className="w-full md:w-80 p-6 flex flex-col gap-6 relative z-10 overflow-y-auto">
                 <div className="space-y-4">
-                    <h2 className="text-[6vw] md:text-xl lg:text-2xl text-primary whitespace-nowrap font-bold">Material Studio</h2>
+                    <h2 className="text-[6vw] md:text-xl lg:text-2xl whitespace-nowrap font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#3B82F6] w-fit inline-block">Material Studio</h2>
                     <p className="text-secondary text-lg leading-relaxed">
                         Architectural material detail sheet generator. The engine compiles a 4K 2x2 presentation grid based on your specific material focal points.
                     </p>

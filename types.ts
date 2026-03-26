@@ -7,7 +7,8 @@ export enum AppStage {
   WEATHER_LAB = 'weather_lab',
   MATERIAL_STUDIO = 'material_studio',
   PRICING = 'pricing',
-  ABOUT = 'about'
+  ABOUT = 'about',
+  GUIDE = 'guide'
 }
 
 export interface MaterialConfig {

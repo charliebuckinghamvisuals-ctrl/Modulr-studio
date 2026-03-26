@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Moon, Sun, Monitor, Image as ImageIcon, Sparkles, Wand2, Layers, Download, CheckCircle2, History, AlertCircle, Trash2, Maximize2, X, Zap, Hexagon, Grid, Palette, Info, PoundSterling } from 'lucide-react';
+import { Moon, Sun, Monitor, Image as ImageIcon, Sparkles, Wand2, Layers, Download, CheckCircle2, History, AlertCircle, Trash2, Maximize2, X, Zap, Hexagon, Grid, Palette, Info, PoundSterling, BookOpen } from 'lucide-react';
 import { AppStage } from '../types';
 
 interface AppShellProps {
@@ -19,10 +19,11 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
   }, []);
 
   const navItems = [
-    { id: AppStage.MATERIAL_STUDIO, icon: <Grid size={16} />, label: 'Material Studio' },
     { id: AppStage.LINE_CONVERT, icon: <Layers size={16} />, label: 'Line Converter' },
     { id: AppStage.RENDER_ENGINE, icon: <ImageIcon size={16} />, label: 'Render Engine' },
     { id: AppStage.EDITOR, icon: <Palette size={16} />, label: 'Refinement Studio' },
+    { id: AppStage.MATERIAL_STUDIO, icon: <Grid size={16} />, label: 'Material Studio' },
+    { id: AppStage.GUIDE, icon: <BookOpen size={16} />, label: 'Guide' },
     { id: AppStage.ABOUT, icon: <Info size={16} />, label: 'About' },
   ];
 
@@ -67,10 +68,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           {headerActions}
           <button
             onClick={() => onNavigate(AppStage.PRICING)}
-            className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-accent/10 to-accent/20 border border-accent/20 hover:border-accent hover:shadow-[0_0_15px_rgba(139,92,246,0.3)] transition-all cursor-pointer"
+            className="hidden lg:flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-accent/10 to-accent/20 border border-accent/20 hover:border-accent hover:shadow-[0_0_15px_rgba(139,92,246,0.3)] transition-all cursor-pointer min-w-[120px]"
           >
-            <PoundSterling size={14} className="text-accent" />
-            <span className="text-xs font-bold tracking-widest text-primary uppercase">Pricing</span>
+            <span className="text-[11px] font-bold tracking-widest text-primary uppercase mt-[2px]">Pricing</span>
           </button>
 
           {onReset && activeStage !== AppStage.HOME && activeStage !== AppStage.PRICING && activeStage !== AppStage.ABOUT && (

@@ -18,6 +18,7 @@ import { MaterialStudioView } from './components/views/MaterialStudioView';
 import { WorkspaceView } from './components/views/WorkspaceView';
 import { PricingView } from './components/views/PricingView';
 import { AboutView } from './components/views/AboutView';
+import { GuideView } from './components/views/GuideView';
 
 const App: React.FC = () => {
     const engine = useAppEngine();
@@ -600,6 +601,10 @@ const App: React.FC = () => {
 
             {engine.activeStage === AppStage.ABOUT && (
                 <AboutView />
+            )}
+
+            {engine.activeStage === AppStage.GUIDE && (
+                <GuideView />
             )}
 
             {engine.activeStage === AppStage.HOME && (
