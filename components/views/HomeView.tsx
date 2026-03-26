@@ -26,7 +26,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
 
                     <div className="flex flex-col items-center mb-8 w-full px-4">
                         <img src="/Logo.png" alt="Modulr Studio Logo" className="h-[24rem] md:h-[32rem] w-auto object-contain drop-shadow-2xl -mt-28 -mb-28 md:-mt-36 md:-mb-36" />
-                        <h1 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-transparent bg-clip-text bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#3B82F6] font-black block max-w-4xl mx-auto leading-tight mt-6 text-center w-fit inline-block">
+                        <h1 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080] font-black block max-w-4xl mx-auto leading-tight mt-6 text-center w-fit inline-block">
                             The pinnacle of AI exterior rendering for garden rooms and annexes.
                         </h1>
                     </div>
@@ -49,7 +49,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                 {/* 2. Before/After Demo Slider Section */}
                 <div className="w-full space-y-8">
                     <div className="text-center space-y-4 max-w-[100vw] overflow-x-hidden md:max-w-4xl mx-auto px-4">
-                        <h2 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-transparent bg-clip-text bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#3B82F6] font-black whitespace-nowrap w-fit inline-block">From Plan to Perfection</h2>
+                        <h2 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080] font-black whitespace-nowrap w-fit inline-block">From Plan to Perfection</h2>
                         <p className="text-secondary text-lg">Swipe to see how our engine transforms technical geometry into stunning 4K visualizations.</p>
                     </div>
                     <div className="w-[calc(100vw-0px)] relative left-1/2 -translate-x-1/2 rounded-none overflow-hidden border-y border-border bg-surface/10 backdrop-blur-md shadow-2xl relative group">
@@ -70,9 +70,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
 
                     <div className="relative z-10 space-y-16">
                         <div className="max-w-3xl">
-                            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#3B82F6] leading-tight mb-6 w-fit inline-block">
-                                Why use Modulr Studio <br />
-                                <span className="text-accent">Instead of General AI?</span>
+                            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080] leading-tight mb-6 w-fit inline-block">
+                                Why use Modulr&nbsp;Studio <br />
+                                Instead of General AI?
                             </h2>
                             <p className="text-slate-600 text-xl leading-relaxed">
                                 Generic AI models like ChatGPT or Gemini are built for art, not architecture. They "hallucinate" details that don't belong, often compromising the structural integrity of your vision.
@@ -119,7 +119,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                         <div className="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent mx-auto">
                             <Box size={24} />
                         </div>
-                        <h2 className="text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#3B82F6] w-fit inline-block">World's First AI Render Engine for Garden Rooms & Annexes</h2>
+                        <h2 className="text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080] w-fit inline-block">World's First AI Render Engine for Garden Rooms & Annexes</h2>
                         <p className="text-secondary text-lg leading-relaxed">
                             Modulr Studio is the world's first platform purposefully built for the garden room and annexe industry.
                             We combine deep AI with an understanding of real-world construction standards.
@@ -147,7 +147,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                 {/* 5. Full Features Grid */}
                 <div className="w-full space-y-12 pb-24">
                     <div className="text-center">
-                        <h2 className="text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#3B82F6] w-fit inline-block mb-4">Purpose-Built for Garden Rooms</h2>
+                        <h2 className="text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080] w-fit inline-block mb-4">Purpose-Built for Garden Rooms</h2>
                         <p className="text-secondary max-w-2xl mx-auto">Every feature is designed around the specific needs of the UK garden room and annexe industry, not adapted from generic tools.</p>
                     </div>
 

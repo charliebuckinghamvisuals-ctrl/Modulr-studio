@@ -21,7 +21,7 @@ export const AboutView: React.FC = () => {
                         </div>
                         <h1 className="text-5xl md:text-7xl font-black text-primary tracking-tight leading-[1.05] max-w-4xl">
                             The World's First Dedicated <br/>
-                            AI Render Engine for <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#3B82F6]">Garden Rooms & Annexes</span>
+                            AI Render Engine for <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080]">Garden Rooms & Annexes</span>
                         </h1>
                         <p className="text-lg md:text-xl text-secondary leading-relaxed max-w-2xl font-medium">
                             We built Modulr Studio to solve a specific problem: making high-end architectural visuals accessible, instant, and affordable for the UK's garden room and annexe specialists.
@@ -115,8 +115,8 @@ export const AboutView: React.FC = () => {
                                             </tr>
                                             <tr className="hover:bg-accent/5 transition-colors group">
                                                 <td className="p-6 md:p-8">
-                                                    <span className="text-sm font-bold text-primary block uppercase tracking-tight">Turnaround Time</span>
-                                                    <span className="text-[10px] text-secondary uppercase tracking-widest font-medium">Time to client delivery</span>
+                                                    <span className="text-sm font-bold text-primary block uppercase tracking-tight">Generation Speed</span>
+                                                    <span className="text-[10px] text-secondary uppercase tracking-widest font-medium">Time to produce visual</span>
                                                 </td>
                                                 <td className="p-6 md:p-8 text-sm font-medium text-secondary">2 - 5 Days</td>
                                                 <td className="p-6 md:p-8 text-sm font-medium text-accent">&lt; 30 Seconds</td>

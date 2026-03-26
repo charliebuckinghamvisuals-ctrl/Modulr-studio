@@ -19,7 +19,7 @@ export const GuideView: React.FC = () => {
                         </div>
                         <h1 className="text-4xl md:text-6xl font-black text-primary tracking-tight leading-tight">
                             Get the Best Results from <br/>
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#3B82F6]">Modulr Studio</span>
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080]">Modulr Studio</span>
                         </h1>
                         <p className="text-lg text-secondary max-w-2xl mx-auto font-medium">
                             Whether you're starting from a hand-drawn sketch or a fully detailed SketchUp model, here is how to achieve studio-level 4K renders.

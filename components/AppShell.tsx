@@ -28,7 +28,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
   ];
 
   return (
-    <div className="min-h-screen bg-background text-primary flex flex-col font-sans selection:bg-accent selection:text-white">
+    <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#ffffff] to-[#e2e8f0] text-primary flex flex-col font-sans selection:bg-accent selection:text-white">
 
       {/* Premium Header */}
       <header className="h-24 border-b border-border flex items-center justify-between px-8 bg-surface/40 backdrop-blur-2xl sticky top-0 z-50 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
