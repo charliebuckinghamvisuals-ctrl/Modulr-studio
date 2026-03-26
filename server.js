@@ -165,14 +165,22 @@ app.post('/api/analyzeComponents', async (req, res) => {
       CRITICAL INSTRUCTIONS:
       1. Determine if this is a photograph/render or a plain black-and-white line drawing.
       2. WALLS VS CLADDING: Identify the main wall material. If it is brick, explicitly say "Brick work" or the specific brick type (e.g. "Red brick"). Only call it "Cladding" if it is timber/composite cladding.
-      3. DECKING/GROUND: If there is no visible decking or paved patio, return 'none' for this field.
+      3. DECKING/GROUND: ONLY return a value if there is a clearly visible raised deck, paved patio, or path directly attached to or in front of the building. If the ground is simply grass or natural ground, return 'none'.
       4. IF IT IS A LINE DRAWING (No base colors, just black lines on white):
          - Deduce the expected materials based on architectural patterns.
          - Horizontal lines on walls: "Timber Cladding" or "Weatherboard".
          - Stippled/Clean surfaces: "White Render" or "Brick work".
          - Grid patterns on roofs: "Tiles".
-      5. DO NOT just say "Door". Propose material/style (e.g., "Anthracite aluminum framed sliding doors").
-      6. IF A COMPONENT IS MISSING: Return 'none'.
+      5. DOORS - CRITICAL: Do NOT just say "Door". You MUST describe:
+         a) The material and colour (e.g. "Anthracite grey aluminium").
+         b) The EXACT glazing zone: Is the glass on the TOP HALF only, the FULL height, or a narrow side panel?
+            - If top half has glass and bottom half is solid panel: say "top-half glazed, bottom solid panel".
+            - If fully glazed: say "full-height glazed".
+            - If only a narrow side strip: say "narrow side-lite glazed".
+         c) The door style (e.g. "single swing door", "composite door", "bifold").
+         Example output: "Anthracite grey aluminium composite door, top-half glazed, bottom solid panel".
+      6. WINDOWS: Describe frame colour, glazing type, and approximate position on the building.
+      7. IF A COMPONENT IS MISSING or not visible: Return 'none'.
     `;
 
         const response = await ai.models.generateContent({
@@ -222,7 +230,13 @@ app.post('/api/analyzeBatchMaterials', async (req, res) => {
       CRITICAL INSTRUCTIONS:
       1. Identify the spatial orientation of EACH image (e.g., "Front Elevation", "Left Side", "Right Side", "Back", "Angle").
       2. Analyze the main exterior materials visible in EACH image individually. Building sides often have different cladding (e.g. Cedar on the front, cheap metal on the sides).
-      3. If a component (like decking or doors) is not visible in that specific angle, return "none".
+      3. DECKING/GROUND: ONLY return a value if a clearly visible raised deck, paved patio, or path is directly in front of the building. If the ground is simply grass, return 'none'.
+      4. DOORS - CRITICAL: Describe the EXACT glazing zone on every visible door:
+         - If glass is ONLY on the top half and bottom is solid: write "top-half glazed, bottom solid panel".
+         - If the door is fully glazed top to bottom: write "full-height glazed".
+         - Always include: material, colour, door style and the glazing zone.
+         - Example: "Anthracite grey aluminium composite door, top-half glazed, bottom solid panel".
+      5. If a component is not visible in that specific angle, return "none".
       
       Return a JSON array where each object corresponds to an image in the exact order they were provided.
     `;
@@ -274,6 +288,8 @@ app.post('/api/renderBuilding', async (req, res) => {
             return `- ${label}: ${value}`;
         };
 
+        const deckingValue = materials.decking && materials.decking.trim().toLowerCase() !== 'none' ? materials.decking : null;
+
         const prompt = `
       RENDER ENGINE SETTINGS:
       - Engine: Nano Banana Pro (V3.2).
@@ -285,21 +301,33 @@ app.post('/api/renderBuilding', async (req, res) => {
       Render the architecture and its environment using the Nano Banana Pro engine.
       ${orientation ? `\nCRITICAL SPATIAL CONTEXT: You are rendering the [${orientation}] elevation/view of the building. Apply the materials specifically aiming at this visible side.` : ''}
       
-      GEOMETRY & CONTEXT RULES:
-      - Stick STRICTLY to the geometry provided. No hallucinations.
-      - PRESERVE THE ENVIRONMENT: Render the surrounding landscape, garden, fence, trees, and sky. 
-      - IF INPUT IS A COLORED RENDER: Treat this as an Image-to-Image / Upscale / Enhance task. Keep 95% of the original colors, lighting, and layout. 
+      GEOMETRY & CONTEXT RULES — CRITICAL:
+      - STRICT GEOMETRY LOCK: You MUST reproduce the EXACT structure shown in the source image. Do NOT add, remove, or modify any architectural elements.
+      - NO HALLUCINATIONS: Do NOT invent new structures. Do NOT add decking, patios, steps, porches, or any raised platforms unless they are explicitly visible in the source geometry.
+      - DOORS: Reproduce the door EXACTLY as shown — pay close attention to where the glass panels are positioned (top half, full height, etc.). DO NOT move or extend glazing that isn't in the source image.
+      - PRESERVE THE ENVIRONMENT: Render the surrounding landscape, garden, fence, trees, and sky exactly as shown in the source.
+      - IF INPUT IS A COLORED RENDER: Treat this as an Image-to-Image / Upscale / Enhance task. Keep 95% of the original colours, lighting, and layout.
 
       MATERIAL ASSIGNMENTS:
       ${buildMaterialInstruction('Walls/Main Facade', materials.walls)}
       ${buildMaterialInstruction('Roof', materials.roof)}
       ${buildMaterialInstruction('Windows', materials.windows)}
       ${buildMaterialInstruction('Doors', materials.doors)}
-      ${buildMaterialInstruction('Decking/Ground', materials.decking)}
+      ${deckingValue
+        ? `- Decking/Ground: ${deckingValue}`
+        : `- Decking/Ground: NONE. The ground in front of and around the building is NATURAL GRASS. DO NOT render any decking boards, patio slabs, raised platforms, or paved areas. The transition from building to ground must be grass only.`
+      }
+
+      DOOR ACCURACY RULE (CRITICAL):
+      The door description specifies the EXACT glazing zone. You MUST render ONLY that zone as glass:
+      - If "top-half glazed" → ONLY the upper portion of the door has glass. The lower panel is SOLID.
+      - If "full-height glazed" → The entire door height is glass.
+      - If "narrow side-lite" → Only a thin vertical strip beside the door is glass.
+      DO NOT extend or relocate the glazing zone beyond what is described.
 
       COLOR & LIGHTING PRECISION:
-      - PIGMENT ACCURACY: If a material color like "Black", "Charred", "Anthracite", or "Dark" is specified, ensure it is rendered as a deep, rich, non-reflective pitch-tone. DO NOT allow it to wash out into grey.
-      - CONTRAST: Use high-contrast architectural lighting. Ensure shadows are deep and blacks are absolute, providing strong definition.
+      - PIGMENT ACCURACY: If a material colour like "Black", "Charred", "Anthracite", or "Dark" is specified, render it as a deep, rich, non-reflective pitch-tone. DO NOT wash out to grey.
+      - CONTRAST: Use high-contrast architectural lighting. Ensure shadows are deep and blacks are absolute.
 
       SCENE MODIFICATIONS:
       ${additionalPrompt || 'None'}
