@@ -463,8 +463,8 @@ const App: React.FC = () => {
                     <ImageIcon className="text-blue-400 group-hover:text-white transition-colors" size={24} />
                 </div>
                 <div className="relative z-10">
-                    <h3 className="text-primary font-bold text-lg mb-2">Upload Previous Render</h3>
-                    <p className="text-secondary text-sm leading-relaxed">Extract and enhance materials from an existing low-quality render.</p>
+                    <h3 className="text-primary font-bold text-lg mb-2">Pre-Added Materials (SketchUp)</h3>
+                    <p className="text-secondary text-sm leading-relaxed">Upload a basic 3D model. AI auto-detects your materials for a 4K render.</p>
                 </div>
             </div>
         </div>
