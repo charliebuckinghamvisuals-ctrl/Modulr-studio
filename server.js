@@ -277,7 +277,7 @@ app.post('/api/analyzeBatchMaterials', async (req, res) => {
 
 app.post('/api/renderBuilding', async (req, res) => {
     try {
-        const { base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation } = req.body;
+        const { base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode } = req.body;
         // Changed to jpeg to significantly reduce file size while maintaining quality
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
 
@@ -290,7 +290,47 @@ app.post('/api/renderBuilding', async (req, res) => {
 
         const deckingValue = materials.decking && materials.decking.trim().toLowerCase() !== 'none' ? materials.decking : null;
 
-        const prompt = `
+        // SketchUp mode: pixel-faithful enhance only — no redrawing, no geometry inference
+        const sketchUpPrompt = `
+      RENDER ENGINE: Nano Banana Pro (V3.2) — ENHANCE / UPSCALE MODE ONLY.
+      
+      ABSOLUTE CRITICAL RULE — THIS IS NOT A RE-RENDER:
+      The input image is a coloured 3D model screenshot (SketchUp or similar) with pre-applied materials.
+      Your ONLY task is to ENHANCE and UPSCALE it to photorealistic quality.
+      YOU MUST NOT redraw, re-compose, extend, crop, or hallucinate ANY part of the scene.
+      
+      GEOMETRY LOCK — NON-NEGOTIABLE:
+      - Every wall, roof plane, window, door, and structural edge in the output MUST match the input PIXEL-FOR-PIXEL in position, angle, and proportion.
+      - Do NOT extend the building beyond its visible edges in the source image.
+      - Do NOT add, remove, or move anything. Not a tree. Not a blade of grass. Not a shadow. Nothing.
+      - If the building appears to end or be cropped at the edge of the frame, keep it ending there. Do NOT continue or complete the building.
+      - The composition (camera angle, crop, framing) MUST be 100% identical to the input.
+      
+      ENHANCEMENT TASK:
+      - Apply photorealistic micro-textures and physically based rendering (PBR) to the materials already visible in the source.
+      - Enhance lighting to be natural and architecturally accurate — crisp shadows, accurate reflections.
+      - DO NOT change any material colours. DO NOT swap any materials. Preserve every colour and finish exactly.
+      - Enhance the surrounding environment (sky, grass, trees) to photorealistic quality without moving or adding any elements.
+      
+      MATERIAL ASSIGNMENTS (apply ONLY if materials provided below differ from their detected state in the image — otherwise preserve):
+      ${buildMaterialInstruction('Walls/Main Facade', materials.walls)}
+      ${buildMaterialInstruction('Roof', materials.roof)}
+      ${buildMaterialInstruction('Windows', materials.windows)}
+      ${buildMaterialInstruction('Doors', materials.doors)}
+      ${deckingValue
+        ? `- Decking/Ground: Apply photorealistic texture to the existing ${deckingValue} shown in the source.`
+        : `- Decking/Ground: Preserve exactly as shown in the source image.`
+      }
+      
+      SCENE MODIFICATIONS (apply subtly without altering geometry):
+      ${additionalPrompt || 'None'}
+      
+      FINAL OUTPUT REQUIREMENT:
+      The result must look like the exact same photo taken with a DSLR camera, with all geometry in exactly the same position as the input.
+      CRITICAL: Output resolution 3840 x 2160 pixels (4K UHD).
+    `;
+
+        const standardPrompt = `
       RENDER ENGINE SETTINGS:
       - Engine: Nano Banana Pro (V3.2).
       - Target: 8k-UHD Photograph-Quality Architectural Visualization.
@@ -338,6 +378,8 @@ app.post('/api/renderBuilding', async (req, res) => {
       CRITICAL: Set the output resolution strictly to 3840 x 2160 pixels (4K UHD). Lock the render to these exact dimensions.
     `;
 
+        const prompt = isSketchUpMode ? sketchUpPrompt : standardPrompt;
+
         const response = await ai.models.generateContent({
             model: isProMode ? 'gemini-3-pro-image-preview' : 'gemini-3.1-flash-image-preview',
             contents: {
@@ -349,7 +391,7 @@ app.post('/api/renderBuilding', async (req, res) => {
             config: {
                 outputMimeType: "image/jpeg",
                 imageConfig: {
-                    aspectRatio: isHighQuality ? "16:9" : ratio,
+                    aspectRatio: (isHighQuality && !isSketchUpMode) ? "16:9" : ratio,
                     imageSize: isHighQuality ? "4K" : "1K"
                 },
                 temperature: 0.2

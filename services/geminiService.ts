@@ -150,7 +150,8 @@ export const renderBuilding = async (
   additionalPrompt?: string,
   isHighQuality: boolean = false,
   isProMode: boolean = false,
-  orientation?: string
+  orientation?: string,
+  isSketchUpMode: boolean = false
 ): Promise<string> => {
   try {
     const { ratio } = await getImageDimensions(base64Image);
@@ -158,7 +159,7 @@ export const renderBuilding = async (
     const response = await fetch(`${API_BASE_URL}/renderBuilding`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation })
+      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode })
     });
 
     if (!response.ok) {

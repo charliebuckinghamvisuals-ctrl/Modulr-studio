@@ -62,8 +62,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
         if (isLoading) {
             return (
                 <div className="w-full h-full min-h-[500px] max-h-[85vh] absolute inset-0 flex flex-col items-center justify-center bg-white z-50">
-                    <Loader2 className="w-10 h-10 animate-spin text-black mb-4 mx-auto" />
-                    <p className="text-black font-medium text-lg tracking-wide text-center mx-auto">{loadingMessage}</p>
+                    <Loader2 className="w-10 h-10 animate-spin text-accent mb-4 mx-auto" />
+                    <p className="text-accent font-medium text-lg tracking-wide text-center mx-auto">{loadingMessage}</p>
                 </div>
             );
         }
@@ -113,14 +113,14 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
 
         return (
             <div
-                className="w-full h-full absolute inset-0 flex flex-col items-center justify-center cursor-pointer group hover:bg-accent/5 transition-colors duration-300"
+                className="w-full h-full absolute inset-0 flex flex-col items-center justify-center cursor-pointer group hover:bg-accent/5 transition-colors duration-300 canvas-grid"
                 onClick={onInputClick}
             >
                 <div className="w-20 h-20 bg-background rounded-full flex items-center justify-center mb-6 shadow-2xl group-hover:scale-110 group-hover:shadow-[0_0_30px_rgba(139,92,246,0.3)] transition-all duration-300 border border-border group-hover:border-accent/30 relative">
                     <div className="absolute inset-0 rounded-full bg-accent/20 blur-xl group-hover:opacity-100 opacity-0 transition-opacity"></div>
                     <Upload className="text-secondary group-hover:text-accent relative z-10 transition-colors" size={28} />
                 </div>
-                <p className="text-primary font-semibold text-lg mb-1 tracking-tight text-center">Drop your drawing here</p>
+                <p className="text-accent font-semibold text-lg mb-1 tracking-tight text-center">Drop your drawing here</p>
                 <p className="text-secondary text-sm text-center">Or click to browse files</p>
             </div>
         );
@@ -132,10 +132,10 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
             {/* Ambient Lighting for Workspace */}
             <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-accent/10 rounded-full blur-[100px] pointer-events-none"></div>
 
-            <div className="w-full md:w-80 p-6 flex flex-col gap-6 relative z-10 overflow-y-auto">
+            <div className="w-full md:w-80 flex flex-col gap-6 relative z-10 p-6 m-4 md:m-4 bg-white/95 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-y-auto border border-white">
                 <div className="space-y-4">
-                    <h2 className="text-[6vw] md:text-xl lg:text-2xl whitespace-nowrap font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080] w-fit inline-block">{title}</h2>
-                    <p className="text-secondary text-lg leading-relaxed">{subtitle}</p>
+                    <h2 className="text-[6vw] md:text-xl lg:text-2xl font-bold text-accent w-fit inline-block">{title}</h2>
+                    <p className="text-slate-600 text-sm leading-relaxed">{subtitle}</p>
                 </div>
                 {controls}
             </div>

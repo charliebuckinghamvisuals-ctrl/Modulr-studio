@@ -9,7 +9,7 @@ export const PricingView: React.FC = () => {
 
             {/* Ambient Background Effects */}
             <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse-slow"></div>
-            <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[150px] pointer-events-none -z-10"></div>
+            <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[150px] pointer-events-none -z-10"></div>
 
             <div className="max-w-7xl mx-auto w-full flex flex-col items-center relative z-10">
 
@@ -20,7 +20,7 @@ export const PricingView: React.FC = () => {
                         <span className="text-sm font-semibold tracking-wide text-primary">Simple, transparent pricing</span>
                     </div>
 
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080] mb-6 drop-shadow-sm pb-2">
+                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-accent mb-6 drop-shadow-sm pb-2">
                         Professional rendering,<br />scaled to your studio.
                     </h1>
 
@@ -44,7 +44,7 @@ export const PricingView: React.FC = () => {
                             <button
                                 onClick={() => setBillingCycle('yearly')}
                                 className={`px-6 py-2 rounded-xl text-sm font-bold transition-all duration-300 relative group ${billingCycle === 'yearly'
-                                    ? 'bg-accent shadow-[0_0_20px_rgba(139,92,246,0.5)] text-white transform scale-105'
+                                    ? 'bg-accent shadow-[0_0_20px_rgba(64,90,86,0.5)] text-white transform scale-105'
                                     : 'text-secondary hover:text-primary'
                                     }`}
                             >
@@ -57,7 +57,7 @@ export const PricingView: React.FC = () => {
                             </button>
                         </div>
                         <div className="flex items-center gap-2 text-[11px] font-bold text-secondary uppercase tracking-widest mt-2">
-                             <TrendingUp size={12} className="text-green-500" />
+                            <TrendingUp size={12} className="text-green-500" />
                             Annual billing includes <span className="text-accent underline decoration-accent/30 decoration-2 underline-offset-4">2 Months FREE</span>
                         </div>
                     </div>
@@ -69,14 +69,14 @@ export const PricingView: React.FC = () => {
                     {/* Free Trial Entry */}
                     <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-surface/40 hover:bg-surface/60 transition-all duration-300 relative group shadow-[0_20px_50px_rgba(0,0,0,0.1)]">
                         <div className="mb-6 text-white">
-                            <h3 className="text-xl font-extrabold text-primary mb-2 flex items-center gap-2">Free Trial</h3>
+                            <h3 className="text-xl font-extrabold text-accent mb-2 flex items-center gap-2">Free Trial</h3>
                             <p className="text-sm text-secondary min-h-[40px]">Test the full engine with every feature included.</p>
                         </div>
                         <div className="mb-8 font-black text-4xl text-primary dark:text-white">
                             3 Days
                         </div>
 
-                        <button className="w-full py-3 px-6 rounded-xl bg-surface border border-border text-primary font-bold hover:bg-black/5 transition-colors mb-8">
+                        <button className="w-full py-3 px-6 rounded-xl bg-accent text-white font-bold hover:brightness-110 transition-all mb-8 shadow-lg shadow-accent/20 active:scale-95">
                             Start My Trial
                         </button>
 
@@ -115,7 +115,7 @@ export const PricingView: React.FC = () => {
                             )}
                         </div>
 
-                        <button className="w-full py-3 px-6 rounded-xl bg-surface border border-accent/20 text-primary font-bold hover:bg-accent/10 transition-colors mb-8 shadow-[0_0_20px_rgba(139,92,246,0.1)]">
+                        <button className="w-full py-3 px-6 rounded-xl bg-accent text-white font-bold hover:brightness-110 transition-all mb-8 shadow-lg shadow-accent/20 active:scale-95">
                             Upgrade Now
                         </button>
 
@@ -139,13 +139,13 @@ export const PricingView: React.FC = () => {
                     {/* Business Plan (Highlighted) */}
                     <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-gradient-to-b from-surface/80 to-accent/5 relative transition-all duration-500 shadow-[0_30px_60px_rgba(139,92,246,0.15)] group">
 
-                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-accent to-blue-500 rounded-full flex items-center gap-1.5 shadow-lg">
+                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-accent to-accent/80 rounded-full flex items-center gap-1.5 shadow-lg">
                             <Zap size={14} className="text-white fill-white" />
                             <span className="text-xs font-bold text-white uppercase tracking-wider">Most Popular</span>
                         </div>
 
                         <div className="mb-6 mt-2">
-                            <h3 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-blue-500 dark:from-white dark:to-blue-200 mb-2 flex items-center gap-2">Business</h3>
+                            <h3 className="text-2xl font-black text-accent dark:text-accent mb-2 flex items-center gap-2">Business</h3>
                             <p className="text-sm text-secondary">The complete toolkit for scaling manufacturers.</p>
                         </div>
                         <div className="mb-8 text-white">
@@ -160,7 +160,7 @@ export const PricingView: React.FC = () => {
                             )}
                         </div>
 
-                        <button className="w-full py-4 px-6 rounded-xl bg-accent text-white font-bold hover:brightness-110 transition-all mb-8 shadow-[0_0_25px_rgba(139,92,246,0.5)] active:scale-95">
+                        <button className="w-full py-4 px-6 rounded-xl bg-accent text-white font-bold hover:brightness-110 transition-all mb-8 shadow-[0_0_25px_rgba(64,90,86,0.5)] active:scale-95">
                             Upgrade Now
                         </button>
 
@@ -175,8 +175,8 @@ export const PricingView: React.FC = () => {
                                 'Priority Chat Support'
                             ].map((feature, i) => (
                                 <div key={i} className="flex items-start gap-3">
-                                    <Check size={18} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" strokeWidth={3} />
-                                    <span className="text-sm font-medium text-primary dark:text-white leading-tight">{feature}</span>
+                                    <Check size={18} className="text-accent shrink-0 mt-0.5" strokeWidth={3} />
+                                    <span className="text-sm font-medium text-accent dark:text-white leading-tight">{feature}</span>
                                 </div>
                             ))}
                         </div>
@@ -190,23 +190,23 @@ export const PricingView: React.FC = () => {
                         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
                             <TrendingUp size={160} />
                         </div>
-                        
+
                         <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 text-accent font-black uppercase tracking-widest text-xs mb-4">
                                     <TrendingUp size={14} />
                                     The Modulr Advantage
                                 </div>
-                                <h4 className="text-3xl font-black text-primary mb-4 leading-tight">
+                                <h4 className="text-3xl font-black text-accent mb-4 leading-tight">
                                     An Investment that Pays for Itself, <span className="text-accent underline decoration-accent/30 underline-offset-8">Every Single Month.</span>
                                 </h4>
                                 <p className="text-secondary text-sm leading-relaxed max-w-xl">
-                                    Traditional CGI studios charge between <span className="font-bold text-primary">£200 - £300 per 4K render</span>, with a 3-5 day wait. 
-                                    With the Modulr Studio Business Plan, you get <span className="font-bold text-primary text-lg">250 renders included</span> instantly—giving you 
+                                    Traditional CGI studios charge between <span className="font-bold text-primary">£200 - £300 per 4K render</span>, with a 3-5 day wait.
+                                    With the Modulr Studio Business Plan, you get <span className="font-bold text-primary text-lg">250 renders included</span> instantly—giving you
                                     a total monthly value of over <span className="font-black text-accent text-xl italic underline transform transition-transform group-hover:scale-110 inline-block px-1">£62,500+</span>.
                                 </p>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-4 w-full md:w-auto shrink-0">
                                 <div className="p-6 rounded-2xl bg-white border border-border shadow-sm flex flex-col items-center justify-center text-center group-hover:shadow-md transition-all">
                                     <span className="text-xs font-bold text-secondary uppercase mb-1">Traditional Cost</span>
@@ -239,7 +239,7 @@ export const PricingView: React.FC = () => {
                                 <div className="p-2 rounded-xl bg-accent/10">
                                     <Wand2 size={24} className="text-accent" />
                                 </div>
-                                <h4 className="text-xl font-black text-primary">Modulr Managed Service</h4>
+                                <h4 className="text-xl font-black text-accent">Modulr Managed Service</h4>
                             </div>
                             <p className="text-sm text-secondary leading-relaxed max-w-2xl">
                                 Short on time? Even though our engine is incredibly fast, we at Modulr Studio can handle the entire creative process for you. We'll generate your high-end visuals and material specs to your exact requirements.
@@ -277,9 +277,9 @@ export const PricingView: React.FC = () => {
                         <p className="text-[11px] text-secondary uppercase tracking-widest font-bold mt-2">100% Transparency • No Hidden Fees</p>
                     </div>
 
-                    <div className="flex flex-col items-center gap-4 p-8 rounded-3xl bg-blue-500/5 border border-blue-500/10">
+                    <div className="flex flex-col items-center gap-4 p-8 rounded-3xl bg-accent/5 border border-accent/10">
                         <div className="flex items-center gap-2 text-primary font-bold">
-                            <Gem size={20} className="text-blue-500" />
+                            <Gem size={20} className="text-accent" />
                             Buy Extra Credits
                         </div>
                         <div className="grid grid-cols-3 gap-3 w-full">
@@ -288,8 +288,8 @@ export const PricingView: React.FC = () => {
                                 { amount: '5,000', price: '£25' },
                                 { amount: '10,000', price: '£45' }
                             ].map((pack, i) => (
-                                <button key={i} className="flex flex-col items-center gap-1 p-3 rounded-2xl bg-white/40 border border-border hover:border-blue-500/30 hover:bg-white/60 transition-all group">
-                                    <span className="text-sm font-black text-primary group-hover:text-blue-600 font-bold">{pack.amount}</span>
+                                <button key={i} className="flex flex-col items-center gap-1 p-3 rounded-2xl bg-white/40 border border-border hover:border-accent/30 hover:bg-white/60 transition-all group">
+                                    <span className="text-sm font-black text-accent group-hover:text-accent font-bold">{pack.amount}</span>
                                     <span className="text-[11px] font-black text-accent uppercase">{pack.price}</span>
                                 </button>
                             ))}

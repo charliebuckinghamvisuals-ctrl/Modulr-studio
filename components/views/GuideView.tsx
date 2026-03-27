@@ -6,7 +6,7 @@ export const GuideView: React.FC = () => {
         <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar">
             {/* Ambient Lighting */}
             <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[150px] pointer-events-none"></div>
-            <div className="absolute bottom-1/4 left-1/3 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+            <div className="absolute bottom-1/4 left-1/3 w-[400px] h-[400px] bg-accent/5 rounded-full blur-[120px] pointer-events-none"></div>
 
             <div className="flex-1 p-8 md:p-16 relative z-10">
                 <div className="max-w-4xl mx-auto space-y-16">
@@ -17,9 +17,9 @@ export const GuideView: React.FC = () => {
                             <BookOpen size={14} className="animate-pulse" />
                             User Guide & Handbook
                         </div>
-                        <h1 className="text-4xl md:text-6xl font-black text-primary tracking-tight leading-tight">
+                        <h1 className="text-4xl md:text-6xl font-black text-accent tracking-tight leading-tight">
                             Get the Best Results from <br/>
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080]">Modulr Studio</span>
+                            Modulr Studio
                         </h1>
                         <p className="text-lg text-secondary max-w-2xl mx-auto font-medium">
                             Whether you're starting from a hand-drawn sketch or a fully detailed SketchUp model, here is how to achieve studio-level 4K renders.
@@ -32,7 +32,7 @@ export const GuideView: React.FC = () => {
                             <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
                                 <Layers className="text-accent" size={20} />
                             </div>
-                            <h2 className="text-2xl font-extrabold text-primary tracking-tight">Step-by-Step: From Sketch to Studio CGI</h2>
+                            <h2 className="text-2xl font-extrabold text-accent tracking-tight">Step-by-Step: From Sketch to Studio CGI</h2>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -43,7 +43,7 @@ export const GuideView: React.FC = () => {
                                 </div>
                                 <div className="space-y-2">
                                     <span className="text-[10px] font-black uppercase tracking-widest text-accent px-3 py-1 rounded-full bg-accent/10">Path A</span>
-                                    <h3 className="text-xl font-bold text-primary">Fresh Canvas (No Materials)</h3>
+                                    <h3 className="text-xl font-bold text-accent">Fresh Canvas (No Materials)</h3>
                                     <p className="text-sm text-secondary leading-relaxed">Best for starting from scratch or turning raw sketches into architectural designs.</p>
                                 </div>
                                 <ul className="space-y-4">
@@ -67,8 +67,8 @@ export const GuideView: React.FC = () => {
                                     <ImageIcon size={80} />
                                 </div>
                                 <div className="space-y-2">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 px-3 py-1 rounded-full bg-blue-500/10">Path B</span>
-                                    <h3 className="text-xl font-bold text-primary">Existing Design (With Materials)</h3>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-accent px-3 py-1 rounded-full bg-accent/10">Path B</span>
+                                    <h3 className="text-xl font-bold text-accent">Existing Design (With Materials)</h3>
                                     <p className="text-sm text-secondary leading-relaxed">Best for moving from SketchUp or other 3D software to high-end, realistic CGIs.</p>
                                 </div>
                                 <ul className="space-y-4">
@@ -79,7 +79,7 @@ export const GuideView: React.FC = () => {
                                         "Generate a professional, studio-level 4K CGI instantly."
                                     ].map((step, idx) => (
                                         <li key={idx} className="flex gap-3 text-sm text-secondary items-start">
-                                            <div className="mt-1 flex-shrink-0 animate-pulse text-blue-500"><CheckCircle2 size={14} /></div>
+                                            <div className="mt-1 flex-shrink-0 animate-pulse text-accent"><CheckCircle2 size={14} /></div>
                                             <span>{step.split('**').map((part, i) => i % 2 === 1 ? <strong key={i} className="text-primary">{part}</strong> : part)}</span>
                                         </li>
                                     ))}
@@ -91,10 +91,10 @@ export const GuideView: React.FC = () => {
                     {/* FAQ Section */}
                     <section className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-400">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                                <HelpCircle className="text-blue-500" size={20} />
+                            <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
+                                <HelpCircle className="text-accent" size={20} />
                             </div>
-                            <h2 className="text-2xl font-extrabold text-primary tracking-tight">Frequently Asked Questions</h2>
+                            <h2 className="text-2xl font-extrabold text-accent tracking-tight">Frequently Asked Questions</h2>
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">
@@ -137,7 +137,7 @@ export const GuideView: React.FC = () => {
                                 }
                             ].map((faq, idx) => (
                                 <div key={idx} className="glass-panel p-6 rounded-2xl border border-border bg-white/20 backdrop-blur-md hover:border-accent/30 transition-all">
-                                    <h4 className="text-sm font-black text-primary uppercase tracking-tight mb-2">{faq.q}</h4>
+                                    <h4 className="text-sm font-black text-accent uppercase tracking-tight mb-2">{faq.q}</h4>
                                     <p className="text-sm text-secondary leading-relaxed">{faq.a}</p>
                                 </div>
                             ))}
@@ -147,7 +147,7 @@ export const GuideView: React.FC = () => {
                     {/* Footer Call to Action */}
                     <section className="text-center py-12 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500">
                         <div className="h-px w-64 bg-gradient-to-r from-transparent via-border to-transparent mx-auto mb-12"></div>
-                        <h3 className="text-xl font-bold text-primary mb-4">Still need help?</h3>
+                        <h3 className="text-xl font-bold text-accent mb-4">Still need help?</h3>
                         <p className="text-secondary mb-8">Visit our contact page for dedicated support or custom integrations.</p>
                         <button 
                             onClick={() => window.open('https://napc.uk/contact/', '_blank')}

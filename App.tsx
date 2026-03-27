@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRight, Wand2, RefreshCw, Zap, Sparkles, PenTool, Image as ImageIcon, Upload, Grid } from 'lucide-react';
+import { ToggleSwitch } from './components/ToggleSwitch';
 import { Toaster, toast } from 'react-hot-toast';
 import { AppShell } from './components/AppShell';
 import { StartupLoader } from './components/StartupLoader';
@@ -65,43 +66,35 @@ const App: React.FC = () => {
     };
 
     const QualityToggle = () => (
-        <button
-            onClick={() => engine.setIsHighQuality(!engine.isHighQuality)}
-            className={`flex items-center justify-center gap-2 px-2 py-3 rounded-xl text-xs font-bold transition-all duration-400 border w-full group relative overflow-hidden ${engine.isHighQuality
-                ? 'bg-accent text-white shadow-[0_0_20px_rgba(139,92,246,0.3)] border-accent/20'
-                : 'glass-panel text-secondary hover:text-primary border-border hover:border-accent/40 bg-surface/30'
-                }`}
-        >
-            {engine.isHighQuality && <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>}
-            <Sparkles size={14} className={`relative z-10 ${engine.isHighQuality ? 'animate-pulse drop-shadow-md text-white' : 'text-accent'}`} />
-            <span className="relative z-10 tracking-wide uppercase">{engine.isHighQuality ? '4K Ultra HD' : 'Standard HD'}</span>
-        </button>
+        <ToggleSwitch 
+            isOn={engine.isHighQuality} 
+            onToggle={() => engine.setIsHighQuality(!engine.isHighQuality)} 
+            label={engine.isHighQuality ? '4K Ultra HD' : 'Standard HD'}
+            icon={<Sparkles size={14} className={engine.isHighQuality ? 'text-accent' : 'text-slate-400'} />}
+            activeColor="bg-accent"
+        />
     );
 
     const ProModelToggle = () => (
-        <button
-            onClick={() => engine.setIsProMode(!engine.isProMode)}
-            className={`flex items-center justify-center gap-2 px-2 py-3 rounded-xl text-xs font-bold transition-all duration-400 border w-full group relative overflow-hidden ${engine.isProMode
-                ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(59,130,246,0.3)] border-blue-400/30'
-                : 'glass-panel text-secondary hover:text-primary border-border hover:border-blue-400/40 bg-surface/30'
-                }`}
-        >
-            {engine.isProMode && <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>}
-            <Zap size={14} className={`relative z-10 ${engine.isProMode ? 'animate-pulse drop-shadow-md text-white' : 'text-blue-500'}`} />
-            <span className="relative z-10 tracking-wide uppercase">{engine.isProMode ? 'Pro Mode' : 'Standard'}</span>
-        </button>
+        <ToggleSwitch 
+            isOn={engine.isProMode} 
+            onToggle={() => engine.setIsProMode(!engine.isProMode)} 
+            label={engine.isProMode ? 'Pro Mode' : 'Standard'}
+            icon={<Zap size={14} className={engine.isProMode ? 'text-accent' : 'text-slate-400'} />}
+            activeColor="bg-accent"
+        />
     );
 
     const renderEngineControls = (
         <>
-            <div className="grid grid-cols-2 gap-2 w-full">
+            <div className="flex flex-col gap-2 w-full">
                 <QualityToggle />
                 <ProModelToggle />
             </div>
 
             <button
                 onClick={() => document.getElementById('batchUploadInput')?.click()}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl glass-panel text-primary hover:text-accent border-border hover:border-accent/40 bg-surface/30 transition-all duration-300 font-semibold text-sm shadow-sm"
+                className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-2xl bg-white text-accent hover:bg-accent hover:text-white border border-accent/20 transition-all duration-300 font-bold text-sm shadow-sm group"
             >
                 <Upload size={16} />
                 {engine.batchImages.length > 0 ? 'Upload New Batch' : (engine.originalImage ? 'Change Reference Image' : 'Upload Batch / Reference Images')}
@@ -110,12 +103,12 @@ const App: React.FC = () => {
             <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
                 {Object.keys(engine.materials).map((key) => (
                     <div key={key} className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-secondary flex items-center gap-2">
+                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></div>
                             {key}
                         </label>
                         <textarea
-                            className="w-full p-3 rounded-xl glass-panel text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-transparent text-sm placeholder-secondary min-h-[60px] resize-none shadow-inner transition-all border border-border"
+                            className="w-full p-4 rounded-2xl bg-white border border-accent/20 text-accent focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-accent/30 min-h-[80px] resize-none shadow-inner transition-all duration-300"
                             placeholder={`Analyzed or custom ${key} material...`}
                             value={engine.materials[key as keyof typeof engine.materials]}
                             onChange={(e) => engine.setMaterials(prev => ({ ...prev, [key]: e.target.value }))}
@@ -127,25 +120,24 @@ const App: React.FC = () => {
             <LightingDirectionPicker value={engine.lightingDirection} onChange={engine.setLightingDirection} />
 
             {engine.batchMaterials.length > 0 && (
-                <div className="space-y-3 p-3 bg-surface/50 rounded-xl border border-border">
-                    <p className="text-xs font-bold text-white mb-2 tracking-wide">AI Geometry & Mapping detected</p>
+                <div className="space-y-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                    <p className="text-[10px] font-bold text-accent/60 mb-2 tracking-widest uppercase italic">AI Geometry Detected</p>
                     {engine.batchMaterials.map((mat, i) => (
-                        <div key={i} className="text-[11px] flex justify-between items-center bg-background/50 p-2 rounded-lg border border-border/50">
-                            <span className="font-bold text-accent px-2 py-0.5 bg-accent/10 rounded">{mat.orientation || `Angle ${i+1}`}</span> 
-                            <span className="text-secondary truncate ml-2 text-right">{mat.walls || 'Auto'} / {mat.roof || 'Auto'}</span>
+                        <div key={i} className="text-[11px] flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm">
+                            <span className="font-bold text-accent px-2 py-0.5 bg-accent/5 rounded">{mat.orientation || `Angle ${i+1}`}</span> 
+                            <span className="text-slate-400 truncate ml-2 text-right">{mat.walls || 'Auto'} / {mat.roof || 'Auto'}</span>
                         </div>
                     ))}
-                    <p className="text-[10px] text-secondary mt-1 leading-relaxed">These materials will be mapped dynamically per angle during batch rendering. Global overrides above will act as universal fallbacks.</p>
                 </div>
             )}
 
-            <div className="space-y-3 pt-6 border-t border-border">
-                <label className="text-xs font-bold uppercase tracking-widest text-secondary flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+            <div className="space-y-3 pt-6 border-t border-slate-200">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
                     Additional Instructions
                 </label>
                 <textarea
-                    className="w-full p-4 rounded-xl glass-panel text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-transparent text-sm placeholder-secondary min-h-[100px] resize-none shadow-inner transition-all"
+                    className="w-full p-4 rounded-2xl bg-white border border-accent/20 text-accent focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-accent/30 min-h-[100px] resize-none shadow-inner transition-all duration-300"
                     placeholder="e.g. Add a sunset background, dramatic lighting, rain..."
                     value={engine.additionalPrompt}
                     onChange={(e) => engine.setAdditionalPrompt(e.target.value)}
@@ -167,25 +159,25 @@ const App: React.FC = () => {
 
     const editorControls = (
         <div className="flex flex-col h-full space-y-4">
-            <div className="grid grid-cols-2 gap-2 w-full">
+            <div className="flex flex-col gap-2 w-full">
                 <QualityToggle />
                 <ProModelToggle />
             </div>
 
             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                <div className="space-y-3 mt-2">
+                <div className="space-y-4 mt-2">
                     <div className="space-y-1">
-                        <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80 flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></div>
                             Editing Prompt
                         </label>
-                        <p className="text-[10px] text-secondary/80 leading-relaxed pl-3.5">
+                        <p className="text-[10px] text-slate-500 leading-relaxed pl-3.5 italic">
                             Describe exactly what you want to change. The AI will perfectly preserve the rest of the image.
                         </p>
                     </div>
 
                     <textarea
-                        className="w-full p-4 rounded-xl glass-panel text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-transparent text-sm placeholder-secondary min-h-[140px] resize-none shadow-inner transition-all border border-border"
+                        className="w-full p-4 rounded-2xl bg-white border border-accent/20 text-accent focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-accent/30 min-h-[140px] resize-none shadow-inner transition-all duration-300"
                         placeholder="e.g. Add a timber pergola, change the cladding to brick, make it snow..."
                         value={engine.editorPrompt}
                         onChange={(e) => engine.setEditorPrompt(e.target.value)}
@@ -203,27 +195,27 @@ const App: React.FC = () => {
 
     const lineControls = (
         <div className="flex flex-col h-full space-y-5">
-            <div className="grid grid-cols-2 gap-2 w-full">
+            <div className="flex flex-col gap-2 w-full">
                 <QualityToggle />
                 <ProModelToggle />
             </div>
 
             {/* Mode Tabs */}
-            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-surface/60 border border-border">
+            <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-100">
                 <button
                     onClick={() => setLineMode('image')}
-                    className={`py-2 rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1.5 ${lineMode === 'image'
-                        ? 'bg-accent text-white shadow-md'
-                        : 'text-secondary hover:text-primary'}`}
+                    className={`py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-1.5 ${lineMode === 'image'
+                        ? 'bg-accent text-white shadow-lg'
+                        : 'text-secondary hover:text-accent'}`}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
                     Image → Line
                 </button>
                 <button
                     onClick={() => setLineMode('text')}
-                    className={`py-2 rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1.5 ${lineMode === 'text'
-                        ? 'bg-accent text-white shadow-md'
-                        : 'text-secondary hover:text-primary'}`}
+                    className={`py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-1.5 ${lineMode === 'text'
+                        ? 'bg-accent text-white shadow-lg'
+                        : 'text-secondary hover:text-accent'}`}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 6.1H3" /><path d="M21 12.1H3" /><path d="M15.1 18H3" /></svg>
                     Text → Line
@@ -231,33 +223,29 @@ const App: React.FC = () => {
             </div>
 
             {/* Drawing Style — shared between both modes */}
-            <div className="space-y-3">
-                <label className="text-xs font-bold uppercase tracking-widest text-secondary flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-accent"></div>
+            <div className="space-y-4">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></div>
                     Drawing Style
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-100">
                     <button
                         onClick={() => engine.setIsColoredLineDrawing(false)}
-                        className={`p-3 rounded-xl text-xs text-center font-semibold transition-all duration-300 flex flex-col items-center gap-2 ${!engine.isColoredLineDrawing
-                            ? 'bg-slate-900 text-white shadow-lg border-slate-700'
-                            : 'glass-panel text-secondary hover:text-primary border-border bg-surface/30'}`}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-1.5 ${!engine.isColoredLineDrawing
+                            ? 'bg-accent text-white shadow-lg'
+                            : 'text-secondary hover:text-accent'}`}
                     >
-                        <PenTool size={18} className={!engine.isColoredLineDrawing ? "text-white" : "text-secondary hover:text-primary"} />
-                        <span className={!engine.isColoredLineDrawing ? "text-white" : "text-secondary hover:text-primary"}>Monochrome</span>
+                        <PenTool size={13} />
+                        <span>Mono</span>
                     </button>
                     <button
                         onClick={() => engine.setIsColoredLineDrawing(true)}
-                        className={`p-3 rounded-xl text-xs text-center font-semibold transition-all duration-300 flex flex-col items-center gap-2 ${engine.isColoredLineDrawing
-                            ? 'bg-accent text-white shadow-[0_0_15px_rgba(139,92,246,0.3)] border-accent/20'
-                            : 'glass-panel text-secondary hover:text-primary border-border bg-surface/30'}`}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-1.5 ${engine.isColoredLineDrawing
+                            ? 'bg-accent text-white shadow-lg'
+                            : 'text-slate-400 hover:text-slate-900'}`}
                     >
-                        <div className="flex -space-x-1">
-                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                        </div>
-                        <span className={engine.isColoredLineDrawing ? "text-white" : "text-secondary hover:text-primary"}>Coloured</span>
+                        <Sparkles size={13} />
+                        <span>Color</span>
                     </button>
                 </div>
             </div>
@@ -266,11 +254,11 @@ const App: React.FC = () => {
             {lineMode === 'image' && (
                 <div className="space-y-4 flex-1">
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-secondary flex items-center gap-2">
+                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50 flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-accent"></div>
                             Upload Image
                         </label>
-                        <p className="text-[10px] text-secondary/70">Upload a photo, render, or sketch and the AI will trace it into a clean architectural line drawing.</p>
+                        <p className="text-[10px] text-slate-500">Upload a photo, render, or sketch and the AI will trace it into a clean architectural line drawing.</p>
                         {engine.lineSourceImage ? (
                             <div className="relative rounded-xl overflow-hidden border border-border group">
                                 <img src={`data:image/jpeg;base64,${engine.lineSourceImage}`} className="w-full h-32 object-cover" alt="Source" />
@@ -316,10 +304,10 @@ const App: React.FC = () => {
 
                     {/* Environment Image Upload for Line Converter */}
                     {engine.lineSourceImage && (
-                        <div className="pt-2 border-t border-border mt-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2 mb-2">
-                                <ImageIcon size={14} className="text-secondary" />
-                                Attach Environment <span className="text-[9px] font-normal normal-case tracking-normal text-secondary/50 ml-1">(Site Context)</span>
+                        <div className="pt-2 border-t border-slate-200 mt-2">
+                            <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2 mb-2">
+                                <ImageIcon size={14} className="text-slate-400" />
+                                Attach Environment <span className="text-[9px] font-normal normal-case tracking-normal text-slate-400 ml-1">(Site Context)</span>
                             </label>
                             {engine.lineEnvironmentImage ? (
                                 <div className="relative rounded-xl overflow-hidden border border-border group">
@@ -337,7 +325,7 @@ const App: React.FC = () => {
                             ) : (
                                 <button
                                     onClick={() => lineEnvInputRef.current?.click()}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed border-border hover:border-accent/40 bg-surface/20 hover:bg-surface/50 text-secondary hover:text-primary transition-all duration-300 font-semibold text-xs shadow-sm"
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed border-slate-200 hover:border-accent/40 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-all duration-300 font-semibold text-xs shadow-sm"
                                 >
                                     <Upload size={14} />
                                     Upload Location/Garden
@@ -367,12 +355,12 @@ const App: React.FC = () => {
 
                     {engine.lineSourceImage && (
                         <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-secondary flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-white/40"></div>
-                                Modifications <span className="text-[9px] font-normal normal-case tracking-normal text-secondary/50 ml-1">(optional)</span>
+                            <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+                                Modifications <span className="text-[9px] font-normal normal-case tracking-normal text-slate-400 ml-1">(optional)</span>
                             </label>
                             <textarea
-                                className="w-full p-3 rounded-xl glass-panel text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-secondary min-h-[70px] resize-none transition-all"
+                                className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-slate-400 min-h-[80px] resize-none transition-all duration-300"
                                 placeholder="e.g. Add thicker line weights, remove garden details..."
                                 value={engine.additionalPrompt}
                                 onChange={(e) => engine.setAdditionalPrompt(e.target.value)}
@@ -397,13 +385,13 @@ const App: React.FC = () => {
             {lineMode === 'text' && (
                 <div className="space-y-4 flex-1">
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-secondary flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-accent"></div>
+                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></div>
                             Describe Your Building
                         </label>
-                        <p className="text-[10px] text-secondary/70 leading-relaxed">Describe the building or scene you want. The AI will generate a CAD line drawing from scratch.</p>
+                        <p className="text-[10px] text-slate-500 leading-relaxed">Describe the building or scene you want. The AI will generate a CAD line drawing from scratch.</p>
                         <textarea
-                            className="w-full p-4 rounded-xl glass-panel text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-secondary min-h-[120px] resize-none transition-all"
+                            className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-slate-400 min-h-[140px] resize-none transition-all duration-300"
                             placeholder="e.g. A modern detached house in the UK with a flat roof, floor-to-ceiling windows, and a timber clad facade..."
                             value={engine.lineDrawingPrompt}
                             onChange={(e) => engine.setLineDrawingPrompt(e.target.value)}
@@ -411,12 +399,12 @@ const App: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-secondary flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-white/40"></div>
-                            Style Instructions <span className="text-[9px] font-normal normal-case tracking-normal text-secondary/50 ml-1">(optional)</span>
+                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+                            Style Instructions <span className="text-[9px] font-normal normal-case tracking-normal text-slate-400 ml-1">(optional)</span>
                         </label>
                         <textarea
-                            className="w-full p-3 rounded-xl glass-panel text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-secondary min-h-[60px] resize-none transition-all"
+                            className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-slate-400 min-h-[80px] resize-none transition-all duration-300"
                             placeholder="e.g. Thick line weights, architectural hatching, minimal background..."
                             value={engine.additionalPrompt}
                             onChange={(e) => engine.setAdditionalPrompt(e.target.value)}
@@ -440,31 +428,37 @@ const App: React.FC = () => {
 
 
     const renderEngineEmptyState = (
-        <div className="flex flex-col md:flex-row gap-6 items-center justify-center w-full h-full p-8 relative">
-            <div className="absolute inset-0 bg-accent/5 backdrop-blur-3xl pointer-events-none"></div>
+        <div className="flex flex-col md:flex-row gap-6 items-center justify-center w-full h-full p-8 relative canvas-grid">
+            <div className="absolute inset-0 bg-accent/10 backdrop-blur-3xl pointer-events-none"></div>
 
             <div
-                onClick={() => engine.fileInputRef.current?.click()}
-                className="flex-1 max-w-sm w-full h-72 glass-panel border border-border hover:border-accent/50 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer group transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_40px_rgba(139,92,246,0.2)] relative overflow-hidden text-center p-6"
+                onClick={() => {
+                    engine.setIsSketchUpMode(false);
+                    engine.fileInputRef.current?.click();
+                }}
+                className="flex-1 max-w-sm w-full h-72 glass-panel border border-accent/20 hover:border-accent/50 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer group transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_40px_rgba(64,90,86,0.2)] relative overflow-hidden text-center p-6 bg-white"
             >
                 <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-xl relative z-10">
                     <PenTool className="text-accent group-hover:text-white transition-colors" size={24} />
                 </div>
                 <div className="relative z-10">
-                    <h3 className="text-primary font-bold text-lg mb-2">Upload B&W Line Drawing</h3>
+                    <h3 className="text-accent font-bold text-lg mb-2">Upload B&W Line Drawing</h3>
                     <p className="text-secondary text-sm leading-relaxed">Auto-detect materials from structural lines and CAD patterns.</p>
                 </div>
             </div>
 
             <div
-                onClick={() => engine.fileInputRef.current?.click()}
-                className="flex-1 max-w-sm w-full h-72 glass-panel border border-border hover:border-blue-500/50 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer group transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_40px_rgba(59,130,246,0.2)] relative overflow-hidden text-center p-6"
+                onClick={() => {
+                    engine.setIsSketchUpMode(true);
+                    engine.fileInputRef.current?.click();
+                }}
+                className="flex-1 max-w-sm w-full h-72 glass-panel border border-border hover:border-accent/50 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer group transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_40px_rgba(64,90,86,0.2)] relative overflow-hidden text-center p-6 bg-white"
             >
                 <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-xl relative z-10">
-                    <ImageIcon className="text-blue-400 group-hover:text-white transition-colors" size={24} />
+                    <ImageIcon className="text-accent group-hover:text-white transition-colors" size={24} />
                 </div>
                 <div className="relative z-10">
-                    <h3 className="text-primary font-bold text-lg mb-2">Pre-Added Materials (SketchUp)</h3>
+                    <h3 className="text-accent font-bold text-lg mb-2">Pre-Added Materials (SketchUp)</h3>
                     <p className="text-secondary text-sm leading-relaxed">Upload a basic 3D model. AI auto-detects your materials for a 4K render.</p>
                 </div>
             </div>
@@ -486,7 +480,7 @@ const App: React.FC = () => {
                         value={engine.refinementPrompt}
                         onChange={(e) => engine.setRefinementPrompt(e.target.value)}
                         placeholder="e.g. 'Make the grass greener and add modern patio furniture'..."
-                        className="flex-1 p-4 rounded-xl bg-surface/50 border border-border focus:border-accent/40 focus:ring-1 focus:ring-accent/20 outline-none text-sm text-primary placeholder:text-secondary/50 resize-none min-h-[60px] transition-all"
+                        className="flex-1 p-4 rounded-xl bg-white border border-accent/20 focus:border-accent/40 focus:ring-1 focus:ring-accent/20 outline-none text-sm text-accent placeholder:text-accent/30 resize-none min-h-[60px] transition-all"
                     />
                     <Button
                         onClick={engine.handleRefineRender}
@@ -505,11 +499,11 @@ const App: React.FC = () => {
     );
 
     const materialStudioBox = (
-        <div className="mt-4 p-5 glass-panel rounded-2xl border border-blue-500/20 bg-blue-500/5 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-5 duration-700">
+        <div className="mt-4 p-5 glass-panel rounded-2xl border border-accent/20 bg-accent/5 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-5 duration-700">
             <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-widest text-blue-400 flex items-center gap-2">
-                        <Grid size={14} className="text-blue-400" />
+                    <label className="text-xs font-bold uppercase tracking-widest text-accent flex items-center gap-2">
+                        <Grid size={14} className="text-accent" />
                         Material Studio (2x2 Sheet)
                     </label>
                     <span className="text-[10px] text-secondary font-medium italic">Callout Details</span>

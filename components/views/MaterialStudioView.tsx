@@ -47,10 +47,10 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
             {/* Ambient Lighting */}
             <div className="absolute top-1/2 right-1/4 w-[600px] h-[600px] bg-white/5 rounded-full blur-[150px] pointer-events-none"></div>
 
-            <div className="w-full md:w-80 p-6 flex flex-col gap-6 relative z-10 overflow-y-auto">
+            <div className="w-full md:w-80 flex flex-col gap-6 relative z-10 p-6 m-4 md:m-4 bg-white/95 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-y-auto border border-white">
                 <div className="space-y-4">
-                    <h2 className="text-[6vw] md:text-xl lg:text-2xl whitespace-nowrap font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080] w-fit inline-block">Material Studio</h2>
-                    <p className="text-secondary text-lg leading-relaxed">
+                    <h2 className="text-[6vw] md:text-xl lg:text-2xl font-bold text-accent w-fit inline-block">Material Studio</h2>
+                    <p className="text-slate-600 text-sm leading-relaxed">
                         Architectural material detail sheet generator. The engine compiles a 4K 2x2 presentation grid based on your specific material focal points.
                     </p>
                 </div>
@@ -58,9 +58,9 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                 {/* Selection Area */}
                 {detectedDetails.length > 0 ? (
                     <div className="flex-1 flex flex-col gap-5">
-                        <div className="flex justify-between items-center text-xs uppercase tracking-widest font-bold text-secondary">
+                        <div className="flex justify-between items-center text-[10px] uppercase tracking-[0.2em] font-bold text-white/50">
                             <span>Select 4 Focus Details</span>
-                            <span className={`${selectedDetails.length === 4 ? 'text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'text-secondary'}`}>{selectedDetails.length} / 4 Selected</span>
+                            <span className={`${selectedDetails.length === 4 ? 'text-white' : 'text-white/30'}`}>{selectedDetails.length} / 4 Selected</span>
                         </div>
 
                         <div className="grid grid-cols-1 gap-3">
@@ -71,39 +71,39 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                                         key={idx}
                                         onClick={() => toggleDetailSelection(detail)}
                                         className={`
-                                        p-4 rounded-xl border cursor-pointer transition-all duration-300 flex items-center justify-between group overflow-hidden relative
+                                        p-5 rounded-2xl border cursor-pointer transition-all duration-500 flex items-center justify-between group overflow-hidden relative
                                         ${isSelected
-                                                ? 'bg-white/10 border-white/50 text-white shadow-[0_0_20px_rgba(255,255,255,0.15)] -translate-y-0.5'
-                                                : 'bg-surface/50 border-border text-secondary hover:text-white hover:border-white/30 hover:bg-surface'
+                                                ? 'bg-accent border-accent/20 text-white shadow-lg -translate-y-1'
+                                                : 'bg-white border-accent/10 text-secondary hover:text-accent hover:border-accent/30 hover:bg-accent/5'
                                             }
-                                        ${selectedDetails.length >= 4 && !isSelected ? 'opacity-40 cursor-not-allowed hover:-translate-y-0 hover:border-border' : ''}
+                                        ${selectedDetails.length >= 4 && !isSelected ? 'opacity-20 cursor-not-allowed hover:-translate-y-0 hover:border-slate-100' : ''}
                                     `}
                                     >
-                                        {isSelected && <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50 pointer-events-none" />}
+                                        {isSelected && <div className="absolute inset-0 bg-gradient-to-r from-accent/10 to-transparent opacity-50 pointer-events-none" />}
                                         <div className="flex flex-col relative z-10">
-                                            <span className={`text-sm font-semibold tracking-wide ${isSelected ? 'text-white' : ''}`}>{detail}</span>
-                                            <span className="text-[10px] text-white/70 uppercase tracking-widest mt-1 font-medium">Texture / Macro</span>
+                                            <span className={`text-sm font-semibold tracking-wide ${isSelected ? 'text-white' : 'text-accent'}`}>{detail}</span>
+                                            <span className={`text-[10px] uppercase tracking-widest mt-1 font-medium ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>Texture / Macro</span>
                                         </div>
-                                        {isSelected ? <CheckCircle size={20} className="text-white relative z-10 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" /> : <Circle size={20} className="text-border group-hover:text-secondary transition-colors relative z-10" />}
+                                        {isSelected ? <CheckCircle size={20} className="text-white relative z-10 drop-shadow-[0_0_8px_rgba(139,92,246,0.8)]" /> : <Circle size={20} className="text-slate-200 group-hover:text-slate-400 transition-colors relative z-10" />}
                                     </div>
                                 )
                             })}
                         </div>
                     </div>
                 ) : (
-                    <div className="p-8 border border-white/5 rounded-2xl bg-surface/20 flex flex-col items-center gap-3 text-center shadow-inner">
+                    <div className="p-8 border border-slate-100 rounded-3xl bg-slate-50/50 flex flex-col items-center gap-4 text-center shadow-inner">
                         {originalImage ? (
                             <div className="flex flex-col items-center gap-4 py-4">
                                 <Loader2 className="w-8 h-8 animate-spin text-accent shadow-[0_0_10px_rgba(139,92,246,0.5)] rounded-full" />
-                                <span className="tracking-wide text-white font-medium">Analyzing geometry...</span>
+                                <span className="tracking-wide text-accent font-medium animate-pulse">Analyzing geometry...</span>
                             </div>
                         ) : (
                             <>
                                 <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center mb-1">
                                     <Grid className="w-6 h-6 text-accent opacity-80" />
                                 </div>
-                                <h3 className="text-white font-medium tracking-tight">Awaiting Scene</h3>
-                                <p className="text-secondary text-xs leading-relaxed">
+                                <h3 className="text-accent font-medium tracking-tight">Awaiting Scene</h3>
+                                <p className="text-slate-400 text-xs leading-relaxed">
                                     Upload an image to detect surface materials and architectural details for your grid.
                                 </p>
                             </>
@@ -111,7 +111,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                     </div>
                 )}
 
-                <div className="mt-auto pt-6 border-t border-border">
+                <div className="mt-auto pt-6 border-t border-white/10">
                     {selectedDetails.length === 4 && (
                         <div className="pt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <Button
@@ -130,8 +130,8 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
             <div className="flex-1 p-6 md:p-12 flex items-center justify-center relative z-10 w-full overflow-hidden">
                 {isLoading ? (
                     <div className="w-full max-w-5xl mx-auto flex-1 min-h-[500px] max-h-[85vh] glass-panel rounded-3xl overflow-hidden border-2 border-dashed border-border relative flex flex-col items-center justify-center bg-white z-50">
-                        <Loader2 className="w-10 h-10 animate-spin text-black mb-4 mx-auto" />
-                        <p className="text-black font-medium text-lg tracking-wide text-center mx-auto">{loadingMessage}</p>
+                        <Loader2 className="w-10 h-10 animate-spin text-accent mb-4 mx-auto" />
+                        <p className="text-accent font-medium text-lg tracking-wide text-center mx-auto">{loadingMessage}</p>
                     </div>
                 ) : materialStudioImage ? (
                     <div className="flex-1 flex items-center justify-center p-8 relative z-10 transition-all duration-700 opacity-100 scale-100">
@@ -169,7 +169,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                 ) : (
                     <div className="flex flex-col items-center justify-center text-secondary w-full">
                         {originalImage ? (
-                            <div className="w-full max-w-5xl mx-auto flex-1 min-h-[500px] max-h-[85vh] glass-panel rounded-3xl overflow-hidden border-2 border-dashed border-border relative flex items-center justify-center bg-surface/50 group">
+                            <div className="w-full max-w-5xl mx-auto flex-1 min-h-[500px] max-h-[85vh] glass-panel canvas-grid rounded-3xl overflow-hidden border-2 border-dashed border-border relative flex items-center justify-center bg-surface/50 group">
                                 <img src={getImageUrl(originalImage)} className="w-full h-full object-contain opacity-30 grayscale transition-all duration-700 group-hover:opacity-50 absolute inset-0" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent"></div>
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -182,7 +182,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                         ) : (
                             <div
                                 onClick={onOpenSceneUpload}
-                                className="w-full max-w-5xl mx-auto flex-1 min-h-[500px] max-h-[85vh] glass-panel rounded-3xl overflow-hidden border-2 border-dashed border-border hover:border-accent/40 relative flex flex-col items-center justify-center bg-surface/50 cursor-pointer group hover:bg-accent/5 transition-colors duration-300"
+                                className="w-full max-w-5xl mx-auto flex-1 min-h-[500px] max-h-[85vh] glass-panel canvas-grid rounded-3xl overflow-hidden border-2 border-dashed border-border hover:border-accent/40 relative flex flex-col items-center justify-center bg-surface/50 cursor-pointer group hover:bg-accent/5 transition-colors duration-300"
                             >
                                 <div className="absolute inset-0 bg-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
 

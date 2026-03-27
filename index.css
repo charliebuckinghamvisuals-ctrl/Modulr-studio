@@ -26,13 +26,13 @@
     --border: rgba(0, 0, 0, 0.08);
 
     /* Typography */
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
+    --text-primary: #405a56;
+    --text-secondary: #5c7b77;
 
     /* Vibrant Gradients & Accents (Darker for light mode) */
-    --accent: #334155;
-    --accent-hover: #000000;
-    --accent-glow: rgba(0, 0, 0, 0.15);
+    --accent: #405a56;
+    --accent-hover: #2d3f3c;
+    --accent-glow: rgba(64, 90, 86, 0.3);
 
     /* Glassmorphism */
     --overlay: rgba(255, 255, 255, 0.6);
@@ -123,12 +123,12 @@ body {
 
 .nav-link:hover {
   color: var(--primary);
-  background: rgba(109, 40, 217, 0.05);
+  background: rgba(64, 90, 86, 0.05);
 }
 
 .nav-link.active {
   color: var(--accent);
-  background: rgba(109, 40, 217, 0.08);
+  background: rgba(64, 90, 86, 0.08);
   font-weight: 600;
 }
 
@@ -231,4 +231,11 @@ input[type=range]::-webkit-slider-runnable-track {
   backface-visibility: hidden;
   transform-style: preserve-3d;
   perspective: 1000px;
+}
+
+.canvas-grid {
+  background-size: 30px 30px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
 }

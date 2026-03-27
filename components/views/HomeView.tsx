@@ -13,7 +13,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
 
             {/* Ambient Background Glows */}
             <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-accent/10 rounded-full blur-[120px] pointer-events-none"></div>
-            <div className="absolute bottom-1/4 right-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[100px] pointer-events-none"></div>
+            <div className="absolute bottom-1/4 right-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[100px] pointer-events-none"></div>
 
             <div className="max-w-6xl w-full flex flex-col items-center relative z-10 gap-24 px-8">
 
@@ -26,7 +26,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
 
                     <div className="flex flex-col items-center mb-8 w-full px-4">
                         <img src="/Logo.png" alt="Modulr Studio Logo" className="h-[24rem] md:h-[32rem] w-auto object-contain drop-shadow-2xl -mt-28 -mb-28 md:-mt-36 md:-mb-36" />
-                        <h1 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080] font-black block max-w-4xl mx-auto leading-tight mt-6 text-center w-fit inline-block">
+                        <h1 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-accent font-black block max-w-4xl mx-auto leading-tight mt-6 text-center w-fit inline-block">
                             The pinnacle of AI exterior rendering for garden rooms and annexes.
                         </h1>
                     </div>
@@ -38,7 +38,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                     <div className="flex justify-center">
                         <button
                             onClick={onOpenEngine}
-                            className="px-10 py-5 bg-primary text-background font-bold rounded-2xl hover:shadow-[0_20px_40px_rgba(255,255,255,0.1)] hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-3 text-lg"
+                            className="px-10 py-5 bg-accent text-white font-bold rounded-2xl hover:shadow-[0_20px_40px_rgba(64,90,86,0.2)] hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-3 text-lg"
                         >
                             <Zap size={22} className="text-background" />
                             Launch Studio
@@ -49,7 +49,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                 {/* 2. Before/After Demo Slider Section */}
                 <div className="w-full space-y-8">
                     <div className="text-center space-y-4 max-w-[100vw] overflow-x-hidden md:max-w-4xl mx-auto px-4">
-                        <h2 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080] font-black whitespace-nowrap w-fit inline-block">From Plan to Perfection</h2>
+                        <h2 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-accent font-black whitespace-nowrap w-fit inline-block">From Plan to Perfection</h2>
                         <p className="text-secondary text-lg">Swipe to see how our engine transforms technical geometry into stunning 4K visualizations.</p>
                     </div>
                     <div className="w-[calc(100vw-0px)] relative left-1/2 -translate-x-1/2 rounded-none overflow-hidden border-y border-border bg-surface/10 backdrop-blur-md shadow-2xl relative group">
@@ -66,11 +66,11 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                 {/* 3. Why Modulr Studio Explanation */}
                 <div className="w-full py-16 px-10 md:px-16 rounded-[45px] bg-white/95 border border-slate-300 shadow-[0_20px_50px_rgba(0,0,0,0.08)] relative overflow-hidden backdrop-blur-xl">
                     <div className="absolute top-0 right-0 w-96 h-96 bg-accent/5 blur-[100px] -mr-48 -mt-48 pointer-events-none"></div>
-                    <div className="absolute bottom-0 left-0 w-72 h-72 bg-blue-500/5 blur-[80px] -ml-36 -mb-36 pointer-events-none"></div>
+                    <div className="absolute bottom-0 left-0 w-72 h-72 bg-accent/5 blur-[80px] -ml-36 -mb-36 pointer-events-none"></div>
 
                     <div className="relative z-10 space-y-16">
                         <div className="max-w-3xl">
-                            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080] leading-tight mb-6 w-fit inline-block">
+                            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-accent leading-tight mb-6 w-fit inline-block">
                                 Why use Modulr&nbsp;Studio <br />
                                 Instead of General AI?
                             </h2>
@@ -84,7 +84,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                                 <div className="bg-accent/10 p-3 rounded-2xl text-accent w-fit border border-accent/10 shadow-sm mb-2">
                                     <ShieldCheck size={24} />
                                 </div>
-                                <h4 className="text-slate-900 font-bold text-xl">Architectural Logic vs. Art</h4>
+                                <h4 className="text-accent font-bold text-xl">Architectural Logic vs. Art</h4>
                                 <p className="text-slate-600 leading-relaxed text-sm">
                                     Don't settle for "creative" guesses. While general AI patterns create beautiful images that can't be built, Modulr follows the strict architectural logic of your technical plan.
                                 </p>
@@ -94,7 +94,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                                 <div className="bg-accent/10 p-3 rounded-2xl text-accent w-fit border border-accent/10 shadow-sm mb-2">
                                     <Layers size={24} />
                                 </div>
-                                <h4 className="text-slate-900 font-bold text-xl">Surgical Material Control</h4>
+                                <h4 className="text-accent font-bold text-xl">Surgical Material Control</h4>
                                 <p className="text-slate-600 leading-relaxed text-sm">
                                     Generic AI changes the whole building when you want one swap. In Modulr, you have surgical control. Change a cladding type or window frame instantly, while the rest of your scene stays perfect.
                                 </p>
@@ -104,7 +104,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                                 <div className="bg-accent/10 p-3 rounded-2xl text-accent w-fit border border-accent/10 shadow-sm mb-2">
                                     <Zap size={24} />
                                 </div>
-                                <h4 className="text-slate-900 font-bold text-xl">Pro-Grade 4K Visualization</h4>
+                                <h4 className="text-accent font-bold text-xl">Pro-Grade 4K Visualization</h4>
                                 <p className="text-slate-600 leading-relaxed text-sm">
                                     Skip the low-res, artistic filters of chat models. Modulr generates high-fidelity, presentation-ready 4K renders designed specifically for clients, brochures, and planning applications.
                                 </p>
@@ -119,7 +119,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                         <div className="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent mx-auto">
                             <Box size={24} />
                         </div>
-                        <h2 className="text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080] w-fit inline-block">World's First AI Render Engine for Garden Rooms & Annexes</h2>
+                        <h2 className="text-4xl font-black tracking-tight text-accent w-fit inline-block">World's First AI Render Engine for Garden Rooms & Annexes</h2>
                         <p className="text-secondary text-lg leading-relaxed">
                             Modulr Studio is the world's first platform purposefully built for the garden room and annexe industry.
                             We combine deep AI with an understanding of real-world construction standards.
@@ -130,14 +130,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                         <div className="flex items-start gap-4">
                             <div className="mt-1 bg-accent/20 p-1.5 rounded-lg text-accent shrink-0"><Maximize size={18} /></div>
                             <div>
-                                <h4 className="text-primary font-bold">CAD-Precision Foundation</h4>
+                                <h4 className="text-accent font-bold">CAD-Precision Foundation</h4>
                                 <p className="text-secondary text-sm">Your structural drawing is the master. We lock the AI to your specific geometry, ensuring that every pillar and window stays exactly where it was designed to be.</p>
                             </div>
                         </div>
                         <div className="flex items-start gap-4">
                             <div className="mt-1 bg-accent/20 p-1.5 rounded-lg text-accent shrink-0"><Cpu size={18} /></div>
                             <div>
-                                <h4 className="text-primary font-bold">Industry-Trained Specifics</h4>
+                                <h4 className="text-accent font-bold">Industry-Trained Specifics</h4>
                                 <p className="text-secondary text-sm">Trained on Western Red Cedar, Siberian Larch, and Anthracite Grey profiles. We render with the knowledge of materials used in real-world UK construction projects.</p>
                             </div>
                         </div>
@@ -147,7 +147,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                 {/* 5. Full Features Grid */}
                 <div className="w-full space-y-12 pb-24">
                     <div className="text-center">
-                        <h2 className="text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080] w-fit inline-block mb-4">Purpose-Built for Garden Rooms</h2>
+                        <h2 className="text-4xl font-black tracking-tight text-accent w-fit inline-block mb-4">Purpose-Built for Garden Rooms</h2>
                         <p className="text-secondary max-w-2xl mx-auto">Every feature is designed around the specific needs of the UK garden room and annexe industry, not adapted from generic tools.</p>
                     </div>
 
@@ -204,7 +204,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, fea
         <div className="text-accent mb-8 bg-accent/10 w-fit p-4 rounded-2xl border border-accent/20 group-hover:bg-accent group-hover:text-white transition-all duration-500 group-hover:scale-110 shadow-sm">
             {icon}
         </div>
-        <h3 className="text-primary font-bold text-lg mb-2">{title}</h3>
+        <h3 className="text-accent font-bold text-lg mb-2">{title}</h3>
         <p className="text-secondary text-sm leading-relaxed">{description}</p>
 
         {features && (

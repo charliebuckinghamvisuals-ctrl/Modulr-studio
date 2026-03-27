@@ -7,7 +7,7 @@ export const AboutView: React.FC = () => {
         <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar">
             {/* Ambient Lighting */}
             <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[150px] pointer-events-none"></div>
-            <div className="absolute bottom-1/4 left-1/3 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+            <div className="absolute bottom-1/4 left-1/3 w-[400px] h-[400px] bg-accent/5 rounded-full blur-[120px] pointer-events-none"></div>
 
             {/* Main Content Area */}
             <div className="flex-1 p-8 md:p-16 lg:p-24 relative z-10">
@@ -19,9 +19,9 @@ export const AboutView: React.FC = () => {
                             <Sparkles size={14} className="animate-pulse" />
                             Architectural Intelligence
                         </div>
-                        <h1 className="text-5xl md:text-7xl font-black text-primary tracking-tight leading-[1.05] max-w-4xl">
+                        <h1 className="text-5xl md:text-7xl font-black text-accent tracking-tight leading-[1.05] max-w-4xl">
                             The World's First Dedicated <br/>
-                            AI Render Engine for <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#000000] via-[#404040] to-[#808080]">Garden Rooms & Annexes</span>
+                            AI Render Engine for Garden Rooms & Annexes
                         </h1>
                         <p className="text-lg md:text-xl text-secondary leading-relaxed max-w-2xl font-medium">
                             We built Modulr Studio to solve a specific problem: making high-end architectural visuals accessible, instant, and affordable for the UK's garden room and annexe specialists.
@@ -35,18 +35,18 @@ export const AboutView: React.FC = () => {
                                 <Target className="text-accent" size={28} />
                             </div>
                             <div className="space-y-3">
-                                <h3 className="text-2xl font-extrabold text-primary tracking-tight">Why We Built It</h3>
+                                <h3 className="text-2xl font-extrabold text-accent tracking-tight">Why We Built It</h3>
                                 <p className="text-secondary text-base leading-relaxed">
                                     Traditional rendering is slow and costs hundreds per image. We created this engine to remove that barrier, allowing you to iterate on designs and present to clients without waiting days for a designer.
                                 </p>
                             </div>
                         </div>
-                        <div className="glass-panel p-10 rounded-[2.5rem] space-y-6 border border-border bg-white/40 backdrop-blur-xl shadow-2xl shadow-black/[0.03] hover:shadow-blue-500/5 transition-all duration-500">
-                            <div className="w-14 h-14 rounded-2xl bg-blue-500/5 flex items-center justify-center">
-                                <Building2 className="text-blue-500" size={28} />
+                        <div className="glass-panel p-10 rounded-[2.5rem] space-y-6 border border-border bg-white/40 backdrop-blur-xl shadow-2xl shadow-black/[0.03] hover:shadow-accent/5 transition-all duration-500">
+                            <div className="w-14 h-14 rounded-2xl bg-accent/5 flex items-center justify-center">
+                                <Building2 className="text-accent" size={28} />
                             </div>
                             <div className="space-y-3">
-                                <h3 className="text-2xl font-extrabold text-primary tracking-tight">Who It's For</h3>
+                                <h3 className="text-2xl font-extrabold text-accent tracking-tight">Who It's For</h3>
                                 <p className="text-secondary text-base leading-relaxed">
                                     Specifically designed for <strong>garden room and annexe providers</strong>. Whether you're a small bespoke builder or a national provider, this tool is geared to your unique architectural language.
                                 </p>
@@ -57,7 +57,7 @@ export const AboutView: React.FC = () => {
                     {/* Unique Value Grid */}
                     <section className="flex flex-col items-center space-y-16 py-10 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-400">
                         <div className="text-center space-y-4">
-                            <h2 className="text-3xl font-extrabold text-primary tracking-tight">The AI Edge.</h2>
+                            <h2 className="text-3xl font-extrabold text-accent tracking-tight">The AI Edge.</h2>
                             <p className="text-secondary text-base max-w-xl">
                                 We are the world's first dedicated AI render engine built specifically for the garden room and annexe sector.
                             </p>
@@ -72,8 +72,8 @@ export const AboutView: React.FC = () => {
                                 <p className="text-secondary text-sm leading-relaxed">Professional 4K results that rival manual design, generated in seconds.</p>
                             </div>
                             <div className="flex flex-col items-center text-center space-y-4">
-                                <div className="w-12 h-12 rounded-full bg-blue-500/5 flex items-center justify-center border border-blue-500/10">
-                                    <PoundSterling className="text-blue-500" size={20} />
+                                <div className="w-12 h-12 rounded-full bg-accent/5 flex items-center justify-center border border-accent/10">
+                                    <PoundSterling className="text-accent" size={20} />
                                 </div>
                                 <h4 className="text-lg font-bold text-primary">Huge Savings</h4>
                                 <p className="text-secondary text-sm leading-relaxed">Dramatically reduce your overheads by moving visualization in-house.</p>
@@ -101,7 +101,7 @@ export const AboutView: React.FC = () => {
                                             <tr className="border-b border-border bg-accent/5">
                                                 <th className="p-6 md:p-8 text-xs font-black uppercase tracking-widest text-secondary">Metric</th>
                                                 <th className="p-6 md:p-8 text-xs font-black uppercase tracking-widest text-secondary">Traditional CGI Studio</th>
-                                                <th className="p-6 md:p-8 text-xs font-black uppercase tracking-widest text-primary">Modulr Studio (Business)</th>
+                                                <th className="p-6 md:p-8 text-xs font-black uppercase tracking-widest text-accent">Modulr Studio (Business)</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border/50">
@@ -129,7 +129,7 @@ export const AboutView: React.FC = () => {
                                                 <td className="p-6 md:p-8 text-sm font-medium text-red-500/80">£62,500+</td>
                                                 <td className="p-6 md:p-8">
                                                     <div className="flex flex-col">
-                                                        <span className="text-sm font-medium text-primary uppercase font-black">£99</span>
+                                                        <span className="text-sm font-medium text-accent uppercase font-black">£99</span>
                                                         <span className="text-[10px] font-medium text-accent uppercase tracking-[0.2em] mt-0.5">600x Value</span>
                                                     </div>
                                                 </td>
@@ -148,7 +148,7 @@ export const AboutView: React.FC = () => {
                         <div className="max-w-2xl space-y-8">
                             <div className="space-y-4">
                                 <h4 className="text-xs font-black uppercase tracking-[0.4em] text-accent">Exclusively Built by NAPC</h4>
-                                <h2 className="text-3xl md:text-4xl font-bold text-primary tracking-tight">Expertise in Planning.</h2>
+                                <h2 className="text-3xl md:text-4xl font-bold text-accent tracking-tight">Expertise in Planning.</h2>
                             </div>
                             
                             <p className="text-secondary text-base leading-relaxed">

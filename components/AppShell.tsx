@@ -31,7 +31,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#ffffff] to-[#e2e8f0] text-primary flex flex-col font-sans selection:bg-accent selection:text-white">
 
       {/* Premium Header */}
-      <header className="h-24 border-b border-border flex items-center justify-between px-8 bg-surface/40 backdrop-blur-2xl sticky top-0 z-50 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+      <header className="h-24 border-b border-white/5 flex items-center justify-between px-8 bg-accent sticky top-0 z-50 text-white">
 
         {/* Logo Area */}
         <div
@@ -42,21 +42,20 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
         </div>
 
         {/* Desktop Navigation - Absolutely Centered */}
-        <nav className="hidden lg:flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
+        <nav className="hidden lg:flex items-center gap-1 absolute left-1/2 -translate-x-1/2 p-1.5 rounded-full border-none">
           {navItems.map(item => {
             const isActive = activeStage === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`px-4 py-2 text-sm rounded-xl flex items-center gap-2 transition-all duration-300 relative overflow-hidden ${isActive
-                  ? 'text-primary bg-primary/5 border border-primary/10 shadow-[0_0_15px_rgba(139,92,246,0.15)]'
-                  : 'text-secondary hover:text-primary hover:bg-primary/5 border border-transparent'
+                className={`px-5 py-2.5 text-sm font-bold uppercase tracking-tight rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden ${isActive
+                  ? 'text-white bg-white/20 shadow-sm shadow-white/10'
+                  : 'text-white hover:bg-white/10'
                   }`}
               >
-                {isActive && <div className="absolute inset-0 bg-gradient-to-r from-accent/20 to-transparent opacity-50 pointer-events-none" />}
-                <span className={`relative z-10 ${isActive ? 'text-accent' : ''}`}>{item.icon}</span>
-                <span className="relative z-10 font-medium tracking-wide">{item.label}</span>
+                <span className="relative z-10">{item.icon}</span>
+                <span className="relative z-10">{item.label}</span>
               </button>
             )
           })}
@@ -68,17 +67,17 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           {headerActions}
           <button
             onClick={() => onNavigate(AppStage.PRICING)}
-            className="hidden lg:flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-accent/10 to-accent/20 border border-accent/20 hover:border-accent hover:shadow-[0_0_15px_rgba(139,92,246,0.3)] transition-all cursor-pointer min-w-[120px]"
+            className="hidden lg:flex items-center justify-center gap-2 px-5 py-2.5 rounded-full hover:bg-white/10 transition-all cursor-pointer min-w-[120px] border-none"
           >
-            <span className="text-[11px] font-bold tracking-widest text-primary uppercase mt-[2px]">Pricing</span>
+            <span className="text-xs font-bold tracking-widest text-white uppercase mt-[2px]">Pricing</span>
           </button>
 
           {onReset && activeStage !== AppStage.HOME && activeStage !== AppStage.PRICING && activeStage !== AppStage.ABOUT && (
             <button
               onClick={onReset}
-              className="group flex items-center gap-2 text-sm text-secondary hover:text-primary transition-colors"
+              className="group flex items-center gap-2 text-sm text-white/80 hover:text-white transition-colors"
             >
-              <span className="w-8 h-8 rounded-full bg-surface border border-border flex items-center justify-center group-hover:border-accent/50 group-hover:bg-accent/10 transition-all">
+              <span className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center group-hover:border-white/50 group-hover:bg-white/20 transition-all">
                 <Sparkles size={14} />
               </span>
               Start Over
@@ -88,27 +87,24 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col relative overflow-hidden">
+      <main className="flex-1 flex flex-col relative overflow-hidden min-h-screen">
         {children}
       </main>
 
       {/* Global Footer */}
-      <footer className="w-full py-4 px-8 border-t border-border bg-white flex items-center justify-between text-xs text-secondary shrink-0 z-50">
-        <div className="flex-[1] flex items-center">
-          <img src="/napc-logo.png" alt="NAPC Logo" className="h-28 object-contain" />
+      <footer className="w-full pt-40 pb-12 px-8 border-t border-border bg-white flex items-center justify-between text-xs text-secondary shrink-0 z-50">
+        <div className="flex-[1] flex items-center gap-4">
+          <img src="/Logo.png" alt="Modulr Studio Logo" className="h-36 w-auto object-contain" />
+          <div className="h-8 w-[1px] bg-accent/10"></div>
+          <p className="text-[10px] text-accent/60 font-montserrat tracking-wide font-bold uppercase italic">Est. 2026</p>
         </div>
 
-        <div className="flex-[2] flex flex-col items-center gap-1">
-          <p className="text-[10px] text-slate-400 font-montserrat tracking-wide">Created by NAPC Ltd &nbsp;|&nbsp; 01285 283 200 &nbsp;|&nbsp; info@napc.uk</p>
-          <button 
-            onClick={() => onNavigate(AppStage.ABOUT)}
-            className="text-[10px] font-bold text-accent/80 hover:text-accent uppercase tracking-wider transition-colors"
-          >
-            About Modulr Studio
-          </button>
+        <div className="flex-[1] flex flex-col items-center gap-3">
+          <p className="text-[10px] text-accent/60 font-montserrat tracking-wide">Created by NAPC Ltd &nbsp;|&nbsp; 01285 283 200 &nbsp;|&nbsp; info@napc.uk</p>
+          <img src="/napc-logo.png" alt="NAPC Logo" className="h-20 object-contain" />
         </div>
 
-        <div className="flex-[1] flex justify-end items-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+        <div className="flex-[1] flex justify-end items-center text-accent/60 font-bold uppercase tracking-widest text-[10px]">
           v3.2
         </div>
       </footer>

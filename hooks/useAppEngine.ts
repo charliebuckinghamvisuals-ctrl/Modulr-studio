@@ -56,6 +56,7 @@ export const useAppEngine = () => {
     const [editorAnalysis, setEditorAnalysis] = useState<any>(null);
     const [refinementPrompt, setRefinementPrompt] = useState('');
     const [downloadFormat, setDownloadFormat] = useState<'png' | 'jpg'>('png');
+    const [isSketchUpMode, setIsSketchUpMode] = useState(false);
 
     const [materials, setMaterials] = useState({
         walls: 'none',
@@ -91,6 +92,7 @@ export const useAppEngine = () => {
         setLineDrawingPrompt('');
         setEditorPrompt('');
         setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
+        setIsSketchUpMode(false);
         setActiveStage(AppStage.HOME);
 
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -292,7 +294,7 @@ export const useAppEngine = () => {
 
         setProcessing({ isLoading: true, message: 'Refining and enhancing render...' });
         try {
-            const result = await renderBuilding(renderedImage, materials, refinementPrompt, true, isProMode);
+            const result = await renderBuilding(renderedImage, materials, refinementPrompt, true, isProMode, undefined, isSketchUpMode);
             setRenderedImage(result);
             setRefinementPrompt('');
             await saveToHistory({
@@ -355,9 +357,12 @@ export const useAppEngine = () => {
         const source = originalImage;
         if (!source) return;
 
-        setProcessing({ isLoading: true, message: 'Rendering photorealistic textures and lighting...' });
+        const loadingMsg = isSketchUpMode
+            ? 'Enhancing SketchUp model to photorealistic quality...'
+            : 'Rendering photorealistic textures and lighting...';
+        setProcessing({ isLoading: true, message: loadingMsg });
         try {
-            const result = await renderBuilding(source, materials, additionalPrompt, isHighQuality, isProMode);
+            const result = await renderBuilding(source, materials, additionalPrompt, isHighQuality, isProMode, undefined, isSketchUpMode);
             setRenderedImage(result);
             setEditorImage(null);
             await saveToHistory({
@@ -393,7 +398,8 @@ export const useAppEngine = () => {
                     additionalPrompt, 
                     isHighQuality, 
                     isProMode,
-                    matConfig.orientation
+                    matConfig.orientation,
+                    isSketchUpMode
                 );
                 
                 newRenders.push(result);
@@ -507,6 +513,7 @@ export const useAppEngine = () => {
         handleReset, handleImageUpload, handleBatchImageUpload, handleDownload,
         refinementPrompt, setRefinementPrompt,
         downloadFormat, setDownloadFormat,
+        isSketchUpMode, setIsSketchUpMode,
         handleGenerateLineDrawing, handleAnalyzeMaterials, handleRender, handleBatchRender, handleRefineRender, handleEditImage, handleWeather, handleMaterialStudio, handleAnalyzeForEditor, handleAnalyzeForMaterialStudio,
         getRenderUrl
     };
