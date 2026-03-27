@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Moon, Sun, Monitor, Image as ImageIcon, Sparkles, Wand2, Layers, Download, CheckCircle2, History, AlertCircle, Trash2, Maximize2, X, Zap, Hexagon, Grid, Palette, Info, PoundSterling, BookOpen } from 'lucide-react';
+import { Moon, Sun, Monitor, Image as ImageIcon, Sparkles, Wand2, Layers, Download, CheckCircle2, History, AlertCircle, Trash2, Maximize2, X, Zap, Hexagon, Grid, Palette, Info, PoundSterling, BookOpen, Coins } from 'lucide-react';
 import { AppStage } from '../types';
 
 interface AppShellProps {
@@ -24,6 +24,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     { id: AppStage.EDITOR, icon: <Palette size={16} />, label: 'Refinement Studio' },
     { id: AppStage.MATERIAL_STUDIO, icon: <Grid size={16} />, label: 'Material Studio' },
     { id: AppStage.GUIDE, icon: <BookOpen size={16} />, label: 'Guide' },
+    { id: AppStage.PRICING, icon: <Coins size={16} />, label: 'Pricing' },
     { id: AppStage.ABOUT, icon: <Info size={16} />, label: 'About' },
   ];
 
@@ -38,24 +39,24 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           className="flex items-center gap-3 cursor-pointer group"
           onClick={() => onNavigate(AppStage.HOME)}
         >
-          <img src="/Logo.png" alt="Modulr Studio Logo" className="h-36 w-auto object-contain transition-transform duration-300 group-hover:scale-105" />
+          <img src="/Logo.png" alt="Modulr Studio Logo" className="h-48 w-auto object-contain transition-transform duration-300 group-hover:scale-105" />
         </div>
 
         {/* Desktop Navigation - Absolutely Centered */}
-        <nav className="hidden lg:flex items-center gap-1 absolute left-1/2 -translate-x-1/2 p-1.5 rounded-full border-none">
+        <nav className="hidden lg:flex items-center gap-0.5 absolute left-1/2 -translate-x-1/2 p-1.5 rounded-full border-none">
           {navItems.map(item => {
             const isActive = activeStage === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`px-5 py-2.5 text-xs font-bold uppercase tracking-tight rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden shadow-sm ${isActive
-                  ? 'text-slate-900 bg-white/60 shadow-white/10 border border-white/20'
+                className={`px-4 py-2.5 text-xs font-bold uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap ${isActive
+                  ? 'text-slate-900 bg-white/60'
                   : 'text-white hover:bg-white/10'
                   }`}
               >
-                <span className="relative z-10">{item.icon}</span>
-                <span className="relative z-10">{item.label}</span>
+                <span className="relative z-10 shrink-0">{item.icon}</span>
+                <span className="relative z-10 whitespace-nowrap">{item.label}</span>
               </button>
             )
           })}
@@ -65,12 +66,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
 
 
           {headerActions}
-          <button
-            onClick={() => onNavigate(AppStage.PRICING)}
-            className="hidden lg:flex items-center justify-center gap-2 px-5 py-2.5 rounded-full hover:bg-white/10 transition-all cursor-pointer min-w-[120px] border-none"
-          >
-            <span className="text-xs font-bold tracking-widest text-white uppercase mt-[2px]">Pricing</span>
-          </button>
+          
 
           {onReset && activeStage !== AppStage.HOME && activeStage !== AppStage.PRICING && activeStage !== AppStage.ABOUT && (
             <button

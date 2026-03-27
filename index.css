@@ -15,7 +15,6 @@
     text-transform: uppercase !important;
     letter-spacing: 0.1em !important;
     font-weight: 700 !important;
-    text-rendering: optimizeLegibility;
   }
 
   :root {
@@ -81,7 +80,6 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
   background-image:
     radial-gradient(circle at 15% 50%, var(--glow-color), transparent 25%),
     radial-gradient(circle at 85% 30%, var(--glow-color), transparent 25%);
@@ -245,72 +243,25 @@ input[type=range]::-webkit-slider-runnable-track {
     linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
 }
 
-/* ── Aurora Mesh Gradient (Homepage Only) ───────────────────── */
-.aurora-bg {
+/* ── Pro Drafting Grid (Technical Graph Paper) ──────────── */
+.drafting-grid {
   position: absolute;
   inset: 0;
-  overflow: hidden;
   pointer-events: none;
   z-index: 0;
-}
-
-.aurora-bg::before,
-.aurora-bg::after,
-.aurora-bg .aurora-spot {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(60px);
-  will-change: transform, opacity;
-}
-
-/* Top-left green orb */
-.aurora-bg::before {
-  width: 800px;
-  height: 800px;
-  top: -15%;
-  left: -10%;
-  background: radial-gradient(ellipse, rgba(64,90,86,0.55) 0%, rgba(64,90,86,0.20) 45%, transparent 70%);
+  background-image: 
+    linear-gradient(to right, rgba(64, 90, 86, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(64, 90, 86, 0.05) 1px, transparent 1px),
+    linear-gradient(to right, rgba(64, 90, 86, 0.015) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(64, 90, 86, 0.015) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: center top;
   mix-blend-mode: multiply;
-  animation: auroraA 14s ease-in-out infinite alternate;
 }
 
-/* Bottom-right cool-grey orb */
-.aurora-bg::after {
-  width: 700px;
-  height: 700px;
-  bottom: -10%;
-  right: -8%;
-  background: radial-gradient(ellipse, rgba(80,115,125,0.45) 0%, rgba(64,90,86,0.18) 50%, transparent 72%);
+.wireframe-ghost {
+  opacity: 0.15;
+  pointer-events: none;
   mix-blend-mode: multiply;
-  animation: auroraB 18s ease-in-out infinite alternate;
-}
-
-/* Centre-right warm sage accent */
-.aurora-bg .aurora-spot {
-  width: 520px;
-  height: 520px;
-  top: 28%;
-  right: 3%;
-  background: radial-gradient(ellipse, rgba(64,90,86,0.35) 0%, rgba(90,120,115,0.15) 55%, transparent 72%);
-  mix-blend-mode: multiply;
-  animation: auroraC 22s ease-in-out infinite alternate;
-}
-
-@keyframes auroraA {
-  0%   { transform: translate(0, 0) scale(1); }
-  50%  { transform: translate(6%, 4%) scale(1.08); }
-  100% { transform: translate(3%, -4%) scale(0.95); }
-}
-
-@keyframes auroraB {
-  0%   { transform: translate(0, 0) scale(1); }
-  40%  { transform: translate(-5%, -6%) scale(1.1); }
-  100% { transform: translate(4%, 5%) scale(0.92); }
-}
-
-@keyframes auroraC {
-  0%   { transform: translate(0, 0) scale(1); opacity: 0.8; }
-  60%  { transform: translate(-8%, 6%) scale(1.15); opacity: 1; }
-  100% { transform: translate(5%, -4%) scale(0.9); opacity: 0.7; }
+  transition: opacity 0.5s ease;
 }

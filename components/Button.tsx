@@ -45,7 +45,7 @@ export const Button: React.FC<ButtonProps> = ({
           }}
         />
         {icon && <span className="w-5 h-5 flex items-center justify-center relative z-10">{icon}</span>}
-        <span className="relative z-10 drop-shadow-sm">{children}</span>
+        <span className="relative z-10">{children}</span>
       </button>
     );
   }

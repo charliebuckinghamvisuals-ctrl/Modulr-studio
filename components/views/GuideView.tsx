@@ -1,9 +1,13 @@
 import React from 'react';
 import { BookOpen, HelpCircle, CheckCircle2, Layers, Grid, Palette, ArrowRight, Sparkles, PenTool, Image as ImageIcon } from 'lucide-react';
+import { DraftingBackground } from '../DraftingBackground';
 
 export const GuideView: React.FC = () => {
     return (
         <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar">
+            {/* Pro Drafting Grid Background */}
+            <DraftingBackground pageName="GUIDE" />
+
             {/* Ambient Lighting */}
             <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[150px] pointer-events-none"></div>
             <div className="absolute bottom-1/4 left-1/3 w-[400px] h-[400px] bg-accent/5 rounded-full blur-[120px] pointer-events-none"></div>

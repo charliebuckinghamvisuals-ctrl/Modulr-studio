@@ -1,12 +1,15 @@
 import React from 'react';
 import { Check, Zap, Sparkles, Building2, Crown, Gem, Wand2, TrendingUp } from 'lucide-react';
 import { Button } from '../Button';
+import { DraftingBackground } from '../DraftingBackground';
 
 export const PricingView: React.FC = () => {
     const [billingCycle, setBillingCycle] = React.useState<'monthly' | 'yearly'>('monthly');
 
     return (
         <div className="min-h-full bg-background relative overflow-y-auto w-full py-20 px-6 sm:px-12 flex flex-col items-center">
+            {/* Pro Drafting Grid Background */}
+            <DraftingBackground pageName="PRICING" />
 
             {/* Ambient Background Effects */}
             <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse-slow"></div>

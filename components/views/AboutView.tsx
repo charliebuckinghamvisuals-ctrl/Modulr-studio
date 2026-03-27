@@ -1,10 +1,14 @@
 import React from 'react';
-import { Info, Building2, Target, PoundSterling, Gem, Phone, Mail, ArrowRight, ExternalLink, Sparkles, TrendingUp } from 'lucide-react';
+import { Building2, Target, PoundSterling, Gem, Phone, Mail, ArrowRight, ExternalLink, Sparkles, TrendingUp } from 'lucide-react';
 import { Button } from '../Button';
+import { DraftingBackground } from '../DraftingBackground';
 
 export const AboutView: React.FC = () => {
     return (
         <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar">
+            {/* Pro Drafting Grid Background */}
+            <DraftingBackground pageName="ABOUT" />
+
             {/* Ambient Lighting */}
             <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[150px] pointer-events-none"></div>
             <div className="absolute bottom-1/4 left-1/3 w-[400px] h-[400px] bg-accent/5 rounded-full blur-[120px] pointer-events-none"></div>

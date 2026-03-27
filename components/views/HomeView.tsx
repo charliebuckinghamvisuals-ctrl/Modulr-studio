@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Smartphone, Zap, Grid, Layers, ShieldCheck, Cpu, Maximize, FileText, CheckCircle2, Sparkles, PenTool, CloudSun } from 'lucide-react';
 import { CompareSlider } from '../CompareSlider';
 import { Button } from '../Button';
+import { DraftingBackground } from '../DraftingBackground';
 
 interface HomeViewProps {
     onOpenEngine: () => void;
@@ -12,10 +13,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
     return (
         <div className="min-h-full flex flex-col items-center bg-background relative overflow-x-hidden pt-20 pb-20 w-full">
 
-            {/* Aurora Mesh Gradient Background */}
-            <div className="aurora-bg">
-                <div className="aurora-spot"></div>
-            </div>
+            {/* Pro Drafting Grid Background */}
+            <DraftingBackground pageName="HOMEPAGE" />
 
             <div className="max-w-6xl w-full flex flex-col items-center relative z-10 gap-24 px-8">
 
