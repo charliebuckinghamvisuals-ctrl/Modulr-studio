@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Smartphone, Zap, Grid, Layers, ShieldCheck, Cpu, Maximize, FileText, CheckCircle2, Sparkles, PenTool, CloudSun } from 'lucide-react';
 import { CompareSlider } from '../CompareSlider';
+import { Button } from '../Button';
 
 interface HomeViewProps {
     onOpenEngine: () => void;
@@ -11,9 +12,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
     return (
         <div className="min-h-full flex flex-col items-center bg-background relative overflow-x-hidden pt-20 pb-20 w-full">
 
-            {/* Ambient Background Glows */}
-            <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-accent/10 rounded-full blur-[120px] pointer-events-none"></div>
-            <div className="absolute bottom-1/4 right-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[100px] pointer-events-none"></div>
+            {/* Aurora Mesh Gradient Background */}
+            <div className="aurora-bg">
+                <div className="aurora-spot"></div>
+            </div>
 
             <div className="max-w-6xl w-full flex flex-col items-center relative z-10 gap-24 px-8">
 
@@ -36,13 +38,13 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                     </p>
 
                     <div className="flex justify-center">
-                        <button
+                        <Button
                             onClick={onOpenEngine}
-                            className="px-10 py-5 bg-accent text-white font-bold rounded-2xl hover:shadow-[0_20px_40px_rgba(64,90,86,0.2)] hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-3 text-lg"
+                            className="px-10 py-5 text-lg shadow-2xl"
+                            icon={<Sparkles size={22} />}
                         >
-                            <Zap size={22} className="text-background" />
-                            Launch Studio
-                        </button>
+                            Launch Render Engine
+                        </Button>
                     </div>
                 </div>
 
@@ -219,12 +221,12 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, fea
         )}
 
         {actionLabel && onAction && (
-            <button
+            <Button
                 onClick={(e) => { e.stopPropagation(); onAction(); }}
-                className="mt-6 w-full py-2.5 rounded-xl bg-accent/10 border border-accent/20 text-accent font-bold text-xs uppercase tracking-widest hover:bg-accent hover:text-white transition-all duration-300 relative z-10"
+                className="mt-6 w-full py-2.5 text-xs uppercase tracking-widest"
             >
                 {actionLabel}
-            </button>
+            </Button>
         )}
     </div>
 );

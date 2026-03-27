@@ -1,5 +1,6 @@
 import React from 'react';
 import { Check, Zap, Sparkles, Building2, Crown, Gem, Wand2, TrendingUp } from 'lucide-react';
+import { Button } from '../Button';
 
 export const PricingView: React.FC = () => {
     const [billingCycle, setBillingCycle] = React.useState<'monthly' | 'yearly'>('monthly');
@@ -44,7 +45,7 @@ export const PricingView: React.FC = () => {
                             <button
                                 onClick={() => setBillingCycle('yearly')}
                                 className={`px-6 py-2 rounded-xl text-sm font-bold transition-all duration-300 relative group ${billingCycle === 'yearly'
-                                    ? 'bg-accent shadow-[0_0_20px_rgba(64,90,86,0.5)] text-white transform scale-105'
+                                    ? 'bg-accent text-white shadow-lg transform scale-105'
                                     : 'text-secondary hover:text-primary'
                                     }`}
                             >
@@ -76,9 +77,9 @@ export const PricingView: React.FC = () => {
                             3 Days
                         </div>
 
-                        <button className="w-full py-3 px-6 rounded-xl bg-accent text-white font-bold hover:brightness-110 transition-all mb-8 shadow-lg shadow-accent/20 active:scale-95">
+                        <Button className="w-full mb-8 shadow-xl" onClick={() => {}}>
                             Start My Trial
-                        </button>
+                        </Button>
 
                         <div className="space-y-4 flex-1">
                             <div className="text-xs font-bold uppercase tracking-widest text-secondary mb-2">What's included</div>
@@ -115,9 +116,9 @@ export const PricingView: React.FC = () => {
                             )}
                         </div>
 
-                        <button className="w-full py-3 px-6 rounded-xl bg-accent text-white font-bold hover:brightness-110 transition-all mb-8 shadow-lg shadow-accent/20 active:scale-95">
+                        <Button className="w-full mb-8 shadow-xl" onClick={() => {}}>
                             Upgrade Now
-                        </button>
+                        </Button>
 
                         <div className="space-y-4 flex-1">
                             <div className="text-xs font-bold uppercase tracking-widest text-secondary mb-2">Everything in Free, plus:</div>
@@ -160,9 +161,9 @@ export const PricingView: React.FC = () => {
                             )}
                         </div>
 
-                        <button className="w-full py-4 px-6 rounded-xl bg-accent text-white font-bold hover:brightness-110 transition-all mb-8 shadow-[0_0_25px_rgba(64,90,86,0.5)] active:scale-95">
+                        <Button className="w-full mb-8 shadow-2xl" onClick={() => {}}>
                             Upgrade Now
-                        </button>
+                        </Button>
 
                         <div className="space-y-4 flex-1">
                             <div className="text-xs font-bold uppercase tracking-widest text-primary dark:text-white mb-2">Everything in Standard, plus:</div>
@@ -250,9 +251,9 @@ export const PricingView: React.FC = () => {
                                 <span className="text-3xl font-black text-primary">£50</span>
                                 <span className="text-xs font-bold text-secondary uppercase tracking-widest">Extra / month</span>
                             </div>
-                            <button className="px-8 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 transition-all shadow-lg hover:shadow-primary/20">
+                            <Button className="px-8" onClick={() => {}}>
                                 Add to Plan
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

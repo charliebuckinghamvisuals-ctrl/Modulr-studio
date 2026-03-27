@@ -49,8 +49,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`px-5 py-2.5 text-sm font-bold uppercase tracking-tight rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden ${isActive
-                  ? 'text-white bg-white/20 shadow-sm shadow-white/10'
+                className={`px-5 py-2.5 text-xs font-bold uppercase tracking-tight rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden shadow-sm ${isActive
+                  ? 'text-slate-900 bg-white/60 shadow-white/10 border border-white/20'
                   : 'text-white hover:bg-white/10'
                   }`}
               >
@@ -95,8 +95,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
       <footer className="w-full pt-40 pb-12 px-8 border-t border-border bg-white flex items-center justify-between text-xs text-secondary shrink-0 z-50">
         <div className="flex-[1] flex items-center gap-4">
           <img src="/Logo.png" alt="Modulr Studio Logo" className="h-36 w-auto object-contain" />
-          <div className="h-8 w-[1px] bg-accent/10"></div>
-          <p className="text-[10px] text-accent/60 font-montserrat tracking-wide font-bold uppercase italic">Est. 2026</p>
         </div>
 
         <div className="flex-[1] flex flex-col items-center gap-3">

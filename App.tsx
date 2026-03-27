@@ -145,11 +145,11 @@ const App: React.FC = () => {
             </div>
             <div className="mt-auto pt-6">
                 {engine.batchImages.length > 0 ? (
-                    <Button className="w-full" onClick={engine.handleBatchRender} icon={<Wand2 size={16} />} disabled={engine.processing.isLoading}>
+                    <Button borderless className="w-full" onClick={engine.handleBatchRender} icon={<Sparkles size={16} />} disabled={engine.processing.isLoading}>
                         Render Batch Sequence ({engine.batchImages.length})
                     </Button>
                 ) : (
-                    <Button className="w-full" onClick={engine.handleRender} icon={<Wand2 size={16} />} disabled={!engine.originalImage}>
+                    <Button borderless className="w-full" onClick={engine.handleRender} icon={<Sparkles size={16} />} disabled={!engine.originalImage}>
                         Render Scene
                     </Button>
                 )}
@@ -183,7 +183,7 @@ const App: React.FC = () => {
                         onChange={(e) => engine.setEditorPrompt(e.target.value)}
                     />
 
-                    <Button className="w-full mt-4" onClick={() => engine.handleEditImage(maskImage)} icon={<Wand2 size={16} />} disabled={!engine.originalImage || !engine.editorPrompt.trim()}>
+                    <Button className="w-full mt-4" onClick={() => engine.handleEditImage(maskImage)} icon={<Sparkles size={16} />} disabled={!engine.originalImage || !engine.editorPrompt.trim()}>
                         Apply Edit
                     </Button>
                 </div>
@@ -485,8 +485,8 @@ const App: React.FC = () => {
                     <Button
                         onClick={engine.handleRefineRender}
                         disabled={engine.processing.isLoading || !engine.refinementPrompt.trim()}
-                        className="h-auto px-6 whitespace-nowrap bg-accent hover:bg-accent-hover text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-accent/20 active:scale-95 transition-all"
-                        icon={<Wand2 size={16} />}
+                        className="h-auto px-6 whitespace-nowrap"
+                        icon={<Sparkles size={16} />}
                     >
                         Refine
                     </Button>
@@ -603,7 +603,7 @@ const App: React.FC = () => {
 
             {engine.activeStage === AppStage.HOME && (
                 <HomeView
-                    onOpenEngine={() => engine.fileInputRef.current?.click()}
+                    onOpenEngine={() => engine.setActiveStage(AppStage.RENDER_ENGINE)}
                     onOpenMaterialStudio={() => engine.materialInputRef.current?.click()}
                 />
             )}
