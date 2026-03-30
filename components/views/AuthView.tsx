@@ -24,15 +24,18 @@ export const AuthView: React.FC = () => {
                 
                 {/* Left Side: Architectural Showcase (Desktop Only) */}
                 <div className="hidden md:flex md:w-[45%] bg-slate-50 relative overflow-hidden flex-col justify-between p-12 border-r border-border">
-                    {/* Background Render - Low Opacity */}
+                    {/* Background Render - Full Opacity */}
                     <img 
                         src="/demo-render.png" 
                         alt="Background Render" 
-                        className="absolute inset-0 w-full h-full object-cover opacity-15 mix-blend-multiply"
+                        className="absolute inset-0 w-full h-full object-cover opacity-100"
                     />
                     
+                    {/* Subtle Gradient Overlay for Text Readability */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-white/10 to-transparent"></div>
+                    
                     <div className="absolute inset-0 bg-accent/5 opacity-40"></div>
-                    <div className="absolute inset-0 canvas-grid opacity-20 scale-150"></div>
+                    <div className="absolute inset-0 canvas-grid opacity-10 scale-150"></div>
                     
                     <div className="relative z-10 space-y-6">
                         <div className="flex items-center gap-2 text-accent">
