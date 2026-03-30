@@ -8,7 +8,10 @@ export enum AppStage {
   MATERIAL_STUDIO = 'material_studio',
   PRICING = 'pricing',
   ABOUT = 'about',
-  GUIDE = 'guide'
+  GUIDE = 'guide',
+  GALLERY = 'gallery',
+  AUTH = 'auth',
+  ACCOUNT = 'account'
 }
 
 export interface MaterialConfig {
@@ -18,6 +21,26 @@ export interface MaterialConfig {
   doors: string;
   decking: string;
   orientation?: string;
+}
+
+export interface PresetMaterial {
+  text: string;
+  image: string | null;
+}
+
+export interface LibraryMaterialItem {
+  id: string;
+  name: string;
+  text: string;
+  image: string | null;
+}
+
+export interface MaterialLibrary {
+  walls: LibraryMaterialItem[];
+  roof: LibraryMaterialItem[];
+  windows: LibraryMaterialItem[];
+  doors: LibraryMaterialItem[];
+  decking: LibraryMaterialItem[];
 }
 
 export interface WeatherConfig {

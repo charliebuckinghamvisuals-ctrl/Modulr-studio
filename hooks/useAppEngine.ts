@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { AppStage, MaterialConfig, WeatherConfig, ProcessingState } from '../types';
+import { AppStage, MaterialConfig, WeatherConfig, ProcessingState, LibraryMaterialItem, MaterialLibrary } from '../types';
 import { PRESET_MATERIALS, WEATHER_CONDITIONS, SEASONS } from '../constants';
 import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor } from '../services/geminiService';
 import { saveToHistory } from '../services/historyService';
@@ -57,6 +57,7 @@ export const useAppEngine = () => {
     const [refinementPrompt, setRefinementPrompt] = useState('');
     const [downloadFormat, setDownloadFormat] = useState<'png' | 'jpg'>('png');
     const [isSketchUpMode, setIsSketchUpMode] = useState(false);
+    const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
 
     const [materials, setMaterials] = useState({
         walls: 'none',
@@ -71,6 +72,50 @@ export const useAppEngine = () => {
         intensity: 0.5,
         season: 'summer'
     });
+
+    // Material Library State
+    const [materialLibrary, setMaterialLibrary] = useState<MaterialLibrary>(() => {
+        const saved = localStorage.getItem('modulr_material_library');
+        if (saved) return JSON.parse(saved);
+        
+        // Default empty structure
+        return {
+            walls: [],
+            roof: [],
+            windows: [],
+            doors: [],
+            decking: []
+        };
+    });
+
+    const addToLibrary = (category: keyof MaterialLibrary, item: Omit<LibraryMaterialItem, 'id'>) => {
+        const newItem: LibraryMaterialItem = {
+            ...item,
+            id: Date.now().toString()
+        };
+
+        setMaterialLibrary(prev => {
+            const next = {
+                ...prev,
+                [category]: [...prev[category], newItem]
+            };
+            localStorage.setItem('modulr_material_library', JSON.stringify(next));
+            return next;
+        });
+        toast.success(`Added to ${category} library`);
+    };
+
+    const removeFromLibrary = (category: keyof MaterialLibrary, id: string) => {
+        setMaterialLibrary(prev => {
+            const next = {
+                ...prev,
+                [category]: prev[category].filter(item => item.id !== id)
+            };
+            localStorage.setItem('modulr_material_library', JSON.stringify(next));
+            return next;
+        });
+        toast.success("Removed from library");
+    };
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const materialInputRef = useRef<HTMLInputElement>(null);
@@ -514,6 +559,8 @@ export const useAppEngine = () => {
         refinementPrompt, setRefinementPrompt,
         downloadFormat, setDownloadFormat,
         isSketchUpMode, setIsSketchUpMode,
+        materialLibrary, addToLibrary, removeFromLibrary,
+        activeProfileId, setActiveProfileId,
         handleGenerateLineDrawing, handleAnalyzeMaterials, handleRender, handleBatchRender, handleRefineRender, handleEditImage, handleWeather, handleMaterialStudio, handleAnalyzeForEditor, handleAnalyzeForMaterialStudio,
         getRenderUrl
     };

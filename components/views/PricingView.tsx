@@ -24,7 +24,7 @@ export const PricingView: React.FC = () => {
                         <span className="text-sm font-semibold tracking-wide text-primary">Simple, transparent pricing</span>
                     </div>
 
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-accent mb-6 drop-shadow-sm pb-2">
+                    <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-accent mb-6 drop-shadow-sm pb-2 leading-[1.05]">
                         Professional rendering,<br />scaled to your studio.
                     </h1>
 

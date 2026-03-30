@@ -14,7 +14,7 @@
     font-family: 'Montserrat', sans-serif !important;
     text-transform: uppercase !important;
     letter-spacing: 0.1em !important;
-    font-weight: 700 !important;
+    font-weight: 400 !important;
   }
 
   :root {
@@ -112,7 +112,7 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .nav-link {
@@ -132,7 +132,7 @@ body {
 .nav-link.active {
   color: var(--accent);
   background: rgba(64, 90, 86, 0.08);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* Premium Animations */

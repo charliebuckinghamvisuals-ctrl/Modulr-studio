@@ -21,7 +21,7 @@ export const GuideView: React.FC = () => {
                             <BookOpen size={14} className="animate-pulse" />
                             User Guide & Handbook
                         </div>
-                        <h1 className="text-4xl md:text-6xl font-black text-accent tracking-tight leading-tight">
+                        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-accent tracking-tight leading-[1.05]">
                             Get the Best Results from <br/>
                             Modulr Studio
                         </h1>

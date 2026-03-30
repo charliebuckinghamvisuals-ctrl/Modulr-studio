@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Wand2, RefreshCw, Zap, Sparkles, PenTool, Image as ImageIcon, Upload, Grid } from 'lucide-react';
+import { ArrowRight, Wand2, RefreshCw, Zap, Sparkles, PenTool, Image as ImageIcon, Upload, Grid, Layers, ChevronDown, Settings, History } from 'lucide-react';
 import { ToggleSwitch } from './components/ToggleSwitch';
 import { Toaster, toast } from 'react-hot-toast';
 import { AppShell } from './components/AppShell';
@@ -20,12 +20,16 @@ import { WorkspaceView } from './components/views/WorkspaceView';
 import { PricingView } from './components/views/PricingView';
 import { AboutView } from './components/views/AboutView';
 import { GuideView } from './components/views/GuideView';
+import { GalleryView } from './components/views/GalleryView';
+import { AuthView } from './components/views/AuthView';
+import { AccountView } from './components/views/AccountView';
 
 const App: React.FC = () => {
     const engine = useAppEngine();
     const [maskImage, setMaskImage] = React.useState<string | null>(null);
     const [isAppLoaded, setIsAppLoaded] = React.useState(false);
     const [selectedBatchIndex, setSelectedBatchIndex] = React.useState(0);
+    const [openCategoryDropdown, setOpenCategoryDropdown] = React.useState<string | null>(null);
     const lineEnvInputRef = React.useRef<HTMLInputElement>(null);
 
     const handleLoadHistory = (item: HistoryItem) => {
@@ -101,17 +105,98 @@ const App: React.FC = () => {
             </button>
 
             <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                {Object.keys(engine.materials).map((key) => (
+                
+                {/* Material Library Quick Access */}
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-2">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
+                        <Layers size={14} className="text-secondary" />
+                        Material Library
+                    </label>
+                    <button 
+                        onClick={() => engine.setActiveStage(AppStage.ACCOUNT)}
+                        className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-secondary hover:text-accent px-2 py-1 rounded-md transition-all hover:bg-slate-50 border border-transparent hover:border-slate-100"
+                    >
+                        <Settings size={12} />
+                        Manage
+                    </button>
+                </div>
+
+                {Object.keys(engine.materials).filter(k => k !== 'orientation').map((key) => (
                     <div key={key} className="space-y-2">
-                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></div>
-                            {key}
-                        </label>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></div>
+                                    {key === 'walls' ? 'Walls / Cladding' : key}
+                                </label>
+                                
+                                <button 
+                                    onClick={() => {
+                                        const text = engine.materials[key as keyof typeof engine.materials];
+                                        if (text === 'none' || !text.trim()) {
+                                            toast.error("Enter a material description first");
+                                            return;
+                                        }
+                                        const name = prompt(`Enter a name for this ${key === 'walls' ? 'cladding' : key} preset:`);
+                                        if (name) {
+                                            engine.addToLibrary(key as any, { name, text, image: null });
+                                        }
+                                    }}
+                                    className="p-1 rounded-md text-secondary hover:text-accent hover:bg-slate-50 transition-all opacity-0 group-hover:opacity-100"
+                                    title="Save to Library"
+                                >
+                                    <History size={12} />
+                                </button>
+                            </div>
+                            
+                            {engine.materialLibrary[key as keyof typeof engine.materialLibrary].length > 0 && (
+                                <div 
+                                    className="relative"
+                                    onMouseLeave={() => setOpenCategoryDropdown(null)}
+                                >
+                                    <button 
+                                        onClick={() => setOpenCategoryDropdown(openCategoryDropdown === key ? null : key)}
+                                        className="text-[9px] font-bold uppercase tracking-widest text-secondary hover:text-accent flex items-center gap-1 px-2 py-1 rounded-md hover:bg-slate-50 transition-all border border-transparent hover:border-slate-200"
+                                    >
+                                        Preset
+                                        <ChevronDown size={10} />
+                                    </button>
+                                    <div className={`absolute right-0 top-full mt-1 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 transition-all duration-200 z-50 origin-top-right ${openCategoryDropdown === key ? 'opacity-100 pointer-events-auto scale-100' : 'opacity-0 pointer-events-none scale-95'}`}>
+                                        <div className="p-1 max-h-60 overflow-y-auto custom-scrollbar">
+                                            <div className="px-3 py-2 border-b border-slate-50 mb-1">
+                                                <p className="text-[9px] font-bold text-accent/40 uppercase tracking-widest">Select {key === 'walls' ? 'Cladding' : key} Preset</p>
+                                            </div>
+                                            {engine.materialLibrary[key as keyof typeof engine.materialLibrary].map(item => (
+                                                <button 
+                                                    key={item.id}
+                                                    onClick={() => {
+                                                        engine.setMaterials(prev => ({ ...prev, [key]: item.text }));
+                                                        toast.success(`Applied ${item.name}`);
+                                                        setOpenCategoryDropdown(null);
+                                                    }}
+                                                    className="w-full text-left px-3 py-2.5 rounded-xl text-[11px] font-bold text-accent hover:bg-slate-50 transition-colors flex flex-col gap-0.5 group/item"
+                                                >
+                                                    <div className="flex items-center justify-between w-full">
+                                                        <span className="truncate pr-2">{item.name}</span>
+                                                        <Sparkles size={8} className="text-accent/0 group-hover/item:text-accent/40 transition-colors" />
+                                                    </div>
+                                                    <span className="text-[9px] text-secondary font-medium truncate italic leading-tight">
+                                                        "{item.text}"
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         <textarea
                             className="w-full p-4 rounded-2xl bg-white border border-accent/20 text-accent focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-accent/30 min-h-[80px] resize-none shadow-inner transition-all duration-300"
                             placeholder={`Analyzed or custom ${key} material...`}
                             value={engine.materials[key as keyof typeof engine.materials]}
-                            onChange={(e) => engine.setMaterials(prev => ({ ...prev, [key]: e.target.value }))}
+                            onChange={(e) => {
+                                engine.setMaterials(prev => ({ ...prev, [key]: e.target.value }));
+                            }}
                         />
                     </div>
                 ))}
@@ -599,6 +684,18 @@ const App: React.FC = () => {
 
             {engine.activeStage === AppStage.GUIDE && (
                 <GuideView />
+            )}
+
+            {engine.activeStage === AppStage.GALLERY && (
+                <GalleryView />
+            )}
+
+            {engine.activeStage === AppStage.AUTH && (
+                <AuthView />
+            )}
+
+            {engine.activeStage === AppStage.ACCOUNT && (
+                <AccountView />
             )}
 
             {engine.activeStage === AppStage.HOME && (

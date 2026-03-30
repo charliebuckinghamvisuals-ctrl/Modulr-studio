@@ -23,7 +23,7 @@ export const AboutView: React.FC = () => {
                             <Sparkles size={14} className="animate-pulse" />
                             Architectural Intelligence
                         </div>
-                        <h1 className="text-5xl md:text-7xl font-black text-accent tracking-tight leading-[1.05] max-w-4xl">
+                        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-accent tracking-tight leading-[1.05] max-w-4xl">
                             The World's First Dedicated <br/>
                             AI Render Engine for Garden Rooms & Annexes
                         </h1>
