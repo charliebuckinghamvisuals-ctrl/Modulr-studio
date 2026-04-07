@@ -265,3 +265,26 @@ input[type=range]::-webkit-slider-runnable-track {
   mix-blend-mode: multiply;
   transition: opacity 0.5s ease;
 }
+
+/* ── Veo Studio Cinematic Animations ───────────────────── */
+@keyframes cinematicZoom {
+  from { transform: scale(1.0); }
+  to   { transform: scale(1.18); }
+}
+
+@keyframes cinematicPan {
+  from { transform: scale(1.12) translateX(-6%); }
+  to   { transform: scale(1.12) translateX(6%); }
+}
+
+@keyframes cinematicCrane {
+  from { transform: scale(1.12) translateY(5%); }
+  to   { transform: scale(1.12) translateY(-5%); }
+}
+
+@keyframes cinematicOrbit {
+  0%   { transform: scale(1.1) translateX(-4%) translateY(0%); }
+  33%  { transform: scale(1.14) translateX(2%) translateY(-3%); }
+  66%  { transform: scale(1.12) translateX(4%) translateY(2%); }
+  100% { transform: scale(1.1) translateX(-4%) translateY(0%); }
+}

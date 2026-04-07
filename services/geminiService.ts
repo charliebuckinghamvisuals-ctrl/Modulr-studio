@@ -307,7 +307,7 @@ export const analyzeExteriorDetails = async (base64Image: string): Promise<strin
 /**
  * Generates a Scene Studio presentation board (2x2 grid) based on SELECTED focus points.
  */
-export const generatePresentationBoard = async (base64Image: string, focusPoints: string[], isProMode: boolean = false): Promise<string> => {
+export const generatePresentationBoard = async (base64Image: string, focusPoints: string[], isHighQuality: boolean = false, isProMode: boolean = false): Promise<string> => {
   try {
     if (focusPoints.length !== 4) {
       throw new Error("Must select exactly 4 focus points");
@@ -316,7 +316,7 @@ export const generatePresentationBoard = async (base64Image: string, focusPoints
     const response = await fetch(`${API_BASE_URL}/generatePresentationBoard`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ base64Image, focusPoints, isProMode })
+      body: JSON.stringify({ base64Image, focusPoints, isHighQuality, isProMode })
     });
 
     if (!response.ok) {
@@ -330,5 +330,44 @@ export const generatePresentationBoard = async (base64Image: string, focusPoints
   } catch (error) {
     console.error("Scene Studio error:", error);
     throw error;
+  }
+};
+
+/**
+ * Analyzes the scene and suggests unique cinematic motion prompts for video generation.
+ */
+export const analyzeSceneForVideo = async (base64Images: string[], mode: 'zoom' | 'walkthrough'): Promise<string[]> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/analyzeSceneForVideo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64Images, mode })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.result as string[];
+
+  } catch (error) {
+    console.error("Video scene analysis error:", error);
+    // Fallback to presets if analysis fails
+    if (mode === 'zoom') {
+      return [
+        "Smooth cinematic zoom-in focusing on the main architectural features.",
+        "Slow majestic pan across the facade to reveal the site context.",
+        "Gentle approach toward the primary entrance with soft lighting.",
+        "Dynamic low-angle tracking shot along the building base."
+      ];
+    } else {
+      return [
+        "Seamless 360-degree orbital walkthrough around the structure.",
+        "Smooth transition between the uploaded perspective points.",
+        "Cinematic rotation highlighting the overall form and materials."
+      ];
+    }
   }
 };

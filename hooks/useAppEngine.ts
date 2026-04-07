@@ -49,7 +49,6 @@ export const useAppEngine = () => {
     const [additionalPrompt, setAdditionalPrompt] = useState('');
     const [lineDrawingPrompt, setLineDrawingPrompt] = useState('');
     const [editorPrompt, setEditorPrompt] = useState('');
-    const [lightingDirection, setLightingDirection] = useState<'morning' | 'noon' | 'evening' | 'night'>('noon');
     const [isHighQuality, setIsHighQuality] = useState(true);
     const [isProMode, setIsProMode] = useState(true);
     const [isColoredLineDrawing, setIsColoredLineDrawing] = useState(false);
@@ -521,7 +520,7 @@ export const useAppEngine = () => {
 
         setProcessing({ isLoading: true, message: 'Generating Material Sheet (2x2 Grid)...' });
         try {
-            const result = await generatePresentationBoard(originalImage, selectedDetails, isProMode);
+            const result = await generatePresentationBoard(originalImage, selectedDetails, isHighQuality, isProMode);
             setMaterialStudioImage(result);
             await saveToHistory({
                 stage: AppStage.MATERIAL_STUDIO,
@@ -547,7 +546,6 @@ export const useAppEngine = () => {
         additionalPrompt, setAdditionalPrompt,
         lineDrawingPrompt, setLineDrawingPrompt,
         editorPrompt, setEditorPrompt,
-        lightingDirection, setLightingDirection,
         isHighQuality, setIsHighQuality,
         isProMode, setIsProMode,
         isColoredLineDrawing, setIsColoredLineDrawing,

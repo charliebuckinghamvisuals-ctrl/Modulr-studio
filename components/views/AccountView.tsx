@@ -6,7 +6,16 @@ import { useAppEngine } from '../../hooks/useAppEngine';
 import { LibraryMaterialItem } from '../../types';
 import { toast } from 'react-hot-toast';
 
-export const AccountView: React.FC = () => {
+import { auth } from '../../services/firebase';
+import { signOut } from 'firebase/auth';
+import { useAuth } from '../../hooks/useAuth';
+import { AppStage } from '../../types';
+
+interface AccountViewProps {
+    onNavigate?: (stage: AppStage) => void;
+}
+
+export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
     const engine = useAppEngine();
 
     // Local state for "Add New" forms (one per category)
@@ -38,10 +47,22 @@ export const AccountView: React.FC = () => {
         }));
     };
 
-    // Design-only mockup data for account stats
-    const user = {
-        name: "Charlie Buckingham",
-        email: "architect@napc.uk",
+    const { user } = useAuth();
+
+    const handleSignOut = async () => {
+        try {
+            await signOut(auth);
+            toast.success('Signed out securely');
+            onNavigate?.(AppStage.HOME);
+        } catch (error) {
+            toast.error('Failed to sign out');
+        }
+    };
+
+    // Design-only mockup data for account stats combined with real user
+    const userDisplay = {
+        name: user?.displayName || "No Name Set",
+        email: user?.email || "No Email",
         plan: "Professional Studio",
         credits: {
             remaining: 420,
@@ -74,7 +95,7 @@ export const AccountView: React.FC = () => {
                             </h1>
                             <p className="text-secondary font-medium pl-1">System Version 3.2 Professional Access</p>
                         </div>
-                        <button className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-600 transition-colors bg-red-50 px-4 py-2 rounded-xl border border-red-100 self-start md:self-auto">
+                        <button onClick={handleSignOut} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-600 transition-colors bg-red-50 px-4 py-2 rounded-xl border border-red-100 self-start md:self-auto">
                             <LogOut size={14} />
                             Terminate Session
                         </button>
@@ -91,7 +112,7 @@ export const AccountView: React.FC = () => {
                             </div>
                             <div>
                                 <p className="text-[10px] font-bold text-accent/50 uppercase tracking-[0.2em]">Active Plan</p>
-                                <h3 className="text-2xl font-bold text-accent tracking-tight">{user.plan}</h3>
+                                <h3 className="text-2xl font-bold text-accent tracking-tight">{userDisplay.plan}</h3>
                             </div>
                         </div>
                         <div className="pt-6 mt-6 border-t border-slate-100">
@@ -116,15 +137,15 @@ export const AccountView: React.FC = () => {
                                 <div>
                                     <p className="text-[10px] font-bold text-accent/50 uppercase tracking-[0.2em]">Credits Remaining</p>
                                     <div className="flex items-baseline gap-2">
-                                        <h3 className="text-3xl font-bold text-accent tracking-tight">{user.credits.remaining}</h3>
-                                        <span className="text-secondary font-medium text-sm">/ {user.credits.total}</span>
+                                        <h3 className="text-3xl font-bold text-accent tracking-tight">{userDisplay.credits.remaining}</h3>
+                                        <span className="text-secondary font-medium text-sm">/ {userDisplay.credits.total}</span>
                                     </div>
                                 </div>
                                 {/* Progress Bar */}
                                 <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                                     <div 
                                         className="h-full bg-accent rounded-full relative overflow-hidden" 
-                                        style={{ width: `${(user.credits.remaining / user.credits.total) * 100}%` }}
+                                        style={{ width: `${(userDisplay.credits.remaining / userDisplay.credits.total) * 100}%` }}
                                     >
                                         <div className="absolute inset-0 bg-white/20 animate-shimmer"></div>
                                     </div>
@@ -146,7 +167,7 @@ export const AccountView: React.FC = () => {
                             </div>
                             <div>
                                 <p className="text-[10px] font-bold text-accent/50 uppercase tracking-[0.2em]">Next Renewal</p>
-                                <h3 className="text-2xl font-bold text-accent tracking-tighter">{user.nextRenewal}</h3>
+                                <h3 className="text-2xl font-bold text-accent tracking-tighter">{userDisplay.nextRenewal}</h3>
                             </div>
                         </div>
                         <div className="pt-6 mt-6 border-t border-slate-100">
@@ -175,7 +196,7 @@ export const AccountView: React.FC = () => {
                                     </div>
                                     <input 
                                         type="text" 
-                                        defaultValue={user.name} 
+                                        defaultValue={userDisplay.name} 
                                         className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 border border-border outline-none transition-all text-sm text-accent font-medium shadow-inner"
                                         readOnly
                                     />
@@ -189,7 +210,7 @@ export const AccountView: React.FC = () => {
                                     </div>
                                     <input 
                                         type="email" 
-                                        defaultValue={user.email} 
+                                        defaultValue={userDisplay.email} 
                                         className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 border border-border outline-none transition-all text-sm text-accent font-medium shadow-inner"
                                         readOnly
                                     />

@@ -49,8 +49,8 @@ if (!apiKey) {
     console.warn("WARNING: Missing VITE_GEMINI_API_KEY environment variable. AI features will not work.");
 }
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey });
+// Initialize Gemini Client via v1beta for early access preview models
+const ai = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1beta' } });
 
 const fileToGenerativePart = (base64Data, mimeType) => {
     return {
@@ -290,16 +290,16 @@ app.post('/api/renderBuilding', async (req, res) => {
 
         const deckingValue = materials.decking && materials.decking.trim().toLowerCase() !== 'none' ? materials.decking : null;
 
-        // SketchUp mode: pixel-faithful enhance only — no redrawing, no geometry inference
+        // SketchUp mode: pixel-faithful enhance only ΓÇö no redrawing, no geometry inference
         const sketchUpPrompt = `
-      RENDER ENGINE: Nano Banana Pro (V3.2) — ENHANCE / UPSCALE MODE ONLY.
+      RENDER ENGINE: Nano Banana Pro (V3.2) ΓÇö ENHANCE / UPSCALE MODE ONLY.
       
-      ABSOLUTE CRITICAL RULE — THIS IS NOT A RE-RENDER:
+      ABSOLUTE CRITICAL RULE ΓÇö THIS IS NOT A RE-RENDER:
       The input image is a coloured 3D model screenshot (SketchUp or similar) with pre-applied materials.
       Your ONLY task is to ENHANCE and UPSCALE it to photorealistic quality.
       YOU MUST NOT redraw, re-compose, extend, crop, or hallucinate ANY part of the scene.
       
-      GEOMETRY LOCK — NON-NEGOTIABLE:
+      GEOMETRY LOCK ΓÇö NON-NEGOTIABLE:
       - Every wall, roof plane, window, door, and structural edge in the output MUST match the input PIXEL-FOR-PIXEL in position, angle, and proportion.
       - Do NOT extend the building beyond its visible edges in the source image.
       - Do NOT add, remove, or move anything. Not a tree. Not a blade of grass. Not a shadow. Nothing.
@@ -308,11 +308,11 @@ app.post('/api/renderBuilding', async (req, res) => {
       
       ENHANCEMENT TASK:
       - Apply photorealistic micro-textures and physically based rendering (PBR) to the materials already visible in the source.
-      - Enhance lighting to be natural and architecturally accurate — crisp shadows, accurate reflections.
+      - Enhance lighting to be natural and architecturally accurate ΓÇö crisp shadows, accurate reflections.
       - DO NOT change any material colours. DO NOT swap any materials. Preserve every colour and finish exactly.
       - Enhance the surrounding environment (sky, grass, trees) to photorealistic quality without moving or adding any elements.
       
-      MATERIAL ASSIGNMENTS (apply ONLY if materials provided below differ from their detected state in the image — otherwise preserve):
+      MATERIAL ASSIGNMENTS (apply ONLY if materials provided below differ from their detected state in the image ΓÇö otherwise preserve):
       ${buildMaterialInstruction('Walls/Main Facade', materials.walls)}
       ${buildMaterialInstruction('Roof', materials.roof)}
       ${buildMaterialInstruction('Windows', materials.windows)}
@@ -341,10 +341,10 @@ app.post('/api/renderBuilding', async (req, res) => {
       Render the architecture and its environment using the Nano Banana Pro engine.
       ${orientation ? `\nCRITICAL SPATIAL CONTEXT: You are rendering the [${orientation}] elevation/view of the building. Apply the materials specifically aiming at this visible side.` : ''}
       
-      GEOMETRY & CONTEXT RULES — CRITICAL:
+      GEOMETRY & CONTEXT RULES ΓÇö CRITICAL:
       - STRICT GEOMETRY LOCK: You MUST reproduce the EXACT structure shown in the source image. Do NOT add, remove, or modify any architectural elements.
       - NO HALLUCINATIONS: Do NOT invent new structures. Do NOT add decking, patios, steps, porches, or any raised platforms unless they are explicitly visible in the source geometry.
-      - DOORS: Reproduce the door EXACTLY as shown — pay close attention to where the glass panels are positioned (top half, full height, etc.). DO NOT move or extend glazing that isn't in the source image.
+      - DOORS: Reproduce the door EXACTLY as shown ΓÇö pay close attention to where the glass panels are positioned (top half, full height, etc.). DO NOT move or extend glazing that isn't in the source image.
       - PRESERVE THE ENVIRONMENT: Render the surrounding landscape, garden, fence, trees, and sky exactly as shown in the source.
       - IF INPUT IS A COLORED RENDER: Treat this as an Image-to-Image / Upscale / Enhance task. Keep 95% of the original colours, lighting, and layout.
 
@@ -360,9 +360,9 @@ app.post('/api/renderBuilding', async (req, res) => {
 
       DOOR ACCURACY RULE (CRITICAL):
       The door description specifies the EXACT glazing zone. You MUST render ONLY that zone as glass:
-      - If "top-half glazed" → ONLY the upper portion of the door has glass. The lower panel is SOLID.
-      - If "full-height glazed" → The entire door height is glass.
-      - If "narrow side-lite" → Only a thin vertical strip beside the door is glass.
+      - If "top-half glazed" ΓåÆ ONLY the upper portion of the door has glass. The lower panel is SOLID.
+      - If "full-height glazed" ΓåÆ The entire door height is glass.
+      - If "narrow side-lite" ΓåÆ Only a thin vertical strip beside the door is glass.
       DO NOT extend or relocate the glazing zone beyond what is described.
 
       COLOR & LIGHTING PRECISION:
@@ -770,6 +770,7 @@ app.post('/api/generatePresentationBoard', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
 
 // Serve static files from the Vite build directory
 app.use(express.static(path.join(__dirname, 'dist')));

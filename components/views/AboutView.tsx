@@ -73,7 +73,7 @@ export const AboutView: React.FC = () => {
                                     <Gem className="text-accent" size={20} />
                                 </div>
                                 <h4 className="text-lg font-bold text-primary">Unrivalled Quality</h4>
-                                <p className="text-secondary text-sm leading-relaxed">Professional 4K results that rival manual design, generated in seconds.</p>
+                                <p className="text-secondary text-sm leading-relaxed">Professional 4K results that rival manual design, generated in seconds—with all showcase images created using Modulr Studio.</p>
                             </div>
                             <div className="flex flex-col items-center text-center space-y-4">
                                 <div className="w-12 h-12 rounded-full bg-accent/5 flex items-center justify-center border border-accent/10">

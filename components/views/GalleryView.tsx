@@ -40,8 +40,16 @@ export const GalleryView: React.FC = () => {
                             Studio Gallery
                         </h1>
                         <p className="text-lg text-secondary max-w-2xl mx-auto font-medium">
-                            A curated selection of photorealistic 4K renders, technical line drawings, and before/after transformations.
+                            A curated selection of photorealistic 4K renders, technical line drawings, and before/after transformations—all created using Modulr Studio.
                         </p>
+                        
+                        <div className="mt-12 flex justify-center">
+                            <div className="px-8 py-6 rounded-[2.5rem] bg-accent/5 border border-accent/10 backdrop-blur-md max-w-3xl shadow-sm hover:shadow-md transition-all duration-500">
+                                <p className="text-lg md:text-xl font-bold text-accent tracking-tight leading-relaxed">
+                                    Want to see your own projects featured here? Send us your Modulr Studio designs and be showcased with your business name in our official gallery.
+                                </p>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Section 1: Sliders */}
@@ -51,21 +59,61 @@ export const GalleryView: React.FC = () => {
                             <p className="text-secondary text-sm max-w-xl">Swipe to see how our engine transforms technical geometry into stunning 4K visualizations.</p>
                             <div className="h-px w-24 bg-accent/20"></div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16 py-8">
-                            {sliderItems.map((item, idx) => (
-                                <div 
-                                    key={item.id} 
-                                    className="group relative glass-panel rounded-[2.5rem] border border-border bg-white shadow-2xl overflow-hidden transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-4 animate-in fade-in slide-in-from-bottom-12"
-                                    style={{ animationDelay: `${idx * 100}ms`, height: '480px' }}
-                                >
-                                    <CompareSlider 
-                                        beforeImage={item.before!} 
-                                        afterImage={item.after!}
-                                        beforeLabel="Lines"
-                                        afterLabel="Render"
-                                    />
-                                </div>
-                            ))}
+                        
+                        <div className="space-y-16">
+                            {/* Row 1: 3 Sliders */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16 py-4">
+                                {sliderItems.slice(0, 3).map((item, idx) => (
+                                    <div 
+                                        key={item.id} 
+                                        className="group relative glass-panel rounded-[2.5rem] border border-border bg-white shadow-2xl overflow-hidden transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-4 animate-in fade-in slide-in-from-bottom-12"
+                                        style={{ animationDelay: `${idx * 100}ms`, height: '480px' }}
+                                    >
+                                        <CompareSlider 
+                                            beforeImage={item.before!} 
+                                            afterImage={item.after!}
+                                            beforeLabel="Lines"
+                                            afterLabel="Render"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Row 2: The Big "Hero" Slider */}
+                            <div className="flex justify-center">
+                                {sliderItems.slice(3, 4).map((item, idx) => (
+                                    <div 
+                                        key={item.id} 
+                                        className="group relative glass-panel rounded-[3rem] border border-border bg-white shadow-[0_50px_100px_rgba(0,0,0,0.1)] overflow-hidden transition-all duration-700 hover:shadow-[0_60px_120px_rgba(0,0,0,0.2)] hover:-translate-y-6 animate-in fade-in slide-in-from-bottom-16 w-full max-w-5xl"
+                                        style={{ animationDelay: '350ms', height: '620px' }}
+                                    >
+                                        <CompareSlider 
+                                            beforeImage={item.before!} 
+                                            afterImage={item.after!}
+                                            beforeLabel="Lines"
+                                            afterLabel="Render"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Row 3: 2 Sliders Centered */}
+                            <div className="flex flex-col md:flex-row justify-center gap-16">
+                                {sliderItems.slice(4, 6).map((item, idx) => (
+                                    <div 
+                                        key={item.id} 
+                                        className="group relative glass-panel rounded-[2.5rem] border border-border bg-white shadow-2xl overflow-hidden transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-4 animate-in fade-in slide-in-from-bottom-12 w-full md:w-[calc(50%-32px)] lg:w-[520px]"
+                                        style={{ animationDelay: `${(idx + 4) * 100}ms`, height: '480px' }}
+                                    >
+                                        <CompareSlider 
+                                            beforeImage={item.before!} 
+                                            afterImage={item.after!}
+                                            beforeLabel="Lines"
+                                            afterLabel="Render"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </section>
 

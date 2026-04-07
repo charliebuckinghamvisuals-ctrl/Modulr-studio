@@ -2,9 +2,12 @@ import React from 'react';
 
 interface DraftingBackgroundProps {
     pageName: string;
+    hideGrid?: boolean;
 }
 
-export const DraftingBackground: React.FC<DraftingBackgroundProps> = ({ pageName }) => {
+export const DraftingBackground: React.FC<DraftingBackgroundProps> = ({ pageName, hideGrid = false }) => {
+    if (hideGrid) return null;
+    
     return (
         <div className="drafting-grid">
             <div className="absolute top-6 left-6 text-[6px] font-mono text-accent/20 uppercase tracking-[0.3em] hidden lg:block">

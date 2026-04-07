@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { Moon, Sun, Monitor, Image as ImageIcon, Sparkles, Wand2, Layers, Download, CheckCircle2, History, AlertCircle, Trash2, Maximize2, X, Zap, Hexagon, Grid, Palette, Info, PoundSterling, BookOpen, Coins, ChevronDown, User, Settings } from 'lucide-react';
 import { AppStage } from '../types';
+import { useAuth } from '../hooks/useAuth';
 
 interface AppShellProps {
   children: ReactNode;
@@ -11,6 +12,7 @@ interface AppShellProps {
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNavigate, onReset, headerActions }) => {
+  const { user } = useAuth();
   const [isAboutDropdownOpen, setIsAboutDropdownOpen] = React.useState(false);
   React.useEffect(() => {
     // Enforce light mode on mount by explicitly removing any dark class
@@ -117,17 +119,30 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
             </div>
           </div>
           
-          {/* Sign In Button */}
-          <button
-            onClick={() => onNavigate(AppStage.AUTH)}
-            className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap hidden lg:flex ${activeStage === AppStage.AUTH
-              ? 'text-slate-900 bg-white/60'
-              : 'text-white hover:bg-white/10'
-              }`}
-          >
-            <User size={16} />
-            <span className="relative z-10 whitespace-nowrap underline underline-offset-4 decoration-white/20">Sign In</span>
-          </button>
+          {/* Sign In / Account Button */}
+          {user ? (
+            <button
+              onClick={() => onNavigate(AppStage.ACCOUNT)}
+              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap hidden lg:flex ${activeStage === AppStage.ACCOUNT
+                ? 'bg-accent text-white'
+                : 'text-slate-900 bg-white/80 hover:bg-white'
+                }`}
+            >
+              <Settings size={16} />
+              <span className="relative z-10 whitespace-nowrap font-bold">{user.displayName || 'Account'}</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => onNavigate(AppStage.AUTH)}
+              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap hidden lg:flex ${activeStage === AppStage.AUTH
+                ? 'text-slate-900 bg-white/60'
+                : 'text-white hover:bg-white/10'
+                }`}
+            >
+              <User size={16} />
+              <span className="relative z-10 whitespace-nowrap underline underline-offset-4 decoration-white/20">Sign In</span>
+            </button>
+          )}
 
           {headerActions}
           

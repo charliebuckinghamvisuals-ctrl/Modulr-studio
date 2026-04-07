@@ -7,7 +7,6 @@ import { StartupLoader } from './components/StartupLoader';
 import { Button } from './components/Button';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { MaterialVisualPicker } from './components/MaterialVisualPicker';
-import { LightingDirectionPicker } from './components/LightingDirectionPicker';
 import { HistoryFooter } from './components/HistoryFooter';
 import { CanvasMask } from './components/CanvasMask';
 import { AppStage, HistoryItem } from './types';
@@ -23,6 +22,7 @@ import { GuideView } from './components/views/GuideView';
 import { GalleryView } from './components/views/GalleryView';
 import { AuthView } from './components/views/AuthView';
 import { AccountView } from './components/views/AccountView';
+
 
 const App: React.FC = () => {
     const engine = useAppEngine();
@@ -202,7 +202,6 @@ const App: React.FC = () => {
                 ))}
             </div>
 
-            <LightingDirectionPicker value={engine.lightingDirection} onChange={engine.setLightingDirection} />
 
             {engine.batchMaterials.length > 0 && (
                 <div className="space-y-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
@@ -691,17 +690,18 @@ const App: React.FC = () => {
             )}
 
             {engine.activeStage === AppStage.AUTH && (
-                <AuthView />
+                <AuthView onNavigate={engine.setActiveStage} />
             )}
 
             {engine.activeStage === AppStage.ACCOUNT && (
-                <AccountView />
+                <AccountView onNavigate={engine.setActiveStage} />
             )}
 
             {engine.activeStage === AppStage.HOME && (
                 <HomeView
                     onOpenEngine={() => engine.setActiveStage(AppStage.RENDER_ENGINE)}
                     onOpenMaterialStudio={() => engine.materialInputRef.current?.click()}
+                    onNavigate={engine.setActiveStage}
                 />
             )}
 
@@ -720,6 +720,10 @@ const App: React.FC = () => {
                     isLoading={engine.activeStage === AppStage.MATERIAL_STUDIO && engine.processing.isLoading}
                     loadingMessage={engine.processing.message}
                     historyFooter={<HistoryFooter currentStage={AppStage.MATERIAL_STUDIO} onLoadHistoryItem={handleLoadHistory} />}
+                    isHighQuality={engine.isHighQuality}
+                    setIsHighQuality={engine.setIsHighQuality}
+                    isProMode={engine.isProMode}
+                    setIsProMode={engine.setIsProMode}
                 />
             )}
 
@@ -795,6 +799,8 @@ const App: React.FC = () => {
                     historyFooter={<HistoryFooter currentStage={AppStage.LINE_CONVERT} onLoadHistoryItem={handleLoadHistory} />}
                 />
             )}
+
+
 
             <input
                 type="file"

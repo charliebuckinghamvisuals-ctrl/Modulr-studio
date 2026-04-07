@@ -74,7 +74,7 @@ export const PricingView: React.FC = () => {
                     <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-surface/40 hover:bg-surface/60 transition-all duration-300 relative group shadow-[0_20px_50px_rgba(0,0,0,0.1)]">
                         <div className="mb-6 text-white">
                             <h3 className="text-xl font-extrabold text-accent mb-2 flex items-center gap-2">Free Trial</h3>
-                            <p className="text-sm text-secondary min-h-[40px]">Test the full engine with every feature included.</p>
+                            <p className="text-sm text-secondary min-h-[40px]">Test the engine with 1080p high definition output.</p>
                         </div>
                         <div className="mb-8 font-black text-4xl text-primary dark:text-white">
                             3 Days
@@ -85,12 +85,12 @@ export const PricingView: React.FC = () => {
                         </Button>
 
                         <div className="space-y-4 flex-1">
-                            <div className="text-xs font-bold uppercase tracking-widest text-secondary mb-2">What's included</div>
+                            <div className="text-xs font-bold uppercase tracking-widest text-secondary mb-2">The Taster Package</div>
                             {[
-                                '10 Free Renders / Day',
-                                'Full Feature Access',
-                                'Standard 1080p & 4K',
-                                'Line Converter & Material Studio',
+                                '10 Renders / Day',
+                                '1080p High Definition only',
+                                'Standard & Pro Modes included',
+                                'Access All Tools (Taster)',
                                 'Refinement Studio'
                             ].map((feature, i) => (
                                 <div key={i} className="flex items-start gap-3">
@@ -109,12 +109,12 @@ export const PricingView: React.FC = () => {
                         </div>
                         <div className="mb-8">
                             <span className="text-4xl font-black text-primary dark:text-white">
-                                £{billingCycle === 'monthly' ? '29' : '290'}
+                                £{billingCycle === 'monthly' ? '39' : '390'}
                             </span>
                             <span className="text-secondary font-medium"> / {billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
                             {billingCycle === 'yearly' && (
                                 <div className="text-[10px] font-bold text-green-500 uppercase mt-1">
-                                    £24.16 effective monthly
+                                    £32.50 effective monthly
                                 </div>
                             )}
                         </div>
@@ -126,11 +126,11 @@ export const PricingView: React.FC = () => {
                         <div className="space-y-4 flex-1">
                             <div className="text-xs font-bold uppercase tracking-widest text-secondary mb-2">Everything in Free, plus:</div>
                             {[
-                                '1,500 High-Speed Credits / mo',
-                                'Standard 1080p Resolution',
-                                'Line Converter Tool Access',
-                                'Refinement Studio',
-                                'Full Environment Control'
+                                '1,500 Credits / mo (50 Renders)',
+                                'Standard & Pro Engine Modes',
+                                'Strictly 1080p Resolution only',
+                                'Line Converter & Refinement',
+                                'No Brand Material Presets'
                             ].map((feature, i) => (
                                 <div key={i} className="flex items-start gap-3">
                                     <Check size={18} className="text-accent shrink-0 mt-0.5" />
@@ -150,16 +150,16 @@ export const PricingView: React.FC = () => {
 
                         <div className="mb-6 mt-2">
                             <h3 className="text-2xl font-black text-accent dark:text-accent mb-2 flex items-center gap-2">Business</h3>
-                            <p className="text-sm text-secondary">The complete toolkit for scaling manufacturers.</p>
+                            <p className="text-sm text-secondary">The absolute peak of visualization performance.</p>
                         </div>
                         <div className="mb-8 text-white">
                             <span className="text-5xl font-black text-primary dark:text-white drop-shadow-md">
-                                £{billingCycle === 'monthly' ? '99' : '990'}
+                                £{billingCycle === 'monthly' ? '129' : '1290'}
                             </span>
                             <span className="text-secondary font-medium"> / {billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
                             {billingCycle === 'yearly' && (
                                 <div className="text-xs font-bold text-green-400 uppercase mt-2">
-                                    £82.50 effective monthly
+                                    £107.50 effective monthly
                                 </div>
                             )}
                         </div>
@@ -169,14 +169,14 @@ export const PricingView: React.FC = () => {
                         </Button>
 
                         <div className="space-y-4 flex-1">
-                            <div className="text-xs font-bold uppercase tracking-widest text-primary dark:text-white mb-2">Everything in Standard, plus:</div>
+                            <div className="text-xs font-bold uppercase tracking-widest text-primary dark:text-white mb-2">The Complete Architectural Toolkit:</div>
                             {[
-                                '15,000 Premium Credits / mo',
+                                '15,500 Premium Credits / mo (250 4K Renders)',
                                 'Unlimited 4K Ultra HD Resolution',
-                                'Full Material Studio Access',
-                                'Commercial Usage Rights',
-                                'Priority White-Labeling',
-                                'Priority Chat Support'
+                                'All Tools (Material Studio + Refinement)',
+                                'Primary Brand Material Presets',
+                                'Full Commercial Rights',
+                                'Priority Rendering Queue'
                             ].map((feature, i) => (
                                 <div key={i} className="flex items-start gap-3">
                                     <Check size={18} className="text-accent shrink-0 mt-0.5" strokeWidth={3} />
@@ -188,14 +188,12 @@ export const PricingView: React.FC = () => {
 
                 </div>
 
-                {/* ROI Comparison Section */}
-                <div className="w-full max-w-6xl mx-auto mb-12">
-                    <div className="bg-primary/5 dark:bg-white/5 rounded-3xl p-10 border border-primary/10 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                            <TrendingUp size={160} />
-                        </div>
-
-                        <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
+                {/* Unified ROI, Managed Service, and Credits Bubble */}
+                <div className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-[3rem] shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16 space-y-16 divide-y-2 divide-border/30">
+                    
+                    {/* ROI Comparison Section */}
+                    <div className="pt-0 group border-none">
+                        <div className="flex flex-col md:flex-row items-center gap-10">
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 text-accent font-black uppercase tracking-widest text-xs mb-4">
                                     <TrendingUp size={14} />
@@ -212,8 +210,8 @@ export const PricingView: React.FC = () => {
                             </div>
 
                             <div className="grid grid-cols-2 gap-4 w-full md:w-auto shrink-0">
-                                <div className="p-6 rounded-2xl bg-white border border-border shadow-sm flex flex-col items-center justify-center text-center group-hover:shadow-md transition-all">
-                                    <span className="text-xs font-bold text-secondary uppercase mb-1">Traditional Cost</span>
+                                <div className="p-6 rounded-2xl bg-slate-50 border border-border shadow-sm flex flex-col items-center justify-center text-center group-hover:shadow-md transition-all">
+                                    <span className="text-xs font-bold text-secondary uppercase mb-1 text-[10px]">Traditional Cost</span>
                                     <span className="text-2xl font-black text-red-500 line-through">
                                         £{billingCycle === 'monthly' ? '62.5k' : '750k'}
                                     </span>
@@ -222,83 +220,83 @@ export const PricingView: React.FC = () => {
                                     </span>
                                 </div>
                                 <div className="p-6 rounded-2xl bg-accent text-white shadow-xl flex flex-col items-center justify-center text-center transform scale-110 group-hover:scale-115 transition-all">
-                                    <span className="text-xs font-bold opacity-80 uppercase mb-1">Modulr Price</span>
-                                    <span className="text-3xl font-black">
-                                        £{billingCycle === 'monthly' ? '99' : '990'}
+                                    <span className="text-xs font-bold opacity-80 uppercase mb-1 text-[10px]">Modulr Price</span>
+                                    <span className="text-3xl font-black text-white">
+                                        £{billingCycle === 'monthly' ? '129' : '1,290'}
                                     </span>
-                                    <span className="text-[10px] opacity-80 uppercase font-black">
-                                        {billingCycle === 'monthly' ? '600x Value' : '750x Value'}
+                                    <span className="text-[10px] opacity-80 uppercase font-black text-white">
+                                        {billingCycle === 'monthly' ? '480x Value' : '580x Value'}
                                     </span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Managed Service Section */}
-                <div className="w-full max-w-6xl mx-auto mb-12">
-                    <div className="glass-panel p-8 rounded-3xl border border-border bg-gradient-to-r from-surface to-accent/5 shadow-[0_20px_50px_rgba(0,0,0,0.08)] flex flex-col md:flex-row items-center justify-between gap-8">
-                        <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="p-2 rounded-xl bg-accent/10">
-                                    <Wand2 size={24} className="text-accent" />
+                    {/* Managed Service Section */}
+                    <div className="pt-16 pb-0 border-none">
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                            <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="p-2 rounded-xl bg-accent/10">
+                                        <Wand2 size={24} className="text-accent" />
+                                    </div>
+                                    <h4 className="text-xl font-black text-accent">Modulr Managed Service</h4>
                                 </div>
-                                <h4 className="text-xl font-black text-accent">Modulr Managed Service</h4>
+                                <p className="text-sm text-secondary leading-relaxed max-w-2xl">
+                                    Short on time? Even though our engine is incredibly fast, we at Modulr Studio can handle the entire creative process for you. We'll generate your high-end visuals and material specs to your exact requirements.
+                                </p>
                             </div>
-                            <p className="text-sm text-secondary leading-relaxed max-w-2xl">
-                                Short on time? Even though our engine is incredibly fast, we at Modulr Studio can handle the entire creative process for you. We'll generate your high-end visuals and material specs to your exact requirements.
-                            </p>
-                        </div>
-                        <div className="flex flex-col items-center md:items-end gap-3 shrink-0">
-                            <div className="flex flex-col items-end">
-                                <span className="text-3xl font-black text-primary">£50</span>
-                                <span className="text-xs font-bold text-secondary uppercase tracking-widest">Extra / month</span>
+                            <div className="flex flex-col items-center md:items-end gap-3 shrink-0">
+                                <div className="flex flex-col items-end">
+                                    <span className="text-4xl font-black text-primary">£100</span>
+                                    <span className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em]">Extra / Month</span>
+                                </div>
+                                <Button className="px-10 py-4 text-xs font-bold uppercase tracking-wider" onClick={() => {}}>
+                                    Add to Plan
+                                </Button>
                             </div>
-                            <Button className="px-8" onClick={() => {}}>
-                                Add to Plan
-                            </Button>
                         </div>
                     </div>
-                </div>
 
-                {/* Credit Cost Key */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12 w-full mx-auto">
-                    <div className="flex flex-col items-center gap-4 p-8 rounded-3xl bg-accent/5 border border-accent/10 h-full justify-center">
-                        <div className="flex items-center gap-2 text-primary font-bold">
-                            <Zap size={20} className="text-accent" />
-                            Usage Guide
-                        </div>
-                        <div className="flex flex-wrap justify-center gap-6 text-sm">
-                            <div className="flex items-center gap-2 py-1.5 px-3 rounded-full bg-white/50 border border-border">
-                                <span className="font-black text-accent">30 Credits</span>
-                                <span className="text-secondary">Standard (1080p)</span>
+                    {/* Credit Cost Key */}
+                    <div className="pt-16 border-none grid grid-cols-1 lg:grid-cols-2 gap-12">
+                        <div className="flex flex-col items-center lg:items-start gap-4 p-0">
+                            <div className="flex items-center gap-2 text-primary font-bold">
+                                <Zap size={20} className="text-accent" />
+                                <span className="text-lg font-black text-accent uppercase tracking-tight">Usage Guide</span>
                             </div>
-                            <div className="flex items-center gap-2 py-1.5 px-3 rounded-full bg-white/50 border border-border">
-                                <span className="font-black text-accent">60 Credits</span>
-                                <span className="text-secondary">Ultra HD (4K)</span>
+                            <div className="flex flex-wrap justify-center lg:justify-start gap-3 text-sm">
+                                <div className="flex items-center gap-2 py-2 px-4 rounded-2xl bg-slate-50 border border-border">
+                                    <span className="font-black text-accent">30 Credits</span>
+                                    <span className="text-secondary text-xs font-medium">Standard (1080p)</span>
+                                </div>
+                                <div className="flex items-center gap-2 py-2 px-4 rounded-2xl bg-slate-50 border border-border">
+                                    <span className="font-black text-accent">60 Credits</span>
+                                    <span className="text-secondary text-xs font-medium">Ultra HD (4K)</span>
+                                </div>
                             </div>
+                            <p className="text-[10px] text-secondary/60 uppercase tracking-widest font-black mt-2">100% Transparency • No Hidden Fees</p>
                         </div>
-                        <p className="text-[11px] text-secondary uppercase tracking-widest font-bold mt-2">100% Transparency • No Hidden Fees</p>
-                    </div>
 
-                    <div className="flex flex-col items-center gap-4 p-8 rounded-3xl bg-accent/5 border border-accent/10">
-                        <div className="flex items-center gap-2 text-primary font-bold">
-                            <Gem size={20} className="text-accent" />
-                            Buy Extra Credits
+                        <div className="flex flex-col items-center lg:items-end gap-4 p-0">
+                            <div className="flex items-center gap-2 text-primary font-bold">
+                                <Gem size={20} className="text-accent" />
+                                <span className="text-lg font-black text-accent uppercase tracking-tight">Buy Extra Credits</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3 w-full max-w-md">
+                                {[
+                                    { amount: '1,000', price: '£5' },
+                                    { amount: '5,000', price: '£25' },
+                                    { amount: '10,000', price: '£45' }
+                                ].map((pack, i) => (
+                                    <button key={i} className="flex flex-col items-center gap-1 p-4 rounded-2xl bg-slate-50 border border-border hover:border-accent/40 hover:bg-white transition-all group active:scale-95 shadow-sm">
+                                        <span className="text-lg font-black text-accent group-hover:text-accent">{pack.amount}</span>
+                                        <span className="text-[10px] font-black text-accent uppercase tracking-widest bg-accent/10 px-2 py-0.5 rounded-full">{pack.price}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-[10px] text-secondary/50 italic mt-1 font-medium select-none">Instant top-ups that never expire.</p>
                         </div>
-                        <div className="grid grid-cols-3 gap-3 w-full">
-                            {[
-                                { amount: '1,000', price: '£5' },
-                                { amount: '5,000', price: '£25' },
-                                { amount: '10,000', price: '£45' }
-                            ].map((pack, i) => (
-                                <button key={i} className="flex flex-col items-center gap-1 p-3 rounded-2xl bg-white/40 border border-border hover:border-accent/30 hover:bg-white/60 transition-all group">
-                                    <span className="text-sm font-black text-accent group-hover:text-accent font-bold">{pack.amount}</span>
-                                    <span className="text-[11px] font-black text-accent uppercase">{pack.price}</span>
-                                </button>
-                            ))}
-                        </div>
-                        <p className="text-[10px] text-secondary/60 italic mt-1 font-medium">Instant top-ups that never expire.</p>
                     </div>
                 </div>
 

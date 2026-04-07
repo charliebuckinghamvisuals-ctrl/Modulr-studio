@@ -1,20 +1,27 @@
 import React from 'react';
-import { Box, Smartphone, Zap, Grid, Layers, ShieldCheck, Cpu, Maximize, FileText, CheckCircle2, Sparkles, PenTool, CloudSun } from 'lucide-react';
+import { Box, Smartphone, Zap, Grid, Layers, ShieldCheck, Cpu, Maximize, FileText, CheckCircle2, Sparkles, PenTool, CloudSun, ArrowRight } from 'lucide-react';
+import { AppStage } from '../../types';
 import { CompareSlider } from '../CompareSlider';
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
 
 interface HomeViewProps {
     onOpenEngine: () => void;
-    onOpenMaterialStudio: () => void; // Changed from onOpenSceneStudio
+    onOpenMaterialStudio: () => void;
+    onNavigate?: (stage: AppStage) => void;
 }
 
-export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterialStudio }) => { // Changed from onOpenSceneStudio
+export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterialStudio, onNavigate }) => {
     return (
         <div className="min-h-full flex flex-col items-center bg-background relative overflow-x-hidden pt-20 pb-20 w-full">
 
-            {/* Pro Drafting Grid Background */}
-            <DraftingBackground pageName="HOMEPAGE" />
+            {/* Pro Drafting Grid (Disabled for Homepage for clean look) */}
+            <DraftingBackground pageName="HOMEPAGE" hideGrid={true} />
+
+            {/* Immersive Scattered Background Gallery */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 select-none">
+                <ScatteredBackground />
+            </div>
 
             <div className="max-w-6xl w-full flex flex-col items-center relative z-10 gap-24 px-8">
 
@@ -51,7 +58,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                 <div className="w-full space-y-8">
                     <div className="text-center space-y-4 max-w-[100vw] overflow-x-hidden md:max-w-4xl mx-auto px-4">
                         <h2 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-accent font-bold whitespace-nowrap w-fit inline-block">From Plan to Perfection</h2>
-                        <p className="text-secondary text-lg">Swipe to see how our engine transforms technical geometry into stunning 4K visualizations.</p>
+                        <p className="text-secondary text-lg">
+                            Swipe to see how our engine transforms technical geometry into stunning 4K visualizations—all created within Modulr Studio.
+                        </p>
                     </div>
                     <div className="w-[calc(100vw-0px)] relative left-1/2 -translate-x-1/2 rounded-none overflow-hidden border-y border-border bg-surface/10 backdrop-blur-md shadow-2xl relative group">
                         <div className="absolute inset-0 bg-accent/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -152,41 +161,122 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                         <p className="text-secondary max-w-2xl mx-auto">Every feature is designed around the specific needs of the UK garden room and annexe industry, not adapted from generic tools.</p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left w-full">
-                        <FeatureCard
-                            icon={<PenTool size={28} />}
-                            title="Line-to-Render Engine"
-                            description="Upload a CAD export or structural line drawing and receive a photorealistic 4K visualisation in seconds, with your geometry as the foundation."
-                        />
-                        <FeatureCard
-                            icon={<Sparkles size={28} />}
-                            title="Refinement Studio"
-                            description="Change the weather, swap the environment, update cladding and materials, or add people and pets to bring your renders to life. Powerful AI-driven edits with a simple text prompt."
-                        />
-                        <FeatureCard
-                            icon={<Grid size={28} />}
-                            title="Material Studio"
-                            description="Upload a photo of any surface and our AI extracts its material profile (colour, texture, finish) and applies it faithfully across your entire rendered build."
-                        />
-                        <FeatureCard
-                            icon={<Box size={28} />}
-                            title="AI Material Intelligence"
-                            description="Our engine identifies real materials. Trained on Siberian Larch, Western Red Cedar, Anthracite Grey and more, it reproduces the exact texture, grain and finish your clients will see in real life."
-                        />
-                        <FeatureCard
-                            icon={<Zap size={28} />}
-                            title="Architectural Intelligence"
-                            description="Trained on UK garden room construction: timber frame, SIPs, glazing systems, flat and pitched roofs. Our engine understands the details that matter to your clients."
-                        />
-                        <FeatureCard
-                            icon={<CloudSun size={28} />}
-                            title="Dynamic Lighting Scenes"
-                            description="Seamlessly adjust the time of day and atmospheric conditions. From bright sunlit afternoons to moody dusk shots with warm interior glows, instantly visualize your garden room in any light."
-                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left w-full">
+                            <FeatureCard
+                                icon={<PenTool size={28} />}
+                                title="Line-to-Render Engine"
+                                description="Upload a CAD export or structural line drawing and receive a photorealistic 4K visualisation in seconds, with your geometry as the foundation."
+                            />
+                            <FeatureCard
+                                icon={<Sparkles size={28} />}
+                                title="Refinement Studio"
+                                description="Change the weather, swap the environment, update cladding and materials, or add people and pets to bring your renders to life. Powerful AI-driven edits with a simple text prompt."
+                            />
+                            <FeatureCard
+                                icon={<Grid size={28} />}
+                                title="Material Studio"
+                                description="Upload a photo of any surface and our AI extracts its material profile (colour, texture, finish) and applies it faithfully across your entire rendered build."
+                            />
+                            <FeatureCard
+                                icon={<Box size={28} />}
+                                title="AI Material Intelligence"
+                                description="Our engine identifies real materials. Trained on Siberian Larch, Western Red Cedar, Anthracite Grey and more, it reproduces the exact texture, grain and finish your clients will see in real life."
+                            />
+                            <FeatureCard
+                                icon={<Zap size={28} />}
+                                title="Architectural Intelligence"
+                                description="Trained on UK garden room construction: timber frame, SIPs, glazing systems, flat and pitched roofs. Our engine understands the details that matter to your clients."
+                            />
+
+                        </div>
                     </div>
-                </div>
             </div >
         </div >
+    );
+};
+
+const ScatteredBackground: React.FC = () => {
+    const [scrollY, setScrollY] = React.useState(0);
+
+    React.useEffect(() => {
+        const handleScroll = () => setScrollY(window.scrollY);
+        window.addEventListener("scroll", handleScroll, { passive: true });
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
+
+    const galleryImages = [
+        // Section 1: Hero
+        { src: "/gallery-4.jpg.png", top: "-2%", left: "-12%", size: "w-[48rem]", rotate: "-8deg", speed: 0.05 },
+        { src: "/gallery-8.jpg.png", top: "2%", right: "-15%", size: "w-[52rem]", rotate: "6deg", speed: 0.1 },
+        { src: "/gallery-1.jpg.png", top: "15%", left: "5%", size: "w-[45rem]", rotate: "12deg", speed: 0.08 },
+        
+        // Section 2: Before/After & Comparison
+        { src: "/gallery-2.jpg.png", top: "45%", right: "-5%", size: "w-[50rem]", rotate: "-4deg", speed: 0.12 },
+        { src: "/gallery-3.jpg.png", top: "60%", left: "-8%", size: "w-[42rem]", rotate: "15deg", speed: 0.04 },
+        { src: "/gallery-5.jpg.png", top: "75%", right: "2%", size: "w-[48rem]", rotate: "-9deg", speed: 0.14 },
+        { src: "/gallery-7.jpg.png", top: "90%", left: "20%", size: "w-[38rem]", rotate: "5deg", speed: 0.06 },
+
+        // Section 3: Why Modulr / Features
+        { src: "/gallery-9.jpg.png", top: "120%", left: "-10%", size: "w-[55rem]", rotate: "4deg", speed: 0.15 },
+        { src: "/gallery-10.jpg.png", top: "135%", right: "-12%", size: "w-[58rem]", rotate: "-12deg", speed: 0.07 },
+        { src: "/gallery-11.jpg.png", top: "155%", left: "10%", size: "w-[48rem]", rotate: "8deg", speed: 0.11 },
+        { src: "/gallery-12.jpg.png", top: "180%", right: "5%", size: "w-[45rem]", rotate: "-6deg", speed: 0.09 },
+        
+        // Section 4: Garden Rooms Specifics
+        { src: "/gallery-13-after.jpg.png", top: "220%", left: "-15%", size: "w-[52rem]", rotate: "-4deg", speed: 0.14 },
+        { src: "/gallery-14-after.jpg.png", top: "245%", right: "-8%", size: "w-[55rem]", rotate: "10deg", speed: 0.08 },
+        { src: "/gallery-15-after.jpg.png", top: "270%", left: "5%", size: "w-[48rem]", rotate: "-15deg", speed: 0.12 },
+        
+        // Section 5: Features Grid
+        { src: "/gallery-16-after.jpg.png", top: "320%", right: "-10%", size: "auto w-[50rem]", rotate: "8deg", speed: 0.05 },
+        { src: "/gallery-17-after.jpg.png", top: "350%", left: "-5%", size: "w-[52rem]", rotate: "-10deg", speed: 0.1 },
+        { src: "/gallery-12-after.jpg.png", top: "380%", right: "12%", size: "w-[48rem]", rotate: "15deg", speed: 0.07 }
+    ];
+
+    return (
+        <div className="relative w-full h-full">
+            {galleryImages.map((img, i) => (
+                <ParallaxImage 
+                    key={i} 
+                    {...img} 
+                    currentScroll={scrollY} 
+                />
+            ))}
+        </div>
+    );
+};
+
+interface ParallaxImageProps {
+    src: string;
+    top: string;
+    left?: string;
+    right?: string;
+    size: string;
+    rotate: string;
+    speed: number;
+    currentScroll: number;
+}
+
+const ParallaxImage: React.FC<ParallaxImageProps> = ({ src, top, left, right, size, rotate, speed, currentScroll }) => {
+    const yOffset = currentScroll * speed;
+    
+    return (
+        <div 
+            className={`absolute ${size} h-auto opacity-[0.25] transition-transform duration-700 ease-out animate-in fade-in duration-1000`}
+            style={{ 
+                top, 
+                left: left || 'auto', 
+                right: right || 'auto',
+                transform: `translateY(${-yOffset}px) rotate(${rotate})`,
+                filter: 'grayscale(15%)'
+            }}
+        >
+            <img 
+                src={src} 
+                alt="" 
+                className="w-full h-auto rounded-[4.5rem] shadow-[0_50px_100px_rgba(0,0,0,0.2)]" 
+            />
+        </div>
     );
 };
 

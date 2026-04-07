@@ -1,5 +1,6 @@
 import React from 'react';
-import { Grid, Download, CheckCircle, Circle, Loader2, Upload } from 'lucide-react';
+import { Grid, Download, CheckCircle, Circle, Loader2, Upload, Sparkles, Zap } from 'lucide-react';
+import { ToggleSwitch } from '../ToggleSwitch';
 import { Button } from '../Button';
 import { SkeletonLoader } from '../SkeletonLoader';
 
@@ -17,6 +18,10 @@ interface MaterialStudioViewProps {
     isLoading: boolean;
     loadingMessage: string;
     historyFooter?: React.ReactNode;
+    isHighQuality: boolean;
+    setIsHighQuality: (val: boolean) => void;
+    isProMode: boolean;
+    setIsProMode: (val: boolean) => void;
 }
 
 export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
@@ -32,7 +37,11 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
     onFormatChange,
     isLoading,
     loadingMessage,
-    historyFooter
+    historyFooter,
+    isHighQuality,
+    setIsHighQuality,
+    isProMode,
+    setIsProMode
 }) => {
     const getImageUrl = (img: string | null) => {
         if (!img) return '';
@@ -53,6 +62,23 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                     <p className="text-slate-600 text-sm leading-relaxed">
                         Architectural material detail sheet generator. The engine compiles a 4K 2x2 presentation grid based on your specific material focal points.
                     </p>
+                </div>
+
+                <div className="flex flex-col gap-2 w-full mt-2 border-b border-accent/10 pb-6">
+                    <ToggleSwitch 
+                        isOn={isHighQuality} 
+                        onToggle={() => setIsHighQuality(!isHighQuality)} 
+                        label={isHighQuality ? '4K Ultra HD' : 'Standard HD'}
+                        icon={<Sparkles size={14} className={isHighQuality ? 'text-accent' : 'text-slate-400'} />}
+                        activeColor="bg-accent"
+                    />
+                    <ToggleSwitch 
+                        isOn={isProMode} 
+                        onToggle={() => setIsProMode(!isProMode)} 
+                        label={isProMode ? 'Pro Mode' : 'Standard'}
+                        icon={<Zap size={14} className={isProMode ? 'text-accent' : 'text-slate-400'} />}
+                        activeColor="bg-accent"
+                    />
                 </div>
 
                 {/* Selection Area */}

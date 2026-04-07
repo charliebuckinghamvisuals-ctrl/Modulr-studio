@@ -121,7 +121,7 @@ export const GuideView: React.FC = () => {
                                 },
                                 {
                                     q: "How can I change the lighting or weather?",
-                                    a: "Use the Weather Lab or the Lighting Direction picker in the Render Engine. You can choose from presets like 'Golden Hour', 'Winter Snow', or 'Autumn Rain' to completely shift the mood of your project."
+                                    a: "Use the Weather Lab in the Editor. You can choose from presets like 'Golden Hour', 'Winter Snow', or 'Autumn Rain' to completely shift the mood of your project."
                                 },
                                 {
                                     q: "What is the Refinement Studio?",
@@ -152,7 +152,9 @@ export const GuideView: React.FC = () => {
                     <section className="text-center py-12 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500">
                         <div className="h-px w-64 bg-gradient-to-r from-transparent via-border to-transparent mx-auto mb-12"></div>
                         <h3 className="text-xl font-bold text-accent mb-4">Still need help?</h3>
-                        <p className="text-secondary mb-8">Visit our contact page for dedicated support or custom integrations.</p>
+                        <p className="text-secondary mb-8">
+                            Visit our contact page for dedicated support or custom integrations—with all images in this guide created using Modulr Studio.
+                        </p>
                         <button 
                             onClick={() => window.open('https://napc.uk/contact/', '_blank')}
                             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm transition-transform hover:scale-105 active:scale-95"

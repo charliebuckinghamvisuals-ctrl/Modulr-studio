@@ -1,14 +1,55 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, ArrowRight, Github, Chrome, Sparkles, Wand2, Hexagon, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Github, Chrome, Sparkles, Wand2, Hexagon, ShieldCheck, Loader2 } from 'lucide-react';
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
+import { auth } from '../../services/firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { toast } from 'react-hot-toast';
+import { AppStage } from '../../types';
 
-export const AuthView: React.FC = () => {
+interface AuthViewProps {
+    onNavigate: (stage: AppStage) => void;
+}
+
+export const AuthView: React.FC<AuthViewProps> = ({ onNavigate }) => {
     const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+    const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
     const toggleMode = () => setMode(prev => prev === 'signin' ? 'signup' : 'signin');
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (!email || !password) {
+            toast.error("Please enter email and password");
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            if (mode === 'signup') {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                if (name) {
+                    await updateProfile(userCredential.user, { displayName: name });
+                }
+                toast.success('Account created successfully!');
+                onNavigate(AppStage.HOME);
+            } else {
+                await signInWithEmailAndPassword(auth, email, password);
+                toast.success('Welcome back!');
+                onNavigate(AppStage.HOME);
+            }
+        } catch (error: any) {
+            toast.error(error.message || 'Authentication failed');
+            console.error("Auth error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar items-center justify-center min-h-[800px] py-20 px-4 md:px-0">
@@ -31,43 +72,27 @@ export const AuthView: React.FC = () => {
                         className="absolute inset-0 w-full h-full object-cover opacity-100"
                     />
                     
-                    {/* Subtle Gradient Overlay for Text Readability */}
-                    <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-white/10 to-transparent"></div>
+                    {/* Subtle Gradient Overlay for Text Readability - Balanced for full render */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-transparent to-transparent"></div>
                     
                     <div className="absolute inset-0 bg-accent/5 opacity-40"></div>
                     <div className="absolute inset-0 canvas-grid opacity-10 scale-150"></div>
                     
-                    <div className="relative z-10 space-y-6">
+                    {/* Top Bubble Section: Brand & Title */}
+                    <div className="relative z-10 p-6 rounded-[2.5rem] bg-white/90 backdrop-blur-md border border-border shadow-xl space-y-4 max-w-[340px] animate-in slide-in-from-left duration-700 delay-150">
                         <div className="flex items-center gap-2 text-accent">
-                            <Hexagon size={28} className="fill-accent/10" />
-                            <span className="font-bold tracking-[0.3em] text-xs uppercase italic">Modulr Render Engine</span>
+                            <Hexagon size={24} className="fill-accent/10" />
+                            <span className="font-bold tracking-[0.3em] text-[10px] uppercase italic">Modulr Render Engine</span>
                         </div>
-                        <h2 className="text-4xl font-bold text-accent leading-tight tracking-tight">
+                        <h2 className="text-3xl font-bold text-accent leading-[1.1] tracking-tight">
                             Unlock the <br/>
                             Future of <br/>
                             Visualisation.
                         </h2>
-                        <div className="h-1 w-12 bg-accent/20 rounded-full"></div>
-                        <p className="text-secondary text-sm leading-relaxed max-w-[240px]">
-                            Access 4K Ultra HD rendering, batch processing, and your complete architectural project history.
-                        </p>
                     </div>
 
-                    <div className="relative z-10 space-y-4">
-                        <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-border shadow-sm">
-                            <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
-                                <Sparkles size={20} />
-                            </div>
-                            <div>
-                                <p className="text-[10px] font-bold text-accent uppercase tracking-wider">Architectural Intelligence</p>
-                                <p className="text-[9px] text-secondary">Neural Render Engine x48</p>
-                            </div>
-                        </div>
-                        <div className="text-[10px] text-secondary/60 flex items-center gap-2 pl-2">
-                            <ShieldCheck size={14} className="text-accent" />
-                            Secure Professional Workspace
-                        </div>
-                    </div>
+                    {/* Bottom Area: Empty - focusing on the render and top title */}
+                    <div className="relative z-10 opacity-0"></div>
 
                     {/* Background Graphic */}
                     <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-accent/20 rounded-full blur-[80px]"></div>
@@ -84,7 +109,7 @@ export const AuthView: React.FC = () => {
                         </p>
                     </div>
 
-                    <form className="space-y-6 pt-2" onSubmit={(e) => e.preventDefault()}>
+                    <form className="space-y-6 pt-2" onSubmit={handleSubmit}>
                         <div className="space-y-4">
                             {mode === 'signup' && (
                                 <div className="space-y-2 group">
@@ -95,6 +120,8 @@ export const AuthView: React.FC = () => {
                                         </div>
                                         <input 
                                             type="text" 
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
                                             placeholder="Charlie Buckingham" 
                                             className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 border border-border focus:border-accent/40 focus:ring-4 focus:ring-accent/5 focus:bg-white outline-none transition-all text-sm text-accent font-medium placeholder-slate-400"
                                         />
@@ -141,8 +168,8 @@ export const AuthView: React.FC = () => {
                         </div>
 
                         <div className="pt-2">
-                            <Button className="w-full py-4 text-sm font-bold uppercase tracking-[0.1em]" borderless icon={<ArrowRight size={18} />}>
-                                {mode === 'signin' ? 'Access Studio' : 'Build Profile'}
+                            <Button type="submit" disabled={isLoading} className="w-full py-4 text-sm font-bold uppercase tracking-[0.1em]" borderless icon={isLoading ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}>
+                                {isLoading ? 'Authenticating...' : (mode === 'signin' ? 'Access Studio' : 'Build Profile')}
                             </Button>
                         </div>
                     </form>
