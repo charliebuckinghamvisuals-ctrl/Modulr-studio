@@ -129,7 +129,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
             >
               <Coins size={14} className="text-yellow-400" />
               <span className="text-[10px] font-black uppercase tracking-widest leading-none">
-                {credits.toLocaleString()} <span className="opacity-60">Credits</span>
+                {typeof credits === 'number' ? credits.toLocaleString() : credits} <span className="opacity-60">Credits</span>
               </span>
             </div>
           )}
