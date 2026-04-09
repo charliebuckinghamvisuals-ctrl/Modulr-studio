@@ -133,8 +133,8 @@ export const AboutView: React.FC = () => {
                                                 <td className="p-6 md:p-8 text-sm font-medium text-red-500/80">£62,500+</td>
                                                 <td className="p-6 md:p-8">
                                                     <div className="flex flex-col">
-                                                        <span className="text-sm font-medium text-accent uppercase font-black">£99</span>
-                                                        <span className="text-[10px] font-medium text-accent uppercase tracking-[0.2em] mt-0.5">600x Value</span>
+                                                        <span className="text-sm font-medium text-accent uppercase font-black">£189.99</span>
+                                                        <span className="text-[10px] font-medium text-accent uppercase tracking-[0.2em] mt-0.5">320x Value</span>
                                                     </div>
                                                 </td>
                                             </tr>

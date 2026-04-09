@@ -4,6 +4,9 @@ import { AppStage, MaterialConfig, WeatherConfig, ProcessingState, LibraryMateri
 import { PRESET_MATERIALS, WEATHER_CONDITIONS, SEASONS } from '../constants';
 import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor } from '../services/geminiService';
 import { saveToHistory } from '../services/historyService';
+import { db, auth } from '../services/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export const useAppEngine = () => {
     const [activeStage, setActiveStage] = useState<AppStage>(AppStage.HOME);
@@ -73,46 +76,78 @@ export const useAppEngine = () => {
     });
 
     // Material Library State
-    const [materialLibrary, setMaterialLibrary] = useState<MaterialLibrary>(() => {
-        const saved = localStorage.getItem('modulr_material_library');
-        if (saved) return JSON.parse(saved);
-        
-        // Default empty structure
-        return {
-            walls: [],
-            roof: [],
-            windows: [],
-            doors: [],
-            decking: []
-        };
+    const [materialLibrary, setMaterialLibrary] = useState<MaterialLibrary>({
+        walls: [],
+        roof: [],
+        windows: [],
+        doors: [],
+        decking: []
     });
 
-    const addToLibrary = (category: keyof MaterialLibrary, item: Omit<LibraryMaterialItem, 'id'>) => {
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                try {
+                    const docRef = doc(db, 'users', user.uid);
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists() && docSnap.data().materialLibrary) {
+                        setMaterialLibrary(docSnap.data().materialLibrary);
+                    } else {
+                        const saved = localStorage.getItem('modulr_material_library');
+                        if (saved) {
+                            const parsed = JSON.parse(saved);
+                            setMaterialLibrary(parsed);
+                            await setDoc(docRef, { materialLibrary: parsed }, { merge: true });
+                        }
+                    }
+                } catch (e) {
+                    console.error("Firestore sync error", e);
+                }
+            } else {
+                setMaterialLibrary({ walls: [], roof: [], windows: [], doors: [], decking: [] });
+            }
+        });
+        return unsubscribe;
+    }, []);
+
+    const addToLibrary = async (category: keyof MaterialLibrary, item: Omit<LibraryMaterialItem, 'id'>) => {
         const newItem: LibraryMaterialItem = {
             ...item,
             id: Date.now().toString()
         };
 
-        setMaterialLibrary(prev => {
-            const next = {
-                ...prev,
-                [category]: [...prev[category], newItem]
-            };
+        const next = {
+            ...materialLibrary,
+            [category]: [...materialLibrary[category], newItem]
+        };
+        
+        setMaterialLibrary(next);
+        
+        if (auth.currentUser) {
+            try {
+                await setDoc(doc(db, 'users', auth.currentUser.uid), { materialLibrary: next }, { merge: true });
+            } catch(e) { console.error("Save error", e); }
+        } else {
             localStorage.setItem('modulr_material_library', JSON.stringify(next));
-            return next;
-        });
+        }
         toast.success(`Added to ${category} library`);
     };
 
-    const removeFromLibrary = (category: keyof MaterialLibrary, id: string) => {
-        setMaterialLibrary(prev => {
-            const next = {
-                ...prev,
-                [category]: prev[category].filter(item => item.id !== id)
-            };
+    const removeFromLibrary = async (category: keyof MaterialLibrary, id: string) => {
+        const next = {
+            ...materialLibrary,
+            [category]: materialLibrary[category].filter(item => item.id !== id)
+        };
+        
+        setMaterialLibrary(next);
+
+        if (auth.currentUser) {
+            try {
+                await setDoc(doc(db, 'users', auth.currentUser.uid), { materialLibrary: next }, { merge: true });
+            } catch(e) { console.error("Save error", e); }
+        } else {
             localStorage.setItem('modulr_material_library', JSON.stringify(next));
-            return next;
-        });
+        }
         toast.success("Removed from library");
     };
 

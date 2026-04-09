@@ -3,7 +3,7 @@ import { Mail, Lock, User, ArrowRight, Github, Chrome, Sparkles, Wand2, Hexagon,
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
 import { auth } from '../../services/firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { toast } from 'react-hot-toast';
 import { AppStage } from '../../types';
 
@@ -46,6 +46,21 @@ export const AuthView: React.FC<AuthViewProps> = ({ onNavigate }) => {
         } catch (error: any) {
             toast.error(error.message || 'Authentication failed');
             console.error("Auth error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleGoogleSignIn = async () => {
+        setIsLoading(true);
+        try {
+            const provider = new GoogleAuthProvider();
+            await signInWithPopup(auth, provider);
+            toast.success('Signed in with Google!');
+            onNavigate(AppStage.HOME);
+        } catch (error: any) {
+            toast.error(error.message || 'Google Auth failed');
+            console.error("Google auth error:", error);
         } finally {
             setIsLoading(false);
         }
@@ -181,7 +196,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onNavigate }) => {
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                            <button className="flex items-center justify-center gap-2 py-3 rounded-2xl border border-border hover:bg-slate-50 transition-all group active:scale-95 shadow-sm">
+                            <button type="button" onClick={handleGoogleSignIn} className="flex items-center justify-center gap-2 py-3 rounded-2xl border border-border hover:bg-slate-50 transition-all group active:scale-95 shadow-sm">
                                 <Chrome size={18} className="text-secondary group-hover:text-accent transition-colors" />
                                 <span className="text-[11px] font-bold text-accent uppercase tracking-wider">Google</span>
                             </button>

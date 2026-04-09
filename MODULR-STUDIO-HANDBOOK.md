@@ -57,13 +57,13 @@ Modulr Studio uses a multi-layered AI stack to ensure accuracy and structural in
 
 ## 5. Pricing & Subscription Plans
 
-### Standard (£29/mo)
+### Standard (£35/mo)
 *For Independent Designers & Sales Reps*
 - **1,500 Credits** (Approx. 50 HD renders)
 - **Render Engine Launch Mode only** (Batch & Single angle)
 - Standard Support
 
-### Business (£99/mo) - *Best Value*
+### Business (£189.99/mo) - *Best Value*
 *For Full-Scale Production & Architecture Teams*
 - **15,000 Credits Monthly** (~250 4K UHD Renders)
   - **The Value of Volume**: While 15,000 credits can cover **~60 full projects** monthly, the real power is the freedom of **Infinite Iterations**. Use your credits to tweak materials, move shadows, or try different lighting setups for a single project until it’s pixel-perfect.

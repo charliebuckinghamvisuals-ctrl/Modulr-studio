@@ -5,11 +5,108 @@ import { GoogleGenAI, Type } from "@google/genai";
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import rateLimit from 'express-rate-limit';
+import admin from 'firebase-admin';
+import Stripe from 'stripe';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize Firebase Admin
+let db;
+try {
+    const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
+    if (fs.existsSync(serviceAccountPath)) {
+        const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+        });
+        db = admin.firestore();
+        console.log("SUCCESS: Firebase Admin & Firestore Initialized");
+    } else {
+        console.warn("WARNING: firebase-service-account.json not found.");
+    }
+} catch (error) {
+    console.error("FATAL: Failed to initialize Firebase Admin:", error);
+}
+
+// Initialize Stripe
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+if (!stripe) {
+    console.warn("WARNING: STRIPE_SECRET_KEY missing. Billing features will be simulated or limited.");
+}
+
+// Credits Deduction Constants
+const CREDIT_COSTS = {
+    LOW_RES: 5,        // 1K / Free Trial
+    STANDARD_RES: 30,  // 1080p
+    UHD_4K: 60,        // 4K UHD
+    BATCH_MULTIPLIER: 5, // Typically 5 images in a batch
+    ANALYSIS: 2        // Basic visual analysis
+};
+
+/**
+ * Helper to check and deduct credits from a user's account
+ * @param {object} user - Firebase User Object
+ * @param {number} amount - Number of credits to deduct
+ * @returns {Promise<{success: boolean, balance: number, error?: string}>}
+ */
+const deductCredits = async (user, amount) => {
+    if (!db) return { success: true, balance: 9999 }; // Dev mode safety
+
+    // Master Account Override
+    if (user.email === 'charlie@napc.uk') {
+        return { success: true, balance: 999999 };
+    }
+
+    const uid = user.uid;
+    const userRef = db.collection('users').doc(uid);
+    
+    try {
+        return await db.runTransaction(async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            
+            if (!userDoc.exists) {
+                // Initialize default user if they don't exist yet but are authenticated
+                const initialData = {
+                    credits: 5, // 5 starter credits for free trial
+                    plan: 'free',
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                };
+                transaction.set(userRef, initialData);
+                
+                if (initialData.credits < amount) {
+                    return { success: false, balance: initialData.credits, error: "Insufficient credits" };
+                }
+                
+                const newBalance = initialData.credits - amount;
+                transaction.update(userRef, { credits: newBalance });
+                return { success: true, balance: newBalance };
+            }
+
+            const plan = userDoc.exists ? (userDoc.data().plan || 'free') : 'free';
+            const currentCredits = userDoc.exists ? (userDoc.data().credits || 0) : 5;
+
+            // Feature Gating: 4K UHD requires Business or Master plan
+            if (amount === CREDIT_COSTS.UHD_4K && plan !== 'business' && plan !== 'master') {
+                return { success: false, balance: currentCredits, error: "4K Ultra HD Support Requires Professional Studio Plan" };
+            }
+
+            if (currentCredits < amount) {
+                return { success: false, balance: currentCredits, error: "Insufficient credits" };
+            }
+
+            const newBalance = currentCredits - amount;
+            transaction.update(userRef, { credits: newBalance });
+            return { success: true, balance: newBalance };
+        });
+    } catch (e) {
+        console.error("Credit deduction transaction failed:", e);
+        return { success: false, balance: 0, error: "Internal Credit Error" };
+    }
+};
 
 const app = express();
 const port = process.env.PORT || 3005;
@@ -30,9 +127,96 @@ if (fs.existsSync(distPath)) {
 }
 console.log("----------------------------");
 
+// Rate Limiters
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, 
+    max: 100, 
+    message: { error: "Too many requests from this IP, please try again after 15 minutes" },
+    standardHeaders: true, 
+    legacyHeaders: false, 
+});
+
+const aiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, 
+    max: 10,
+    message: { error: "IP-based render limit reached. Please wait a minute." }
+});
+
+// Per-User AI Limiter (Phase 1)
+const userAiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000,
+    max: 5, // max 5 renders per minute per individual user
+    keyGenerator: (req) => req.user?.uid || req.ip,
+    message: { error: "You have reached your individual render limit. Please wait a minute." },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 // Middleware
 app.use(cors());
+
+// Stripe Webhook MUST come before express.json() because it needs raw body for signature verification
+app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!stripe || !webhookSecret) {
+        console.warn("Stripe Webhook received but Stripe is not fully configured.");
+        return res.status(200).json({ received: true, info: "Stripe not configured" });
+    }
+
+    let event;
+    try {
+        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    } catch (err) {
+        console.error(`Webhook Error: ${err.message}`);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle checkout.session.completed (Initial purchase) AND invoice.paid (Renewals)
+    if (event.type === 'checkout.session.completed' || event.type === 'invoice.paid') {
+        const object = event.data.object;
+        
+        // For checkout.session.completed, we get uid from metadata
+        // For invoice.paid, we might need to look up uid by customerId if metadata isn't on the invoice
+        let uid = object.metadata?.firebase_uid;
+        let creditsToAward = parseInt(object.metadata?.credits || "0");
+        let plan = object.metadata?.plan || 'free';
+        let customerId = object.customer;
+
+        // If it's an invoice, we need to extract line item metadata or look up the subscription
+        if (event.type === 'invoice.paid' && !uid) {
+            try {
+                // Subscription typically has the metadata
+                const subscription = await stripe.subscriptions.retrieve(object.subscription);
+                uid = subscription.metadata?.firebase_uid;
+                creditsToAward = parseInt(subscription.metadata?.credits || "0");
+                plan = subscription.metadata?.plan || 'free';
+            } catch (err) {
+                console.error("[STRIPE] Error retrieving subscription for invoice:", err.message);
+            }
+        }
+
+        if (uid && creditsToAward > 0) {
+            try {
+                await db.collection('users').doc(uid).set({
+                    credits: admin.firestore.FieldValue.increment(creditsToAward),
+                    plan: plan,
+                    stripeCustomerId: customerId,
+                    lastPaymentAt: admin.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                console.log(`[STRIPE] ${event.type} processed: Awarded ${creditsToAward} credits to ${uid}`);
+            } catch (error) {
+                console.error("[STRIPE] Error updating user credits in Firestore:", error);
+            }
+        }
+    }
+
+    res.json({ received: true });
+});
+
 app.use(express.json({ limit: '100mb' })); // Increase limit for large base64 images
+app.use(globalLimiter);
 
 // Error handler for JSON parsing or payload limits
 app.use((err, req, res, next) => {
@@ -42,6 +226,35 @@ app.use((err, req, res, next) => {
     }
     next();
 });
+
+// Middleware to verify Firebase JWT
+const verifyFirebaseToken = async (req, res, next) => {
+    // Production Hardening: Strictly require Firebase Admin
+    try { 
+        admin.app(); 
+    } catch(_) {
+        console.error("ERROR: Firebase Admin not initialized. Auth blocked.");
+        return res.status(500).json({ error: "Server Configuration Error: Auth System Offline" });
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: "Unauthorized: Missing authentication token" });
+    }
+
+    const idToken = authHeader.split('Bearer ')[1];
+    try {
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        req.user = decodedToken;
+        next();
+    } catch (error) {
+        console.error("Error verifying auth token:", error);
+        return res.status(403).json({ error: "Unauthorized: Invalid or expired token" });
+    }
+};
+
+// Protect all API routes
+app.use('/api', verifyFirebaseToken);
 
 const apiKey = process.env.VITE_GEMINI_API_KEY;
 
@@ -61,9 +274,17 @@ const fileToGenerativePart = (base64Data, mimeType) => {
     };
 };
 
-app.post('/api/generateLineDrawing', async (req, res) => {
+app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
     try {
         const { base64Image, additionalPrompt, isHighQuality, ratio, hasColor, environmentImage, isProMode } = req.body;
+        
+        // Phase 2: Credit-based deduction
+        const cost = isHighQuality ? CREDIT_COSTS.STANDARD_RES : CREDIT_COSTS.LOW_RES;
+        const creditCheck = await deductCredits(req.user, cost);
+        if (!creditCheck.success) {
+            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        }
+
         const hasImage = base64Image && typeof base64Image === 'string' && base64Image.trim().length > 100;
         const hasEnv = environmentImage && typeof environmentImage === 'string' && environmentImage.trim().length > 100;
 
@@ -154,9 +375,16 @@ app.post('/api/generateLineDrawing', async (req, res) => {
     }
 });
 
-app.post('/api/analyzeComponents', async (req, res) => {
+app.post('/api/analyzeComponents', userAiLimiter, async (req, res) => {
     try {
         const { base64Image } = req.body;
+
+        // Phase 2: Analysis deduction
+        const creditCheck = await deductCredits(req.user, CREDIT_COSTS.ANALYSIS);
+        if (!creditCheck.success) {
+            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        }
+
         const imagePart = fileToGenerativePart(base64Image, "image/png");
 
         const prompt = `
@@ -166,30 +394,19 @@ app.post('/api/analyzeComponents', async (req, res) => {
       1. Determine if this is a photograph/render or a plain black-and-white line drawing.
       2. WALLS VS CLADDING: Identify the main wall material. If it is brick, explicitly say "Brick work" or the specific brick type (e.g. "Red brick"). Only call it "Cladding" if it is timber/composite cladding.
       3. DECKING/GROUND: ONLY return a value if there is a clearly visible raised deck, paved patio, or path directly attached to or in front of the building. If the ground is simply grass or natural ground, return 'none'.
-      4. IF IT IS A LINE DRAWING (No base colors, just black lines on white):
-         - Deduce the expected materials based on architectural patterns.
-         - Horizontal lines on walls: "Timber Cladding" or "Weatherboard".
-         - Stippled/Clean surfaces: "White Render" or "Brick work".
-         - Grid patterns on roofs: "Tiles".
-      5. DOORS - CRITICAL: Do NOT just say "Door". You MUST describe:
-         a) The material and colour (e.g. "Anthracite grey aluminium").
-         b) The EXACT glazing zone: Is the glass on the TOP HALF only, the FULL height, or a narrow side panel?
-            - If top half has glass and bottom half is solid panel: say "top-half glazed, bottom solid panel".
-            - If fully glazed: say "full-height glazed".
-            - If only a narrow side strip: say "narrow side-lite glazed".
-         c) The door style (e.g. "single swing door", "composite door", "bifold").
-         Example output: "Anthracite grey aluminium composite door, top-half glazed, bottom solid panel".
-      6. WINDOWS: Describe frame colour, glazing type, and approximate position on the building.
-      7. IF A COMPONENT IS MISSING or not visible: Return 'none'.
+      4. IF IT IS A LINE DRAWING:
+         - Deduce materials based on architectural patterns.
+         - Horizontal lines: "Timber Cladding" or "Composite Cladding".
+         - Stippled: "Render".
+         - Grid: "Tiles".
+      5. DOORS: Describe material, color, and glazing zone (e.g. "top-half glazed").
+      6. Return ONLY a valid JSON object.
     `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview', // Always use Pro for text reasoning!
+            model: 'gemini-3.1-pro-preview',
             contents: {
-                parts: [
-                    imagePart,
-                    { text: prompt }
-                ]
+                parts: [imagePart, { text: prompt }]
             },
             config: {
                 responseMimeType: "application/json",
@@ -208,77 +425,32 @@ app.post('/api/analyzeComponents', async (req, res) => {
 
         const text = response.text;
         if (!text) throw new Error("No analysis returned");
-        const cleanText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-        res.json({ result: JSON.parse(cleanText) });
+        
+        // Robust JSON extraction — strip markdown fences first, then grab JSON object
+        const stripped = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const jsonMatch = stripped.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error("Could not find JSON in response: " + stripped.substring(0, 200));
+        
+        res.json({ result: JSON.parse(jsonMatch[0]) });
 
     } catch (error) {
-        console.error("Analysis error:", error);
+        console.error("analyzeComponents error:", error);
+        try { fs.appendFileSync('error.log', '\n[' + new Date().toISOString() + '] analyzeComponents: ' + error.message); } catch(_) {}
         res.status(500).json({ error: error.message });
     }
 });
 
-app.post('/api/analyzeBatchMaterials', async (req, res) => {
-    try {
-        const { base64Images } = req.body;
-        if (!base64Images || !Array.isArray(base64Images)) throw new Error("Expected array of images");
-
-        const parts = base64Images.map(img => fileToGenerativePart(img, "image/jpeg"));
-        const prompt = `
-      ROLE: Expert Architectural Analyst.
-      TASK: You are looking at ${base64Images.length} images of the same building (e.g. a garden room/studio) from different angles.
-      
-      CRITICAL INSTRUCTIONS:
-      1. Identify the spatial orientation of EACH image (e.g., "Front Elevation", "Left Side", "Right Side", "Back", "Angle").
-      2. Analyze the main exterior materials visible in EACH image individually. Building sides often have different cladding (e.g. Cedar on the front, cheap metal on the sides).
-      3. DECKING/GROUND: ONLY return a value if a clearly visible raised deck, paved patio, or path is directly in front of the building. If the ground is simply grass, return 'none'.
-      4. DOORS - CRITICAL: Describe the EXACT glazing zone on every visible door:
-         - If glass is ONLY on the top half and bottom is solid: write "top-half glazed, bottom solid panel".
-         - If the door is fully glazed top to bottom: write "full-height glazed".
-         - Always include: material, colour, door style and the glazing zone.
-         - Example: "Anthracite grey aluminium composite door, top-half glazed, bottom solid panel".
-      5. If a component is not visible in that specific angle, return "none".
-      
-      Return a JSON array where each object corresponds to an image in the exact order they were provided.
-    `;
-        parts.push({ text: prompt });
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview', // Pro for reasoning across multiple images
-            contents: { parts },
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            orientation: { type: Type.STRING },
-                            walls: { type: Type.STRING },
-                            roof: { type: Type.STRING },
-                            windows: { type: Type.STRING },
-                            doors: { type: Type.STRING },
-                            decking: { type: Type.STRING }
-                        }
-                    }
-                }
-            }
-        });
-
-        const text = response.text;
-        if (!text) throw new Error("No analysis returned");
-        const cleanText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-        res.json({ result: JSON.parse(cleanText) });
-
-    } catch (error) {
-        console.error("Batch Analysis error:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/renderBuilding', async (req, res) => {
+app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
     try {
         const { base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode } = req.body;
-        // Changed to jpeg to significantly reduce file size while maintaining quality
+        
+        // Phase 2: Credit-based deduction
+        const cost = isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES;
+        const creditCheck = await deductCredits(req.user, cost);
+        if (!creditCheck.success) {
+            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        }
+
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
 
         const buildMaterialInstruction = (label, value) => {
@@ -290,63 +462,38 @@ app.post('/api/renderBuilding', async (req, res) => {
 
         const deckingValue = materials.decking && materials.decking.trim().toLowerCase() !== 'none' ? materials.decking : null;
 
-        // SketchUp mode: pixel-faithful enhance only ΓÇö no redrawing, no geometry inference
         const sketchUpPrompt = `
-      RENDER ENGINE: Nano Banana Pro (V3.2) ΓÇö ENHANCE / UPSCALE MODE ONLY.
+      RENDER ENGINE: Nano Banana Pro (V3.2) — ENHANCE / UPSCALE MODE ONLY.
       
-      ABSOLUTE CRITICAL RULE ΓÇö THIS IS NOT A RE-RENDER:
-      The input image is a coloured 3D model screenshot (SketchUp or similar) with pre-applied materials.
+      ABSOLUTE CRITICAL RULE:
+      The input image is a coloured 3D model screenshot with pre-applied materials.
       Your ONLY task is to ENHANCE and UPSCALE it to photorealistic quality.
-      YOU MUST NOT redraw, re-compose, extend, crop, or hallucinate ANY part of the scene.
+      GEOMETRY MUST BE PIXEL-LOCKED. Do NOT redraw, re-compose, or extend any geometry.
       
-      GEOMETRY LOCK ΓÇö NON-NEGOTIABLE:
-      - Every wall, roof plane, window, door, and structural edge in the output MUST match the input PIXEL-FOR-PIXEL in position, angle, and proportion.
-      - Do NOT extend the building beyond its visible edges in the source image.
-      - Do NOT add, remove, or move anything. Not a tree. Not a blade of grass. Not a shadow. Nothing.
-      - If the building appears to end or be cropped at the edge of the frame, keep it ending there. Do NOT continue or complete the building.
-      - The composition (camera angle, crop, framing) MUST be 100% identical to the input.
-      
-      ENHANCEMENT TASK:
-      - Apply photorealistic micro-textures and physically based rendering (PBR) to the materials already visible in the source.
-      - Enhance lighting to be natural and architecturally accurate ΓÇö crisp shadows, accurate reflections.
-      - DO NOT change any material colours. DO NOT swap any materials. Preserve every colour and finish exactly.
-      - Enhance the surrounding environment (sky, grass, trees) to photorealistic quality without moving or adding any elements.
-      
-      MATERIAL ASSIGNMENTS (apply ONLY if materials provided below differ from their detected state in the image ΓÇö otherwise preserve):
-      ${buildMaterialInstruction('Walls/Main Facade', materials.walls)}
+      MATERIAL ASSIGNMENTS:
+      ${buildMaterialInstruction('Walls', materials.walls)}
       ${buildMaterialInstruction('Roof', materials.roof)}
       ${buildMaterialInstruction('Windows', materials.windows)}
       ${buildMaterialInstruction('Doors', materials.doors)}
-      ${deckingValue
-        ? `- Decking/Ground: Apply photorealistic texture to the existing ${deckingValue} shown in the source.`
-        : `- Decking/Ground: Preserve exactly as shown in the source image.`
-      }
+      ${buildMaterialInstruction('Decking/Ground', materials.decking)}
       
-      SCENE MODIFICATIONS (apply subtly without altering geometry):
-      ${additionalPrompt || 'None'}
-      
-      FINAL OUTPUT REQUIREMENT:
-      The result must look like the exact same photo taken with a DSLR camera, with all geometry in exactly the same position as the input.
-      CRITICAL: Output resolution 3840 x 2160 pixels (4K UHD).
+      SCENE MODIFICATIONS: ${additionalPrompt || 'None'}
+      FINAL OUTPUT: 4K UHD Photorealistic.
     `;
 
         const standardPrompt = `
       RENDER ENGINE SETTINGS:
       - Engine: Nano Banana Pro (V3.2).
-      - Target: 8k-UHD Photograph-Quality Architectural Visualization.
+      - Target: 8K-UHD Photograph-Quality Architectural Visualization.
       - Quality: Ultra-realistic, Physically Based Rendering (PBR), sharp focus, hyper-detailed micro-textures.
-      - DO NOT add artistic filters, painterly effects, or smooth brush strokes.
       
-      TASK:
-      Render the architecture and its environment using the Nano Banana Pro engine.
-      ${orientation ? `\nCRITICAL SPATIAL CONTEXT: You are rendering the [${orientation}] elevation/view of the building. Apply the materials specifically aiming at this visible side.` : ''}
-      
-      GEOMETRY & CONTEXT RULES ΓÇö CRITICAL:
-      - STRICT GEOMETRY LOCK: You MUST reproduce the EXACT structure shown in the source image. Do NOT add, remove, or modify any architectural elements.
-      - NO HALLUCINATIONS: Do NOT invent new structures. Do NOT add decking, patios, steps, porches, or any raised platforms unless they are explicitly visible in the source geometry.
-      - DOORS: Reproduce the door EXACTLY as shown ΓÇö pay close attention to where the glass panels are positioned (top half, full height, etc.). DO NOT move or extend glazing that isn't in the source image.
-      - PRESERVE THE ENVIRONMENT: Render the surrounding landscape, garden, fence, trees, and sky exactly as shown in the source.
-      - IF INPUT IS A COLORED RENDER: Treat this as an Image-to-Image / Upscale / Enhance task. Keep 95% of the original colours, lighting, and layout.
+      TASK: Render the architecture using the exact materials specified below.
+      ${orientation ? `\nSPATIAL CONTEXT: You are rendering the [${orientation}] elevation. Apply materials to this specific facing side.` : ''}
+
+      GEOMETRY & CONTEXT RULES — CRITICAL:
+      - STRICT GEOMETRY LOCK: Reproduce the EXACT structure shown. Do NOT add, remove, or modify any architectural elements.
+      - NO HALLUCINATIONS: Do NOT invent structures, decking, patios, or raised platforms unless visible in the source.
+      - PRESERVE THE ENVIRONMENT: Render surrounding landscape, fences, trees, and sky exactly as shown.
 
       MATERIAL ASSIGNMENTS:
       ${buildMaterialInstruction('Walls/Main Facade', materials.walls)}
@@ -355,27 +502,17 @@ app.post('/api/renderBuilding', async (req, res) => {
       ${buildMaterialInstruction('Doors', materials.doors)}
       ${deckingValue
         ? `- Decking/Ground: ${deckingValue}`
-        : `- Decking/Ground: NONE. The ground in front of and around the building is NATURAL GRASS. DO NOT render any decking boards, patio slabs, raised platforms, or paved areas. The transition from building to ground must be grass only.`
+        : `- Decking/Ground: NATURAL GRASS only. DO NOT render any decking, patio slabs, or paved areas.`
       }
 
-      DOOR ACCURACY RULE (CRITICAL):
-      The door description specifies the EXACT glazing zone. You MUST render ONLY that zone as glass:
-      - If "top-half glazed" ΓåÆ ONLY the upper portion of the door has glass. The lower panel is SOLID.
-      - If "full-height glazed" ΓåÆ The entire door height is glass.
-      - If "narrow side-lite" ΓåÆ Only a thin vertical strip beside the door is glass.
-      DO NOT extend or relocate the glazing zone beyond what is described.
-
       COLOR & LIGHTING PRECISION:
-      - PIGMENT ACCURACY: If a material colour like "Black", "Charred", "Anthracite", or "Dark" is specified, render it as a deep, rich, non-reflective pitch-tone. DO NOT wash out to grey.
-      - CONTRAST: Use high-contrast architectural lighting. Ensure shadows are deep and blacks are absolute.
+      - If a colour like "Black", "Charred", "Anthracite", or "Dark" is specified, render it as deep, rich, non-reflective tone. DO NOT wash out to grey.
+      - Use high-contrast architectural lighting with crisp shadows.
 
-      SCENE MODIFICATIONS:
-      ${additionalPrompt || 'None'}
-      
-      FINAL OUTPUT REQUIREMENT:
-      The result must be indistinguishable from a real high-end unedited architectural photograph from a DSLR camera.
-      Focus on extremely sharp crisp realistic lighting, hard shadows, and micro-textures.
-      CRITICAL: Set the output resolution strictly to 3840 x 2160 pixels (4K UHD). Lock the render to these exact dimensions.
+      SCENE MODIFICATIONS: ${additionalPrompt || 'None'}
+
+      FINAL OUTPUT: The result must be indistinguishable from a real architectural photograph (DSLR quality).
+      CRITICAL: Output resolution 3840 x 2160 pixels (4K UHD).
     `;
 
         const prompt = isSketchUpMode ? sketchUpPrompt : standardPrompt;
@@ -383,10 +520,7 @@ app.post('/api/renderBuilding', async (req, res) => {
         const response = await ai.models.generateContent({
             model: isProMode ? 'gemini-3-pro-image-preview' : 'gemini-3.1-flash-image-preview',
             contents: {
-                parts: [
-                    imagePart,
-                    { text: prompt }
-                ]
+                parts: [imagePart, { text: prompt }]
             },
             config: {
                 outputMimeType: "image/jpeg",
@@ -411,9 +545,17 @@ app.post('/api/renderBuilding', async (req, res) => {
     }
 });
 
-app.post('/api/editImage', async (req, res) => {
+app.post('/api/editImage', userAiLimiter, async (req, res) => {
     try {
         const { base64Image, maskImage, editPrompt, isHighQuality, ratio, isProMode } = req.body;
+
+        // Phase 2: Credit-based deduction
+        const cost = isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES;
+        const creditCheck = await deductCredits(req.user, cost);
+        if (!creditCheck.success) {
+            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        }
+
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
 
         const parts = [imagePart];
@@ -473,9 +615,16 @@ app.post('/api/editImage', async (req, res) => {
     }
 });
 
-app.post('/api/analyzeMaterials', async (req, res) => {
+app.post('/api/analyzeMaterials', userAiLimiter, async (req, res) => {
     try {
         const { base64Image } = req.body;
+
+        // Phase 2: Analysis deduction
+        const creditCheck = await deductCredits(req.user, CREDIT_COSTS.ANALYSIS);
+        if (!creditCheck.success) {
+            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        }
+
         const imagePart = fileToGenerativePart(base64Image, "image/png");
 
         const prompt = `
@@ -536,9 +685,16 @@ app.post('/api/analyzeMaterials', async (req, res) => {
     }
 });
 
-app.post('/api/analyzeScene', async (req, res) => {
+app.post('/api/analyzeScene', userAiLimiter, async (req, res) => {
     try {
         const { base64Image } = req.body;
+
+        // Phase 2: Analysis deduction
+        const creditCheck = await deductCredits(req.user, CREDIT_COSTS.ANALYSIS);
+        if (!creditCheck.success) {
+            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        }
+
         const imagePart = fileToGenerativePart(base64Image, "image/png");
 
         const prompt = `
@@ -585,9 +741,17 @@ app.post('/api/analyzeScene', async (req, res) => {
     }
 });
 
-app.post('/api/applyWeather', async (req, res) => {
+app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
     try {
         const { base64Image, weather, isHighQuality, ratio, isProMode } = req.body;
+
+        // Phase 2: Credit-based deduction
+        const cost = isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES;
+        const creditCheck = await deductCredits(req.user, cost);
+        if (!creditCheck.success) {
+            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        }
+
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
 
         const prompt = `
@@ -641,9 +805,16 @@ app.post('/api/applyWeather', async (req, res) => {
     }
 });
 
-app.post('/api/analyzeExteriorDetails', async (req, res) => {
+app.post('/api/analyzeExteriorDetails', userAiLimiter, async (req, res) => {
     try {
         const { base64Image } = req.body;
+
+        // Phase 2: Analysis deduction
+        const creditCheck = await deductCredits(req.user, CREDIT_COSTS.ANALYSIS);
+        if (!creditCheck.success) {
+            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        }
+
         const imagePart = fileToGenerativePart(base64Image, "image/png");
         const prompt = `
             Analyze this exterior architectural image.
@@ -700,9 +871,17 @@ app.post('/api/analyzeExteriorDetails', async (req, res) => {
     }
 });
 
-app.post('/api/generatePresentationBoard', async (req, res) => {
+app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
     try {
         const { base64Image, focusPoints, isProMode } = req.body;
+        
+        // Phase 2: Credit-based deduction
+        const cost = CREDIT_COSTS.UHD_4K; // Presentation boards are high-detail
+        const creditCheck = await deductCredits(req.user, cost);
+        if (!creditCheck.success) {
+            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        }
+
         if (focusPoints.length !== 4) {
             throw new Error("Must select exactly 4 focus points");
         }
@@ -771,6 +950,89 @@ app.post('/api/generatePresentationBoard', async (req, res) => {
     }
 });
 
+
+// --- BILLING / ACCOUNT ENDPOINTS ---
+
+app.get('/api/user/credits', async (req, res) => {
+    try {
+        if (req.user.email === 'charlie@napc.uk') {
+            return res.json({ credits: 'Unlimited', plan: 'master' });
+        }
+
+        const userRef = db.collection('users').doc(req.user.uid);
+        const userDoc = await userRef.get();
+        if (!userDoc.exists) {
+            // New user, give them trial credits (5 renders)
+            const starterCredits = 5;
+            await userRef.set({
+                credits: starterCredits,
+                plan: 'free',
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            return res.json({ credits: starterCredits, plan: 'free' });
+        }
+        const data = userDoc.data();
+        res.json({ credits: data.credits || 0, plan: data.plan || 'free' });
+    } catch (error) {
+        console.error("Error fetching user credits:", error);
+        res.status(500).json({ error: "Could not fetch credits balance" });
+    }
+});
+
+app.post('/api/create-checkout-session', async (req, res) => {
+    try {
+        const { priceId, planName, creditsAmount, isOneTime } = req.body;
+        
+        if (!stripe) throw new Error("Stripe is not configured on the server");
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price: priceId,
+                    quantity: 1,
+                },
+            ],
+            mode: isOneTime ? 'payment' : 'subscription',
+            success_url: `${req.headers.origin}/account?success=true`,
+            cancel_url: `${req.headers.origin}/pricing?canceled=true`,
+            metadata: {
+                firebase_uid: req.user.uid,
+                plan: planName || 'credits_pack',
+                credits: creditsAmount
+            },
+        });
+
+        res.json({ sessionId: session.id, url: session.url });
+    } catch (error) {
+        console.error("Stripe Checkout Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/create-portal-session', async (req, res) => {
+    try {
+        if (!stripe) throw new Error("Stripe is not configured");
+
+        const userDoc = await db.collection('users').doc(req.user.uid).get();
+        if (!userDoc.exists) throw new Error("User not found");
+
+        const customerId = userDoc.data().stripeCustomerId;
+        if (!customerId) {
+            return res.status(400).json({ error: "No active Stripe customer found. Please subscribe to a plan first." });
+        }
+
+        const portalSession = await stripe.billingPortal.sessions.create({
+            customer: customerId,
+            return_url: `${req.headers.origin}/account`,
+        });
+
+        res.json({ url: portalSession.url });
+    } catch (error) {
+        console.error("Portal error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // Serve static files from the Vite build directory
 app.use(express.static(path.join(__dirname, 'dist')));

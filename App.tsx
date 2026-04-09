@@ -674,7 +674,7 @@ const App: React.FC = () => {
             />
 
             {engine.activeStage === AppStage.PRICING && (
-                <PricingView />
+                <PricingView onNavigate={engine.setActiveStage} />
             )}
 
             {engine.activeStage === AppStage.ABOUT && (

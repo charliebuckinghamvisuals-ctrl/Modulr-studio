@@ -1,10 +1,57 @@
 import React from 'react';
-import { Check, Zap, Sparkles, Building2, Crown, Gem, Wand2, TrendingUp } from 'lucide-react';
+import { Check, Zap, Sparkles, Building2, Crown, Gem, Wand2, TrendingUp, Loader2 } from 'lucide-react';
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
+import { useAuth } from '../../hooks/useAuth';
+import { toast } from 'react-hot-toast';
+import { AppStage } from '../../types';
 
-export const PricingView: React.FC = () => {
+interface PricingViewProps {
+    onNavigate?: (stage: AppStage) => void;
+}
+
+export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
+    const { user } = useAuth();
     const [billingCycle, setBillingCycle] = React.useState<'monthly' | 'yearly'>('monthly');
+    const [loadingPlan, setLoadingPlan] = React.useState<string | null>(null);
+
+    const handleUpgrade = async (planName: string, priceId: string, creditsAmount: number, isOneTime = false) => {
+        if (!user) {
+            toast.error('Please sign in to upgrade your plan');
+            onNavigate?.(AppStage.AUTH);
+            return;
+        }
+
+        setLoadingPlan(priceId);
+        try {
+            const token = await user.getIdToken();
+            const response = await fetch('/api/create-checkout-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    priceId,
+                    planName,
+                    creditsAmount,
+                    isOneTime
+                })
+            });
+
+            const data = await response.json();
+            if (data.url) {
+                window.location.href = data.url;
+            } else {
+                throw new Error(data.error || 'Failed to create checkout session');
+            }
+        } catch (error: any) {
+            console.error('Checkout error:', error);
+            toast.error(error.message || 'Something went wrong. Please try again.');
+        } finally {
+            setLoadingPlan(null);
+        }
+    };
 
     return (
         <div className="min-h-full bg-background relative overflow-y-auto w-full py-20 px-6 sm:px-12 flex flex-col items-center">
@@ -80,8 +127,12 @@ export const PricingView: React.FC = () => {
                             3 Days
                         </div>
 
-                        <Button className="w-full mb-8 shadow-xl" onClick={() => {}}>
-                            Start My Trial
+                        <Button 
+                            className="w-full mb-8 shadow-xl" 
+                            onClick={() => handleUpgrade('trial', 'price_1TKI9zQkJ0HSsGbJzQq51D2H', 30)}
+                            disabled={loadingPlan !== null}
+                        >
+                            {loadingPlan === 'price_1TKI9zQkJ0HSsGbJzQq51D2H' ? <Loader2 className="animate-spin" /> : 'Start My Trial'}
                         </Button>
 
                         <div className="space-y-4 flex-1">
@@ -108,19 +159,30 @@ export const PricingView: React.FC = () => {
                             <p className="text-sm text-secondary min-h-[40px]">Perfect for smaller projects and high-volume basic visuals.</p>
                         </div>
                         <div className="mb-8">
-                            <span className="text-4xl font-black text-primary dark:text-white">
-                                £{billingCycle === 'monthly' ? '39' : '390'}
-                            </span>
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-4xl font-black text-primary dark:text-white">
+                                    £{billingCycle === 'monthly' ? '35' : '315'}
+                                </span>
+                                <span className="text-xs font-bold text-secondary uppercase tracking-tighter self-end mb-1">+ VAT</span>
+                            </div>
                             <span className="text-secondary font-medium"> / {billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
                             {billingCycle === 'yearly' && (
                                 <div className="text-[10px] font-bold text-green-500 uppercase mt-1">
-                                    £32.50 effective monthly
+                                    £26.25 effective monthly
                                 </div>
                             )}
                         </div>
 
-                        <Button className="w-full mb-8 shadow-xl" onClick={() => {}}>
-                            Upgrade Now
+                        <Button 
+                            className="w-full mb-8 shadow-xl" 
+                            onClick={() => handleUpgrade(
+                                'standard', 
+                                billingCycle === 'monthly' ? 'price_1TKI6UQkJ0HSsGbJml0Cl8cE' : 'price_1TKI7IQkJ0HSsGbJl2fUWKoc',
+                                1500
+                            )}
+                            disabled={loadingPlan !== null}
+                        >
+                            {loadingPlan === (billingCycle === 'monthly' ? 'price_1TKI6UQkJ0HSsGbJml0Cl8cE' : 'price_1TKI7IQkJ0HSsGbJl2fUWKoc') ? <Loader2 className="animate-spin" /> : 'Upgrade Now'}
                         </Button>
 
                         <div className="space-y-4 flex-1">
@@ -153,26 +215,37 @@ export const PricingView: React.FC = () => {
                             <p className="text-sm text-secondary">The absolute peak of visualization performance.</p>
                         </div>
                         <div className="mb-8 text-white">
-                            <span className="text-5xl font-black text-primary dark:text-white drop-shadow-md">
-                                £{billingCycle === 'monthly' ? '129' : '1290'}
-                            </span>
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-5xl font-black text-primary dark:text-white drop-shadow-md">
+                                    £{billingCycle === 'monthly' ? '189.99' : '1,710'}
+                                </span>
+                                <span className="text-xs font-bold text-secondary uppercase tracking-tighter self-end mb-2">+ VAT</span>
+                            </div>
                             <span className="text-secondary font-medium"> / {billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
                             {billingCycle === 'yearly' && (
                                 <div className="text-xs font-bold text-green-400 uppercase mt-2">
-                                    £107.50 effective monthly
+                                    £142.50 effective monthly
                                 </div>
                             )}
                         </div>
 
-                        <Button className="w-full mb-8 shadow-2xl" onClick={() => {}}>
-                            Upgrade Now
+                        <Button 
+                            className="w-full mb-8 shadow-2xl" 
+                            onClick={() => handleUpgrade(
+                                'business', 
+                                billingCycle === 'monthly' ? 'price_1TKI8QQkJ0HSsGbJoK37LzcK' : 'price_1TKI8nQkJ0HSsGbJIqLwL2K4',
+                                15500
+                            )}
+                            disabled={loadingPlan !== null}
+                        >
+                            {loadingPlan === (billingCycle === 'monthly' ? 'price_1TKI8QQkJ0HSsGbJoK37LzcK' : 'price_1TKI8nQkJ0HSsGbJIqLwL2K4') ? <Loader2 className="animate-spin" /> : 'Upgrade Now'}
                         </Button>
 
                         <div className="space-y-4 flex-1">
                             <div className="text-xs font-bold uppercase tracking-widest text-primary dark:text-white mb-2">The Complete Architectural Toolkit:</div>
                             {[
                                 '15,500 Premium Credits / mo (250 4K Renders)',
-                                'Unlimited 4K Ultra HD Resolution',
+                                '4K Ultra HD Resolution Support',
                                 'All Tools (Material Studio + Refinement)',
                                 'Primary Brand Material Presets',
                                 'Full Commercial Rights',
@@ -222,10 +295,10 @@ export const PricingView: React.FC = () => {
                                 <div className="p-6 rounded-2xl bg-accent text-white shadow-xl flex flex-col items-center justify-center text-center transform scale-110 group-hover:scale-115 transition-all">
                                     <span className="text-xs font-bold opacity-80 uppercase mb-1 text-[10px]">Modulr Price</span>
                                     <span className="text-3xl font-black text-white">
-                                        £{billingCycle === 'monthly' ? '129' : '1,290'}
+                                        £{billingCycle === 'monthly' ? '189.99' : '1,710'}
                                     </span>
                                     <span className="text-[10px] opacity-80 uppercase font-black text-white">
-                                        {billingCycle === 'monthly' ? '480x Value' : '580x Value'}
+                                        {billingCycle === 'monthly' ? '320x Value' : '430x Value'}
                                     </span>
                                 </div>
                             </div>
@@ -248,7 +321,7 @@ export const PricingView: React.FC = () => {
                             </div>
                             <div className="flex flex-col items-center md:items-end gap-3 shrink-0">
                                 <div className="flex flex-col items-end">
-                                    <span className="text-4xl font-black text-primary">£100</span>
+                                    <span className="text-4xl font-black text-primary">£100 <span className="text-xs font-black text-secondary uppercase">+ VAT</span></span>
                                     <span className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em]">Extra / Month</span>
                                 </div>
                                 <Button className="px-10 py-4 text-xs font-bold uppercase tracking-wider" onClick={() => {}}>
@@ -285,13 +358,24 @@ export const PricingView: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-3 gap-3 w-full max-w-md">
                                 {[
-                                    { amount: '1,000', price: '£5' },
-                                    { amount: '5,000', price: '£25' },
-                                    { amount: '10,000', price: '£45' }
+                                    { amount: '1,000', price: '£5', id: 'price_1TKIYDQkJ0HSsGbJP14cRzkT', val: 1000 },
+                                    { amount: '5,000', price: '£25', id: 'price_1TKIYaQkJ0HSsGbJiQaD7IZY', val: 5000 },
+                                    { amount: '10,000', price: '£45', id: 'price_1TKIZ0QkJ0HSsGbJD2g9BYAs', val: 10000 }
                                 ].map((pack, i) => (
-                                    <button key={i} className="flex flex-col items-center gap-1 p-4 rounded-2xl bg-slate-50 border border-border hover:border-accent/40 hover:bg-white transition-all group active:scale-95 shadow-sm">
-                                        <span className="text-lg font-black text-accent group-hover:text-accent">{pack.amount}</span>
-                                        <span className="text-[10px] font-black text-accent uppercase tracking-widest bg-accent/10 px-2 py-0.5 rounded-full">{pack.price}</span>
+                                    <button 
+                                        key={i} 
+                                        className="flex flex-col items-center gap-1 p-4 rounded-2xl bg-slate-50 border border-border hover:border-accent/40 hover:bg-white transition-all group active:scale-95 shadow-sm disabled:opacity-50"
+                                        onClick={() => handleUpgrade('credits_pack', pack.id, pack.val, true)}
+                                        disabled={loadingPlan !== null}
+                                    >
+                                        {loadingPlan === pack.id ? (
+                                            <Loader2 size={16} className="animate-spin my-auto" />
+                                        ) : (
+                                            <>
+                                                <span className="text-lg font-black text-accent group-hover:text-accent">{pack.amount}</span>
+                                                <span className="text-[10px] font-black text-accent uppercase tracking-widest bg-accent/10 px-2 py-0.5 rounded-full">{pack.price}</span>
+                                            </>
+                                        )}
                                     </button>
                                 ))}
                             </div>

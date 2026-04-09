@@ -2,6 +2,7 @@ import React, { ReactNode } from 'react';
 import { Moon, Sun, Monitor, Image as ImageIcon, Sparkles, Wand2, Layers, Download, CheckCircle2, History, AlertCircle, Trash2, Maximize2, X, Zap, Hexagon, Grid, Palette, Info, PoundSterling, BookOpen, Coins, ChevronDown, User, Settings } from 'lucide-react';
 import { AppStage } from '../types';
 import { useAuth } from '../hooks/useAuth';
+import { useCredits } from '../hooks/useCredits';
 
 interface AppShellProps {
   children: ReactNode;
@@ -13,6 +14,7 @@ interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNavigate, onReset, headerActions }) => {
   const { user } = useAuth();
+  const { credits, plan, loading: creditsLoading } = useCredits();
   const [isAboutDropdownOpen, setIsAboutDropdownOpen] = React.useState(false);
   React.useEffect(() => {
     // Enforce light mode on mount by explicitly removing any dark class
@@ -118,6 +120,19 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
               </div>
             </div>
           </div>
+          
+          {/* Credit Balance Badge */}
+          {user && !creditsLoading && credits !== null && (
+            <div 
+              className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 mr-2 cursor-pointer hover:bg-white/20 transition-all"
+              onClick={() => onNavigate(AppStage.ACCOUNT)}
+            >
+              <Coins size={14} className="text-yellow-400" />
+              <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                {credits.toLocaleString()} <span className="opacity-60">Credits</span>
+              </span>
+            </div>
+          )}
           
           {/* Sign In / Account Button */}
           {user ? (

@@ -1,11 +1,12 @@
 export const PRESET_MATERIALS = {
     walls: [
-        'Anthracite Composite',
+        'Anthracite Composite Cladding (Horizontal)',
+        'Anthracite Composite Cladding (Vertical)',
         'Black Charred Timber (Shou Sugi Ban)',
-        'London Stock Brick',
-        'Modern Grey Brick',
+        'Cedar Composite Cladding (Horizontal)',
+        'Cedar Composite Cladding (Vertical)',
+        'Cedar Timber Cladding',
         'Siberian Larch',
-        'Traditional Red Brick',
         'Western Red Cedar',
         'White Render',
         'Zinc Standing Seam'
@@ -19,12 +20,14 @@ export const PRESET_MATERIALS = {
     ],
     windows: [
         'Anthracite Grey Aluminium',
+        'Anthracite Grey UPVC',
         'Black Crittall Style',
         'Frameless Glass',
         'Oak Frame',
         'White UPVC'
     ],
     doors: [
+        'Anthracite Grey UPVC',
         'Bi-fold Aluminium',
         'French Doors',
         'Pivot Door',

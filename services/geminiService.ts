@@ -1,4 +1,17 @@
 import { MaterialConfig, WeatherConfig } from "../types";
+import { auth } from "./firebase";
+
+const getAuthHeaders = async (baseHeaders: Record<string, string> = {}) => {
+  try {
+    const token = await auth.currentUser?.getIdToken();
+    if (token) {
+      return { ...baseHeaders, 'Authorization': `Bearer ${token}` };
+    }
+  } catch (e) {
+    console.error("Token error", e);
+  }
+  return baseHeaders;
+};
 
 // Use relative API path for production and development
 const API_BASE_URL = '/api';
@@ -73,7 +86,7 @@ export const generateLineDrawing = async (base64Image: string | null | undefined
 
     const response = await fetch(`${API_BASE_URL}/generateLineDrawing`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body)
     });
 
@@ -98,7 +111,7 @@ export const analyzeComponents = async (base64Image: string): Promise<MaterialCo
   try {
     const response = await fetch(`${API_BASE_URL}/analyzeComponents`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ base64Image })
     });
 
@@ -123,7 +136,7 @@ export const analyzeBatchMaterials = async (base64Images: string[]): Promise<Arr
   try {
     const response = await fetch(`${API_BASE_URL}/analyzeBatchMaterials`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ base64Images })
     });
 
@@ -145,7 +158,7 @@ export const analyzeBatchMaterials = async (base64Images: string[]): Promise<Arr
  * Renders the building with specific materials.
  */
 export const renderBuilding = async (
-  base64Image: string, // Can be the line drawing or original
+  base64Image: string,
   materials: MaterialConfig,
   additionalPrompt?: string,
   isHighQuality: boolean = false,
@@ -158,7 +171,7 @@ export const renderBuilding = async (
 
     const response = await fetch(`${API_BASE_URL}/renderBuilding`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode })
     });
 
@@ -191,7 +204,7 @@ export const editImage = async (
 
     const response = await fetch(`${API_BASE_URL}/editImage`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ base64Image, maskImage, editPrompt, isHighQuality, ratio, isProMode })
     });
 
@@ -216,7 +229,7 @@ export const analyzeSceneForEditor = async (base64Image: string): Promise<{ desc
   try {
     const response = await fetch(`${API_BASE_URL}/analyzeScene`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ base64Image })
     });
 
@@ -250,7 +263,7 @@ export const applyWeather = async (
 
       const response = await fetch(`${API_BASE_URL}/applyWeather`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ base64Image, weather, isHighQuality, ratio, isProMode })
       });
 
@@ -282,7 +295,7 @@ export const analyzeExteriorDetails = async (base64Image: string): Promise<strin
   try {
     const response = await fetch(`${API_BASE_URL}/analyzeExteriorDetails`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ base64Image })
     });
 
@@ -315,7 +328,7 @@ export const generatePresentationBoard = async (base64Image: string, focusPoints
 
     const response = await fetch(`${API_BASE_URL}/generatePresentationBoard`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ base64Image, focusPoints, isHighQuality, isProMode })
     });
 
@@ -340,7 +353,7 @@ export const analyzeSceneForVideo = async (base64Images: string[], mode: 'zoom' 
   try {
     const response = await fetch(`${API_BASE_URL}/analyzeSceneForVideo`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ base64Images, mode })
     });
 
