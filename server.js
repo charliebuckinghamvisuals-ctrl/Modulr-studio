@@ -109,6 +109,7 @@ const deductCredits = async (user, amount) => {
 };
 
 const app = express();
+app.set('trust proxy', 1); // Enable proxy trust for Render load balancers
 const port = process.env.PORT || 3005;
 
 console.log("--- SERVER STARTUP DEBUG ---");
