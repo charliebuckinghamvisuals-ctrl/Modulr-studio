@@ -18,15 +18,27 @@ const __dirname = path.dirname(__filename);
 let db;
 try {
     const serviceAccountPath = path.join(__dirname, 'firebase-service-account.json');
-    if (fs.existsSync(serviceAccountPath)) {
-        const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+    let serviceAccount;
+
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        console.log("SUCCESS: Loaded Firebase credentials from Environment Variable");
+    } else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+        console.log("SUCCESS: Loaded Firebase credentials from Environment Variable");
+    } else if (fs.existsSync(serviceAccountPath)) {
+        serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+        console.log("SUCCESS: Loaded Firebase credentials from local file");
+    } else {
+        console.warn("WARNING: Firebase credentials not found in env or local file. Authentication will fail.");
+    }
+
+    if (serviceAccount) {
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount)
         });
         db = admin.firestore();
         console.log("SUCCESS: Firebase Admin & Firestore Initialized");
-    } else {
-        console.warn("WARNING: firebase-service-account.json not found.");
     }
 } catch (error) {
     console.error("FATAL: Failed to initialize Firebase Admin:", error);
