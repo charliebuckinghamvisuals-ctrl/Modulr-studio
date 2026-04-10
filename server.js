@@ -146,7 +146,8 @@ const globalLimiter = rateLimit({
     max: 100, 
     message: { error: "Too many requests from this IP, please try again after 15 minutes" },
     standardHeaders: true, 
-    legacyHeaders: false, 
+    legacyHeaders: false,
+    validate: false, 
     validate: { ip: false, xForwardedForHeader: false }
 });
 
@@ -154,7 +155,7 @@ const aiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, 
     max: 10,
     message: { error: "IP-based render limit reached. Please wait a minute." },
-    validate: { ip: false, xForwardedForHeader: false }
+    validate: false
 });
 
 // Per-User AI Limiter (Phase 1)
@@ -164,7 +165,7 @@ const userAiLimiter = rateLimit({
     keyGenerator: (req) => req.user?.uid || req.ip || 'unknown',
     message: { error: "You have reached your individual render limit. Please wait a minute." },
     standardHeaders: true,
-    validate: { ip: false, xForwardedForHeader: false },
+    validate: false,
     legacyHeaders: false,
 });
 
