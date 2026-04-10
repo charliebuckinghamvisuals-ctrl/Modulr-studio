@@ -381,7 +381,9 @@ app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
 
         for (const part of response.candidates?.[0]?.content?.parts || []) {
             if (part.inlineData) {
-                return res.json({ result: part.inlineData.data });
+                const rData = part.inlineData.data;
+                const b64Data = Buffer.isBuffer(rData) ? rData.toString("base64") : ((rData instanceof Uint8Array || rData instanceof ArrayBuffer) ? Buffer.from(rData).toString("base64") : rData);
+                return res.json({ result: b64Data });
             }
         }
         throw new Error("No image generated");
