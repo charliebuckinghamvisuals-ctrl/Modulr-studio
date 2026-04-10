@@ -135,21 +135,24 @@ const globalLimiter = rateLimit({
     message: { error: "Too many requests from this IP, please try again after 15 minutes" },
     standardHeaders: true, 
     legacyHeaders: false, 
+    validate: { ip: false, xForwardedForHeader: false }
 });
 
 const aiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, 
     max: 10,
-    message: { error: "IP-based render limit reached. Please wait a minute." }
+    message: { error: "IP-based render limit reached. Please wait a minute." },
+    validate: { ip: false, xForwardedForHeader: false }
 });
 
 // Per-User AI Limiter (Phase 1)
 const userAiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000,
     max: 5, // max 5 renders per minute per individual user
-    keyGenerator: (req) => req.user?.uid || req.ip,
+    keyGenerator: (req) => req.user?.uid || req.ip || 'unknown',
     message: { error: "You have reached your individual render limit. Please wait a minute." },
     standardHeaders: true,
+    validate: { ip: false, xForwardedForHeader: false },
     legacyHeaders: false,
 });
 
@@ -230,17 +233,16 @@ app.use((err, req, res, next) => {
 
 // Middleware to verify Firebase JWT
 const verifyFirebaseToken = async (req, res, next) => {
-    // Production Hardening: Strictly require Firebase Admin
-    try { 
-        admin.app(); 
-    } catch(_) {
-        console.error("ERROR: Firebase Admin not initialized. Auth blocked.");
-        return res.status(500).json({ error: "Server Configuration Error: Auth System Offline" });
+    // 🔥 DEVELOPMENT BYPASS: Set to true only for local feature testing. IMPORTANT: MUST BE FALSE IN PRODUCTION.
+    const MOCK_AUTH = false;
+    if (MOCK_AUTH) {
+        req.user = { uid: "testuser", email: "charlie@napc.uk" };
+        return next();
     }
 
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: "Unauthorized: Missing authentication token" });
+        return res.status(401).json({ error: 'Unauthorized: Missing authentication token' });
     }
 
     const idToken = authHeader.split('Bearer ')[1];
@@ -249,8 +251,8 @@ const verifyFirebaseToken = async (req, res, next) => {
         req.user = decodedToken;
         next();
     } catch (error) {
-        console.error("Error verifying auth token:", error);
-        return res.status(403).json({ error: "Unauthorized: Invalid or expired token" });
+        console.error("Firebase auth error:", error);
+        return res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
     }
 };
 
@@ -432,11 +434,16 @@ app.post('/api/analyzeComponents', userAiLimiter, async (req, res) => {
         const jsonMatch = stripped.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error("Could not find JSON in response: " + stripped.substring(0, 200));
         
-        res.json({ result: JSON.parse(jsonMatch[0]) });
-
+        try {
+            res.json({ result: JSON.parse(jsonMatch[0]) });
+        } catch (parseError) {
+            console.error("JSON Parse Error in analyzeComponents:", parseError, text);
+            // Graceful fallback for non-json responses when AI gets confused (e.g. line drawings)
+            res.json({ result: { walls: "none", roof: "none", windows: "none", doors: "none", decking: "none" } });
+        }
     } catch (error) {
-        console.error("analyzeComponents error:", error);
-        try { fs.appendFileSync('error.log', '\n[' + new Date().toISOString() + '] analyzeComponents: ' + error.message); } catch(_) {}
+        console.error("analyzeComponents error:", error, error.stack);
+        try { require('fs').appendFileSync('error.log', '\\n[' + new Date().toISOString() + '] analyzeComponents: ' + (error.stack || error.message)); } catch(_) {}
         res.status(500).json({ error: error.message });
     }
 });
@@ -535,13 +542,17 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
 
         for (const part of response.candidates?.[0]?.content?.parts || []) {
             if (part.inlineData) {
-                return res.json({ result: part.inlineData.data });
+                const rData = part.inlineData.data;
+                const b64Data = Buffer.isBuffer(rData) ? rData.toString("base64") : ((rData instanceof Uint8Array || rData instanceof ArrayBuffer) ? Buffer.from(rData).toString("base64") : rData);
+                return res.json({ result: b64Data });
             }
         }
-        throw new Error("No render generated");
-
+        
+        console.error("No render generated. Response data:", JSON.stringify(response, null, 2));
+        throw new Error("No render generated. Check server logs for response payload.");
     } catch (error) {
-        console.error("Render error:", error);
+        console.error("Render error in /api/renderBuilding:", error, error.stack);
+        try { require('fs').appendFileSync('error.log', '\\n[' + new Date().toISOString() + '] renderBuilding: ' + (error.stack || error.message)); } catch(_) {}
         res.status(500).json({ error: error.message });
     }
 });

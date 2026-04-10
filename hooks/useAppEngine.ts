@@ -200,7 +200,7 @@ export const useAppEngine = () => {
             setMaterials(detectedMaterials);
         } catch (error) {
             console.error(error);
-            toast.error('Could not auto-detect materials. Using defaults.');
+            toast.error(`Auto-detect failed: ${error instanceof Error ? error.message : 'Unknown error'}. Using defaults.`);
         } finally {
             setProcessing({ isLoading: false, message: '' });
         }
