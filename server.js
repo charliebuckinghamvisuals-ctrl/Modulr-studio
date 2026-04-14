@@ -1021,6 +1021,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
                 },
             ],
             mode: isOneTime ? 'payment' : 'subscription',
+            automatic_tax: { enabled: true },
             success_url: `${req.headers.origin}/account?success=true`,
             cancel_url: `${req.headers.origin}/pricing?canceled=true`,
             metadata: {

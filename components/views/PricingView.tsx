@@ -111,6 +111,15 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             <TrendingUp size={12} className="text-green-500" />
                             Annual billing includes <span className="text-accent underline decoration-accent/30 decoration-2 underline-offset-4">2 Months FREE</span>
                         </div>
+
+                        {/* TEMPORARY TEST BUTTON */}
+                        <Button 
+                            className="bg-red-500 hover:bg-red-600 border-none shadow-lg mt-6"
+                            onClick={() => handleUpgrade('dev_test_payment', 'price_1TM2R5HtB5liiqHxObbhPhYl', 50, true)}
+                            disabled={loadingPlan !== null}
+                        >
+                            {loadingPlan === 'price_1TM2R5HtB5liiqHxObbhPhYl' ? <Loader2 className="animate-spin" /> : 'DEV: Run 1p Test Checkout'}
+                        </Button>
                     </div>
                 </div>
 
@@ -129,10 +138,10 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
 
                         <Button 
                             className="w-full mb-8 shadow-xl" 
-                            onClick={() => handleUpgrade('trial', 'price_1TKI9zQkJ0HSsGbJzQq51D2H', 30)}
+                            onClick={() => handleUpgrade('trial', 'price_1TM29AHtB5liiqHxKB8iAiRI', 30)}
                             disabled={loadingPlan !== null}
                         >
-                            {loadingPlan === 'price_1TKI9zQkJ0HSsGbJzQq51D2H' ? <Loader2 className="animate-spin" /> : 'Start My Trial'}
+                            {loadingPlan === 'price_1TM29AHtB5liiqHxKB8iAiRI' ? <Loader2 className="animate-spin" /> : 'Start My Trial'}
                         </Button>
 
                         <div className="space-y-4 flex-1">
@@ -163,7 +172,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                 <span className="text-4xl font-black text-primary dark:text-white">
                                     £{billingCycle === 'monthly' ? '35' : '315'}
                                 </span>
-                                <span className="text-xs font-bold text-secondary uppercase tracking-tighter self-end mb-1">+ VAT</span>
+                                <span className="text-xs font-bold text-secondary uppercase tracking-tighter self-end mb-1">inc VAT</span>
                             </div>
                             <span className="text-secondary font-medium"> / {billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
                             {billingCycle === 'yearly' && (
@@ -177,12 +186,12 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             className="w-full mb-8 shadow-xl" 
                             onClick={() => handleUpgrade(
                                 'standard', 
-                                billingCycle === 'monthly' ? 'price_1TKI6UQkJ0HSsGbJml0Cl8cE' : 'price_1TKI7IQkJ0HSsGbJl2fUWKoc',
+                                billingCycle === 'monthly' ? 'price_1TM28BHtB5liiqHx3i4x0Gkp' : 'price_1TM2OfHtB5liiqHxRwZoscAa',
                                 1500
                             )}
                             disabled={loadingPlan !== null}
                         >
-                            {loadingPlan === (billingCycle === 'monthly' ? 'price_1TKI6UQkJ0HSsGbJml0Cl8cE' : 'price_1TKI7IQkJ0HSsGbJl2fUWKoc') ? <Loader2 className="animate-spin" /> : 'Upgrade Now'}
+                            {loadingPlan === (billingCycle === 'monthly' ? 'price_1TM28BHtB5liiqHx3i4x0Gkp' : 'price_1TM2OfHtB5liiqHxRwZoscAa') ? <Loader2 className="animate-spin" /> : 'Upgrade Now'}
                         </Button>
 
                         <div className="space-y-4 flex-1">
@@ -219,7 +228,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                 <span className="text-5xl font-black text-primary dark:text-white drop-shadow-md">
                                     £{billingCycle === 'monthly' ? '189.99' : '1,710'}
                                 </span>
-                                <span className="text-xs font-bold text-secondary uppercase tracking-tighter self-end mb-2">+ VAT</span>
+                                <span className="text-xs font-bold text-secondary uppercase tracking-tighter self-end mb-2">inc VAT</span>
                             </div>
                             <span className="text-secondary font-medium"> / {billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
                             {billingCycle === 'yearly' && (
@@ -233,12 +242,12 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             className="w-full mb-8 shadow-2xl" 
                             onClick={() => handleUpgrade(
                                 'business', 
-                                billingCycle === 'monthly' ? 'price_1TKI8QQkJ0HSsGbJoK37LzcK' : 'price_1TKI8nQkJ0HSsGbJIqLwL2K4',
+                                billingCycle === 'monthly' ? 'price_1TM28kHtB5liiqHxBZvK7pjm' : 'price_1TM2OGHtB5liiqHx2RQXMxO3',
                                 15500
                             )}
                             disabled={loadingPlan !== null}
                         >
-                            {loadingPlan === (billingCycle === 'monthly' ? 'price_1TKI8QQkJ0HSsGbJoK37LzcK' : 'price_1TKI8nQkJ0HSsGbJIqLwL2K4') ? <Loader2 className="animate-spin" /> : 'Upgrade Now'}
+                            {loadingPlan === (billingCycle === 'monthly' ? 'price_1TM28kHtB5liiqHxBZvK7pjm' : 'price_1TM2OGHtB5liiqHx2RQXMxO3') ? <Loader2 className="animate-spin" /> : 'Upgrade Now'}
                         </Button>
 
                         <div className="space-y-4 flex-1">
@@ -321,7 +330,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             </div>
                             <div className="flex flex-col items-center md:items-end gap-3 shrink-0">
                                 <div className="flex flex-col items-end">
-                                    <span className="text-4xl font-black text-primary">£100 <span className="text-xs font-black text-secondary uppercase">+ VAT</span></span>
+                                    <span className="text-4xl font-black text-primary">£100 <span className="text-xs font-black text-secondary uppercase">inc VAT</span></span>
                                     <span className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em]">Extra / Month</span>
                                 </div>
                                 <Button className="px-10 py-4 text-xs font-bold uppercase tracking-wider" onClick={() => {}}>
@@ -358,9 +367,9 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             </div>
                             <div className="grid grid-cols-3 gap-3 w-full max-w-md">
                                 {[
-                                    { amount: '1,000', price: '£5', id: 'price_1TKIYDQkJ0HSsGbJP14cRzkT', val: 1000 },
-                                    { amount: '5,000', price: '£25', id: 'price_1TKIYaQkJ0HSsGbJiQaD7IZY', val: 5000 },
-                                    { amount: '10,000', price: '£45', id: 'price_1TKIZ0QkJ0HSsGbJD2g9BYAs', val: 10000 }
+                                    { amount: '1,000', price: '£5', id: 'price_1TM2A5HtB5liiqHx3wUW9Fft', val: 1000 },
+                                    { amount: '5,000', price: '£22.99', id: 'price_1TM2ArHtB5liiqHxRD0k8UaS', val: 5000 },
+                                    { amount: '10,000', price: '£45', id: 'price_1TM2BNHtB5liiqHxj3fUvxia', val: 10000 }
                                 ].map((pack, i) => (
                                     <button 
                                         key={i} 
