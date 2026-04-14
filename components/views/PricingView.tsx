@@ -115,7 +115,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         {/* TEMPORARY TEST BUTTON */}
                         <Button 
                             className="bg-red-500 hover:bg-red-600 border-none shadow-lg mt-6"
-                            onClick={() => handleUpgrade('dev_test_payment', 'price_1TM2R5HtB5liiqHxObbhPhYl', 50, true)}
+                            onClick={() => handleUpgrade('dev_test_payment', 'price_1TM2R5HtB5liiqHxObbhPhYl', 50, false)}
                             disabled={loadingPlan !== null}
                         >
                             {loadingPlan === 'price_1TM2R5HtB5liiqHxObbhPhYl' ? <Loader2 className="animate-spin" /> : 'DEV: Run 1p Test Checkout'}
