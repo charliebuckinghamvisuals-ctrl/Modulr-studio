@@ -92,6 +92,56 @@ export const GuideView: React.FC = () => {
                         </div>
                     </section>
 
+                    {/* Detailed Tools Grid */}
+                    <section className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
+                                <Grid className="text-accent" size={20} />
+                            </div>
+                            <h2 className="text-2xl font-extrabold text-accent tracking-tight">Modulr Studio Tools Overview</h2>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {[
+                                {
+                                    icon: <Sparkles size={24} />,
+                                    title: "Render Engine",
+                                    desc: "The core engine. Import structural drawings or SketchUp screenshots, auto-detect exterior materials, and generate stunning 4K photorealistic architectural visualizations."
+                                },
+                                {
+                                    icon: <ImageIcon size={24} />,
+                                    title: "Standalone Studio",
+                                    desc: "Generate perfectly isolated product renders. Drops grass and environments, placing your building geometry exclusively onto pure white, soft gradient, or dark studio backdrops."
+                                },
+                                {
+                                    icon: <PenTool size={24} />,
+                                    title: "Smart Editor",
+                                    desc: "Refine existing renders without starting over. Make surgical textual edits ('Make the grass greener') or apply drastic weather changes like 'Winter Snow' or 'Golden Hour'."
+                                },
+                                {
+                                    icon: <Palette size={24} />,
+                                    title: "Line Converter",
+                                    desc: "Clean up messy hand-drawn sketches or raw CAD geometry, outputting crisp black-and-white architectural drawings. Perfect for structural planning applications."
+                                },
+                                {
+                                    icon: <Layers size={24} />,
+                                    title: "Material Studio",
+                                    desc: "Dynamically generate a 2x2 presentation sheet spotlighting extreme close-up details—ideal for showing off timber cladding grains, zinc seams, and composite deck textures to clients."
+                                }
+                            ].map((tool, idx) => (
+                                <div key={idx} className="glass-panel p-8 rounded-3xl border border-border bg-white/60 backdrop-blur-xl hover:border-accent/40 hover:shadow-xl transition-all duration-300 group">
+                                    <div className="bg-accent/10 p-4 rounded-2xl text-accent w-fit border border-accent/10 shadow-sm mb-6 group-hover:scale-110 group-hover:bg-accent group-hover:text-white transition-all">
+                                        {tool.icon}
+                                    </div>
+                                    <h4 className="text-accent font-bold text-xl mb-3">{tool.title}</h4>
+                                    <p className="text-slate-600 leading-relaxed text-sm">
+                                        {tool.desc}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+
                     {/* FAQ Section */}
                     <section className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-400">
                         <div className="flex items-center gap-3">

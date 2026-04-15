@@ -70,55 +70,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                     </div>
                 </div>
 
-                {/* 3. Why Modulr Studio Explanation */}
-                <div className="w-full py-16 px-10 md:px-16 rounded-[45px] bg-white/95 border border-slate-300 shadow-[0_20px_50px_rgba(0,0,0,0.08)] relative overflow-hidden backdrop-blur-xl">
-                    <div className="absolute top-0 right-0 w-96 h-96 bg-accent/5 blur-[100px] -mr-48 -mt-48 pointer-events-none"></div>
-                    <div className="absolute bottom-0 left-0 w-72 h-72 bg-accent/5 blur-[80px] -ml-36 -mb-36 pointer-events-none"></div>
 
-                    <div className="relative z-10 space-y-16">
-                        <div className="max-w-3xl">
-                            <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-accent leading-tight mb-6 w-fit inline-block">
-                                Why use Modulr&nbsp;Studio <br />
-                                Instead of General AI?
-                            </h2>
-                            <p className="text-slate-600 text-xl leading-relaxed">
-                                Generic AI models like ChatGPT or Gemini are built for art, not architecture. They "hallucinate" details that don't belong, often compromising the structural integrity of your vision.
-                            </p>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-                            <div className="space-y-4">
-                                <div className="bg-accent/10 p-3 rounded-2xl text-accent w-fit border border-accent/10 shadow-sm mb-2">
-                                    <ShieldCheck size={24} />
-                                </div>
-                                <h4 className="text-accent font-bold text-xl">Architectural Logic vs. Art</h4>
-                                <p className="text-slate-600 leading-relaxed text-sm">
-                                    Don't settle for "creative" guesses. While general AI patterns create beautiful images that can't be built, Modulr follows the strict architectural logic of your technical plan.
-                                </p>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="bg-accent/10 p-3 rounded-2xl text-accent w-fit border border-accent/10 shadow-sm mb-2">
-                                    <Layers size={24} />
-                                </div>
-                                <h4 className="text-accent font-bold text-xl">Surgical Material Control</h4>
-                                <p className="text-slate-600 leading-relaxed text-sm">
-                                    Generic AI changes the whole building when you want one swap. In Modulr, you have surgical control. Change a cladding type or window frame instantly, while the rest of your scene stays perfect.
-                                </p>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="bg-accent/10 p-3 rounded-2xl text-accent w-fit border border-accent/10 shadow-sm mb-2">
-                                    <Zap size={24} />
-                                </div>
-                                <h4 className="text-accent font-bold text-xl">Pro-Grade 4K Visualization</h4>
-                                <p className="text-slate-600 leading-relaxed text-sm">
-                                    Skip the low-res, artistic filters of chat models. Modulr generates high-fidelity, presentation-ready 4K renders designed specifically for clients, brochures, and planning applications.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
                 {/* 4. Dedicated Garden Room AI */}
                 <div className="w-full flex flex-col items-center text-center py-12 gap-10">
