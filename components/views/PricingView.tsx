@@ -333,8 +333,12 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                     <span className="text-4xl font-black text-primary">£100 <span className="text-xs font-black text-secondary uppercase">inc VAT</span></span>
                                     <span className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em]">Extra / Month</span>
                                 </div>
-                                <Button className="px-10 py-4 text-xs font-bold uppercase tracking-wider" onClick={() => {}}>
-                                    Add to Plan
+                                <Button 
+                                    className="px-10 py-4 text-xs font-bold uppercase tracking-wider" 
+                                    onClick={() => handleUpgrade('managed_service', 'price_1TMS40HtB5liiqHxq6XkJGK4', 0)}
+                                    disabled={loadingPlan !== null}
+                                >
+                                    {loadingPlan === 'price_1TMS40HtB5liiqHxq6XkJGK4' ? <Loader2 className="animate-spin" /> : 'Add to Plan'}
                                 </Button>
                             </div>
                         </div>
