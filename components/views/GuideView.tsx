@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, HelpCircle, CheckCircle2, Layers, Grid, Palette, ArrowRight, Sparkles, PenTool, Image as ImageIcon } from 'lucide-react';
+import { BookOpen, HelpCircle, CheckCircle2, Layers, Grid, Palette, ArrowRight, Sparkles, PenTool, Image as ImageIcon, Briefcase } from 'lucide-react';
 import { DraftingBackground } from '../DraftingBackground';
 
 export const GuideView: React.FC = () => {
@@ -111,7 +111,7 @@ export const GuideView: React.FC = () => {
                                 {
                                     icon: <ImageIcon size={24} />,
                                     title: "Standalone Studio",
-                                    desc: "Generate perfectly isolated product renders. Drops grass and environments, placing your building geometry exclusively onto pure white, soft gradient, or dark studio backdrops."
+                                    desc: "Perfect for quoting. Drop complex environments and confidently place your building onto pure white, soft gradient, or dark studio backdrops alongside proper environment renders."
                                 },
                                 {
                                     icon: <PenTool size={24} />,
@@ -127,6 +127,11 @@ export const GuideView: React.FC = () => {
                                     icon: <Layers size={24} />,
                                     title: "Material Studio",
                                     desc: "Dynamically generate a 2x2 presentation sheet spotlighting extreme close-up details—ideal for showing off timber cladding grains, zinc seams, and composite deck textures to clients."
+                                },
+                                {
+                                    icon: <Briefcase size={24} />,
+                                    title: "The Ultimate Package",
+                                    desc: "By combining environmental renders, crisp studio backgrounds, and detailed material sheets, you instantly arm yourself with the ultimate quoting package. Perfectly curated to dominate social media algorithms and win over high-ticket clients."
                                 }
                             ].map((tool, idx) => (
                                 <div key={idx} className="glass-panel p-8 rounded-3xl border border-border bg-white/60 backdrop-blur-xl hover:border-accent/40 hover:shadow-xl transition-all duration-300 group">
