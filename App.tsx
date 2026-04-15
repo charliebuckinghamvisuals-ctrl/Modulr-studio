@@ -96,6 +96,35 @@ const App: React.FC = () => {
                 <ProModelToggle />
             </div>
 
+            {/* Studio Mode Toggles */}
+            <div className="flex flex-col gap-3 w-full bg-slate-50 p-3 rounded-2xl border border-slate-200 shadow-inner">
+                <div className="flex items-center justify-between cursor-pointer" onClick={() => engine.setIsStudioMode(!engine.isStudioMode)}>
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2 cursor-pointer">
+                        <Grid size={12} className="text-accent" />
+                        Vexta-Style Studio
+                    </label>
+                    <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${engine.isStudioMode ? 'bg-accent' : 'bg-slate-300'}`}>
+                         <div className={`w-3 h-3 rounded-full bg-white transition-transform ${engine.isStudioMode ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </div>
+                </div>
+                
+                {engine.isStudioMode && (
+                    <div className="flex items-center justify-between border-t border-slate-200/50 pt-2 animate-in fade-in slide-in-from-top-2">
+                         <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Angle</label>
+                         <select 
+                            value={engine.selectedAngle} 
+                            onChange={(e) => engine.setSelectedAngle(e.target.value)}
+                            className="bg-white border border-slate-200 text-xs font-bold text-accent rounded-lg px-2 py-1 outline-none"
+                         >
+                            <option value="Front Elevational">Front</option>
+                            <option value="Rear Elevational">Back</option>
+                            <option value="Side Elevational">Side</option>
+                            <option value="Isometric">Isometric</option>
+                         </select>
+                    </div>
+                )}
+            </div>
+
             <button
                 onClick={() => document.getElementById('batchUploadInput')?.click()}
                 className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-2xl bg-white text-accent hover:bg-accent hover:text-white border border-accent/20 transition-all duration-300 font-bold text-sm shadow-sm group"
@@ -237,6 +266,11 @@ const App: React.FC = () => {
                         Render Scene
                     </Button>
                 )}
+                <div className="text-center mt-3">
+                    <p className="text-[9px] text-slate-400 font-medium leading-tight">
+                        <span className="font-bold uppercase tracking-widest">AI Disclaimer:</span> While tuned for precision, the AI may occasionally hallucinate minor details. Please review structural boundaries carefully.
+                    </p>
+                </div>
             </div>
         </>
     );
@@ -550,34 +584,31 @@ const App: React.FC = () => {
     );
 
     const refinementBox = (
-        <div className="mt-4 p-5 glass-panel rounded-2xl border border-accent/20 bg-accent/5 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col gap-4">
+        <div className="mt-4 p-4 glass-panel rounded-2xl border border-accent/20 bg-accent/5 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-500 shadow-sm">
+            <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-widest text-accent flex items-center gap-2">
-                        <Sparkles size={14} className="animate-pulse" />
-                        Quick Changes / Refinement
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-accent flex items-center gap-2">
+                        <Sparkles size={12} className="text-amber-500 animate-pulse" />
+                        Refinement Mode
                     </label>
-                    <span className="text-[10px] text-secondary font-medium italic">4K High Quality Refinement</span>
                 </div>
-                <div className="flex gap-3">
-                    <textarea
+                <div className="flex items-center gap-3 bg-white pl-4 pr-1 py-1 rounded-full border border-accent/20 focus-within:border-accent/50 focus-within:ring-2 focus-within:ring-accent/10 transition-all shadow-inner">
+                    <input
                         value={engine.refinementPrompt}
                         onChange={(e) => engine.setRefinementPrompt(e.target.value)}
-                        placeholder="e.g. 'Make the grass greener and add modern patio furniture'..."
-                        className="flex-1 p-4 rounded-xl bg-white border border-accent/20 focus:border-accent/40 focus:ring-1 focus:ring-accent/20 outline-none text-sm text-accent placeholder:text-accent/30 resize-none min-h-[60px] transition-all"
+                        placeholder="e.g. Add modern patio furniture"
+                        className="flex-1 bg-transparent border-none outline-none text-xs text-accent placeholder:text-accent/30"
+                        onKeyDown={(e) => { if (e.key === 'Enter') engine.handleRefineRender(); }}
                     />
                     <Button
                         onClick={engine.handleRefineRender}
                         disabled={engine.processing.isLoading || !engine.refinementPrompt.trim()}
-                        className="h-auto px-6 whitespace-nowrap"
-                        icon={<Sparkles size={16} />}
+                        className="h-8 px-4 text-[10px] rounded-full whitespace-nowrap"
+                        icon={<Sparkles size={12} />}
                     >
-                        Refine
+                        Apply
                     </Button>
                 </div>
-                <p className="text-[10px] text-secondary/70 leading-relaxed px-1">
-                    This will use your current render as a seed to apply specific changes without losing quality.
-                </p>
             </div>
         </div>
     );
@@ -746,6 +777,7 @@ const App: React.FC = () => {
                     isLoading={engine.activeStage === AppStage.RENDER_ENGINE && engine.processing.isLoading}
                     loadingMessage={engine.processing.message}
                     customEmptyState={engine.activeStage === AppStage.RENDER_ENGINE && !engine.originalImage && engine.batchImages.length === 0 ? renderEngineEmptyState : undefined}
+                    userPlan={engine.userPlan}
                     extraFooter={engine.renderedImage || engine.batchRenders.length > 0 ? (
                         <>
                             {refinementBox}

@@ -61,6 +61,10 @@ export const useAppEngine = () => {
     const [isSketchUpMode, setIsSketchUpMode] = useState(false);
     const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
 
+    const [userPlan, setUserPlan] = useState<string>('free');
+    const [isStudioMode, setIsStudioMode] = useState(false);
+    const [selectedAngle, setSelectedAngle] = useState<string>('Front');
+
     const [materials, setMaterials] = useState({
         walls: 'none',
         roof: 'none',
@@ -90,8 +94,13 @@ export const useAppEngine = () => {
                 try {
                     const docRef = doc(db, 'users', user.uid);
                     const docSnap = await getDoc(docRef);
-                    if (docSnap.exists() && docSnap.data().materialLibrary) {
-                        setMaterialLibrary(docSnap.data().materialLibrary);
+                    if (docSnap.exists()) {
+                        if (docSnap.data().materialLibrary) {
+                            setMaterialLibrary(docSnap.data().materialLibrary);
+                        }
+                        if (docSnap.data().plan) {
+                            setUserPlan(docSnap.data().plan);
+                        }
                     } else {
                         const saved = localStorage.getItem('modulr_material_library');
                         if (saved) {
@@ -342,6 +351,23 @@ export const useAppEngine = () => {
             }
             ctx.drawImage(img, 0, 0);
 
+            // Watermark for Free users
+            if (userPlan === 'free' || userPlan === 'trial') {
+                ctx.save();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+                ctx.font = 'bold 36px "Inter", sans-serif';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'bottom';
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                ctx.shadowBlur = 10;
+                ctx.fillText('MODULR STUDIO', canvas.width - 40, canvas.height - 40);
+                
+                ctx.font = 'italic 20px "Inter", sans-serif';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.fillText('Trial Render', canvas.width - 40, canvas.height - 15);
+                ctx.restore();
+            }
+
             // Convert and trigger download
             const dataUrl = canvas.toDataURL(mimeType, downloadFormat === 'jpg' ? 0.95 : undefined);
             const link = document.createElement('a');
@@ -441,7 +467,7 @@ export const useAppEngine = () => {
             : 'Rendering photorealistic textures and lighting...';
         setProcessing({ isLoading: true, message: loadingMsg });
         try {
-            const result = await renderBuilding(source, materials, additionalPrompt, isHighQuality, isProMode, undefined, isSketchUpMode);
+            const result = await renderBuilding(source, materials, additionalPrompt, isHighQuality, isProMode, isStudioMode ? selectedAngle : undefined, isSketchUpMode, isStudioMode);
             setRenderedImage(result);
             setEditorImage(null);
             await saveToHistory({
@@ -592,6 +618,7 @@ export const useAppEngine = () => {
         refinementPrompt, setRefinementPrompt,
         downloadFormat, setDownloadFormat,
         isSketchUpMode, setIsSketchUpMode,
+        userPlan, isStudioMode, setIsStudioMode, selectedAngle, setSelectedAngle,
         materialLibrary, addToLibrary, removeFromLibrary,
         activeProfileId, setActiveProfileId,
         handleGenerateLineDrawing, handleAnalyzeMaterials, handleRender, handleBatchRender, handleRefineRender, handleEditImage, handleWeather, handleMaterialStudio, handleAnalyzeForEditor, handleAnalyzeForMaterialStudio,

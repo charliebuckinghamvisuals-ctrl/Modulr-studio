@@ -25,6 +25,7 @@ interface WorkspaceViewProps {
     batchRenders?: string[];
     selectedBatchIndex?: number;
     onBatchSelect?: (index: number) => void;
+    userPlan?: string;
 }
 
 export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
@@ -47,7 +48,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     batchImages,
     batchRenders,
     selectedBatchIndex = 0,
-    onBatchSelect
+    onBatchSelect,
+    userPlan
 }) => {
 
     const getImageUrl = (img: string | null) => {
@@ -143,6 +145,12 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
             <div className="flex-1 p-6 lg:p-10 flex flex-col gap-6 relative z-10 min-w-0">
                 <div className="w-full max-w-5xl mx-auto flex-1 min-h-[500px] max-h-[85vh] glass-panel rounded-3xl overflow-hidden border-2 border-dashed border-border hover:border-accent/40 transition-colors duration-300 relative flex items-center justify-center bg-surface/50">
                     {renderViewer()}
+                    {(userPlan === 'free' || userPlan === 'trial') && primaryImg && (
+                        <div className="absolute inset-0 pointer-events-none flex flex-col items-end justify-end p-8 z-50">
+                            <h1 className="text-4xl md:text-5xl font-black text-white/80 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] tracking-tighter">MODULR STUDIO</h1>
+                            <p className="text-lg text-white/60 font-medium italic drop-shadow-[0_2px_5px_rgba(0,0,0,0.8)]">Trial Render</p>
+                        </div>
+                    )}
                 </div>
                 <div className="flex justify-between items-center text-xs text-secondary px-2 font-medium tracking-wide uppercase">
                     <div></div> {/* Placeholder for flex parity */}
