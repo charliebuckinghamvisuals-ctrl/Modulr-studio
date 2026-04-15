@@ -154,7 +154,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onNavigate }) => {
                                         type="email" 
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        placeholder="architect@napc.uk" 
+                                        placeholder="yourname@modulr.uk" 
                                         className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 border border-border focus:border-accent/40 focus:ring-4 focus:ring-accent/5 focus:bg-white outline-none transition-all text-sm text-accent font-medium placeholder-slate-400"
                                     />
                                 </div>
