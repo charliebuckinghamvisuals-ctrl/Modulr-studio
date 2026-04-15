@@ -171,7 +171,7 @@ const userAiLimiter = rateLimit({
 });
 
 // Security Headers
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 
 // CORS Configuration (Strict Origins)
 const allowedOrigins = [
