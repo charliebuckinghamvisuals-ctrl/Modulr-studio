@@ -15,6 +15,8 @@ import { useAppEngine } from './hooks/useAppEngine';
 // import { PDFGenerator } from './components/PDFGenerator';
 import { HomeView } from './components/views/HomeView';
 import { MaterialStudioView } from './components/views/MaterialStudioView';
+import { StudioView } from './components/views/StudioView';
+import { BatchSlotUploader } from './components/BatchSlotUploader';
 import { WorkspaceView } from './components/views/WorkspaceView';
 import { PricingView } from './components/views/PricingView';
 import { AboutView } from './components/views/AboutView';
@@ -96,44 +98,13 @@ const App: React.FC = () => {
                 <ProModelToggle />
             </div>
 
-            {/* Studio Mode Toggles */}
-            <div className="flex flex-col gap-3 w-full bg-slate-50 p-3 rounded-2xl border border-slate-200 shadow-inner">
-                <div className="flex items-center justify-between cursor-pointer" onClick={() => engine.setIsStudioMode(!engine.isStudioMode)}>
-                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2 cursor-pointer">
-                        <Grid size={12} className="text-accent" />
-                        Vexta-Style Studio
-                    </label>
-                    <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${engine.isStudioMode ? 'bg-accent' : 'bg-slate-300'}`}>
-                         <div className={`w-3 h-3 rounded-full bg-white transition-transform ${engine.isStudioMode ? 'translate-x-4' : 'translate-x-0'}`} />
-                    </div>
-                </div>
-                
-                {engine.isStudioMode && (
-                    <div className="flex items-center justify-between border-t border-slate-200/50 pt-2 animate-in fade-in slide-in-from-top-2">
-                         <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Angle</label>
-                         <select 
-                            value={engine.selectedAngle} 
-                            onChange={(e) => engine.setSelectedAngle(e.target.value)}
-                            className="bg-white border border-slate-200 text-xs font-bold text-accent rounded-lg px-2 py-1 outline-none"
-                         >
-                            <option value="Front Elevational">Front</option>
-                            <option value="Rear Elevational">Back</option>
-                            <option value="Side Elevational">Side</option>
-                            <option value="Isometric">Isometric</option>
-                         </select>
-                    </div>
-                )}
-            </div>
+            <BatchSlotUploader 
+                batchImages={engine.batchImages}
+                batchRenders={engine.batchRenders}
+                onUpload={(file, index) => engine.handleSlotImageUpload(file, index, AppStage.RENDER_ENGINE)}
+            />
 
-            <button
-                onClick={() => document.getElementById('batchUploadInput')?.click()}
-                className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-2xl bg-white text-accent hover:bg-accent hover:text-white border border-accent/20 transition-all duration-300 font-bold text-sm shadow-sm group"
-            >
-                <Upload size={16} />
-                {engine.batchImages.length > 0 ? 'Upload New Batch' : (engine.originalImage ? 'Change Reference Image' : 'Upload Batch / Reference Images')}
-            </button>
-
-            <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar mt-4">
                 
                 {/* Material Library Quick Access */}
                 <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-2">
@@ -257,13 +228,13 @@ const App: React.FC = () => {
                 />
             </div>
             <div className="mt-auto pt-6">
-                {engine.batchImages.length > 0 ? (
+                {engine.batchImages.some(img => img && img.trim() !== '') ? (
                     <Button borderless className="w-full" onClick={engine.handleBatchRender} icon={<Sparkles size={16} />} disabled={engine.processing.isLoading}>
-                        Render Batch Sequence ({engine.batchImages.length})
+                        Render Batch Sequence
                     </Button>
                 ) : (
-                    <Button borderless className="w-full" onClick={engine.handleRender} icon={<Sparkles size={16} />} disabled={!engine.originalImage}>
-                        Render Scene
+                    <Button borderless className="w-full disabled" disabled={true} icon={<Sparkles size={16} />}>
+                        Upload Images First
                     </Button>
                 )}
                 <div className="text-center mt-3">
@@ -773,10 +744,10 @@ const App: React.FC = () => {
                     onDownload={engine.handleDownload}
                     onFormatChange={engine.setDownloadFormat}
                     downloadFormat={engine.downloadFormat}
-                    onInputClick={() => document.getElementById('batchUploadInput')?.click()}
+                    onInputClick={() => {}} // Inputs are inside slots now
                     isLoading={engine.activeStage === AppStage.RENDER_ENGINE && engine.processing.isLoading}
                     loadingMessage={engine.processing.message}
-                    customEmptyState={engine.activeStage === AppStage.RENDER_ENGINE && !engine.originalImage && engine.batchImages.length === 0 ? renderEngineEmptyState : undefined}
+                    customEmptyState={engine.activeStage === AppStage.RENDER_ENGINE && !engine.batchImages.some(Boolean) ? renderEngineEmptyState : undefined}
                     userPlan={engine.userPlan}
                     extraFooter={engine.renderedImage || engine.batchRenders.length > 0 ? (
                         <>
@@ -785,6 +756,14 @@ const App: React.FC = () => {
                         </>
                     ) : undefined}
                     historyFooter={<HistoryFooter currentStage={AppStage.RENDER_ENGINE} onLoadHistoryItem={handleLoadHistory} />}
+                />
+            )}
+
+            {engine.activeStage === AppStage.STUDIO && (
+                <StudioView 
+                    engine={engine}
+                    selectedBatchIndex={selectedBatchIndex}
+                    setSelectedBatchIndex={setSelectedBatchIndex}
                 />
             )}
 
@@ -848,15 +827,6 @@ const App: React.FC = () => {
                 accept="image/*"
                 onChange={(e) => engine.handleImageUpload(e, AppStage.MATERIAL_STUDIO)}
             />
-            <input
-                type="file"
-                id="batchUploadInput"
-                className="hidden"
-                multiple
-                accept="image/*"
-                onChange={engine.handleBatchImageUpload}
-            />
-
         </AppShell>
     );
 

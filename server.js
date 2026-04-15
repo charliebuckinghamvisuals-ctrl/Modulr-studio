@@ -465,7 +465,7 @@ app.post('/api/analyzeComponents', userAiLimiter, async (req, res) => {
 
 app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
     try {
-        const { base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, isStudioMode } = req.body;
+        const { base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground } = req.body;
         
         // Phase 2: Credit-based deduction
         const cost = isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES;
@@ -500,7 +500,7 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
       ${buildMaterialInstruction('Decking/Ground', materials.decking)}
       
       SCENE MODIFICATIONS: ${additionalPrompt || 'None'}
-      ${isStudioMode ? '\n      STUDIO OVERRIDE: Render this building completely isolated on a pure, seamless white studio backdrop. Do NOT render grass, trees, fences, skies, or any natural environment. Pure white studio lighting only.' : ''}
+      ${studioBackground ? `\n      STUDIO OVERRIDE: Render this building completely isolated on a ${studioBackground}. Do NOT render grass, trees, fences, skies, or any natural environment. Pure studio lighting only.` : ''}
       FINAL OUTPUT: 4K UHD Photorealistic.
     `;
 
@@ -531,7 +531,7 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
       - Use high-contrast architectural lighting with crisp shadows.
 
       SCENE MODIFICATIONS: ${additionalPrompt || 'None'}
-      ${isStudioMode ? '\n      STUDIO OVERRIDE: Render this building completely isolated on a pure, seamless white studio backdrop. Do NOT render grass, trees, fences, skies, or any natural environment. Pure white studio lighting only.' : ''}
+      ${studioBackground ? `\n      STUDIO OVERRIDE: Render this building completely isolated on a ${studioBackground}. Do NOT render grass, trees, fences, skies, or any natural environment. Pure studio lighting only.` : ''}
 
       FINAL OUTPUT: The result must be indistinguishable from a real architectural photograph (DSLR quality).
       CRITICAL: Output resolution 3840 x 2160 pixels (4K UHD).

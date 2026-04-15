@@ -9,20 +9,9 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
 export const useAppEngine = () => {
-    const [activeStage, setRawActiveStage] = useState<AppStage>(AppStage.HOME);
+    const [activeStage, setActiveStage] = useState<AppStage>(AppStage.HOME);
 
-    const setActiveStage = (stage: AppStage) => {
-        if (stage === AppStage.STUDIO) {
-            setIsStudioMode(true);
-            setRawActiveStage(AppStage.RENDER_ENGINE);
-        } else {
-            if (stage !== AppStage.RENDER_ENGINE) {
-                setIsStudioMode(false);
-            }
-            setRawActiveStage(stage);
-        }
-    };
-    const [stageImages, setStageImages] = useState<Partial<Record<AppStage, string>>>({});
+    // Image State
     const originalImage = stageImages[activeStage] || null;
 
     const setOriginalImage = (img: string | null) => {
@@ -72,7 +61,7 @@ export const useAppEngine = () => {
     const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
 
     const [userPlan, setUserPlan] = useState<string>('free');
-    const [isStudioMode, setIsStudioMode] = useState(false);
+    const [studioBackground, setStudioBackground] = useState<string>('Pure White Studio');
     const [selectedAngle, setSelectedAngle] = useState<string>('Front');
 
     const [materials, setMaterials] = useState({
@@ -272,6 +261,53 @@ export const useAppEngine = () => {
             reader.readAsDataURL(file);
             e.target.value = '';
         }
+    };
+
+    const handleSlotImageUpload = (file: File | null, index: number, targetStage: AppStage) => {
+        if (!file) {
+            // Allow clearing a slot
+            setBatchImages(prev => {
+                const next = [...prev];
+                next[index] = '';
+                return next;
+            });
+            return;
+        }
+
+        setActiveStage(targetStage);
+        setOriginalImage(null); // Clear single image mode
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const result = event.target?.result as string;
+            const base64Data = result.split(',')[1];
+            
+            setBatchImages(prev => {
+                const next = [...prev];
+                // Ensure array has at least 5 slots
+                while(next.length < 5) next.push('');
+                next[index] = base64Data;
+                
+                // Trigger batch material auto-detect on the new image
+                analyzeBatchMaterials([base64Data]).then(detected => {
+                    if (detected && detected.length > 0) {
+                        setBatchMaterials(mats => {
+                            const newMats = [...mats];
+                            while(newMats.length < 5) newMats.push(materials);
+                            newMats[index] = detected[0];
+                            return newMats;
+                        });
+                        // If this is the first image uploaded, set root materials
+                        if (next.filter(Boolean).length === 1) {
+                            setMaterials(detected[0]);
+                        }
+                    }
+                });
+                
+                return next;
+            });
+        };
+        reader.readAsDataURL(file);
     };
 
     const handleBatchImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -500,32 +536,46 @@ export const useAppEngine = () => {
 
         setProcessing({ isLoading: true, message: 'Rendering batch sequence...' });
         try {
-            const newRenders: string[] = [];
-            for (let i = 0; i < batchImages.length; i++) {
-                const sourceImg = batchImages[i];
-                const matConfig = batchMaterials[i] || materials;
+            const validIndices = batchImages.map((img, idx) => img && img.trim() !== '' ? idx : -1).filter(idx => idx !== -1);
+            if (validIndices.length === 0) return;
+
+            setProcessing({ isLoading: true, message: 'Rendering batch sequence...' });
+            
+            const newRenders: string[] = [...batchRenders];
+            while(newRenders.length < 5) newRenders.push(''); // Ensure matching array length
+            
+            for (let i = 0; i < validIndices.length; i++) {
+                const slotIndex = validIndices[i];
+                const sourceImg = batchImages[slotIndex];
+                const matConfig = batchMaterials[slotIndex] || materials;
                 
-                setProcessing({ isLoading: true, message: `Rendering angle ${i + 1} of ${batchImages.length}...` });
+                setProcessing({ isLoading: true, message: `Rendering angle ${i + 1} of ${validIndices.length}...` });
                 
+                const isStudioReq = activeStage === AppStage.STUDIO;
                 const result = await renderBuilding(
                     sourceImg, 
                     matConfig, 
                     additionalPrompt, 
                     isHighQuality, 
                     isProMode,
-                    matConfig.orientation,
-                    isSketchUpMode
+                    matConfig.orientation, // backend orientation prompt
+                    isSketchUpMode,
+                    isStudioReq ? studioBackground : undefined // Pass background if studio
                 );
                 
-                newRenders.push(result);
+                newRenders[slotIndex] = result;
                 setBatchRenders([...newRenders]);
-                setRenderedImage(result);
+                
+                // Show last rendered
+                if (i === validIndices.length - 1) {
+                    setRenderedImage(result);
+                }
             }
             
             await saveToHistory({
-                stage: AppStage.RENDER_ENGINE,
-                image: newRenders[0],
-                originalImage: batchImages[0],
+                stage: activeStage,
+                image: newRenders.find(i => i !== '') || null,
+                originalImage: batchImages.find(i => i !== '') || null,
                 prompt: 'Batch Render: ' + additionalPrompt,
                 settings: materials
             });
@@ -628,10 +678,11 @@ export const useAppEngine = () => {
         refinementPrompt, setRefinementPrompt,
         downloadFormat, setDownloadFormat,
         isSketchUpMode, setIsSketchUpMode,
-        userPlan, isStudioMode, setIsStudioMode, selectedAngle, setSelectedAngle,
+        userPlan, studioBackground, setStudioBackground, selectedAngle, setSelectedAngle,
         materialLibrary, addToLibrary, removeFromLibrary,
         activeProfileId, setActiveProfileId,
         handleGenerateLineDrawing, handleAnalyzeMaterials, handleRender, handleBatchRender, handleRefineRender, handleEditImage, handleWeather, handleMaterialStudio, handleAnalyzeForEditor, handleAnalyzeForMaterialStudio,
+        handleSlotImageUpload,
         getRenderUrl
     };
 };
