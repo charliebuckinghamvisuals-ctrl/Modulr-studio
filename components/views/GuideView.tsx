@@ -91,7 +91,10 @@ export const GuideView: React.FC = () => {
                             </div>
                         </div>
                     </section>
+                </div>
 
+                {/* Wide Section for Overview Grid */}
+                <div className="max-w-[1500px] mx-auto space-y-10 my-24 w-full">
                     {/* Detailed Tools Grid */}
                     <section className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
                         <div className="flex items-center gap-3">
@@ -101,7 +104,7 @@ export const GuideView: React.FC = () => {
                             <h2 className="text-2xl font-extrabold text-accent tracking-tight">Modulr Studio Tools Overview</h2>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6">
                             {[
                                 {
                                     icon: <Sparkles size={24} />,
@@ -127,26 +130,38 @@ export const GuideView: React.FC = () => {
                                     icon: <Layers size={24} />,
                                     title: "Material Studio",
                                     desc: "Dynamically generate a 2x2 presentation sheet spotlighting extreme close-up details—ideal for showing off timber cladding grains, zinc seams, and composite deck textures to clients."
-                                },
-                                {
-                                    icon: <Briefcase size={24} />,
-                                    title: "The Ultimate Package",
-                                    desc: "By combining environmental renders, crisp studio backgrounds, and detailed material sheets, you instantly arm yourself with the ultimate quoting package. Perfectly curated to dominate social media algorithms and win over high-ticket clients."
                                 }
                             ].map((tool, idx) => (
-                                <div key={idx} className="glass-panel p-8 rounded-3xl border border-border bg-white/60 backdrop-blur-xl hover:border-accent/40 hover:shadow-xl transition-all duration-300 group">
+                                <div key={idx} className="glass-panel p-6 rounded-3xl border border-border bg-white/60 backdrop-blur-xl hover:border-accent/40 hover:shadow-xl transition-all duration-300 group flex flex-col h-full">
                                     <div className="bg-accent/10 p-4 rounded-2xl text-accent w-fit border border-accent/10 shadow-sm mb-6 group-hover:scale-110 group-hover:bg-accent group-hover:text-white transition-all">
                                         {tool.icon}
                                     </div>
                                     <h4 className="text-accent font-bold text-xl mb-3">{tool.title}</h4>
-                                    <p className="text-slate-600 leading-relaxed text-sm">
+                                    <p className="text-slate-600 leading-relaxed text-sm flex-1">
                                         {tool.desc}
                                     </p>
                                 </div>
                             ))}
                         </div>
-                    </section>
 
+                        {/* Ultimate Package Banner */}
+                        <div className="mt-8 glass-panel p-10 md:p-14 rounded-[2.5rem] border border-border bg-gradient-to-br from-white/80 to-accent/5 backdrop-blur-3xl hover:border-accent/30 hover:shadow-2xl transition-all duration-500 group flex flex-col md:flex-row items-center gap-10 overflow-hidden relative">
+                            <div className="absolute top-0 right-0 w-96 h-96 bg-accent/5 blur-[100px] -mr-48 -mt-48 pointer-events-none group-hover:bg-accent/10 transition-all duration-500"></div>
+                            
+                            <div className="bg-accent/10 p-6 rounded-3xl text-accent w-fit border border-accent/20 shadow-md group-hover:scale-110 group-hover:bg-accent group-hover:text-white transition-all shrink-0 relative z-10">
+                                <Briefcase size={40} />
+                            </div>
+                            <div className="space-y-4 relative z-10 w-full">
+                                <h4 className="text-accent font-bold text-3xl">The Ultimate Quoting Package</h4>
+                                <p className="text-slate-600 leading-relaxed text-lg max-w-4xl">
+                                    By combining environmental renders, crisp studio backgrounds, and detailed material sheets, you instantly arm yourself with the ultimate quoting package. Perfectly curated to dominate social media algorithms and win over high-ticket clients.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <div className="max-w-4xl mx-auto space-y-16">
                     {/* FAQ Section */}
                     <section className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-400">
                         <div className="flex items-center gap-3">
