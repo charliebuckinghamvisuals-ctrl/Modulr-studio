@@ -70,7 +70,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                     </div>
                 </div>
                 {/* Wide Section for Overview Grid */}
-                <div className="w-[calc(100vw-2rem)] xl:w-[95vw] max-w-[1500px] relative left-1/2 -translate-x-1/2 space-y-10 my-4 w-full">
+                <div className="w-[calc(100vw-4vw)] max-w-[1500px] relative left-1/2 -translate-x-1/2 space-y-10 my-4 px-4 overflow-hidden">
                     <section className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
