@@ -3,6 +3,7 @@ export enum AppStage {
   UPLOAD = 'upload', // Legacy upload, maps to Render Engine Entry
   LINE_CONVERT = 'line_convert',
   RENDER_ENGINE = 'render_engine',
+  STUDIO = 'studio',
   EDITOR = 'editor',
   WEATHER_LAB = 'weather_lab',
   MATERIAL_STUDIO = 'material_studio',

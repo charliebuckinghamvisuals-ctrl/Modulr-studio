@@ -26,6 +26,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
   const toolItems = [
     { id: AppStage.LINE_CONVERT, icon: <Layers size={16} />, label: 'Line Converter' },
     { id: AppStage.RENDER_ENGINE, icon: <ImageIcon size={16} />, label: 'Render Engine' },
+    { id: AppStage.STUDIO, icon: <Grid size={16} />, label: 'Studio' },
     { id: AppStage.EDITOR, icon: <Palette size={16} />, label: 'Refinement Studio' },
     { id: AppStage.MATERIAL_STUDIO, icon: <Grid size={16} />, label: 'Material Studio' },
   ];
@@ -43,7 +44,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#ffffff] to-[#e2e8f0] text-primary flex flex-col font-sans selection:bg-accent selection:text-white">
 
       {/* Premium Header */}
-      <header className="h-24 border-b border-white/5 flex items-center justify-between px-8 bg-accent sticky top-0 z-50 text-white gap-4 w-full overflow-hidden">
+      <header className="h-24 border-b border-white/5 flex items-center justify-between px-8 bg-accent sticky top-0 z-50 text-white gap-4 w-full">
 
         {/* Logo Area */}
         <div

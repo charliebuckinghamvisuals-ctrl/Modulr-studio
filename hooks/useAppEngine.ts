@@ -9,9 +9,19 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
 export const useAppEngine = () => {
-    const [activeStage, setActiveStage] = useState<AppStage>(AppStage.HOME);
+    const [activeStage, setRawActiveStage] = useState<AppStage>(AppStage.HOME);
 
-    // Image State
+    const setActiveStage = (stage: AppStage) => {
+        if (stage === AppStage.STUDIO) {
+            setIsStudioMode(true);
+            setRawActiveStage(AppStage.RENDER_ENGINE);
+        } else {
+            if (stage !== AppStage.RENDER_ENGINE) {
+                setIsStudioMode(false);
+            }
+            setRawActiveStage(stage);
+        }
+    };
     const [stageImages, setStageImages] = useState<Partial<Record<AppStage, string>>>({});
     const originalImage = stageImages[activeStage] || null;
 
