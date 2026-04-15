@@ -220,6 +220,21 @@ const App: React.FC = () => {
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
                     Additional Instructions
                 </label>
+                
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Weather Condition</label>
+                    <select 
+                        value={engine.weather.condition} 
+                        onChange={(e) => engine.setWeather(prev => ({ ...prev, condition: e.target.value }))}
+                        className="w-full bg-white border border-slate-300 text-sm font-bold text-accent rounded-xl px-3 py-2 outline-none shadow-sm focus:ring-2 focus:ring-accent/50"
+                    >
+                        <option value="auto">Auto (Natural Lighting)</option>
+                        {WEATHER_CONDITIONS.map(w => (
+                            <option key={w} value={w}>{w}</option>
+                        ))}
+                    </select>
+                </div>
+
                 <textarea
                     className="w-full p-4 rounded-2xl bg-white border border-accent/20 text-accent focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-accent/30 min-h-[100px] resize-none shadow-inner transition-all duration-300"
                     placeholder="e.g. Add a sunset background, dramatic lighting, rain..."

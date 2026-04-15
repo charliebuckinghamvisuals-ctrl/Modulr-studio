@@ -103,7 +103,7 @@ export const useAppEngine = () => {
     });
 
     const [weather, setWeather] = useState<WeatherConfig>({
-        condition: 'sunny',
+        condition: 'auto',
         intensity: 0.5,
         season: 'summer'
     });
@@ -569,9 +569,12 @@ export const useAppEngine = () => {
         const loadingMsg = isSketchUpMode
             ? 'Enhancing SketchUp model to photorealistic quality...'
             : 'Rendering photorealistic textures and lighting...';
+        const weatherPrompt = weather.condition !== 'auto' ? `Weather condition: ${weather.condition}. ` : '';
+        const finalPrompt = weatherPrompt + additionalPrompt;
+        
         setProcessing({ isLoading: true, message: loadingMsg });
         try {
-            const result = await renderBuilding(source, materials, additionalPrompt, isHighQuality, isProMode, activeStage === AppStage.STUDIO ? selectedAngle : undefined, isSketchUpMode, activeStage === AppStage.STUDIO ? studioBackground : undefined);
+            const result = await renderBuilding(source, materials, finalPrompt, isHighQuality, isProMode, activeStage === AppStage.STUDIO ? selectedAngle : undefined, isSketchUpMode, activeStage === AppStage.STUDIO ? studioBackground : undefined);
             setRenderedImage(result);
             setEditorImage(null);
             await saveToHistory({
@@ -609,11 +612,14 @@ export const useAppEngine = () => {
                 
                 setProcessing({ isLoading: true, message: `Rendering angle ${i + 1} of ${validIndices.length}...` });
                 
+                const weatherPrompt = weather.condition !== 'auto' ? `Weather condition: ${weather.condition}. ` : '';
+                const finalPrompt = weatherPrompt + additionalPrompt;
                 const isStudioReq = activeStage === AppStage.STUDIO;
+
                 const result = await renderBuilding(
                     sourceImg, 
                     matConfig, 
-                    additionalPrompt, 
+                    finalPrompt, 
                     isHighQuality, 
                     isProMode,
                     matConfig.orientation, // backend orientation prompt

@@ -21,6 +21,7 @@
     "express-rate-limit": "^8.3.2",
     "firebase": "^12.11.0",
     "firebase-admin": "^13.7.0",
+    "helmet": "^8.1.0",
     "html2canvas": "^1.4.1",
     "idb-keyval": "^6.2.2",
     "jspdf": "^4.2.0",

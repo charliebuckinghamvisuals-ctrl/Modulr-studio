@@ -8,6 +8,7 @@ import fs from 'fs';
 import rateLimit from 'express-rate-limit';
 import admin from 'firebase-admin';
 import Stripe from 'stripe';
+import helmet from 'helmet';
 
 dotenv.config();
 
@@ -169,8 +170,33 @@ const userAiLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-// Middleware
-app.use(cors());
+// Security Headers
+app.use(helmet());
+
+// CORS Configuration (Strict Origins)
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:4173',
+    process.env.VITE_APP_URL, // E.g., https://modulr.studio
+    'https://bxcksai-exterior-render-engine.onrender.com', // Old Fallback Render URL
+    'https://modulr-studio.onrender.com', // New Render URL
+    'https://modulrstudio.co.uk',
+    'https://www.modulrstudio.co.uk'
+].filter(Boolean);
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        // OR allow if the origin is in our allowed list
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Stripe Webhook MUST come before express.json() because it needs raw body for signature verification
 app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -216,12 +242,34 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
 
         if (uid && creditsToAward > 0) {
             try {
-                await db.collection('users').doc(uid).set({
-                    credits: admin.firestore.FieldValue.increment(creditsToAward),
-                    plan: plan,
-                    stripeCustomerId: customerId,
-                    lastPaymentAt: admin.firestore.FieldValue.serverTimestamp()
-                }, { merge: true });
+                // IDEMPOTENCY CHECK: Ensure we haven't processed this exact event before
+                const eventRef = db.collection('stripe_events').doc(event.id);
+                
+                await db.runTransaction(async (transaction) => {
+                    const eventDoc = await transaction.get(eventRef);
+                    if (eventDoc.exists) {
+                        console.warn(`[STRIPE] WARNING: Duplicate webhook event detected: ${event.id}. Skipping.`);
+                        return; // Exit transaction
+                    }
+                    
+                    // Mark event as processed
+                    transaction.set(eventRef, {
+                        type: event.type,
+                        uid: uid,
+                        creditsAwarded: creditsToAward,
+                        processedAt: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    // Award credits
+                    const userRef = db.collection('users').doc(uid);
+                    transaction.set(userRef, {
+                        credits: admin.firestore.FieldValue.increment(creditsToAward),
+                        plan: plan,
+                        stripeCustomerId: customerId,
+                        lastPaymentAt: admin.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                });
+                
                 console.log(`[STRIPE] ${event.type} processed: Awarded ${creditsToAward} credits to ${uid}`);
             } catch (error) {
                 console.error("[STRIPE] Error updating user credits in Firestore:", error);
