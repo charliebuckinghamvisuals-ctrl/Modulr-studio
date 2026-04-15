@@ -18,10 +18,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
             {/* Pro Drafting Grid (Disabled for Homepage for clean look) */}
             <DraftingBackground pageName="HOMEPAGE" hideGrid={true} />
 
-            {/* Immersive Scattered Background Gallery */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 select-none">
-                <ScatteredBackground />
-            </div>
+
 
             <div className="max-w-6xl w-full flex flex-col items-center relative z-10 gap-24 px-8">
 

@@ -8,6 +8,35 @@ import { db, auth } from '../services/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
+const compressImageFile = (file: File, maxWidth = 1920): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return reject(new Error('Canvas ctx failed'));
+                ctx.drawImage(img, 0, 0, width, height);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                resolve(dataUrl.split(',')[1]);
+            };
+            img.onerror = () => reject(new Error('Image logic failed'));
+            img.src = e.target?.result as string;
+        };
+        reader.onerror = () => reject(new Error('File reader failed'));
+        reader.readAsDataURL(file);
+    });
+};
+
 export const useAppEngine = () => {
     const [activeStage, setActiveStage] = useState<AppStage>(AppStage.HOME);
 
@@ -228,13 +257,12 @@ export const useAppEngine = () => {
         }
     };
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, targetStage: AppStage) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetStage: AppStage) => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const result = event.target?.result as string;
-                const base64Data = result.split(',')[1];
+            setProcessing({ isLoading: true, message: 'Optimizing high-res upload...' });
+            try {
+                const base64Data = await compressImageFile(file, 1920);
 
                 setStageImages(prev => ({ ...prev, [targetStage]: base64Data }));
 
@@ -258,13 +286,17 @@ export const useAppEngine = () => {
                 } else if (targetStage === AppStage.EDITOR) {
                     handleAnalyzeForEditor(base64Data);
                 }
-            };
-            reader.readAsDataURL(file);
-            e.target.value = '';
+            } catch (err) {
+                console.error('Image compression failed', err);
+                toast.error('Failed to process image upload');
+            } finally {
+                setProcessing({ isLoading: false, message: '' });
+                e.target.value = '';
+            }
         }
     };
 
-    const handleSlotImageUpload = (file: File | null, index: number, targetStage: AppStage) => {
+    const handleSlotImageUpload = async (file: File | null, index: number, targetStage: AppStage) => {
         if (!file) {
             // Allow clearing a slot
             setBatchImages(prev => {
@@ -272,17 +304,35 @@ export const useAppEngine = () => {
                 next[index] = '';
                 return next;
             });
+            // Wipe stale renders from matching index
+            setBatchRenders(prev => {
+                const next = [...prev];
+                if (next.length > index) next[index] = '';
+                return next;
+            });
+            setBatchMaterials(prev => {
+                const next = [...prev];
+                if (next.length > index) next[index] = null as any;
+                return next;
+            });
             return;
         }
 
         setActiveStage(targetStage);
         setOriginalImage(null); // Clear single image mode
+        setProcessing({ isLoading: true, message: 'Optimizing high-res upload...' });
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const result = event.target?.result as string;
-            const base64Data = result.split(',')[1];
+        try {
+            const base64Data = await compressImageFile(file, 1920);
             
+            // Wipe any old render data when re-uploading into an existing slot
+            setBatchRenders(prev => {
+                const next = [...prev];
+                while(next.length < 5) next.push('');
+                next[index] = '';
+                return next;
+            });
+
             setBatchImages(prev => {
                 const next = [...prev];
                 // Ensure array has at least 5 slots
@@ -303,12 +353,19 @@ export const useAppEngine = () => {
                             setMaterials(detected[0]);
                         }
                     }
+                }).catch(err => {
+                    console.error("Slot auto-detect failed", err);
+                    toast.error("Auto detect failed for this slot.");
                 });
                 
                 return next;
             });
-        };
-        reader.readAsDataURL(file);
+        } catch (err) {
+            console.error('Image compression failed', err);
+            toast.error('Failed to process image upload');
+        } finally {
+            setProcessing({ isLoading: false, message: '' });
+        }
     };
 
     const handleBatchImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -232,7 +232,7 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
     res.json({ received: true });
 });
 
-app.use(express.json({ limit: '100mb' })); // Increase limit for large base64 images
+app.use(express.json({ limit: '20mb' })); // Reduced from 100mb for DoS protection (Images compress to ~1MB max client-side)
 app.use(globalLimiter);
 
 // Error handler for JSON parsing or payload limits
@@ -248,7 +248,11 @@ app.use((err, req, res, next) => {
 const verifyFirebaseToken = async (req, res, next) => {
     // 🔥 DEVELOPMENT BYPASS: Set to true only for local feature testing. IMPORTANT: MUST BE FALSE IN PRODUCTION.
     const MOCK_AUTH = false;
+    
     if (MOCK_AUTH) {
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error("CRITICAL SECURITY FATAL: MOCK_AUTH is enabled in a production environment!");
+        }
         req.user = { uid: "testuser", email: "charlie@napc.uk" };
         return next();
     }
