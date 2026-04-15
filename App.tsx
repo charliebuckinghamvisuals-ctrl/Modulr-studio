@@ -24,6 +24,7 @@ import { GuideView } from './components/views/GuideView';
 import { GalleryView } from './components/views/GalleryView';
 import { AuthView } from './components/views/AuthView';
 import { AccountView } from './components/views/AccountView';
+import { ComingSoonView } from './components/views/ComingSoonView';
 
 
 const App: React.FC = () => {
@@ -33,6 +34,12 @@ const App: React.FC = () => {
     const [selectedBatchIndex, setSelectedBatchIndex] = React.useState(0);
     const [openCategoryDropdown, setOpenCategoryDropdown] = React.useState<string | null>(null);
     const lineEnvInputRef = React.useRef<HTMLInputElement>(null);
+
+    const isComingSoon = import.meta.env.VITE_COMING_SOON === 'true';
+
+    if (isComingSoon) {
+        return <ComingSoonView />;
+    }
 
     const handleLoadHistory = (item: HistoryItem) => {
         engine.setActiveStage(item.stage);
