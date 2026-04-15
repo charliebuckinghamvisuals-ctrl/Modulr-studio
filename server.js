@@ -327,7 +327,7 @@ app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
             - Keep the grass, fences, trees, and landscape from the environment image, but ensure the ONLY building shown is the new one from the second image.
             - The final drawing must be a single, unified architectural line drawing where the new building looks naturally part of the old garden.`;
         } else if (hasImage) {
-            taskInstruction += `\n\nDraw the building, garden, trees, fences, furniture, and landscape details. Exact perspective match to the input. PRESERVE TEXT PERFECTLY.`;
+            taskInstruction += `\n\nDraw the building, garden, trees, fences, furniture, and landscape details. EXACT PERSPECTIVE MATCH to the input.\n            CRITICAL: DO NOT invent new geometry. DO NOT add decking, patios, or change the roof shape. ONLY draw what is physically present in the input image.`;
         } else {
             taskInstruction += `\n\nGenerate a brand new architectural CAD line drawing from the description below. Standard front-elevation perspective unless otherwise described.`;
         }
@@ -490,8 +490,7 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
       
       ABSOLUTE CRITICAL RULE:
       The input image is a coloured 3D model screenshot with pre-applied materials.
-      Your ONLY task is to ENHANCE and UPSCALE it to photorealistic quality.
-      GEOMETRY MUST BE PIXEL-LOCKED. Do NOT redraw, re-compose, or extend any geometry.
+      Your ONLY task is to ENHANCE and UPSCALE it to photorealistic quality by applying lighting, reflections, and textures.\n      GEOMETRY MUST BE PIXEL-LOCKED. Do NOT redraw, re-compose, or extend any geometry.\n      DO NOT invent structures, decking, patios, porches, or raised platforms.\n      DO NOT change the roof pitch, shape, or modify any architectural elements.\n      PRESERVE the environment exactly as shown.
       
       MATERIAL ASSIGNMENTS:
       ${buildMaterialInstruction('Walls', materials.walls)}
@@ -514,9 +513,7 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
       ${orientation ? `\nSPATIAL CONTEXT: You are rendering the [${orientation}] elevation. Apply materials to this specific facing side.` : ''}
 
       GEOMETRY & CONTEXT RULES — CRITICAL:
-      - STRICT GEOMETRY LOCK: Reproduce the EXACT structure shown. Do NOT add, remove, or modify any architectural elements.
-      - NO HALLUCINATIONS: Do NOT invent structures, decking, patios, or raised platforms unless visible in the source.
-      - PRESERVE THE ENVIRONMENT: Render surrounding landscape, fences, trees, and sky exactly as shown.
+      - STRICT GEOMETRY LOCK: Reproduce the EXACT structure shown. Do NOT add, remove, or modify any architectural elements. DO NOT change the roof pitch or shape.\n      - NO HALLUCINATIONS: Do NOT invent structures, decking, patios, porches, or raised platforms unless clearly visible in the source. Your assignment is surface-level materials only.\n      - PRESERVE THE ENVIRONMENT: Render surrounding landscape, fences, trees, and sky exactly as shown.
 
       MATERIAL ASSIGNMENTS:
       ${buildMaterialInstruction('Walls/Main Facade', materials.walls)}

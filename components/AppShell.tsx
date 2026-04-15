@@ -43,18 +43,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#ffffff] to-[#e2e8f0] text-primary flex flex-col font-sans selection:bg-accent selection:text-white">
 
       {/* Premium Header */}
-      <header className="h-24 border-b border-white/5 flex items-center justify-between px-8 bg-accent sticky top-0 z-50 text-white">
+      <header className="h-24 border-b border-white/5 flex items-center justify-between px-8 bg-accent sticky top-0 z-50 text-white gap-4 w-full overflow-hidden">
 
         {/* Logo Area */}
         <div
-          className="flex items-center gap-3 cursor-pointer group"
+          className="flex items-center gap-3 cursor-pointer group shrink-0"
           onClick={() => onNavigate(AppStage.HOME)}
         >
           <img src="/Logo.png" alt="Modulr Studio Logo" className="h-48 w-auto object-contain transition-transform duration-300 group-hover:scale-105" />
         </div>
 
-        {/* Desktop Tools Navigation - Absolutely Centered */}
-        <nav className="hidden lg:flex items-center gap-0.5 absolute left-1/2 -translate-x-1/2 p-1.5 rounded-full border-none">
+        {/* Desktop Tools Navigation */}
+        <nav className="hidden lg:flex items-center justify-center flex-1 gap-0.5 p-1.5 rounded-full border-none overflow-hidden mx-4">
           {toolItems.map(item => {
             const isActive = activeStage === item.id;
             return (
@@ -73,7 +73,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           })}
         </nav>
 
-        <div className="flex items-center gap-2 relative">
+        <div className="flex items-center gap-2 relative shrink-0">
           {/* Desktop Info Dropdown */}
           <div 
             className="hidden lg:block relative"
