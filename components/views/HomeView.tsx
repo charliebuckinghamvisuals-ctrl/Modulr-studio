@@ -69,9 +69,11 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                         />
                     </div>
                 </div>
-                {/* Wide Section for Overview Grid */}
-                <div className="w-[calc(100vw-4vw)] max-w-[1500px] relative left-1/2 -translate-x-1/2 space-y-10 my-4 px-4 overflow-hidden">
-                    <section className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
+            </div>
+
+            {/* Wide Section for Overview Grid - Broken out of max-w-6xl */}
+            <div className="w-full max-w-[1500px] mx-auto px-6 my-16 relative z-10">
+                <section className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
                                 <Grid className="text-accent" size={20} />
@@ -134,7 +136,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                             </div>
                         </div>
                     </section>
-                </div>
+            </div>
+
+            {/* Resume Main Container */}
+            <div className="max-w-6xl w-full flex flex-col items-center relative z-10 gap-24 px-8">
                 {/* 4. Dedicated Garden Room AI */}
                 <div className="w-full flex flex-col items-center text-center py-12 gap-10">
                     <div className="max-w-2xl space-y-6">
