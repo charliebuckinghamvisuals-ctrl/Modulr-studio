@@ -12,6 +12,7 @@ export const useAppEngine = () => {
     const [activeStage, setActiveStage] = useState<AppStage>(AppStage.HOME);
 
     // Image State
+    const [stageImages, setStageImages] = useState<Partial<Record<AppStage, string>>>({});
     const originalImage = stageImages[activeStage] || null;
 
     const setOriginalImage = (img: string | null) => {
@@ -513,7 +514,7 @@ export const useAppEngine = () => {
             : 'Rendering photorealistic textures and lighting...';
         setProcessing({ isLoading: true, message: loadingMsg });
         try {
-            const result = await renderBuilding(source, materials, additionalPrompt, isHighQuality, isProMode, isStudioMode ? selectedAngle : undefined, isSketchUpMode, isStudioMode);
+            const result = await renderBuilding(source, materials, additionalPrompt, isHighQuality, isProMode, activeStage === AppStage.STUDIO ? selectedAngle : undefined, isSketchUpMode, activeStage === AppStage.STUDIO ? studioBackground : undefined);
             setRenderedImage(result);
             setEditorImage(null);
             await saveToHistory({

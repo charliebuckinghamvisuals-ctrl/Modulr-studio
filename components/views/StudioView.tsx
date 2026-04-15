@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { WorkspaceView } from './WorkspaceView';
 import { ToggleSwitch } from '../ToggleSwitch';
 import { BatchSlotUploader } from '../BatchSlotUploader';
-import { Sparkles, Layers, Search, ChevronDown, CheckCircle2, History, Zap } from 'lucide-react';
+import { Sparkles, Layers, Search, ChevronDown, CheckCircle2, History, Zap, Grid } from 'lucide-react';
 import { AppStage } from '../../types';
 import { Button } from '../Button';
 import toast from 'react-hot-toast';
