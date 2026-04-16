@@ -89,11 +89,6 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                                     desc: "The core engine. Import structural drawings or SketchUp screenshots, auto-detect exterior materials, and generate stunning 4K photorealistic architectural visualizations."
                                 },
                                 {
-                                    icon: <ImageIcon size={24} />,
-                                    title: "Standalone Studio",
-                                    desc: "Perfect for quoting. Drop complex environments and confidently place your building onto pure white, soft gradient, or dark studio backdrops alongside proper environment renders."
-                                },
-                                {
                                     icon: <PenTool size={24} />,
                                     title: "Smart Editor",
                                     desc: "Refine existing renders without starting over. Make surgical textual edits ('Make the grass greener') or apply drastic weather changes like 'Winter Snow' or 'Golden Hour'."

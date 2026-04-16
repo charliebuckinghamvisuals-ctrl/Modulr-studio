@@ -22,6 +22,7 @@ interface MaterialStudioViewProps {
     setIsHighQuality: (val: boolean) => void;
     isProMode: boolean;
     setIsProMode: (val: boolean) => void;
+    userPlan?: string;
 }
 
 export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({

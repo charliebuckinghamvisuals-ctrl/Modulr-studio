@@ -510,7 +510,7 @@ app.post('/api/analyzeComponents', userAiLimiter, async (req, res) => {
         }
     } catch (error) {
         console.error("analyzeComponents error:", error, error.stack);
-        try { require('fs').appendFileSync('error.log', '\\n[' + new Date().toISOString() + '] analyzeComponents: ' + (error.stack || error.message)); } catch(_) {}
+        // Removed require('fs') to prevent node crashes
         res.status(500).json({ error: error.message });
     }
 });
@@ -618,7 +618,7 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
         throw new Error("No render generated. Check server logs for response payload.");
     } catch (error) {
         console.error("Render error in /api/renderBuilding:", error, error.stack);
-        try { require('fs').appendFileSync('error.log', '\\n[' + new Date().toISOString() + '] renderBuilding: ' + (error.stack || error.message)); } catch(_) {}
+        // Removed require('fs') to prevent node crashes
         res.status(500).json({ error: error.message });
     }
 });

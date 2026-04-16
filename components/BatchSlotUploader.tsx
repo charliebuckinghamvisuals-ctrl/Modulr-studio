@@ -8,7 +8,7 @@ interface BatchSlotUploaderProps {
 }
 
 export const BatchSlotUploader: React.FC<BatchSlotUploaderProps> = ({ batchImages, batchRenders, onUpload }) => {
-    const slots = ['Front View', 'Left Side', 'Right Side', 'Back View', 'Top / Isometric'];
+    const slots = ['Angle 1', 'Angle 2', 'Angle 3', 'Angle 4', 'Angle 5'];
     const fileInputs = useRef<(HTMLInputElement | null)[]>([]);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
@@ -21,7 +21,7 @@ export const BatchSlotUploader: React.FC<BatchSlotUploaderProps> = ({ batchImage
         <div className="flex flex-col gap-2 w-full mt-2">
             <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 mb-1 flex items-center gap-2">
                 <Upload size={12} className="text-secondary" />
-                Architecture Batch Slots
+                Batch Angles
             </label>
             
             <div className="grid grid-cols-2 gap-2">

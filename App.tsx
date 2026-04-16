@@ -35,11 +35,7 @@ const App: React.FC = () => {
     const [openCategoryDropdown, setOpenCategoryDropdown] = React.useState<string | null>(null);
     const lineEnvInputRef = React.useRef<HTMLInputElement>(null);
 
-    const isComingSoon = import.meta.env.VITE_COMING_SOON === 'true';
-
-    if (isComingSoon) {
-        return <ComingSoonView />;
-    }
+    const isComingSoon = false; // Turned off for live access
 
     const handleLoadHistory = (item: HistoryItem) => {
         engine.setActiveStage(item.stage);
@@ -103,17 +99,24 @@ const App: React.FC = () => {
             <div className="flex flex-col gap-2 w-full">
                 <QualityToggle />
                 <ProModelToggle />
+                <ToggleSwitch 
+                    isOn={engine.isBatchMode} 
+                    onToggle={() => engine.setIsBatchMode(!engine.isBatchMode)} 
+                    label="Batch Mode"
+                    icon={<Layers size={14} className={engine.isBatchMode ? 'text-accent' : 'text-slate-400'} />}
+                    activeColor="bg-accent"
+                />
             </div>
 
-            <BatchSlotUploader 
-                batchImages={engine.batchImages}
-                batchRenders={engine.batchRenders}
-                onUpload={(file, index) => engine.handleSlotImageUpload(file, index, AppStage.RENDER_ENGINE)}
-            />
-
             <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar mt-4">
+                {engine.isBatchMode && (
+                    <BatchSlotUploader 
+                        batchImages={engine.batchImages}
+                        batchRenders={engine.batchRenders}
+                        onUpload={(file, index) => engine.handleSlotImageUpload(file, index, AppStage.RENDER_ENGINE)}
+                    />
+                )}
                 
-                {/* Material Library Quick Access */}
                 <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-2">
                     <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
                         <Layers size={14} className="text-secondary" />
@@ -209,19 +212,6 @@ const App: React.FC = () => {
                 ))}
             </div>
 
-
-            {engine.batchMaterials.length > 0 && (
-                <div className="space-y-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                    <p className="text-[10px] font-bold text-accent/60 mb-2 tracking-widest uppercase italic">AI Geometry Detected</p>
-                    {engine.batchMaterials.map((mat, i) => (
-                        <div key={i} className="text-[11px] flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm">
-                            <span className="font-bold text-accent px-2 py-0.5 bg-accent/5 rounded">{mat.orientation || `Angle ${i+1}`}</span> 
-                            <span className="text-slate-400 truncate ml-2 text-right">{mat.walls || 'Auto'} / {mat.roof || 'Auto'}</span>
-                        </div>
-                    ))}
-                </div>
-            )}
-
             <div className="space-y-3 pt-6 border-t border-slate-200">
                 <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
@@ -250,14 +240,26 @@ const App: React.FC = () => {
                 />
             </div>
             <div className="mt-auto pt-6">
-                {engine.batchImages.some(img => img && img.trim() !== '') ? (
-                    <Button borderless className="w-full" onClick={engine.handleBatchRender} icon={<Sparkles size={16} />} disabled={engine.processing.isLoading}>
-                        Render Batch Sequence
-                    </Button>
+                {engine.isBatchMode ? (
+                    engine.batchImages.some(img => img && img.trim() !== '') ? (
+                        <Button borderless className="w-full" onClick={engine.handleBatchRender} icon={<Sparkles size={16} />} disabled={engine.processing.isLoading}>
+                            Render Batch Sequence
+                        </Button>
+                    ) : (
+                        <Button borderless className="w-full disabled" disabled={true} icon={<Sparkles size={16} />}>
+                            Upload Images First
+                        </Button>
+                    )
                 ) : (
-                    <Button borderless className="w-full disabled" disabled={true} icon={<Sparkles size={16} />}>
-                        Upload Images First
-                    </Button>
+                    engine.originalImage ? (
+                        <Button borderless className="w-full" onClick={engine.handleRender} icon={<Sparkles size={16} />} disabled={engine.processing.isLoading}>
+                            Render Image
+                        </Button>
+                    ) : (
+                        <Button borderless className="w-full disabled" disabled={true} icon={<Sparkles size={16} />}>
+                            Upload Image First
+                        </Button>
+                    )
                 )}
                 <div className="text-center mt-3">
                     <p className="text-[9px] text-slate-400 font-medium leading-tight">
@@ -756,27 +758,21 @@ const App: React.FC = () => {
                     title="Render Engine"
                     subtitle="Configure exterior materials and lighting."
                     controls={renderEngineControls}
-                    primaryImg={engine.batchRenders.length > 0 ? engine.getRenderUrl(engine.batchRenders[selectedBatchIndex]) : engine.getRenderUrl(engine.renderedImage)}
-                    secondaryImg={engine.batchImages.length > 0 ? engine.getRenderUrl(engine.batchImages[selectedBatchIndex]) : engine.getRenderUrl(engine.originalImage)}
-                    batchImages={engine.batchImages}
-                    batchRenders={engine.batchRenders}
+                    primaryImg={engine.isBatchMode && engine.batchRenders.length > 0 ? engine.getRenderUrl(engine.batchRenders[selectedBatchIndex]) : engine.getRenderUrl(engine.renderedImage)}
+                    secondaryImg={engine.isBatchMode && engine.batchImages.length > 0 ? engine.getRenderUrl(engine.batchImages[selectedBatchIndex]) : engine.getRenderUrl(engine.originalImage)}
+                    batchImages={engine.isBatchMode ? engine.batchImages : undefined}
+                    batchRenders={engine.isBatchMode ? engine.batchRenders : undefined}
                     selectedBatchIndex={selectedBatchIndex}
                     onBatchSelect={setSelectedBatchIndex}
                     placeholder="Ready to Render"
                     onDownload={engine.handleDownload}
                     onFormatChange={engine.setDownloadFormat}
                     downloadFormat={engine.downloadFormat}
-                    onInputClick={() => {}} // Inputs are inside slots now
+                    onInputClick={engine.isBatchMode ? undefined : () => engine.fileInputRef.current?.click()}
                     isLoading={engine.activeStage === AppStage.RENDER_ENGINE && engine.processing.isLoading}
                     loadingMessage={engine.processing.message}
-                    customEmptyState={engine.activeStage === AppStage.RENDER_ENGINE && !engine.batchImages.some(Boolean) ? renderEngineEmptyState : undefined}
+                    customEmptyState={engine.activeStage === AppStage.RENDER_ENGINE && !engine.originalImage && !engine.isBatchMode ? renderEngineEmptyState : undefined}
                     userPlan={engine.userPlan}
-                    extraFooter={engine.renderedImage || engine.batchRenders.length > 0 ? (
-                        <>
-                            {refinementBox}
-                            {materialStudioBox}
-                        </>
-                    ) : undefined}
                     historyFooter={<HistoryFooter currentStage={AppStage.RENDER_ENGINE} onLoadHistoryItem={handleLoadHistory} />}
                 />
             )}

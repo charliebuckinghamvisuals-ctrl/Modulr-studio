@@ -62,12 +62,17 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
 
     const renderViewer = () => {
         if (isLoading) {
-            return (
-                <div className="w-full h-full min-h-[500px] max-h-[85vh] absolute inset-0 flex flex-col items-center justify-center bg-white z-50">
-                    <Loader2 className="w-10 h-10 animate-spin text-accent mb-4 mx-auto" />
-                    <p className="text-accent font-medium text-lg tracking-wide text-center mx-auto">{loadingMessage}</p>
-                </div>
-            );
+            const isBatchActive = batchImages && batchImages.length > 1;
+            const currentIsRendered = isBatchActive && batchRenders && batchRenders[selectedBatchIndex];
+            
+            if (!currentIsRendered) {
+                return (
+                    <div className="w-full h-full min-h-[500px] max-h-[85vh] absolute inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm z-50">
+                        <Loader2 className="w-10 h-10 animate-spin text-accent mb-4 mx-auto" />
+                        <p className="text-accent font-medium text-lg tracking-wide text-center mx-auto">{loadingMessage}</p>
+                    </div>
+                );
+            }
         }
 
         if (customViewer) {
@@ -78,23 +83,14 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
             );
         }
 
+        let content = null;
         if (primaryImg && secondaryImg) {
-            return (
-                <div className="w-full h-full absolute inset-0 flex items-center justify-center">
-                    <CompareSlider beforeImage={secondaryImg} afterImage={primaryImg} />
-                </div>
-            );
-        }
-        if (primaryImg) {
-            return (
-                <div className="w-full h-full absolute inset-0 flex items-center justify-center">
-                    <img src={getImageUrl(primaryImg)} className="w-full h-full object-contain" alt="Result" />
-                </div>
-            );
-        }
-        if (secondaryImg) {
-            return (
-                <div className="w-full h-full absolute inset-0 flex items-center justify-center">
+            content = <CompareSlider beforeImage={secondaryImg} afterImage={primaryImg} />;
+        } else if (primaryImg) {
+            content = <img src={getImageUrl(primaryImg)} className="w-full h-full object-contain" alt="Result" />;
+        } else if (secondaryImg) {
+            content = (
+                <>
                     <img src={getImageUrl(secondaryImg)} className="w-full h-full object-contain opacity-40 grayscale" alt="Source" />
                     <div className="absolute inset-0 flex items-center justify-center">
                         <span className="bg-background/80 backdrop-blur-md px-6 py-3 rounded-full text-primary font-medium shadow-[0_0_20px_rgba(139,92,246,0.3)] border border-accent/20 flex items-center gap-2">
@@ -102,6 +98,20 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                             {placeholder}
                         </span>
                     </div>
+                </>
+            );
+        }
+
+        if (content) {
+            return (
+                <div className="w-full h-full absolute inset-0 flex items-center justify-center">
+                    {content}
+                    {isLoading && (
+                        <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-xl border border-accent/20 flex items-center gap-3 z-50">
+                            <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                            <span className="text-accent text-[10px] font-bold uppercase tracking-widest">{loadingMessage}</span>
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -183,6 +193,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                         {batchImages.map((bImage, idx) => {
                             const isSelected = selectedBatchIndex === idx;
                             const hasRender = batchRenders && batchRenders[idx];
+                            const hasImage = bImage && bImage.trim() !== '';
                             const thumbUrl = getImageUrl(hasRender ? batchRenders[idx] : bImage);
                             
                             return (
@@ -191,7 +202,11 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                                     onClick={() => onBatchSelect?.(idx)}
                                     className={`relative flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-300 ${isSelected ? 'border-accent shadow-[0_0_15px_rgba(139,92,246,0.3)]' : 'border-border opacity-60 hover:opacity-100 hover:border-accent/50'}`}
                                 >
-                                    <img src={thumbUrl} className="w-full h-full object-cover" alt={`Angle ${idx + 1}`} />
+                                    {hasImage || hasRender ? (
+                                        <img src={thumbUrl} className="w-full h-full object-cover" alt={`Angle ${idx + 1}`} />
+                                    ) : (
+                                        <div className="w-full h-full bg-slate-50 flex items-center justify-center"></div>
+                                    )}
                                     {hasRender && (
                                         <div className="absolute top-1 right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background flex items-center justify-center shadow-lg">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4"><polyline points="20 6 9 17 4 12"></polyline></svg>

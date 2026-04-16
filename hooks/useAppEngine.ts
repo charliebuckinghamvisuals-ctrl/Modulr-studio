@@ -88,6 +88,7 @@ export const useAppEngine = () => {
     const [refinementPrompt, setRefinementPrompt] = useState('');
     const [downloadFormat, setDownloadFormat] = useState<'png' | 'jpg'>('png');
     const [isSketchUpMode, setIsSketchUpMode] = useState(false);
+    const [isBatchMode, setIsBatchMode] = useState(false);
     const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
 
     const [userPlan, setUserPlan] = useState<string>('free');
@@ -210,6 +211,7 @@ export const useAppEngine = () => {
         setEditorPrompt('');
         setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
         setIsSketchUpMode(false);
+        setIsBatchMode(false);
         setActiveStage(AppStage.HOME);
 
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -282,7 +284,9 @@ export const useAppEngine = () => {
                     handleAnalyzeForMaterialStudio(base64Data);
                 } else if (targetStage === AppStage.RENDER_ENGINE) {
                     setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
-                    handleAnalyzeForRenderEngine(base64Data);
+                    if (!isSketchUpMode) {
+                        handleAnalyzeForRenderEngine(base64Data);
+                    }
                 } else if (targetStage === AppStage.EDITOR) {
                     handleAnalyzeForEditor(base64Data);
                 }
@@ -339,27 +343,22 @@ export const useAppEngine = () => {
                 while(next.length < 5) next.push('');
                 next[index] = base64Data;
                 
-                // Trigger batch material auto-detect on the new image
-                analyzeBatchMaterials([base64Data]).then(detected => {
-                    if (detected && detected.length > 0) {
-                        setBatchMaterials(mats => {
-                            const newMats = [...mats];
-                            while(newMats.length < 5) newMats.push(materials);
-                            newMats[index] = detected[0];
-                            return newMats;
-                        });
-                        // If this is the first image uploaded, set root materials
-                        if (next.filter(Boolean).length === 1) {
-                            setMaterials(detected[0]);
-                        }
-                    }
-                }).catch(err => {
-                    console.error("Slot auto-detect failed", err);
-                    toast.error("Auto detect failed for this slot.");
+                // Ensure batch materials array aligns with slots, copying current overrides
+                setBatchMaterials(mats => {
+                    const newMats = [...mats];
+                    while(newMats.length < 5) newMats.push(materials);
+                    return newMats;
                 });
                 
                 return next;
             });
+
+            if (targetStage === AppStage.RENDER_ENGINE) {
+                const isDefault = materials.walls === 'none' && materials.roof === 'none';
+                if (isDefault && !isSketchUpMode) {
+                    await handleAnalyzeForRenderEngine(base64Data);
+                }
+            }
         } catch (err) {
             console.error('Image compression failed', err);
             toast.error('Failed to process image upload');
@@ -616,15 +615,21 @@ export const useAppEngine = () => {
                 const finalPrompt = weatherPrompt + additionalPrompt;
                 const isStudioReq = activeStage === AppStage.STUDIO;
 
+                // Add a small delay between requests if not the first request to prevent Google API 429 Rate Limit
+                if (i > 0) {
+                    await new Promise(res => setTimeout(res, 3000));
+                }
+
                 const result = await renderBuilding(
                     sourceImg, 
                     matConfig, 
                     finalPrompt, 
                     isHighQuality, 
                     isProMode,
-                    matConfig.orientation, // backend orientation prompt
+                    matConfig.orientation,
                     isSketchUpMode,
-                    isStudioReq ? studioBackground : undefined // Pass background if studio
+                    isStudioReq ? studioBackground : undefined,
+                    true // isBatchSequence
                 );
                 
                 newRenders[slotIndex] = result;
@@ -742,7 +747,9 @@ export const useAppEngine = () => {
         refinementPrompt, setRefinementPrompt,
         downloadFormat, setDownloadFormat,
         isSketchUpMode, setIsSketchUpMode,
-        userPlan, studioBackground, setStudioBackground, selectedAngle, setSelectedAngle,
+        isBatchMode, setIsBatchMode,
+        userPlan, setUserPlan,
+        studioBackground, setStudioBackground, selectedAngle, setSelectedAngle,
         materialLibrary, addToLibrary, removeFromLibrary,
         activeProfileId, setActiveProfileId,
         handleGenerateLineDrawing, handleAnalyzeMaterials, handleRender, handleBatchRender, handleRefineRender, handleEditImage, handleWeather, handleMaterialStudio, handleAnalyzeForEditor, handleAnalyzeForMaterialStudio,

@@ -13,6 +13,27 @@ const getAuthHeaders = async (baseHeaders: Record<string, string> = {}) => {
   return baseHeaders;
 };
 
+const formatErrorMessage = (errorStr: string | undefined, status: number): string => {
+  if (!errorStr) return `HTTP error! status: ${status}`;
+  try {
+     const parsed = JSON.parse(errorStr);
+     if (parsed.error && parsed.error.message) {
+         errorStr = parsed.error.message;
+     }
+  } catch (e) {}
+  if (errorStr.includes('limit: 0') || (errorStr.includes('quota') && errorStr.includes('pro-image'))) {
+      return "Google API Quota Error: Google is rejecting this API key for 'Pro Mode' because it detects it as a Free-Tier key with 0 limit. Ensure your API Key is generated inside a Google Cloud Project that is explicitly linked to your paid Billing Account.";
+  }
+  
+  if (errorStr.includes('429') || errorStr.includes('RESOURCE_EXHAUSTED') || errorStr.includes('quota')) {
+      return "Studio Rate Limit Exceeded: Please wait a moment before trying again, or check your Google API quota.";
+  }
+  if (errorStr.length > 200) {
+      return errorStr.substring(0, 197) + "..."; // Prevent massive toast boxes
+  }
+  return errorStr;
+};
+
 // Use relative API path for production and development
 const API_BASE_URL = '/api';
 
@@ -92,7 +113,7 @@ export const generateLineDrawing = async (base64Image: string | null | undefined
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorMessage(errorData.error, response.status));
     }
 
     const data = await response.json();
@@ -117,7 +138,7 @@ export const analyzeComponents = async (base64Image: string): Promise<MaterialCo
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorMessage(errorData.error, response.status));
     }
 
     const data = await response.json();
@@ -142,7 +163,7 @@ export const analyzeBatchMaterials = async (base64Images: string[]): Promise<Arr
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorMessage(errorData.error, response.status));
     }
 
     const data = await response.json();
@@ -165,7 +186,8 @@ export const renderBuilding = async (
   isProMode: boolean = false,
   orientation?: string,
   isSketchUpMode: boolean = false,
-  studioBackground?: string
+  studioBackground?: string,
+  isBatchSequence: boolean = false
 ): Promise<string> => {
   try {
     const { ratio } = await getImageDimensions(base64Image);
@@ -173,12 +195,12 @@ export const renderBuilding = async (
     const response = await fetch(`${API_BASE_URL}/renderBuilding`, {
       method: 'POST',
       headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground })
+      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground, isBatchSequence })
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorMessage(errorData.error, response.status));
     }
 
     const data = await response.json();
@@ -211,7 +233,7 @@ export const editImage = async (
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorMessage(errorData.error, response.status));
     }
 
     const data = await response.json();
@@ -236,7 +258,7 @@ export const analyzeSceneForEditor = async (base64Image: string): Promise<{ desc
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorMessage(errorData.error, response.status));
     }
 
     const data = await response.json();
@@ -270,7 +292,7 @@ export const applyWeather = async (
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        throw new Error(formatErrorMessage(errorData.error, response.status));
       }
 
       const data = await response.json();
@@ -302,7 +324,7 @@ export const analyzeExteriorDetails = async (base64Image: string): Promise<strin
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorMessage(errorData.error, response.status));
     }
 
     const data = await response.json();
@@ -335,7 +357,7 @@ export const generatePresentationBoard = async (base64Image: string, focusPoints
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorMessage(errorData.error, response.status));
     }
 
     const data = await response.json();
@@ -360,7 +382,7 @@ export const analyzeSceneForVideo = async (base64Images: string[], mode: 'zoom' 
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorMessage(errorData.error, response.status));
     }
 
     const data = await response.json();

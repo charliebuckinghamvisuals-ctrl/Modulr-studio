@@ -26,7 +26,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
   const toolItems = [
     { id: AppStage.LINE_CONVERT, icon: <Layers size={16} />, label: 'Line Converter' },
     { id: AppStage.RENDER_ENGINE, icon: <ImageIcon size={16} />, label: 'Render Engine' },
-    { id: AppStage.STUDIO, icon: <Grid size={16} />, label: 'Studio' },
     { id: AppStage.EDITOR, icon: <Palette size={16} />, label: 'Refinement Studio' },
     { id: AppStage.MATERIAL_STUDIO, icon: <Grid size={16} />, label: 'Material Studio' },
   ];
@@ -48,14 +47,14 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
 
         {/* Logo Area */}
         <div
-          className="flex items-center gap-3 cursor-pointer group shrink-0"
+          className="flex flex-1 items-center justify-start gap-3 cursor-pointer group"
           onClick={() => onNavigate(AppStage.HOME)}
         >
           <img src="/Logo.png" alt="Modulr Studio Logo" className="h-48 w-auto object-contain transition-transform duration-300 group-hover:scale-105" />
         </div>
 
         {/* Desktop Tools Navigation */}
-        <nav className="hidden lg:flex items-center justify-center flex-1 gap-0.5 p-1.5 rounded-full border-none overflow-hidden mx-4">
+        <nav className="hidden lg:flex items-center justify-center gap-0.5 p-1.5 rounded-full border-none overflow-hidden shrink-0">
           {toolItems.map(item => {
             const isActive = activeStage === item.id;
             return (
@@ -74,7 +73,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           })}
         </nav>
 
-        <div className="flex items-center gap-2 relative shrink-0">
+        <div className="flex flex-1 items-center justify-end gap-2 relative shrink-0">
           {/* Desktop Info Dropdown */}
           <div 
             className="hidden lg:block relative"
