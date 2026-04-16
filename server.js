@@ -67,60 +67,50 @@ const CREDIT_COSTS = {
  * @returns {Promise<{success: boolean, balance: number, error?: string}>}
  */
 const deductCredits = async (user, amount) => {
-    if (!db) return { success: true, balance: 9999 }; // Dev mode safety
+    if (!db) return { success: true, balance: 9999 }; // Dev mode safety (no Firebase locally)
 
-    // Master Account Override
+    // Master Account Override — unlimited renders
     if (user.email === 'charlie@napc.uk') {
         return { success: true, balance: 999999 };
     }
 
     const uid = user.uid;
     const userRef = db.collection('users').doc(uid);
-    
+
     try {
-        return await db.runTransaction(async (transaction) => {
-            const userDoc = await transaction.get(userRef);
-            
-            if (!userDoc.exists) {
-                // Initialize default user — only set once, deduct credits in same operation
-                const starterCredits = 5;
-                const newBalance = Math.max(0, starterCredits - amount);
-                
-                if (starterCredits < amount) {
-                    transaction.set(userRef, {
-                        credits: starterCredits,
-                        plan: 'free',
-                        createdAt: admin.firestore.FieldValue.serverTimestamp()
-                    });
-                    return { success: false, balance: starterCredits, error: "Insufficient credits" };
-                }
+        const userDoc = await userRef.get();
 
-                transaction.set(userRef, {
-                    credits: newBalance,
-                    plan: 'free',
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-                return { success: true, balance: newBalance };
+        // If user doc doesn't exist yet, create it with starter credits
+        if (!userDoc.exists) {
+            const starterCredits = 5;
+            if (starterCredits < amount) {
+                await userRef.set({ credits: starterCredits, plan: 'free', createdAt: admin.firestore.FieldValue.serverTimestamp() });
+                return { success: false, balance: starterCredits, error: "Insufficient credits" };
             }
-
-            const plan = userDoc.exists ? (userDoc.data().plan || 'free') : 'free';
-            const currentCredits = userDoc.exists ? (userDoc.data().credits || 0) : 5;
-
-            // Feature Gating: 4K UHD requires Business or Master plan
-            if (amount === CREDIT_COSTS.UHD_4K && plan !== 'business' && plan !== 'master') {
-                return { success: false, balance: currentCredits, error: "4K Ultra HD Support Requires Professional Studio Plan" };
-            }
-
-            if (currentCredits < amount) {
-                return { success: false, balance: currentCredits, error: "Insufficient credits" };
-            }
-
-            const newBalance = currentCredits - amount;
-            transaction.update(userRef, { credits: newBalance });
+            const newBalance = starterCredits - amount;
+            await userRef.set({ credits: newBalance, plan: 'free', createdAt: admin.firestore.FieldValue.serverTimestamp() });
             return { success: true, balance: newBalance };
-        });
+        }
+
+        const data = userDoc.data();
+        const plan = data.plan || 'free';
+        const currentCredits = typeof data.credits === 'number' ? data.credits : 0;
+
+        // Feature gate: 4K requires Business plan
+        if (amount === CREDIT_COSTS.UHD_4K && plan !== 'business' && plan !== 'master') {
+            return { success: false, balance: currentCredits, error: "4K Ultra HD requires the Business Plan" };
+        }
+
+        if (currentCredits < amount) {
+            return { success: false, balance: currentCredits, error: "Insufficient credits" };
+        }
+
+        // Atomic decrement — no transaction needed for a single-document update
+        await userRef.update({ credits: admin.firestore.FieldValue.increment(-amount) });
+        return { success: true, balance: currentCredits - amount };
+
     } catch (e) {
-        console.error("Credit deduction transaction failed:", e);
+        console.error("[CREDITS] Deduction failed for uid:", uid, "| Error:", e.message || e);
         return { success: false, balance: 0, error: "Internal Credit Error" };
     }
 };
