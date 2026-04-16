@@ -1,8 +1,9 @@
 import React from 'react';
-import { Check, Zap, Sparkles, Building2, Crown, Gem, Wand2, TrendingUp, Loader2 } from 'lucide-react';
+import { Check, Zap, Sparkles, Wand2, TrendingUp, Loader2 } from 'lucide-react';
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
 import { useAuth } from '../../hooks/useAuth';
+import { useCredits } from '../../hooks/useCredits';
 import { toast } from 'react-hot-toast';
 import { AppStage } from '../../types';
 
@@ -12,8 +13,20 @@ interface PricingViewProps {
 
 export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
     const { user } = useAuth();
+    const { plan } = useCredits();
     const [billingCycle, setBillingCycle] = React.useState<'monthly' | 'yearly'>('monthly');
     const [loadingPlan, setLoadingPlan] = React.useState<string | null>(null);
+
+    const handleStartTrial = () => {
+        if (user) {
+            // Already signed in — they already have their free trial credits
+            toast.success('Your free trial is active! Start rendering.');
+            onNavigate?.(AppStage.RENDER_ENGINE);
+        } else {
+            toast('Please sign in to start your free trial', { icon: '🔐' });
+            onNavigate?.(AppStage.AUTH);
+        }
+    };
 
     const handleUpgrade = async (planName: string, priceId: string, creditsAmount: number, isOneTime = false) => {
         if (!user) {
@@ -112,14 +125,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             Annual billing includes <span className="text-accent underline decoration-accent/30 decoration-2 underline-offset-4">2 Months FREE</span>
                         </div>
 
-                        {/* TEMPORARY TEST BUTTON */}
-                        <Button 
-                            className="bg-red-500 hover:bg-red-600 border-none shadow-lg mt-6"
-                            onClick={() => handleUpgrade('dev_test_payment', 'price_1TM2R5HtB5liiqHxObbhPhYl', 50, false)}
-                            disabled={loadingPlan !== null}
-                        >
-                            {loadingPlan === 'price_1TM2R5HtB5liiqHxObbhPhYl' ? <Loader2 className="animate-spin" /> : 'DEV: Run 1p Test Checkout'}
-                        </Button>
+
                     </div>
                 </div>
 
@@ -138,10 +144,9 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
 
                         <Button 
                             className="w-full mb-8 shadow-xl" 
-                            onClick={() => handleUpgrade('trial', 'price_1TM29AHtB5liiqHxKB8iAiRI', 30)}
-                            disabled={loadingPlan !== null}
+                            onClick={handleStartTrial}
                         >
-                            {loadingPlan === 'price_1TM29AHtB5liiqHxKB8iAiRI' ? <Loader2 className="animate-spin" /> : 'Start My Trial'}
+                            {user ? 'Go to Studio →' : 'Sign In to Start Trial'}
                         </Button>
 
                         <div className="space-y-4 flex-1">
@@ -345,7 +350,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                     </div>
 
                     {/* Credit Cost Key */}
-                    <div className="pt-16 border-none grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <div className="pt-16 border-none">
                         <div className="flex flex-col items-center lg:items-start gap-4 p-0">
                             <div className="flex items-center gap-2 text-primary font-bold">
                                 <Zap size={20} className="text-accent" />
@@ -358,41 +363,10 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                 </div>
                                 <div className="flex items-center gap-2 py-2 px-4 rounded-2xl bg-slate-50 border border-border">
                                     <span className="font-black text-accent">60 Credits</span>
-                                    <span className="text-secondary text-xs font-medium">Ultra HD (4K)</span>
+                                    <span className="text-secondary text-xs font-medium">Ultra HD (4K) — Business only</span>
                                 </div>
                             </div>
                             <p className="text-[10px] text-secondary/60 uppercase tracking-widest font-black mt-2">100% Transparency • No Hidden Fees</p>
-                        </div>
-
-                        <div className="flex flex-col items-center lg:items-end gap-4 p-0">
-                            <div className="flex items-center gap-2 text-primary font-bold">
-                                <Gem size={20} className="text-accent" />
-                                <span className="text-lg font-black text-accent uppercase tracking-tight">Buy Extra Credits</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-3 w-full max-w-md">
-                                {[
-                                    { amount: '1,000', price: '£5', id: 'price_1TM2A5HtB5liiqHx3wUW9Fft', val: 1000 },
-                                    { amount: '5,000', price: '£22.99', id: 'price_1TM2ArHtB5liiqHxRD0k8UaS', val: 5000 },
-                                    { amount: '10,000', price: '£45', id: 'price_1TM2BNHtB5liiqHxj3fUvxia', val: 10000 }
-                                ].map((pack, i) => (
-                                    <button 
-                                        key={i} 
-                                        className="flex flex-col items-center gap-1 p-4 rounded-2xl bg-slate-50 border border-border hover:border-accent/40 hover:bg-white transition-all group active:scale-95 shadow-sm disabled:opacity-50"
-                                        onClick={() => handleUpgrade('credits_pack', pack.id, pack.val, true)}
-                                        disabled={loadingPlan !== null}
-                                    >
-                                        {loadingPlan === pack.id ? (
-                                            <Loader2 size={16} className="animate-spin my-auto" />
-                                        ) : (
-                                            <>
-                                                <span className="text-lg font-black text-accent group-hover:text-accent">{pack.amount}</span>
-                                                <span className="text-[10px] font-black text-accent uppercase tracking-widest bg-accent/10 px-2 py-0.5 rounded-full">{pack.price}</span>
-                                            </>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                            <p className="text-[10px] text-secondary/50 italic mt-1 font-medium select-none">Instant top-ups that never expire.</p>
                         </div>
                     </div>
                 </div>

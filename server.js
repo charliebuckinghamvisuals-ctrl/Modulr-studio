@@ -1040,13 +1040,34 @@ app.get('/api/user/credits', async (req, res) => {
         const userRef = db.collection('users').doc(req.user.uid);
         const userDoc = await userRef.get();
         if (!userDoc.exists) {
-            // New user, give them trial credits (5 renders)
+            // Device/IP fingerprint check to prevent trial abuse via new accounts
+            const clientIp = String(req.ip || req.headers['x-forwarded-for'] || 'unknown');
+            const { createHash } = await import('crypto');
+            const ipHash = createHash('sha256').update(clientIp).digest('hex');
+            
+            const trialFingerprintRef = db.collection('trial_fingerprints').doc(ipHash);
+            const existingTrial = await trialFingerprintRef.get();
+            
+            if (existingTrial.exists) {
+                console.warn(`[TRIAL ABUSE] Blocked repeat trial from IP hash: ${ipHash.slice(0, 8)}...`);
+                await userRef.set({
+                    credits: 0, plan: 'free', trialBlocked: true,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                return res.json({ credits: 0, plan: 'free' });
+            }
+
             const starterCredits = 5;
-            await userRef.set({
-                credits: starterCredits,
-                plan: 'free',
-                createdAt: admin.firestore.FieldValue.serverTimestamp()
-            });
+            await Promise.all([
+                userRef.set({
+                    credits: starterCredits, plan: 'free',
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                }),
+                trialFingerprintRef.set({
+                    uid: req.user.uid,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                })
+            ]);
             return res.json({ credits: starterCredits, plan: 'free' });
         }
         const data = userDoc.data();
