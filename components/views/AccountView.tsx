@@ -8,7 +8,7 @@ import { toast } from 'react-hot-toast';
 import { PRESET_MATERIALS } from '../../constants';
 
 import { auth } from '../../services/firebase';
-import { signOut, updateProfile } from 'firebase/auth';
+import { signOut, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { useAuth } from '../../hooks/useAuth';
 import { useCredits } from '../../hooks/useCredits';
 import { AppStage } from '../../types';
@@ -43,6 +43,16 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
         }
     };
 
+    const handleUpdatePassword = async () => {
+        if (!user?.email) return;
+        try {
+            await sendPasswordResetEmail(auth, user.email);
+            toast.success(`Password reset email sent to ${user.email}`);
+        } catch (error) {
+            toast.error('Failed to send password reset email');
+        }
+    };
+
     const handleSignOut = async () => {
         try {
             await signOut(auth);
@@ -73,7 +83,8 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
     };
 
     const getPlanName = (p: string | null) => {
-        if (!p) return "Loading...";
+        if (p === null) return "Free Trial"; // null = loaded but no plan set
+        if (!p) return "Free Trial";
         if (p.toLowerCase() === 'master') return 'Modulr Master';
         if (p.includes('business') || p.includes('price_1TKI8')) return 'Business Plan';
         if (p.includes('standard') || p.includes('price_1TKI6') || p.includes('price_1TKI7')) return 'Standard Plan';
@@ -176,11 +187,18 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                             </div>
                             <div className="space-y-4">
                                 <div>
-                                    <p className="text-[10px] font-bold text-accent/50 uppercase tracking-[0.2em]">Credits Remaining</p>
+                                    <p className="text-[10px] font-bold text-accent/50 uppercase tracking-[0.2em]">
+                                        {isPaidPlan ? 'Credits Remaining' : 'Trial Renders Remaining'}
+                                    </p>
                                     <div className="flex items-baseline gap-2">
                                         <h3 className="text-3xl font-bold text-accent tracking-tight">{userDisplay.credits.remaining}</h3>
-                                        {!isUnlimited && <span className="text-secondary font-medium text-sm">/ {userDisplay.credits.total}</span>}
+                                        {!isUnlimited && <span className="text-secondary font-medium text-sm">/ {userDisplay.credits.total} {!isPaidPlan ? 'renders' : 'credits'}</span>}
                                     </div>
+                                    {!isPaidPlan && (
+                                        <p className="text-[10px] text-secondary mt-1">
+                                            Each trial render costs 5 credits. Upgrade for more.
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                                     <div 
@@ -271,14 +289,15 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">
-                            <div className="glass-panel p-6 rounded-3xl border border-border bg-white flex items-center justify-between group cursor-pointer hover:bg-slate-50 transition-all duration-300">
+                            <div className="glass-panel p-6 rounded-3xl border border-border bg-white flex items-center justify-between group cursor-pointer hover:bg-slate-50 transition-all duration-300"
+                                 onClick={handleUpdatePassword}>
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-xl bg-accent/5 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-white transition-all duration-300">
                                         <Shield size={18} />
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-accent tracking-tighter leading-none uppercase">Update Password</p>
-                                        <p className="text-[10px] text-secondary mt-1">Rotate your secure access credentials</p>
+                                        <p className="text-[10px] text-secondary mt-1">Sends a reset link to your registered email</p>
                                     </div>
                                 </div>
                                 <ChevronRight size={18} className="text-slate-300 group-hover:text-accent transition-colors" />

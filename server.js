@@ -82,20 +82,24 @@ const deductCredits = async (user, amount) => {
             const userDoc = await transaction.get(userRef);
             
             if (!userDoc.exists) {
-                // Initialize default user if they don't exist yet but are authenticated
-                const initialData = {
-                    credits: 5, // 5 starter credits for free trial
+                // Initialize default user — only set once, deduct credits in same operation
+                const starterCredits = 5;
+                const newBalance = Math.max(0, starterCredits - amount);
+                
+                if (starterCredits < amount) {
+                    transaction.set(userRef, {
+                        credits: starterCredits,
+                        plan: 'free',
+                        createdAt: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                    return { success: false, balance: starterCredits, error: "Insufficient credits" };
+                }
+
+                transaction.set(userRef, {
+                    credits: newBalance,
                     plan: 'free',
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
-                };
-                transaction.set(userRef, initialData);
-                
-                if (initialData.credits < amount) {
-                    return { success: false, balance: initialData.credits, error: "Insufficient credits" };
-                }
-                
-                const newBalance = initialData.credits - amount;
-                transaction.update(userRef, { credits: newBalance });
+                });
                 return { success: true, balance: newBalance };
             }
 
