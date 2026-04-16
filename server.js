@@ -116,6 +116,63 @@ const deductCredits = async (user, amount) => {
     }
 };
 
+
+/**
+ * Check and record a free trial render.
+ * Trial: 5 renders/day for 3 days. No credits involved.
+ */
+const checkTrialRender = async (user) => {
+    if (!db) return { allowed: true }; // dev mode bypass
+    if (user.email === 'charlie@napc.uk') return { allowed: true };
+
+    const userRef = db.collection('users').doc(user.uid);
+    const RENDERS_PER_DAY = 5;
+    const TRIAL_DAYS = 3;
+
+    try {
+        const userDoc = await userRef.get();
+        const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+        if (!userDoc.exists) {
+            await userRef.set({
+                plan: 'free',
+                trialStartDate: todayStr,
+                trialRenderDate: todayStr,
+                trialRendersToday: 1,
+                trialRendersTotal: 1,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            return { allowed: true, rendersLeft: RENDERS_PER_DAY - 1 };
+        }
+
+        const data = userDoc.data();
+        const trialStart = data.trialStartDate || todayStr;
+        const daysSinceStart = Math.floor((Date.now() - new Date(trialStart).getTime()) / 86400000);
+
+        if (daysSinceStart >= TRIAL_DAYS) {
+            return { allowed: false, error: 'Your 3-day free trial has ended. Upgrade to keep rendering.' };
+        }
+
+        const renderDate = data.trialRenderDate || '';
+        const rendersToday = renderDate === todayStr ? (data.trialRendersToday || 0) : 0;
+
+        if (rendersToday >= RENDERS_PER_DAY) {
+            return { allowed: false, error: 'Daily limit reached (5 renders/day on trial). Resets at midnight or upgrade your plan.' };
+        }
+
+        await userRef.update({
+            trialRenderDate: todayStr,
+            trialRendersToday: rendersToday + 1,
+            trialRendersTotal: admin.firestore.FieldValue.increment(1)
+        });
+        return { allowed: true, rendersLeft: RENDERS_PER_DAY - (rendersToday + 1) };
+
+    } catch (e) {
+        console.error('[TRIAL] Check failed:', e.message || e);
+        return { allowed: true }; // fail open - never block renders on DB issues
+    }
+};
+
 const app = express();
 app.set('trust proxy', 1); // Enable proxy trust for Render load balancers
 const port = process.env.PORT || 3005;
@@ -514,23 +571,36 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
     try {
         const { base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground } = req.body;
         
-        // Phase 2: Credit-based deduction
-        // Trial/free users: 5 credits. Paid: 30. 4K: 60 (Business only).
-        let cost = CREDIT_COSTS.LOW_RES;
-        if (isHighQuality) {
-            cost = CREDIT_COSTS.UHD_4K;
-        } else if (db) {
+        // Access control: trial users get 5 renders/day for 3 days (no credits).
+        // Paid plans (standard/business/master) use the credit system.
+        const isPaidRender = req.user.email === 'charlie@napc.uk' || (() => {
+            // We'll check from the deductCredits path which already reads the plan
+            return false;
+        })();
+
+        // Read plan once to route correctly
+        let userPlan = 'free';
+        if (db) {
             try {
                 const uDoc = await db.collection('users').doc(req.user.uid).get();
-                const uPlan = uDoc.exists ? (uDoc.data().plan || 'free') : 'free';
-                if (uPlan === 'business' || uPlan === 'standard' || uPlan === 'master') {
-                    cost = CREDIT_COSTS.STANDARD_RES;
-                }
-            } catch (_) { /* use LOW_RES on DB failure */ }
+                userPlan = uDoc.exists ? (uDoc.data().plan || 'free') : 'free';
+            } catch (_) {}
         }
-        const creditCheck = await deductCredits(req.user, cost);
-        if (!creditCheck.success) {
-            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        if (req.user.email === 'charlie@napc.uk') userPlan = 'master';
+
+        if (userPlan === 'free') {
+            // Trial path — no credits, just daily render count
+            const trialCheck = await checkTrialRender(req.user);
+            if (!trialCheck.allowed) {
+                return res.status(402).json({ error: trialCheck.error });
+            }
+        } else {
+            // Paid path — deduct credits
+            const cost = isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES;
+            const creditCheck = await deductCredits(req.user, cost);
+            if (!creditCheck.success) {
+                return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+            }
         }
 
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
