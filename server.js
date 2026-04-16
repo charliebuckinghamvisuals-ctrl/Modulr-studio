@@ -82,7 +82,7 @@ const deductCredits = async (user, amount) => {
 
         // If user doc doesn't exist yet, create it with starter credits
         if (!userDoc.exists) {
-            const starterCredits = 5;
+            const starterCredits = 10;
             if (starterCredits < amount) {
                 await userRef.set({ credits: starterCredits, plan: 'free', createdAt: admin.firestore.FieldValue.serverTimestamp() });
                 return { success: false, balance: starterCredits, error: "Insufficient credits" };
@@ -111,7 +111,8 @@ const deductCredits = async (user, amount) => {
 
     } catch (e) {
         console.error("[CREDITS] Deduction failed for uid:", uid, "| Error:", e.message || e);
-        return { success: false, balance: 0, error: "Internal Credit Error" };
+        // Resilient fallback: If Firestore fails, allow the request but log the error
+        return { success: true, balance: 0, warning: "Credit system temporarily unavailable" };
     }
 };
 
@@ -514,7 +515,19 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
         const { base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground } = req.body;
         
         // Phase 2: Credit-based deduction
-        const cost = isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES;
+        // Trial/free users: 5 credits. Paid: 30. 4K: 60 (Business only).
+        let cost = CREDIT_COSTS.LOW_RES;
+        if (isHighQuality) {
+            cost = CREDIT_COSTS.UHD_4K;
+        } else if (db) {
+            try {
+                const uDoc = await db.collection('users').doc(req.user.uid).get();
+                const uPlan = uDoc.exists ? (uDoc.data().plan || 'free') : 'free';
+                if (uPlan === 'business' || uPlan === 'standard' || uPlan === 'master') {
+                    cost = CREDIT_COSTS.STANDARD_RES;
+                }
+            } catch (_) { /* use LOW_RES on DB failure */ }
+        }
         const creditCheck = await deductCredits(req.user, cost);
         if (!creditCheck.success) {
             return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
