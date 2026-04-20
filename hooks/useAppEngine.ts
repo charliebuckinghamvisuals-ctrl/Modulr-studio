@@ -4,7 +4,9 @@ import { AppStage, MaterialConfig, WeatherConfig, ProcessingState, LibraryMateri
 import { PRESET_MATERIALS, WEATHER_CONDITIONS, SEASONS } from '../constants';
 import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor } from '../services/geminiService';
 import { saveToHistory } from '../services/historyService';
+import { trackFeatureUsage } from '../services/analytics';
 import { db, auth } from '../services/firebase';
+
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -530,7 +532,9 @@ export const useAppEngine = () => {
         setProcessing({ isLoading: true, message: 'Constructing architectural geometry...' });
         try {
             const result = await generateLineDrawing(lineSourceImage, combinedPrompt, isHighQuality, isColoredLineDrawing, lineEnvironmentImage, isProMode);
+            trackFeatureUsage('line_converter');
             setLineImage(result);
+
             await saveToHistory({
                 stage: AppStage.LINE_CONVERT,
                 image: result,
@@ -574,7 +578,9 @@ export const useAppEngine = () => {
         setProcessing({ isLoading: true, message: loadingMsg });
         try {
             const result = await renderBuilding(source, materials, finalPrompt, isHighQuality, isProMode, activeStage === AppStage.STUDIO ? selectedAngle : undefined, isSketchUpMode, activeStage === AppStage.STUDIO ? studioBackground : undefined);
+            trackFeatureUsage('render_engine');
             setRenderedImage(result);
+
             setEditorImage(null);
             await saveToHistory({
                 stage: AppStage.RENDER_ENGINE,
@@ -711,7 +717,9 @@ export const useAppEngine = () => {
         setProcessing({ isLoading: true, message: 'Generating Material Sheet (2x2 Grid)...' });
         try {
             const result = await generatePresentationBoard(originalImage, selectedDetails, isHighQuality, isProMode);
+            trackFeatureUsage('material_studio');
             setMaterialStudioImage(result);
+
             await saveToHistory({
                 stage: AppStage.MATERIAL_STUDIO,
                 image: result,

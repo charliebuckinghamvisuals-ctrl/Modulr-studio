@@ -4,7 +4,9 @@ import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
 import { useAuth } from '../../hooks/useAuth';
 import { useCredits } from '../../hooks/useCredits';
+import { trackBeginCheckout, trackFeatureUsage } from '../../services/analytics';
 import { toast } from 'react-hot-toast';
+
 import { AppStage } from '../../types';
 
 interface PricingViewProps {
@@ -21,7 +23,9 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
         if (user) {
             // Already signed in — they already have their free trial credits
             toast.success('Your free trial is active! Start rendering.');
+            trackFeatureUsage('start_trial');
             onNavigate?.(AppStage.RENDER_ENGINE);
+
         } else {
             toast('Please sign in to start your free trial', { icon: '🔐' });
             onNavigate?.(AppStage.AUTH);
@@ -36,7 +40,9 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
         }
 
         setLoadingPlan(priceId);
+        trackBeginCheckout(planName, isOneTime ? creditsAmount / 100 : (planName === 'business' ? 189.99 : 35));
         try {
+
             const token = await user.getIdToken();
             const response = await fetch('/api/create-checkout-session', {
                 method: 'POST',

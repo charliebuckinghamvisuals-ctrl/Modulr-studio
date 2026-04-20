@@ -3,7 +3,9 @@ import { Mail, Lock, User, ArrowRight, Github, Chrome, Sparkles, Wand2, Hexagon,
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
 import { auth } from '../../services/firebase';
+import { trackSignUp, trackLogin } from '../../services/analytics';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+
 import { toast } from 'react-hot-toast';
 import { AppStage } from '../../types';
 
@@ -37,11 +39,15 @@ export const AuthView: React.FC<AuthViewProps> = ({ onNavigate }) => {
                     await updateProfile(userCredential.user, { displayName: name });
                 }
                 toast.success('Account created successfully!');
+                trackSignUp('email');
                 onNavigate(AppStage.HOME);
+
             } else {
                 await signInWithEmailAndPassword(auth, email, password);
                 toast.success('Welcome back!');
+                trackLogin('email');
                 onNavigate(AppStage.HOME);
+
             }
         } catch (error: any) {
             toast.error(error.message || 'Authentication failed');
@@ -57,7 +63,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onNavigate }) => {
             const provider = new GoogleAuthProvider();
             await signInWithPopup(auth, provider);
             toast.success('Signed in with Google!');
+            trackLogin('google');
             onNavigate(AppStage.HOME);
+
         } catch (error: any) {
             toast.error(error.message || 'Google Auth failed');
             console.error("Google auth error:", error);

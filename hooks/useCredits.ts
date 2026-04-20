@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
+import { trackUserPlan } from '../services/analytics';
+
 
 interface CreditsData {
     credits: number;
@@ -31,7 +33,9 @@ export function useCredits() {
             const data: CreditsData = await response.json();
             setCredits(data.credits);
             setPlan(data.plan);
+            if (data.plan) trackUserPlan(data.plan);
             setRendersLeft(data.rendersLeft ?? null);
+
             setRendersPerDay(data.rendersPerDay ?? null);
             setTrialDaysLeft(data.trialDaysLeft ?? null);
             setTrialBlocked(data.trialBlocked ?? false);
