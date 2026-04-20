@@ -1223,7 +1223,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
         
         if (!stripe) throw new Error("Stripe is not configured on the server");
 
-        const session = await stripe.checkout.sessions.create({
+        const sessionPayload = {
             payment_method_types: ['card'],
             line_items: [
                 {
@@ -1238,9 +1238,24 @@ app.post('/api/create-checkout-session', async (req, res) => {
             metadata: {
                 firebase_uid: req.user.uid,
                 plan: planName || 'credits_pack',
-                credits: creditsAmount
+                credits: String(creditsAmount)
             },
-        });
+        };
+
+        // For subscriptions, also set metadata on the Subscription object itself.
+        // This is CRITICAL for invoice.paid renewal events to work — invoices
+        // inherit metadata from the Subscription, not the checkout Session.
+        if (!isOneTime) {
+            sessionPayload.subscription_data = {
+                metadata: {
+                    firebase_uid: req.user.uid,
+                    plan: planName || 'credits_pack',
+                    credits: String(creditsAmount)
+                }
+            };
+        }
+
+        const session = await stripe.checkout.sessions.create(sessionPayload);
 
         res.json({ sessionId: session.id, url: session.url });
     } catch (error) {

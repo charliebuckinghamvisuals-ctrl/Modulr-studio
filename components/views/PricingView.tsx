@@ -152,7 +152,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         <div className="space-y-4 flex-1">
                             <div className="text-xs font-bold uppercase tracking-widest text-secondary mb-2">The Taster Package</div>
                             {[
-                                '10 Renders / Day',
+                                '5 Renders / Day (3 Days)',
                                 '1080p High Definition only',
                                 'Standard & Pro Modes included',
                                 'Access All Tools (Taster)',
