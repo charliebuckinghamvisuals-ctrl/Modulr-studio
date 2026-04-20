@@ -1224,7 +1224,7 @@ app.get('/api/user/credits', async (req, res) => {
                     credits: 0, plan: 'free', trialBlocked: true,
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
-                return res.json({ credits: 0, plan: 'free' });
+                return res.json({ credits: 0, plan: 'free', rendersLeft: 0, rendersPerDay: RENDERS_PER_DAY, trialDaysLeft: 0, trialBlocked: true });
             }
 
             const starterCredits = 5;
@@ -1238,7 +1238,7 @@ app.get('/api/user/credits', async (req, res) => {
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 })
             ]);
-            return res.json({ credits: starterCredits, plan: 'free' });
+            return res.json({ credits: starterCredits, plan: 'free', rendersLeft: RENDERS_PER_DAY, rendersPerDay: RENDERS_PER_DAY, trialDaysLeft: TRIAL_DAYS, trialBlocked: false });
         }
         const data = userDoc.data();
         const plan = data.plan || 'free';
