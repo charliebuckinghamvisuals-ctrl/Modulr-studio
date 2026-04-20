@@ -286,9 +286,8 @@ export const useAppEngine = () => {
                     handleAnalyzeForMaterialStudio(base64Data);
                 } else if (targetStage === AppStage.RENDER_ENGINE) {
                     setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
-                    if (!isSketchUpMode) {
-                        handleAnalyzeForRenderEngine(base64Data);
-                    }
+                    // Always auto-detect materials — works for photos, B&W line drawings, and SketchUp models
+                    handleAnalyzeForRenderEngine(base64Data);
                 } else if (targetStage === AppStage.EDITOR) {
                     handleAnalyzeForEditor(base64Data);
                 }

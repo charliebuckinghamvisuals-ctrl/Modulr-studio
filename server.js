@@ -579,11 +579,7 @@ app.post('/api/analyzeComponents', userAiLimiter, async (req, res) => {
     try {
         const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
 
-        // Phase 2: Analysis deduction
-        const creditCheck = await deductCredits(req.user, CREDIT_COSTS.ANALYSIS);
-        if (!creditCheck.success) {
-            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
-        }
+        // Note: analyzeComponents is a free supporting feature — no credit deduction.
 
         const imagePart = fileToGenerativePart(base64Image, "image/png");
 
