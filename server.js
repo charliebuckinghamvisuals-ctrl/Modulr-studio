@@ -195,32 +195,54 @@ console.log("----------------------------");
 
 // Rate Limiters
 const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, 
-    max: 100, 
+    windowMs: 15 * 60 * 1000,
+    max: 100,
     message: { error: "Too many requests from this IP, please try again after 15 minutes" },
-    standardHeaders: true, 
+    standardHeaders: true,
     legacyHeaders: false,
-    validate: false, 
-    validate: { ip: false, xForwardedForHeader: false }
+    validate: { ip: false, xForwardedForHeader: false } // suppress proxy warning — trust proxy is set above
 });
 
 const aiLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, 
+    windowMs: 1 * 60 * 1000,
     max: 10,
     message: { error: "IP-based render limit reached. Please wait a minute." },
-    validate: false
+    validate: { ip: false, xForwardedForHeader: false }
 });
 
-// Per-User AI Limiter (Phase 1)
+// Per-User AI Limiter — rate-limited per Firebase UID, not just IP
 const userAiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000,
     max: 5, // max 5 renders per minute per individual user
     keyGenerator: (req) => req.user?.uid || req.ip || 'unknown',
     message: { error: "You have reached your individual render limit. Please wait a minute." },
     standardHeaders: true,
-    validate: false,
     legacyHeaders: false,
+    validate: { ip: false, xForwardedForHeader: false }
 });
+
+/**
+ * Sanitize a user-supplied string.
+ * - Rejects non-strings (returns '')
+ * - Trims whitespace
+ * - Caps length to prevent prompt-injection via enormous payloads
+ */
+const sanitizeString = (value, maxLength = 2000) => {
+    if (typeof value !== 'string') return '';
+    return value.trim().slice(0, maxLength);
+};
+
+/**
+ * Sanitize a user-supplied boolean.
+ * Accepts real booleans or the string literals 'true'/'false'.
+ * Defaults to false for anything else.
+ */
+const sanitizeBool = (value) => {
+    if (typeof value === 'boolean') return value;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return false;
+};
 
 // Security Headers
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -396,7 +418,13 @@ const fileToGenerativePart = (base64Data, mimeType) => {
 
 app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
     try {
-        const { base64Image, additionalPrompt, isHighQuality, ratio, hasColor, environmentImage, isProMode } = req.body;
+        const base64Image      = sanitizeString(req.body.base64Image, 10_000_000);
+        const additionalPrompt = sanitizeString(req.body.additionalPrompt, 2000);
+        const isHighQuality    = sanitizeBool(req.body.isHighQuality);
+        const ratio            = sanitizeString(req.body.ratio, 10);
+        const hasColor         = sanitizeBool(req.body.hasColor);
+        const environmentImage = sanitizeString(req.body.environmentImage, 10_000_000);
+        const isProMode        = sanitizeBool(req.body.isProMode);
         
         // Phase 2: Credit-based deduction
         const cost = isHighQuality ? CREDIT_COSTS.STANDARD_RES : CREDIT_COSTS.LOW_RES;
@@ -499,7 +527,7 @@ app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
 
 app.post('/api/analyzeComponents', userAiLimiter, async (req, res) => {
     try {
-        const { base64Image } = req.body;
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
 
         // Phase 2: Analysis deduction
         const creditCheck = await deductCredits(req.user, CREDIT_COSTS.ANALYSIS);
@@ -569,8 +597,24 @@ app.post('/api/analyzeComponents', userAiLimiter, async (req, res) => {
 
 app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
     try {
-        const { base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground } = req.body;
-        
+        const base64Image      = sanitizeString(req.body.base64Image, 10_000_000);
+        const additionalPrompt = sanitizeString(req.body.additionalPrompt, 2000);
+        const isHighQuality    = sanitizeBool(req.body.isHighQuality);
+        const ratio            = sanitizeString(req.body.ratio, 10);
+        const isProMode        = sanitizeBool(req.body.isProMode);
+        const orientation      = sanitizeString(req.body.orientation, 50);
+        const isSketchUpMode   = sanitizeBool(req.body.isSketchUpMode);
+        const studioBackground = sanitizeString(req.body.studioBackground, 200);
+        // Sanitize each material field individually — they are embedded directly in AI prompts
+        const rawMats          = req.body.materials || {};
+        const materials = {
+            walls:   sanitizeString(rawMats.walls,   200),
+            roof:    sanitizeString(rawMats.roof,    200),
+            windows: sanitizeString(rawMats.windows, 200),
+            doors:   sanitizeString(rawMats.doors,   200),
+            decking: sanitizeString(rawMats.decking, 200),
+        };
+
         // Access control: trial users get 5 renders/day for 3 days (no credits).
         // Paid plans (standard/business/master) use the credit system.
         const isPaidRender = req.user.email === 'charlie@napc.uk' || (() => {
@@ -702,7 +746,12 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
 
 app.post('/api/editImage', userAiLimiter, async (req, res) => {
     try {
-        const { base64Image, maskImage, editPrompt, isHighQuality, ratio, isProMode } = req.body;
+        const base64Image   = sanitizeString(req.body.base64Image, 10_000_000);
+        const maskImage     = sanitizeString(req.body.maskImage, 10_000_000);
+        const editPrompt    = sanitizeString(req.body.editPrompt, 1000); // embedded directly in prompt — strict cap
+        const isHighQuality = sanitizeBool(req.body.isHighQuality);
+        const ratio         = sanitizeString(req.body.ratio, 10);
+        const isProMode     = sanitizeBool(req.body.isProMode);
 
         // Phase 2: Credit-based deduction
         const cost = isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES;
@@ -772,7 +821,7 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
 
 app.post('/api/analyzeMaterials', userAiLimiter, async (req, res) => {
     try {
-        const { base64Image } = req.body;
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
 
         // Phase 2: Analysis deduction
         const creditCheck = await deductCredits(req.user, CREDIT_COSTS.ANALYSIS);
@@ -842,7 +891,7 @@ app.post('/api/analyzeMaterials', userAiLimiter, async (req, res) => {
 
 app.post('/api/analyzeScene', userAiLimiter, async (req, res) => {
     try {
-        const { base64Image } = req.body;
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
 
         // Phase 2: Analysis deduction
         const creditCheck = await deductCredits(req.user, CREDIT_COSTS.ANALYSIS);
@@ -898,7 +947,16 @@ app.post('/api/analyzeScene', userAiLimiter, async (req, res) => {
 
 app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
     try {
-        const { base64Image, weather, isHighQuality, ratio, isProMode } = req.body;
+        const base64Image   = sanitizeString(req.body.base64Image, 10_000_000);
+        const isHighQuality = sanitizeBool(req.body.isHighQuality);
+        const ratio         = sanitizeString(req.body.ratio, 10);
+        const isProMode     = sanitizeBool(req.body.isProMode);
+        const rawWeather    = req.body.weather || {};
+        const weather = {
+            condition: sanitizeString(rawWeather.condition, 100),
+            season:    sanitizeString(rawWeather.season,    50),
+            timeOfDay: sanitizeString(rawWeather.timeOfDay, 50),
+        };
 
         // Phase 2: Credit-based deduction
         const cost = isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES;
@@ -962,7 +1020,7 @@ app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
 
 app.post('/api/analyzeExteriorDetails', userAiLimiter, async (req, res) => {
     try {
-        const { base64Image } = req.body;
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
 
         // Phase 2: Analysis deduction
         const creditCheck = await deductCredits(req.user, CREDIT_COSTS.ANALYSIS);
@@ -1028,7 +1086,11 @@ app.post('/api/analyzeExteriorDetails', userAiLimiter, async (req, res) => {
 
 app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
     try {
-        const { base64Image, focusPoints, isProMode } = req.body;
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
+        const isProMode   = sanitizeBool(req.body.isProMode);
+        // Sanitize focusPoints — each string is injected into an AI prompt
+        const rawPoints   = Array.isArray(req.body.focusPoints) ? req.body.focusPoints : [];
+        const focusPoints = rawPoints.map(p => sanitizeString(p, 200));
         
         // Phase 2: Credit-based deduction
         const cost = CREDIT_COSTS.UHD_4K; // Presentation boards are high-detail
