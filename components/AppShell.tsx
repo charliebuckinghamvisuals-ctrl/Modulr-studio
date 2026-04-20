@@ -321,15 +321,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
 
       {/* ── Main Content ── */}
       <main className="flex-1 flex flex-col relative overflow-hidden min-h-screen">
-        {/* Mobile: gate tool pages behind a "Desktop Required" screen */}
-        <div className="block lg:hidden">
-          {isDesktopOnly ? <DesktopOnlyScreen onNavigate={onNavigate} /> : children}
-        </div>
-        {/* Desktop: always show children */}
-        <div className="hidden lg:flex flex-col flex-1">
+        {/* Children always render once — no duplicate refs */}
+        <div className={`flex-1 flex flex-col ${isDesktopOnly ? 'hidden lg:flex' : 'flex'}`}>
           {children}
         </div>
+        {/* On mobile, gate tool pages with the Desktop Required screen */}
+        {isDesktopOnly && (
+          <div className="block lg:hidden">
+            <DesktopOnlyScreen onNavigate={onNavigate} />
+          </div>
+        )}
       </main>
+
 
       {/* ── Footer ── */}
       <footer className="w-full pt-20 md:pt-40 pb-12 px-6 md:px-8 border-t border-border bg-white flex flex-col md:flex-row items-center justify-between text-xs text-secondary shrink-0 z-50 gap-6 md:gap-0">
