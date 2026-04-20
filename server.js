@@ -175,6 +175,57 @@ const checkTrialRender = async (user) => {
 
 const app = express();
 app.set('trust proxy', 1); // Enable proxy trust for Render load balancers
+
+/**
+ * Unified render access gate — call this at the top of EVERY render endpoint.
+ *
+ * Free / trial users  → checkTrialRender (5 renders/day for 3 days, no credits consumed)
+ * Paid users          → deductCredits (standard credit system)
+ *
+ * Returns:
+ *   { allowed: false, status: 402, body: {...} }  → endpoint should return this immediately
+ *   { allowed: true, rendersLeft?: number }       → endpoint may proceed
+ */
+const enforceRenderAccess = async (req, creditCost) => {
+    // Master account — always allowed
+    if (req.user.email === 'charlie@napc.uk') {
+        return { allowed: true };
+    }
+
+    // Read plan from Firestore
+    let userPlan = 'free';
+    if (db) {
+        try {
+            const uDoc = await db.collection('users').doc(req.user.uid).get();
+            userPlan = uDoc.exists ? (uDoc.data().plan || 'free') : 'free';
+        } catch (_) { /* default to free on DB error */ }
+    }
+
+    if (userPlan === 'free') {
+        // Trial path — no credits deducted, daily count enforced
+        const trialCheck = await checkTrialRender(req.user);
+        if (!trialCheck.allowed) {
+            return {
+                allowed: false,
+                status: 402,
+                body: { error: trialCheck.error, upgradeRequired: true }
+            };
+        }
+        return { allowed: true, rendersLeft: trialCheck.rendersLeft };
+    }
+
+    // Paid path — deduct credits
+    const creditCheck = await deductCredits(req.user, creditCost);
+    if (!creditCheck.success) {
+        return {
+            allowed: false,
+            status: 402,
+            body: { error: creditCheck.error, balance: creditCheck.balance }
+        };
+    }
+    return { allowed: true, creditBalance: creditCheck.balance };
+};
+
 const port = process.env.PORT || 3005;
 
 console.log("--- SERVER STARTUP DEBUG ---");
@@ -426,11 +477,10 @@ app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
         const environmentImage = sanitizeString(req.body.environmentImage, 10_000_000);
         const isProMode        = sanitizeBool(req.body.isProMode);
         
-        // Phase 2: Credit-based deduction
-        const cost = isHighQuality ? CREDIT_COSTS.STANDARD_RES : CREDIT_COSTS.LOW_RES;
-        const creditCheck = await deductCredits(req.user, cost);
-        if (!creditCheck.success) {
-            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        // Phase 2: Enforce render access (trial for free users, credit deduction for paid)
+        const access = await enforceRenderAccess(req, isHighQuality ? CREDIT_COSTS.STANDARD_RES : CREDIT_COSTS.LOW_RES);
+        if (!access.allowed) {
+            return res.status(access.status).json(access.body);
         }
 
         const hasImage = base64Image && typeof base64Image === 'string' && base64Image.trim().length > 100;
@@ -622,29 +672,10 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
             return false;
         })();
 
-        // Read plan once to route correctly
-        let userPlan = 'free';
-        if (db) {
-            try {
-                const uDoc = await db.collection('users').doc(req.user.uid).get();
-                userPlan = uDoc.exists ? (uDoc.data().plan || 'free') : 'free';
-            } catch (_) {}
-        }
-        if (req.user.email === 'charlie@napc.uk') userPlan = 'master';
-
-        if (userPlan === 'free') {
-            // Trial path — no credits, just daily render count
-            const trialCheck = await checkTrialRender(req.user);
-            if (!trialCheck.allowed) {
-                return res.status(402).json({ error: trialCheck.error });
-            }
-        } else {
-            // Paid path — deduct credits
-            const cost = isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES;
-            const creditCheck = await deductCredits(req.user, cost);
-            if (!creditCheck.success) {
-                return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
-            }
+        // Enforce render access (trial for free users, credit deduction for paid)
+        const access = await enforceRenderAccess(req, isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES);
+        if (!access.allowed) {
+            return res.status(access.status).json(access.body);
         }
 
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
@@ -754,10 +785,10 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
         const isProMode     = sanitizeBool(req.body.isProMode);
 
         // Phase 2: Credit-based deduction
-        const cost = isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES;
-        const creditCheck = await deductCredits(req.user, cost);
-        if (!creditCheck.success) {
-            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        // Enforce render access (trial for free users, credit deduction for paid)
+        const access = await enforceRenderAccess(req, isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES);
+        if (!access.allowed) {
+            return res.status(access.status).json(access.body);
         }
 
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
@@ -959,10 +990,10 @@ app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
         };
 
         // Phase 2: Credit-based deduction
-        const cost = isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES;
-        const creditCheck = await deductCredits(req.user, cost);
-        if (!creditCheck.success) {
-            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        // Enforce render access (trial for free users, credit deduction for paid)
+        const access = await enforceRenderAccess(req, isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES);
+        if (!access.allowed) {
+            return res.status(access.status).json(access.body);
         }
 
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
@@ -1093,10 +1124,10 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
         const focusPoints = rawPoints.map(p => sanitizeString(p, 200));
         
         // Phase 2: Credit-based deduction
-        const cost = CREDIT_COSTS.UHD_4K; // Presentation boards are high-detail
-        const creditCheck = await deductCredits(req.user, cost);
-        if (!creditCheck.success) {
-            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        // Enforce render access (trial for free users, credit deduction for paid)
+        const access = await enforceRenderAccess(req, CREDIT_COSTS.UHD_4K);
+        if (!access.allowed) {
+            return res.status(access.status).json(access.body);
         }
 
         if (focusPoints.length !== 4) {
@@ -1210,7 +1241,28 @@ app.get('/api/user/credits', async (req, res) => {
             return res.json({ credits: starterCredits, plan: 'free' });
         }
         const data = userDoc.data();
-        res.json({ credits: data.credits || 0, plan: data.plan || 'free' });
+        const plan = data.plan || 'free';
+
+        // For free/trial plan: enrich response with daily render info
+        if (plan === 'free') {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const trialStart = data.trialStartDate || todayStr;
+            const daysSinceStart = Math.floor((Date.now() - new Date(trialStart).getTime()) / 86400000);
+            const trialDaysLeft = Math.max(0, TRIAL_DAYS - daysSinceStart);
+            const renderDate = data.trialRenderDate || '';
+            const rendersToday = renderDate === todayStr ? (data.trialRendersToday || 0) : 0;
+            const rendersLeft = Math.max(0, RENDERS_PER_DAY - rendersToday);
+            return res.json({
+                credits: data.credits || 0,
+                plan,
+                rendersLeft,
+                rendersPerDay: RENDERS_PER_DAY,
+                trialDaysLeft,
+                trialBlocked: data.trialBlocked || false
+            });
+        }
+
+        res.json({ credits: data.credits || 0, plan });
     } catch (error) {
         console.error("Error fetching user credits:", error);
         res.status(500).json({ error: "Could not fetch credits balance" });
