@@ -651,6 +651,8 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
         const orientation      = sanitizeString(req.body.orientation, 50);
         const isSketchUpMode   = sanitizeBool(req.body.isSketchUpMode);
         const studioBackground = sanitizeString(req.body.studioBackground, 200);
+        const isBatchSequence  = sanitizeBool(req.body.isBatchSequence);
+        const seed             = req.body.seed ? parseInt(req.body.seed) : undefined;
         // Sanitize each material field individually — they are embedded directly in AI prompts
         const rawMats          = req.body.materials || {};
         const materials = {
@@ -701,6 +703,7 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
       
       SCENE MODIFICATIONS: ${additionalPrompt || 'None'}
       ${studioBackground ? `\n      STUDIO OVERRIDE: Render this building completely isolated on a ${studioBackground}. Do NOT render grass, trees, fences, skies, or any natural environment. Pure studio lighting only.` : ''}
+      ${isBatchSequence ? `\n      BATCH SEQUENCE CONTINUITY: This image is part of a multi-angle batch sequence. You MUST maintain exactly the same surrounding landscape, garden design, driveway, sky, trees, and general environment style as the other angles of this property.` : ''}
       FINAL OUTPUT: 4K UHD Photorealistic.
     `;
 
@@ -732,6 +735,7 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
 
       SCENE MODIFICATIONS: ${additionalPrompt || 'None'}
       ${studioBackground ? `\n      STUDIO OVERRIDE: Render this building completely isolated on a ${studioBackground}. Do NOT render grass, trees, fences, skies, or any natural environment. Pure studio lighting only.` : ''}
+      ${isBatchSequence ? `\n      BATCH SEQUENCE CONTINUITY: This image is part of a multi-angle batch sequence. You MUST maintain exactly the same surrounding landscape, garden design, driveway, sky, trees, and general environment style as the other angles of this property.` : ''}
 
       FINAL OUTPUT: The result must be indistinguishable from a real architectural photograph (DSLR quality).
       CRITICAL: Output resolution 3840 x 2160 pixels (4K UHD).
@@ -748,9 +752,11 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                 outputMimeType: "image/jpeg",
                 imageConfig: {
                     aspectRatio: (isHighQuality && !isSketchUpMode) ? "16:9" : ratio,
-                    imageSize: isHighQuality ? "4K" : "1K"
+                    imageSize: isHighQuality ? "4K" : "1K",
+                    ...(seed !== undefined && !isNaN(seed) && { seed })
                 },
-                temperature: 0.2
+                temperature: 0.2,
+                ...(seed !== undefined && !isNaN(seed) && { seed })
             }
         });
 

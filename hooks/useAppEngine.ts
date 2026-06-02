@@ -609,6 +609,8 @@ export const useAppEngine = () => {
             const newRenders: string[] = [...batchRenders];
             while(newRenders.length < 5) newRenders.push(''); // Ensure matching array length
             
+            const batchSeed = Math.floor(Math.random() * 2147483647);
+            
             for (let i = 0; i < validIndices.length; i++) {
                 const slotIndex = validIndices[i];
                 const sourceImg = batchImages[slotIndex];
@@ -634,7 +636,8 @@ export const useAppEngine = () => {
                     matConfig.orientation,
                     isSketchUpMode,
                     isStudioReq ? studioBackground : undefined,
-                    true // isBatchSequence
+                    true, // isBatchSequence
+                    batchSeed
                 );
                 
                 newRenders[slotIndex] = result;

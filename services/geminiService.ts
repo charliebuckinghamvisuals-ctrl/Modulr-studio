@@ -187,7 +187,8 @@ export const renderBuilding = async (
   orientation?: string,
   isSketchUpMode: boolean = false,
   studioBackground?: string,
-  isBatchSequence: boolean = false
+  isBatchSequence: boolean = false,
+  seed?: number
 ): Promise<string> => {
   try {
     const { ratio } = await getImageDimensions(base64Image);
@@ -195,7 +196,7 @@ export const renderBuilding = async (
     const response = await fetch(`${API_BASE_URL}/renderBuilding`, {
       method: 'POST',
       headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground, isBatchSequence })
+      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground, isBatchSequence, seed })
     });
 
     if (!response.ok) {
