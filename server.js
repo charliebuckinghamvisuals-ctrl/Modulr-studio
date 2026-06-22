@@ -535,7 +535,7 @@ app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
         console.log(`[DEBUG] Final parts array length: ${parts.length}`);
         if (!hasImage) console.log(`[DEBUG] Text Prompt: ${textPrompt.substring(0, 50)}...`);
 
-        const imageModel = isProMode ? 'gemini-3-pro-image-preview' : 'gemini-3.1-flash-image-preview';
+        const imageModel = 'gemini-3.1-flash-image';
         const modelName = imageModel;
         
         console.log(`[DEBUG] hasImage: ${hasImage}, modelName: ${modelName}`);
@@ -600,7 +600,7 @@ app.post('/api/analyzeComponents', userAiLimiter, async (req, res) => {
     `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3.1-pro',
             contents: {
                 parts: [imagePart, { text: prompt }]
             },
@@ -744,7 +744,7 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
         const prompt = isSketchUpMode ? sketchUpPrompt : standardPrompt;
 
         const response = await ai.models.generateContent({
-            model: isProMode ? 'gemini-3-pro-image-preview' : 'gemini-3.1-flash-image-preview',
+            model: 'gemini-3.1-flash-image',
             contents: {
                 parts: [imagePart, { text: prompt }]
             },
@@ -825,7 +825,7 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
         parts.push({ text: prompt });
 
         const response = await ai.models.generateContent({
-            model: isProMode ? 'gemini-3-pro-image-preview' : 'gemini-3.1-flash-image-preview',
+            model: 'gemini-3.1-flash-image',
             contents: {
                 parts: parts
             },
@@ -883,7 +883,7 @@ app.post('/api/analyzeMaterials', userAiLimiter, async (req, res) => {
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3.1-pro',
             contents: {
                 parts: [
                     imagePart,
@@ -944,7 +944,7 @@ app.post('/api/analyzeScene', userAiLimiter, async (req, res) => {
     `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3.1-pro',
             contents: {
                 parts: [
                     imagePart,
@@ -1021,7 +1021,7 @@ app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
     `;
 
         const response = await ai.models.generateContent({
-            model: isProMode ? 'gemini-3-pro-image-preview' : 'gemini-3.1-flash-image-preview',
+            model: 'gemini-3.1-flash-image',
             contents: {
                 parts: [
                     imagePart,
@@ -1080,7 +1080,7 @@ app.post('/api/analyzeExteriorDetails', userAiLimiter, async (req, res) => {
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3.1-pro',
             contents: {
                 parts: [imagePart, { text: prompt }]
             },
@@ -1170,7 +1170,7 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
       `;
 
         const response = await ai.models.generateContent({
-            model: isProMode ? 'gemini-3-pro-image-preview' : 'gemini-3.1-flash-image-preview',
+            model: 'gemini-3.1-flash-image',
             contents: {
                 parts: [
                     imagePart,

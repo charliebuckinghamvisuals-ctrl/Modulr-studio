@@ -9,7 +9,7 @@ async function run() {
     console.log("Reproducing Text to Line error with gemini-3.1-pro-preview...");
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3.1-pro',
             contents: { parts: [{ text: "A simple line drawing of a house" }] },
             config: {
                 outputMimeType: "image/jpeg",
