@@ -600,7 +600,7 @@ app.post('/api/analyzeComponents', userAiLimiter, async (req, res) => {
     `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3.5-flash',
+            model: 'gemini-pro-latest',
             contents: {
                 parts: [imagePart, { text: prompt }]
             },
@@ -883,7 +883,7 @@ app.post('/api/analyzeMaterials', userAiLimiter, async (req, res) => {
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3.5-flash',
+            model: 'gemini-pro-latest',
             contents: {
                 parts: [
                     imagePart,
@@ -944,7 +944,7 @@ app.post('/api/analyzeScene', userAiLimiter, async (req, res) => {
     `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3.5-flash',
+            model: 'gemini-pro-latest',
             contents: {
                 parts: [
                     imagePart,
@@ -1080,7 +1080,7 @@ app.post('/api/analyzeExteriorDetails', userAiLimiter, async (req, res) => {
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3.5-flash',
+            model: 'gemini-pro-latest',
             contents: {
                 parts: [imagePart, { text: prompt }]
             },
