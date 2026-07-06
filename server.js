@@ -693,6 +693,7 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
       ABSOLUTE CRITICAL RULE:
       The input image is a coloured 3D model screenshot with pre-applied materials.
       Your ONLY task is to ENHANCE and UPSCALE it to photorealistic quality by applying lighting, reflections, and textures.\n      GEOMETRY MUST BE PIXEL-LOCKED. Do NOT redraw, re-compose, or extend any geometry.\n      DO NOT invent structures, decking, patios, porches, or raised platforms.\n      DO NOT change the roof pitch, shape, or modify any architectural elements.\n      PRESERVE the environment exactly as shown.
+      IGNORE 3D GRID LINES: The source image has a 3D floor grid visible on the ground/grass. IGNORE THESE COMPLETELY. Do NOT render these grid lines into the final image, render a natural, seamless ground/grass instead.
       
       MATERIAL ASSIGNMENTS:
       ${buildMaterialInstruction('Walls', materials.walls)}
