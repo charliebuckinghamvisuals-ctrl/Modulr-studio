@@ -242,7 +242,12 @@ export const useAppEngine = () => {
             setMaterials(detectedMaterials);
         } catch (error) {
             console.error(error);
-            toast.error(`Auto-detect failed: ${error instanceof Error ? error.message : 'Unknown error'}. Using defaults.`);
+            const msg = error instanceof Error ? error.message : 'Unknown error';
+            if (msg.includes('Missing authentication token') || msg.includes('Unauthorized')) {
+                toast.error('Please log in to use the auto-detect feature.');
+            } else {
+                toast.error(`Auto-detect failed: ${msg}. Using defaults.`);
+            }
         } finally {
             setProcessing({ isLoading: false, message: '' });
         }
