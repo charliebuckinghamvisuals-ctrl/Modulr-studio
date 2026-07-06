@@ -432,6 +432,9 @@ const verifyFirebaseToken = async (req, res, next) => {
 
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (req.originalUrl === '/api/analyzeComponents' || req.originalUrl === '/api/analyzeComponents/') {
+            return next();
+        }
         return res.status(401).json({ error: 'Unauthorized: Missing authentication token' });
     }
 
