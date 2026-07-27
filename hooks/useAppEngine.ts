@@ -92,6 +92,7 @@ export const useAppEngine = () => {
     const [isSketchUpMode, setIsSketchUpMode] = useState(false);
     const [isBatchMode, setIsBatchMode] = useState(false);
     const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
+    const [isAnalyzingMaterials, setIsAnalyzingMaterials] = useState(false);
 
     const [userPlan, setUserPlan] = useState<string>('free');
     const [studioBackground, setStudioBackground] = useState<string>('Pure White Studio');
@@ -237,6 +238,7 @@ export const useAppEngine = () => {
     const handleAnalyzeForRenderEngine = async (image: string) => {
         setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' }); // Explicit reset
         setProcessing({ isLoading: true, message: 'Detecting existing materials...' });
+        setIsAnalyzingMaterials(true);
         try {
             const detectedMaterials = await analyzeComponents(image);
             setMaterials(detectedMaterials);
@@ -250,6 +252,7 @@ export const useAppEngine = () => {
             }
         } finally {
             setProcessing({ isLoading: false, message: '' });
+            setIsAnalyzingMaterials(false);
         }
     };
 
@@ -527,22 +530,23 @@ export const useAppEngine = () => {
         }
     };
 
-    const handleGenerateLineDrawing = async () => {
+    const handleGenerateLineDrawing = async (mode: 'image' | 'text' = 'image') => {
         const combinedPrompt = [lineDrawingPrompt, additionalPrompt].filter(Boolean).join('. ');
-        if (!lineSourceImage && !combinedPrompt.trim()) {
+        const activeSource = mode === 'image' ? lineSourceImage : null;
+        if (!activeSource && !combinedPrompt.trim()) {
             toast.error('Please describe what you want to generate, or upload an image.');
             return;
         }
         setProcessing({ isLoading: true, message: 'Constructing architectural geometry...' });
         try {
-            const result = await generateLineDrawing(lineSourceImage, combinedPrompt, isHighQuality, isColoredLineDrawing, lineEnvironmentImage, isProMode);
+            const result = await generateLineDrawing(activeSource, combinedPrompt, isHighQuality, isColoredLineDrawing, lineEnvironmentImage, isProMode);
             trackFeatureUsage('line_converter');
             setLineImage(result);
 
             await saveToHistory({
                 stage: AppStage.LINE_CONVERT,
                 image: result,
-                originalImage: lineSourceImage,
+                originalImage: activeSource,
                 prompt: combinedPrompt,
                 settings: { isHighQuality, isColoredLineDrawing },
                 referenceImage: lineEnvironmentImage
@@ -558,6 +562,7 @@ export const useAppEngine = () => {
     const handleAnalyzeMaterials = async () => {
         if (!originalImage) return;
         setProcessing({ isLoading: true, message: 'Analyzing building components...' });
+        setIsAnalyzingMaterials(true);
         try {
             const detected = await analyzeComponents(originalImage);
             setMaterials(prev => ({ ...prev, ...detected }));
@@ -566,6 +571,7 @@ export const useAppEngine = () => {
             toast.error('Failed to analyze materials automatically.');
         } finally {
             setProcessing({ isLoading: false, message: '' });
+            setIsAnalyzingMaterials(false);
         }
     };
 
@@ -717,22 +723,23 @@ export const useAppEngine = () => {
         }
     };
 
-    const handleMaterialStudio = async () => {
-        if (!originalImage) return;
+    const handleMaterialStudio = async (sourceImg?: string | null) => {
+        const targetImage = sourceImg || originalImage;
+        if (!targetImage) return;
         if (selectedDetails.length !== 4) return;
 
         setProcessing({ isLoading: true, message: 'Generating Material Sheet (2x2 Grid)...' });
         try {
-            const result = await generatePresentationBoard(originalImage, selectedDetails, isHighQuality, isProMode);
+            const result = await generatePresentationBoard(targetImage, selectedDetails, isHighQuality, isProMode);
             trackFeatureUsage('material_studio');
             setMaterialStudioImage(result);
 
             await saveToHistory({
                 stage: AppStage.MATERIAL_STUDIO,
                 image: result,
-                originalImage: originalImage,
+                originalImage: targetImage,
                 prompt: 'Generated Architecture Detailed Callouts',
-                settings: { selectedDetails }
+                settings: { selectedDetails, detectedDetails }
             });
             window.dispatchEvent(new Event('aiarchviz-history-updated'));
         } catch (error) {
@@ -756,6 +763,7 @@ export const useAppEngine = () => {
         isColoredLineDrawing, setIsColoredLineDrawing,
         editorAnalysis, setEditorAnalysis,
         materials, setMaterials,
+        isAnalyzingMaterials,
         weather, setWeather,
         fileInputRef, materialInputRef,
         handleReset, handleImageUpload, handleBatchImageUpload, handleDownload,

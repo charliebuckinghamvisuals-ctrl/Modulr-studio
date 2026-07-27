@@ -1,18 +1,16 @@
 import React from 'react';
-import { Box, Smartphone, Zap, Grid, Layers, ShieldCheck, Cpu, Maximize, FileText, CheckCircle2, Sparkles, PenTool, CloudSun, ArrowRight, Image as ImageIcon, Palette, Briefcase, Settings, History, ChevronDown, Download, Camera, Home, ArrowLeft, Loader2 } from 'lucide-react';
+import { Zap, Grid, Layers, Sparkles, PenTool, Image as ImageIcon, Settings, History, ChevronDown, Loader2, Upload } from 'lucide-react';
 import { ToggleSwitch } from './components/ToggleSwitch';
 import { Toaster, toast } from 'react-hot-toast';
 import { AppShell } from './components/AppShell';
 import { StartupLoader } from './components/StartupLoader';
 import { Button } from './components/Button';
 import { LoadingOverlay } from './components/LoadingOverlay';
-import { MaterialVisualPicker } from './components/MaterialVisualPicker';
 import { HistoryFooter } from './components/HistoryFooter';
 import { CanvasMask } from './components/CanvasMask';
 import { AppStage, HistoryItem } from './types';
-import { PRESET_MATERIALS, WEATHER_CONDITIONS, ENTOURAGE_PEOPLE, ENTOURAGE_ANIMALS, SCENE_PRESETS } from './constants';
+import { WEATHER_CONDITIONS } from './constants';
 import { useAppEngine } from './hooks/useAppEngine';
-// import { PDFGenerator } from './components/PDFGenerator';
 import { HomeView } from './components/views/HomeView';
 import { MaterialStudioView } from './components/views/MaterialStudioView';
 import { StudioView } from './components/views/StudioView';
@@ -24,7 +22,6 @@ import { GuideView } from './components/views/GuideView';
 import { GalleryView } from './components/views/GalleryView';
 import { AuthView } from './components/views/AuthView';
 import { AccountView } from './components/views/AccountView';
-import { ComingSoonView } from './components/views/ComingSoonView';
 import { DesignerView } from './components/views/DesignerView';
 
 
@@ -34,9 +31,13 @@ const App: React.FC = () => {
     const [isAppLoaded, setIsAppLoaded] = React.useState(false);
     const [selectedBatchIndex, setSelectedBatchIndex] = React.useState(0);
     const [openCategoryDropdown, setOpenCategoryDropdown] = React.useState<string | null>(null);
+    const [savingPresetKey, setSavingPresetKey] = React.useState<string | null>(null);
+    const [presetName, setPresetName] = React.useState('');
     const lineEnvInputRef = React.useRef<HTMLInputElement>(null);
 
-    const isComingSoon = false; // Turned off for live access
+    React.useEffect(() => {
+        setMaskImage(null);
+    }, [engine.activeStage, engine.originalImage, engine.editorImage]);
 
     const handleLoadHistory = (item: HistoryItem) => {
         engine.setActiveStage(item.stage);
@@ -71,6 +72,9 @@ const App: React.FC = () => {
             case AppStage.MATERIAL_STUDIO:
                 engine.setMaterialStudioImage(item.image);
                 engine.setSelectedDetails(item.settings?.selectedDetails || []);
+                if (item.settings?.detectedDetails) {
+                    engine.setDetectedDetails(item.settings.detectedDetails);
+                }
                 break;
         }
     };
@@ -102,7 +106,10 @@ const App: React.FC = () => {
                 <ProModelToggle />
                 <ToggleSwitch 
                     isOn={engine.isBatchMode} 
-                    onToggle={() => engine.setIsBatchMode(!engine.isBatchMode)} 
+                    onToggle={() => {
+                        engine.setIsBatchMode(!engine.isBatchMode);
+                        setSelectedBatchIndex(0);
+                    }} 
                     label="Batch Mode"
                     icon={<Layers size={14} className={engine.isBatchMode ? 'text-accent' : 'text-slate-400'} />}
                     activeColor="bg-accent"
@@ -133,7 +140,7 @@ const App: React.FC = () => {
                 </div>
 
                 {Object.keys(engine.materials).filter(k => k !== 'orientation').map((key) => (
-                    <div key={key} className="space-y-2">
+                    <div key={key} className="group space-y-2">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
@@ -141,23 +148,44 @@ const App: React.FC = () => {
                                     {key === 'walls' ? 'Walls / Cladding' : key}
                                 </label>
                                 
-                                <button 
-                                    onClick={() => {
-                                        const text = engine.materials[key as keyof typeof engine.materials];
-                                        if (text === 'none' || !text.trim()) {
-                                            toast.error("Enter a material description first");
-                                            return;
-                                        }
-                                        const name = prompt(`Enter a name for this ${key === 'walls' ? 'cladding' : key} preset:`);
-                                        if (name) {
-                                            engine.addToLibrary(key as any, { name, text, image: null });
-                                        }
-                                    }}
-                                    className="p-1 rounded-md text-secondary hover:text-accent hover:bg-slate-50 transition-all opacity-0 group-hover:opacity-100"
-                                    title="Save to Library"
-                                >
-                                    <History size={12} />
-                                </button>
+                                {savingPresetKey === key ? (
+                                    <div className="flex items-center gap-1 opacity-100 transition-all">
+                                        <input
+                                            autoFocus
+                                            value={presetName}
+                                            onChange={(e) => setPresetName(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    engine.addToLibrary(key as any, { name: presetName || 'New Preset', text: engine.materials[key as keyof typeof engine.materials], image: null });
+                                                    setSavingPresetKey(null);
+                                                    setPresetName('');
+                                                } else if (e.key === 'Escape') {
+                                                    setSavingPresetKey(null);
+                                                    setPresetName('');
+                                                }
+                                            }}
+                                            placeholder="Name preset..."
+                                            className="w-24 text-[9px] px-1.5 py-0.5 border border-accent/20 rounded outline-none focus:border-accent bg-white text-accent"
+                                        />
+                                        <button onClick={() => setSavingPresetKey(null)} className="text-secondary hover:text-red-500">×</button>
+                                    </div>
+                                ) : (
+                                    <button 
+                                        onClick={() => {
+                                            const text = engine.materials[key as keyof typeof engine.materials];
+                                            if (text === 'none' || !text.trim()) {
+                                                toast.error("Enter a material description first");
+                                                return;
+                                            }
+                                            setSavingPresetKey(key);
+                                            setPresetName('');
+                                        }}
+                                        className="p-1 rounded-md text-secondary hover:text-accent hover:bg-slate-50 transition-all opacity-0 group-hover:opacity-100"
+                                        title="Save to Library"
+                                    >
+                                        <History size={12} />
+                                    </button>
+                                )}
                             </div>
                             
                             {engine.materialLibrary[key as keyof typeof engine.materialLibrary].length > 0 && (
@@ -201,7 +229,7 @@ const App: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                        {engine.processing.isLoading && (engine.processing.message.includes('Detecting') || engine.processing.message.includes('Analyzing')) ? (
+                        {engine.isAnalyzingMaterials ? (
                             <div className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center gap-3 min-h-[80px] text-accent/50 shadow-inner">
                                 <Loader2 size={16} className="animate-spin text-green-500" />
                                 <span className="text-sm font-medium animate-pulse">Analyzing material...</span>
@@ -304,7 +332,7 @@ const App: React.FC = () => {
                         onChange={(e) => engine.setEditorPrompt(e.target.value)}
                     />
 
-                    <Button className="w-full mt-4" onClick={() => engine.handleEditImage(maskImage)} icon={<Sparkles size={16} />} disabled={!engine.originalImage || !engine.editorPrompt.trim()}>
+                    <Button className="w-full mt-4" onClick={() => engine.handleEditImage(maskImage)} icon={<Sparkles size={16} />} disabled={!(engine.editorImage || engine.originalImage) || !engine.editorPrompt.trim()}>
                         Apply Edit
                     </Button>
                 </div>
@@ -375,7 +403,7 @@ const App: React.FC = () => {
             {lineMode === 'image' && (
                 <div className="space-y-4 flex-1">
                     <div className="space-y-2">
-                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50 flex items-center gap-2">
+                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-accent"></div>
                             Upload Image
                         </label>
@@ -417,6 +445,7 @@ const App: React.FC = () => {
                                             engine.setOriginalImage(b64);
                                         };
                                         reader.readAsDataURL(file);
+                                        e.target.value = '';
                                     }}
                                 />
                             </label>
@@ -492,7 +521,7 @@ const App: React.FC = () => {
                     <div className="pt-2">
                         <Button
                             className="w-full"
-                            onClick={engine.handleGenerateLineDrawing}
+                            onClick={() => engine.handleGenerateLineDrawing('image')}
                             icon={<PenTool size={16} />}
                             disabled={!engine.lineSourceImage}
                         >
@@ -535,7 +564,7 @@ const App: React.FC = () => {
                     <div className="pt-2">
                         <Button
                             className="w-full"
-                            onClick={engine.handleGenerateLineDrawing}
+                            onClick={() => engine.handleGenerateLineDrawing('text')}
                             icon={<PenTool size={16} />}
                             disabled={!engine.lineDrawingPrompt.trim()}
                         >
@@ -559,7 +588,7 @@ const App: React.FC = () => {
                 }}
                 className="flex-1 max-w-sm w-full h-72 glass-panel border border-accent/20 hover:border-accent/50 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer group transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_40px_rgba(64,90,86,0.2)] relative overflow-hidden text-center p-6 bg-white"
             >
-                <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-xl relative z-10">
+                <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center group-hover:bg-accent group-hover:scale-110 transition-all duration-300 shadow-xl relative z-10">
                     <PenTool className="text-accent group-hover:text-white transition-colors" size={24} />
                 </div>
                 <div className="relative z-10">
@@ -575,7 +604,7 @@ const App: React.FC = () => {
                 }}
                 className="flex-1 max-w-sm w-full h-72 glass-panel border border-border hover:border-accent/50 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer group transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_40px_rgba(64,90,86,0.2)] relative overflow-hidden text-center p-6 bg-white"
             >
-                <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-xl relative z-10">
+                <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center group-hover:bg-accent group-hover:scale-110 transition-all duration-300 shadow-xl relative z-10">
                     <ImageIcon className="text-accent group-hover:text-white transition-colors" size={24} />
                 </div>
                 <div className="relative z-10">
@@ -601,7 +630,11 @@ const App: React.FC = () => {
                         onChange={(e) => engine.setRefinementPrompt(e.target.value)}
                         placeholder="e.g. Add modern patio furniture"
                         className="flex-1 bg-transparent border-none outline-none text-xs text-accent placeholder:text-accent/30"
-                        onKeyDown={(e) => { if (e.key === 'Enter') engine.handleRefineRender(); }}
+                        onKeyDown={(e) => { 
+                            if (e.key === 'Enter' && !engine.processing.isLoading && engine.refinementPrompt.trim()) {
+                                engine.handleRefineRender(); 
+                            }
+                        }}
                     />
                     <Button
                         onClick={engine.handleRefineRender}
@@ -645,7 +678,7 @@ const App: React.FC = () => {
                     <div className="space-y-4">
                         <div className="flex justify-between items-center text-xs uppercase tracking-widest font-bold text-secondary">
                             <span>Select 4 Focus Details</span>
-                            <span className={`${engine.selectedDetails.length === 4 ? 'text-white' : 'text-secondary'}`}>
+                            <span className={`${engine.selectedDetails.length === 4 ? 'text-accent' : 'text-secondary'}`}>
                                 {engine.selectedDetails.length} / 4 Selected
                             </span>
                         </div>
@@ -657,8 +690,8 @@ const App: React.FC = () => {
                                         key={idx}
                                         onClick={() => engine.toggleDetailSelection(detail)}
                                         className={`p-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 border text-center ${isSelected
-                                            ? 'bg-blue-500/20 border-blue-400 text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
-                                            : 'glass-panel border-white/5 text-secondary hover:text-white hover:border-white/30'
+                                            ? 'bg-accent text-white border-accent'
+                                            : 'bg-white border-slate-200 text-secondary hover:text-accent hover:border-accent/40'
                                             }`}
                                     >
                                         {detail}
@@ -672,7 +705,7 @@ const App: React.FC = () => {
                                 onClick={() => {
                                     engine.setActiveStage(AppStage.MATERIAL_STUDIO);
                                     engine.setOriginalImageForStage(AppStage.MATERIAL_STUDIO, engine.renderedImage); // Carry over render
-                                    engine.handleMaterialStudio();
+                                    engine.handleMaterialStudio(engine.renderedImage);
                                 }}
                                 disabled={engine.processing.isLoading}
                                 icon={<Grid size={16} />}
@@ -770,8 +803,8 @@ const App: React.FC = () => {
                     title="Render Engine"
                     subtitle="Configure exterior materials and lighting."
                     controls={renderEngineControls}
-                    primaryImg={engine.isBatchMode && engine.batchRenders.length > 0 ? engine.getRenderUrl(engine.batchRenders[selectedBatchIndex]) : engine.getRenderUrl(engine.renderedImage)}
-                    secondaryImg={engine.isBatchMode && engine.batchImages.length > 0 ? engine.getRenderUrl(engine.batchImages[selectedBatchIndex]) : engine.getRenderUrl(engine.originalImage)}
+                    primaryImg={engine.isBatchMode && engine.batchRenders.length > 0 ? engine.getRenderUrl(engine.batchRenders[Math.min(selectedBatchIndex, engine.batchRenders.length - 1)]) : engine.getRenderUrl(engine.renderedImage)}
+                    secondaryImg={engine.isBatchMode && engine.batchImages.length > 0 ? engine.getRenderUrl(engine.batchImages[Math.min(selectedBatchIndex, engine.batchImages.length - 1)]) : engine.getRenderUrl(engine.originalImage)}
                     batchImages={engine.isBatchMode ? engine.batchImages : undefined}
                     batchRenders={engine.isBatchMode ? engine.batchRenders : undefined}
                     selectedBatchIndex={selectedBatchIndex}
