@@ -835,7 +835,8 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
                 outputMimeType: "image/jpeg",
                 imageConfig: {
                     aspectRatio: ratio,
-                    imageSize: isHighQuality ? "4K" : "1K"
+                    imageSize: isHighQuality ? "4K" : "1K",
+                    editMode: "EDIT_MODE_DEFAULT"
                 },
                 temperature: 0.2
             }
