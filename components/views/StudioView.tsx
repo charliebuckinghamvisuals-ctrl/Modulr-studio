@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { WorkspaceView } from './WorkspaceView';
 import { ToggleSwitch } from '../ToggleSwitch';
 import { BatchSlotUploader } from '../BatchSlotUploader';
-import { Sparkles, Layers, Search, ChevronDown, CheckCircle2, History, Zap, Grid } from 'lucide-react';
+import { Sparkles, Layers, Search, ChevronDown, CheckCircle2, History, Zap, Grid, Loader2 } from 'lucide-react';
 import { AppStage } from '../../types';
 import { Button } from '../Button';
 import toast from 'react-hot-toast';
@@ -84,13 +84,20 @@ export const StudioView: React.FC<StudioViewProps> = ({ engine, selectedBatchInd
                             </label>
                         </div>
                         
-                        <input
-                            type="text"
-                            value={engine.materials[key as keyof typeof engine.materials]}
-                            onChange={(e) => engine.setMaterials((prev: any) => ({ ...prev, [key]: e.target.value }))}
-                            className="w-full bg-slate-50 border border-slate-200 text-accent rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-accent/50 text-xs transition-all shadow-inner"
-                            placeholder={`Describe ${key}...`}
-                        />
+                        {engine.processing.isLoading && (engine.processing.message.includes('Detecting') || engine.processing.message.includes('Analyzing')) ? (
+                            <div className="w-full bg-slate-50 border border-slate-200 flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 shadow-inner text-accent/50">
+                                <Loader2 size={14} className="animate-spin text-green-500" />
+                                <span className="text-xs font-medium animate-pulse">Analyzing...</span>
+                            </div>
+                        ) : (
+                            <input
+                                type="text"
+                                value={engine.materials[key as keyof typeof engine.materials]}
+                                onChange={(e) => engine.setMaterials((prev: any) => ({ ...prev, [key]: e.target.value }))}
+                                className="w-full bg-slate-50 border border-slate-200 text-accent rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-accent/50 text-xs transition-all shadow-inner"
+                                placeholder={`Describe ${key}...`}
+                            />
+                        )}
                     </div>
                 ))}
             </div>

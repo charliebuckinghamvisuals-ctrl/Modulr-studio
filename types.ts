@@ -12,7 +12,8 @@ export enum AppStage {
   GUIDE = 'guide',
   GALLERY = 'gallery',
   AUTH = 'auth',
-  ACCOUNT = 'account'
+  ACCOUNT = 'account',
+  DESIGNER = 'designer'
 }
 
 export interface MaterialConfig {

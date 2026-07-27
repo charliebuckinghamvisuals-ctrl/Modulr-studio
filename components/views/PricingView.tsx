@@ -226,7 +226,6 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                     <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-gradient-to-b from-surface/80 to-accent/5 relative transition-all duration-500 shadow-[0_30px_60px_rgba(139,92,246,0.15)] group">
 
                         <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-accent to-accent/80 rounded-full flex items-center gap-1.5 shadow-lg">
-                            <Zap size={14} className="text-white fill-white" />
                             <span className="text-xs font-bold text-white uppercase tracking-wider">Most Popular</span>
                         </div>
 
@@ -330,9 +329,6 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
                             <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-3">
-                                    <div className="p-2 rounded-xl bg-accent/10">
-                                        <Wand2 size={24} className="text-accent" />
-                                    </div>
                                     <h4 className="text-xl font-black text-accent">Modulr Managed Service</h4>
                                 </div>
                                 <p className="text-sm text-secondary leading-relaxed max-w-2xl">
@@ -359,7 +355,6 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                     <div className="pt-16 border-none">
                         <div className="flex flex-col items-center lg:items-start gap-4 p-0">
                             <div className="flex items-center gap-2 text-primary font-bold">
-                                <Zap size={20} className="text-accent" />
                                 <span className="text-lg font-black text-accent uppercase tracking-tight">Usage Guide</span>
                             </div>
                             <div className="flex flex-wrap justify-center lg:justify-start gap-3 text-sm">

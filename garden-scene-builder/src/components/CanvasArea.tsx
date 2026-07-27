@@ -1,0 +1,136 @@
+import { Canvas } from '@react-three/fiber';
+import { MainScene } from './3d/MainScene';
+import { useStore } from '../store';
+import { ViewModeToggle } from './UI/ViewModeToggle';
+import { PricePill } from './UI/PricePill';
+import { ObjectEditorPanel } from './UI/ObjectEditorPanel';
+import { HistoryButtons } from './UI/HistoryButtons';
+import { ActionButtons } from './UI/ActionButtons';
+import { CameraWidget } from './UI/CameraWidget';
+import { useRef, useState, useEffect } from 'react';
+import { useProgress } from '@react-three/drei';
+import * as THREE from 'three';
+
+function LoadingScreen() {
+  const { active, progress } = useProgress();
+  const [show, setShow] = useState(true);
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  const [displayProgress, setDisplayProgress] = useState(0);
+  const progressRef = useRef(0);
+  const startTimeRef = useRef(Date.now());
+
+  useEffect(() => {
+    const minTimer = setTimeout(() => {
+      setMinTimeElapsed(true);
+    }, 4200); // wait at least ~4.2s + 0.8s fade = 5s total
+    return () => clearTimeout(minTimer);
+  }, []);
+
+  const isComplete = !active && (progress === 100 || progress === 0) && minTimeElapsed;
+
+  useEffect(() => {
+    if (isComplete) {
+      const timeout = setTimeout(() => setShow(false), 800);
+      return () => clearTimeout(timeout);
+    } else {
+      setShow(true);
+    }
+  }, [isComplete]);
+
+  useEffect(() => {
+    let frame: number;
+    const update = () => {
+      const elapsed = Date.now() - startTimeRef.current;
+      const fakeTarget = Math.min(99, (elapsed / 4200) * 100);
+      const realTarget = (!minTimeElapsed && progress === 100) ? 99 : progress;
+      const target = Math.max(fakeTarget, realTarget);
+      
+      if (progressRef.current < target) {
+        progressRef.current += (target - progressRef.current) * 0.05 + 0.1;
+        if (progressRef.current > target) progressRef.current = target;
+        setDisplayProgress(progressRef.current);
+      }
+      frame = requestAnimationFrame(update);
+    };
+    frame = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(frame);
+  }, [progress, minTimeElapsed]);
+
+  if (!show) return null;
+
+  return (
+    <div 
+      className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-[#fafaf9] transition-opacity duration-700 ease-in-out" 
+      style={{ opacity: isComplete ? 0 : 1, pointerEvents: isComplete ? 'none' : 'auto' }}
+    >
+      <div className="text-2xl font-bold tracking-[0.2em] text-[#3b4d4a] mb-8">MODULR 3D</div>
+      <div className="w-64 max-w-sm">
+        <div className="flex justify-between text-[10px] font-bold text-[#3b4d4a] mb-3 uppercase tracking-widest">
+          <span>Loading Studio</span>
+          <span>{Math.round(displayProgress)}%</span>
+        </div>
+        <div className="h-[2px] bg-gray-200 overflow-hidden">
+          <div 
+            className="h-full bg-[#3b4d4a] transition-none" 
+            style={{ width: `${displayProgress}%` }}
+          ></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function CanvasArea() {
+  const { viewMode, addObject, uploadedBgImage } = useStore();
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const type = e.dataTransfer.getData('type');
+    if (!type || !wrapperRef.current) return;
+
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    addObject(type as any, x * 10, -y * 10);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  return (
+    <div 
+      className="absolute inset-0 w-full h-full" 
+      ref={wrapperRef}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+    >
+      {viewMode === 'render' && uploadedBgImage ? (
+         <img src={uploadedBgImage} className="absolute inset-0 w-full h-full object-cover z-0" alt="Background" />
+      ) : (
+         <div className="absolute inset-0 opacity-20 pointer-events-none z-0" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+      )}
+      
+      <div className="absolute inset-0 z-10 pointer-events-none">
+        <Canvas 
+          className="pointer-events-auto"
+          shadows 
+          camera={{ position: [10, 10, 15], fov: 50 }}
+          gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}
+          dpr={window.devicePixelRatio ? Math.min(1.5, window.devicePixelRatio) : 1.5}
+        >
+          <MainScene />
+        </Canvas>
+      </div>
+      <ViewModeToggle />
+      <CameraWidget />
+      <HistoryButtons />
+      <PricePill />
+      <ObjectEditorPanel />
+      <ActionButtons />
+      <LoadingScreen />
+    </div>
+  );
+}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building2, Target, PoundSterling, Gem, Phone, Mail, ArrowRight, ExternalLink, Sparkles, TrendingUp } from 'lucide-react';
+import { Building2, Target, PoundSterling, Gem, Phone, Mail, ArrowRight, ExternalLink, Sparkles, TrendingUp, Box } from 'lucide-react';
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
 
@@ -35,9 +35,6 @@ export const AboutView: React.FC = () => {
                     {/* Mission Cards - The Why & How */}
                     <section className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
                         <div className="glass-panel p-10 rounded-[2.5rem] space-y-6 border border-border bg-white/40 backdrop-blur-xl shadow-2xl shadow-black/[0.03] hover:shadow-accent/5 transition-all duration-500">
-                            <div className="w-14 h-14 rounded-2xl bg-accent/5 flex items-center justify-center">
-                                <Target className="text-accent" size={28} />
-                            </div>
                             <div className="space-y-3">
                                 <h3 className="text-2xl font-extrabold text-accent tracking-tight">Why We Built It</h3>
                                 <p className="text-secondary text-base leading-relaxed">
@@ -46,9 +43,6 @@ export const AboutView: React.FC = () => {
                             </div>
                         </div>
                         <div className="glass-panel p-10 rounded-[2.5rem] space-y-6 border border-border bg-white/40 backdrop-blur-xl shadow-2xl shadow-black/[0.03] hover:shadow-accent/5 transition-all duration-500">
-                            <div className="w-14 h-14 rounded-2xl bg-accent/5 flex items-center justify-center">
-                                <Building2 className="text-accent" size={28} />
-                            </div>
                             <div className="space-y-3">
                                 <h3 className="text-2xl font-extrabold text-accent tracking-tight">Who It's For</h3>
                                 <p className="text-secondary text-base leading-relaxed">
@@ -69,23 +63,14 @@ export const AboutView: React.FC = () => {
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
                             <div className="flex flex-col items-center text-center space-y-4">
-                                <div className="w-12 h-12 rounded-full bg-accent/5 flex items-center justify-center border border-accent/10">
-                                    <Gem className="text-accent" size={20} />
-                                </div>
                                 <h4 className="text-lg font-bold text-primary">Unrivalled Quality</h4>
                                 <p className="text-secondary text-sm leading-relaxed">Professional 4K results that rival manual design, generated in seconds—with all showcase images created using Modulr Studio.</p>
                             </div>
                             <div className="flex flex-col items-center text-center space-y-4">
-                                <div className="w-12 h-12 rounded-full bg-accent/5 flex items-center justify-center border border-accent/10">
-                                    <PoundSterling className="text-accent" size={20} />
-                                </div>
                                 <h4 className="text-lg font-bold text-primary">Huge Savings</h4>
                                 <p className="text-secondary text-sm leading-relaxed">Dramatically reduce your overheads by moving visualization in-house.</p>
                             </div>
                             <div className="flex flex-col items-center text-center space-y-4">
-                                <div className="w-12 h-12 rounded-full bg-accent/5 flex items-center justify-center border border-accent/10">
-                                    <ArrowRight className="text-accent" size={20} />
-                                </div>
                                 <h4 className="text-lg font-bold text-primary">Faster Sales</h4>
                                 <p className="text-secondary text-sm leading-relaxed">Impress clients on the spot with instant visuals during your site consultations.</p>
                             </div>
@@ -140,6 +125,37 @@ export const AboutView: React.FC = () => {
                                             </tr>
                                         </tbody>
                                     </table>
+                                </div>
+                            </div>
+                        </div>
+                        {/* 3D Configurator Feature Highlight */}
+                        <div className="w-full mt-24 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-500">
+                            <div className="glass-panel p-10 md:p-14 rounded-[3rem] border border-accent/20 bg-accent/5 backdrop-blur-2xl shadow-2xl max-w-5xl mx-auto w-full text-center space-y-6 relative overflow-hidden group hover:border-accent/30 transition-all duration-700">
+                                {/* Decorative background glow */}
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-accent/10 blur-[100px] rounded-full pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-700"></div>
+                                
+                                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/80 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em] shadow-sm relative z-10 mx-auto">
+                                    New Feature
+                                </div>
+                                
+                                <h2 className="text-3xl md:text-5xl font-extrabold text-accent tracking-tight relative z-10">
+                                    3D Garden Room Configurator
+                                </h2>
+                                
+                                <p className="text-lg text-secondary leading-relaxed max-w-3xl mx-auto font-medium relative z-10">
+                                    Design and visualize custom garden rooms directly in your browser. Experiment with dimensions, roof types, and cladding instantly in 3D. 
+                                </p>
+                                
+                                <div className="pt-6 relative z-10 flex justify-center">
+                                    <div className="inline-flex flex-col sm:flex-row items-center gap-4 bg-white/90 p-2 pl-6 pr-3 rounded-full border border-accent/20 shadow-md">
+                                        <span className="text-sm font-semibold text-primary">
+                                            The 3D builder is <strong className="text-accent">100% Free</strong> to use.
+                                        </span>
+                                        <div className="hidden sm:block w-px h-6 bg-border"></div>
+                                        <span className="text-[11px] text-accent font-bold uppercase tracking-wider px-3 py-1.5 bg-accent/10 rounded-full">
+                                            Requires Paid Plan to Render
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

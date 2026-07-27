@@ -1,0 +1,6 @@
+{
+  "name": "Modulr Configurator",
+  "description": "Interactive 3D configurator for structural insulated panel garden rooms.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

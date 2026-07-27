@@ -102,12 +102,13 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                                     icon: <Layers size={24} />,
                                     title: "Material Studio",
                                     desc: "Dynamically generate a 2x2 presentation sheet spotlighting extreme close-up details—ideal for showing off timber cladding grains, zinc seams, and composite deck textures to clients."
+                                },
+                                {
+                                    title: "3D Configurator",
+                                    desc: "Design custom garden rooms directly in your browser. Experiment with dimensions and styles in an interactive 3D builder, ready to render instantly."
                                 }
                             ].map((tool, idx) => (
                                 <div key={idx} className="glass-panel p-6 rounded-3xl border border-border bg-white/60 backdrop-blur-xl hover:border-accent/40 hover:shadow-xl transition-all duration-300 group flex flex-col h-full text-left">
-                                    <div className="bg-accent/10 p-4 rounded-2xl text-accent w-fit border border-accent/10 shadow-sm mb-6 group-hover:scale-110 group-hover:bg-accent group-hover:text-white transition-all">
-                                        {tool.icon}
-                                    </div>
                                     <h4 className="text-accent font-bold text-xl mb-3">{tool.title}</h4>
                                     <p className="text-slate-600 leading-relaxed text-sm flex-1">
                                         {tool.desc}
@@ -119,10 +120,6 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                         {/* Ultimate Package Banner */}
                         <div className="mt-8 glass-panel p-10 md:p-14 rounded-[2.5rem] border border-border bg-gradient-to-br from-white/80 to-accent/5 backdrop-blur-3xl hover:border-accent/30 hover:shadow-2xl transition-all duration-500 group flex flex-col md:flex-row items-center justify-start gap-10 overflow-hidden relative text-left">
                             <div className="absolute top-0 right-0 w-96 h-96 bg-accent/5 blur-[100px] -mr-48 -mt-48 pointer-events-none group-hover:bg-accent/10 transition-all duration-500"></div>
-                            
-                            <div className="bg-accent/10 p-6 rounded-3xl text-accent w-fit border border-accent/20 shadow-md group-hover:scale-110 group-hover:bg-accent group-hover:text-white transition-all shrink-0 relative z-10">
-                                <Briefcase size={40} />
-                            </div>
                             <div className="space-y-4 relative z-10 w-full">
                                 <h4 className="text-accent font-bold text-3xl">The Ultimate Quoting Package</h4>
                                 <p className="text-slate-600 leading-relaxed text-lg max-w-4xl">
@@ -175,27 +172,22 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left w-full">
                             <FeatureCard
-                                icon={<PenTool size={28} />}
                                 title="Line-to-Render Engine"
                                 description="Upload a CAD export or structural line drawing and receive a photorealistic 4K visualisation in seconds, with your geometry as the foundation."
                             />
                             <FeatureCard
-                                icon={<Sparkles size={28} />}
                                 title="Refinement Studio"
                                 description="Change the weather, swap the environment, update cladding and materials, or add people and pets to bring your renders to life. Powerful AI-driven edits with a simple text prompt."
                             />
                             <FeatureCard
-                                icon={<Grid size={28} />}
                                 title="Material Studio"
                                 description="Upload a photo of any surface and our AI extracts its material profile (colour, texture, finish) and applies it faithfully across your entire rendered build."
                             />
                             <FeatureCard
-                                icon={<Box size={28} />}
                                 title="AI Material Intelligence"
                                 description="Our engine identifies real materials. Trained on Siberian Larch, Western Red Cedar, Anthracite Grey and more, it reproduces the exact texture, grain and finish your clients will see in real life."
                             />
                             <FeatureCard
-                                icon={<Zap size={28} />}
                                 title="Architectural Intelligence"
                                 description="Trained on UK garden room construction: timber frame, SIPs, glazing systems, flat and pitched roofs. Our engine understands the details that matter to your clients."
                             />
@@ -293,7 +285,6 @@ const ParallaxImage: React.FC<ParallaxImageProps> = ({ src, top, left, right, si
 };
 
 interface FeatureCardProps {
-    icon: React.ReactNode;
     title: string;
     description: string;
     features?: string[];
@@ -301,12 +292,9 @@ interface FeatureCardProps {
     onAction?: () => void;
 }
 
-const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, features, actionLabel, onAction }) => (
+const FeatureCard: React.FC<FeatureCardProps> = ({ title, description, features, actionLabel, onAction }) => (
     <div className="p-10 rounded-[35px] glass-panel bg-white/95 shadow-[0_15px_40px_rgba(0,0,0,0.1)] relative overflow-hidden group border border-slate-300 hover:border-accent/60 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_25px_60px_rgba(0,0,0,0.2)] backdrop-blur-xl">
         <div className="absolute top-0 right-0 w-24 h-24 bg-accent/10 rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-accent/20 transition-colors"></div>
-        <div className="text-accent mb-8 bg-accent/10 w-fit p-4 rounded-2xl border border-accent/20 group-hover:bg-accent group-hover:text-white transition-all duration-500 group-hover:scale-110 shadow-sm">
-            {icon}
-        </div>
         <h3 className="text-accent font-bold text-lg mb-2">{title}</h3>
         <p className="text-secondary text-sm leading-relaxed">{description}</p>
 

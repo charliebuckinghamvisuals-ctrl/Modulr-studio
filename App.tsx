@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Wand2, RefreshCw, Zap, Sparkles, PenTool, Image as ImageIcon, Upload, Grid, Layers, ChevronDown, Settings, History } from 'lucide-react';
+import { Box, Smartphone, Zap, Grid, Layers, ShieldCheck, Cpu, Maximize, FileText, CheckCircle2, Sparkles, PenTool, CloudSun, ArrowRight, Image as ImageIcon, Palette, Briefcase, Settings, History, ChevronDown, Download, Camera, Home, ArrowLeft, Loader2 } from 'lucide-react';
 import { ToggleSwitch } from './components/ToggleSwitch';
 import { Toaster, toast } from 'react-hot-toast';
 import { AppShell } from './components/AppShell';
@@ -25,6 +25,7 @@ import { GalleryView } from './components/views/GalleryView';
 import { AuthView } from './components/views/AuthView';
 import { AccountView } from './components/views/AccountView';
 import { ComingSoonView } from './components/views/ComingSoonView';
+import { DesignerView } from './components/views/DesignerView';
 
 
 const App: React.FC = () => {
@@ -200,14 +201,21 @@ const App: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                        <textarea
-                            className="w-full p-4 rounded-2xl bg-white border border-accent/20 text-accent focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-accent/30 min-h-[80px] resize-none shadow-inner transition-all duration-300"
-                            placeholder={`Analyzed or custom ${key} material...`}
-                            value={engine.materials[key as keyof typeof engine.materials]}
-                            onChange={(e) => {
-                                engine.setMaterials(prev => ({ ...prev, [key]: e.target.value }));
-                            }}
-                        />
+                        {engine.processing.isLoading && (engine.processing.message.includes('Detecting') || engine.processing.message.includes('Analyzing')) ? (
+                            <div className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center gap-3 min-h-[80px] text-accent/50 shadow-inner">
+                                <Loader2 size={16} className="animate-spin text-green-500" />
+                                <span className="text-sm font-medium animate-pulse">Analyzing material...</span>
+                            </div>
+                        ) : (
+                            <textarea
+                                className="w-full p-4 rounded-2xl bg-white border border-accent/20 text-accent focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-accent/30 min-h-[80px] resize-none shadow-inner transition-all duration-300"
+                                placeholder={`Analyzed or custom ${key} material...`}
+                                value={engine.materials[key as keyof typeof engine.materials]}
+                                onChange={(e) => {
+                                    engine.setMaterials(prev => ({ ...prev, [key]: e.target.value }));
+                                }}
+                            />
+                        )}
                     </div>
                 ))}
             </div>
@@ -709,6 +717,10 @@ const App: React.FC = () => {
 
             {engine.activeStage === AppStage.GUIDE && (
                 <GuideView />
+            )}
+            
+            {engine.activeStage === AppStage.DESIGNER && (
+                <DesignerView engine={engine} />
             )}
 
             {engine.activeStage === AppStage.GALLERY && (

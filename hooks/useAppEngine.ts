@@ -10,7 +10,7 @@ import { db, auth } from '../services/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
-const compressImageFile = (file: File, maxWidth = 1920): Promise<string> => {
+export const compressImageFile = (file: File, maxWidth = 1920): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -288,13 +288,13 @@ export const useAppEngine = () => {
                 if (targetStage === AppStage.LINE_CONVERT) {
                     setLineSourceImage(base64Data);
                 } else if (targetStage === AppStage.MATERIAL_STUDIO) {
-                    handleAnalyzeForMaterialStudio(base64Data);
+                    await handleAnalyzeForMaterialStudio(base64Data);
                 } else if (targetStage === AppStage.RENDER_ENGINE) {
                     setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
                     // Always auto-detect materials — works for photos, B&W line drawings, and SketchUp models
-                    handleAnalyzeForRenderEngine(base64Data);
+                    await handleAnalyzeForRenderEngine(base64Data);
                 } else if (targetStage === AppStage.EDITOR) {
-                    handleAnalyzeForEditor(base64Data);
+                    await handleAnalyzeForEditor(base64Data);
                 }
             } catch (err) {
                 console.error('Image compression failed', err);
@@ -767,7 +767,7 @@ export const useAppEngine = () => {
         studioBackground, setStudioBackground, selectedAngle, setSelectedAngle,
         materialLibrary, addToLibrary, removeFromLibrary,
         activeProfileId, setActiveProfileId,
-        handleGenerateLineDrawing, handleAnalyzeMaterials, handleRender, handleBatchRender, handleRefineRender, handleEditImage, handleWeather, handleMaterialStudio, handleAnalyzeForEditor, handleAnalyzeForMaterialStudio,
+        handleGenerateLineDrawing, handleAnalyzeMaterials, handleRender, handleBatchRender, handleRefineRender, handleEditImage, handleWeather, handleMaterialStudio, handleAnalyzeForEditor, handleAnalyzeForMaterialStudio, handleAnalyzeForRenderEngine,
         handleSlotImageUpload,
         getRenderUrl
     };

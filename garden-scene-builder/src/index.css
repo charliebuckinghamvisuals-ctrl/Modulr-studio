@@ -1,0 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@600;700&family=Alex+Brush&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-handwriting: "Alex Brush", cursive;
+}
+
+@layer utilities {
+  .apple-slider {
+    @apply appearance-none bg-black/5 rounded-full outline-none;
+    height: 4px;
+  }
+  .apple-slider::-webkit-slider-thumb {
+    @apply appearance-none w-5 h-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.2)] border border-black/5 cursor-grab;
+    transition: transform 0.1s;
+  }
+  .apple-slider::-webkit-slider-thumb:active {
+    @apply cursor-grabbing scale-95 bg-gray-50;
+  }
+  
+  .apple-tab-active {
+    @apply bg-white shadow-sm text-[#1d1d1f] font-semibold rounded-md;
+  }
+  .apple-tab-inactive {
+    @apply text-gray-500 hover:text-gray-700 font-medium rounded-md hover:bg-black/5;
+  }
+}

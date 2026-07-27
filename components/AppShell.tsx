@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, Info, BookOpen, Coins, ChevronDown, User, Settings, Menu } from 'lucide-react';
+import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, Info, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool } from 'lucide-react';
 import { AppStage } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useCredits } from '../hooks/useCredits';
@@ -88,8 +88,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
   }, [activeStage]);
 
   const toolItems = [
-    { id: AppStage.LINE_CONVERT, icon: <Layers size={16} />, label: 'Line Converter' },
+    { id: AppStage.DESIGNER, icon: <Layers size={16} />, label: '3D Config' },
     { id: AppStage.RENDER_ENGINE, icon: <ImageIcon size={16} />, label: 'Render Engine' },
+    { id: AppStage.LINE_CONVERT, icon: <PenTool size={16} />, label: 'Line Converter' },
     { id: AppStage.EDITOR, icon: <Palette size={16} />, label: 'Refinement Studio' },
     { id: AppStage.MATERIAL_STUDIO, icon: <Grid size={16} />, label: 'Material Studio' },
   ];

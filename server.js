@@ -300,6 +300,7 @@ app.use(helmet({ contentSecurityPolicy: false }));
 
 // CORS Configuration (Strict Origins)
 const allowedOrigins = [
+    'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:4173',
     process.env.VITE_APP_URL, // E.g., https://modulr.studio

@@ -8,6 +8,11 @@
   <link rel="icon" type="image/png" href="/favicon.png" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      alert("React Crash Error: " + message + "\n" + source + ":" + lineno + "\n" + (error ? error.stack : ""));
+    };
+  </script>
+  <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
