@@ -88,31 +88,31 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
   }, [activeStage]);
 
   const toolItems = [
-    { id: AppStage.DESIGNER, icon: <Layers size={16} />, label: '3D Config' },
-    { id: AppStage.RENDER_ENGINE, icon: <ImageIcon size={16} />, label: 'Render Engine' },
-    { id: AppStage.LINE_CONVERT, icon: <PenTool size={16} />, label: 'Line Converter' },
-    { id: AppStage.EDITOR, icon: <Palette size={16} />, label: 'Refinement Studio' },
-    { id: AppStage.MATERIAL_STUDIO, icon: <Grid size={16} />, label: 'Material Studio' },
+    { id: AppStage.DESIGNER, label: '3D Config' },
+    { id: AppStage.RENDER_ENGINE, label: 'Render Engine' },
+    { id: AppStage.LINE_CONVERT, label: 'Line Converter' },
+    { id: AppStage.EDITOR, label: 'Refinement Studio' },
+    { id: AppStage.MATERIAL_STUDIO, label: 'Material Studio' },
   ];
 
   const infoItems = [
-    { id: AppStage.HOME, icon: <Hexagon size={16} />, label: 'Home' },
-    { id: AppStage.GALLERY, icon: <ImageIcon size={16} />, label: 'Gallery' },
-    { id: AppStage.GUIDE, icon: <BookOpen size={16} />, label: 'Guide' },
-    { id: AppStage.PRICING, icon: <Coins size={16} />, label: 'Pricing' },
-    { id: AppStage.ABOUT, icon: <Info size={16} />, label: 'About' },
-    { id: AppStage.ACCOUNT, icon: <Settings size={16} />, label: 'Account Dashboard' },
+    { id: AppStage.HOME, label: 'Home' },
+    { id: AppStage.GALLERY, label: 'Gallery' },
+    { id: AppStage.GUIDE, label: 'Guide' },
+    { id: AppStage.PRICING, label: 'Pricing' },
+    { id: AppStage.ABOUT, label: 'About' },
+    { id: AppStage.ACCOUNT, label: 'Account Dashboard' },
   ];
 
   const mobileNavItems = [
-    { id: AppStage.HOME, icon: <Hexagon size={18} />, label: 'Home' },
-    { id: AppStage.PRICING, icon: <Coins size={18} />, label: 'Pricing' },
-    { id: AppStage.GUIDE, icon: <BookOpen size={18} />, label: 'Guide' },
-    { id: AppStage.GALLERY, icon: <ImageIcon size={18} />, label: 'Gallery' },
-    { id: AppStage.ABOUT, icon: <Info size={18} />, label: 'About' },
+    { id: AppStage.HOME, label: 'Home' },
+    { id: AppStage.PRICING, label: 'Pricing' },
+    { id: AppStage.GUIDE, label: 'Guide' },
+    { id: AppStage.GALLERY, label: 'Gallery' },
+    { id: AppStage.ABOUT, label: 'About' },
     ...(user
-      ? [{ id: AppStage.ACCOUNT, icon: <Settings size={18} />, label: 'Account' }]
-      : [{ id: AppStage.AUTH, icon: <User size={18} />, label: 'Sign In / Sign Up' }]),
+      ? [{ id: AppStage.ACCOUNT, label: 'Account' }]
+      : [{ id: AppStage.AUTH, label: 'Sign In / Sign Up' }]),
   ];
 
   const isDesktopOnly = DESKTOP_ONLY_STAGES.has(activeStage);
@@ -141,7 +141,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
                 onClick={() => onNavigate(item.id)}
                 className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap ${isActive ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
               >
-                <span className="relative z-10 shrink-0">{item.icon}</span>
                 <span className="relative z-10 whitespace-nowrap">{item.label}</span>
               </button>
             );
@@ -166,15 +165,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
             <div className={`absolute right-0 top-full pt-2 w-56 transition-all duration-300 z-[60] origin-top-right ${isAboutDropdownOpen ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-2 scale-95 pointer-events-none'}`}>
               <div className="p-2 rounded-2xl bg-white shadow-2xl border border-slate-200 flex flex-col gap-1">
                 {infoItems.map(item => {
-                  const isActive = activeStage === item.id;
                   return (
                     <button
                       key={item.id}
                       onClick={() => { onNavigate(item.id); setIsAboutDropdownOpen(false); }}
-                      className={`px-4 py-3 text-[10px] font-bold uppercase tracking-[0.15em] rounded-xl flex items-center gap-3 transition-all duration-300 text-left ${isActive ? 'bg-accent text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                      className="w-full px-4 py-2 text-xs font-semibold text-slate-700 hover:text-accent hover:bg-slate-50 flex items-center gap-2 transition-colors text-left"
                     >
-                      <span className="shrink-0">{item.icon}</span>
-                      <span>{item.label}</span>
+                      {item.label}
                     </button>
                   );
                 })}
@@ -287,9 +284,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all duration-200 ${isActive ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-accent hover:bg-slate-50'}`}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold transition-all ${isActive ? 'text-accent bg-accent/5 rounded-xl' : 'text-slate-600 hover:text-accent hover:bg-slate-50 rounded-xl'}`}
               >
-                <span className={`shrink-0 ${isActive ? 'text-white' : 'text-accent/60'}`}>{item.icon}</span>
                 {item.label}
               </button>
             );

@@ -191,7 +191,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                                 title="Architectural Intelligence"
                                 description="Trained on UK garden room construction: timber frame, SIPs, glazing systems, flat and pitched roofs. Our engine understands the details that matter to your clients."
                             />
-
+                            <FeatureCard
+                                title="3D Configurator"
+                                description="Design custom garden rooms directly in your browser. Experiment with dimensions and styles in a free interactive 3D builder, ready to render instantly."
+                            />
                         </div>
                     </div>
             </div >

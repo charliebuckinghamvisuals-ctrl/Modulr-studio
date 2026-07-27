@@ -57,7 +57,7 @@ export const AboutView: React.FC = () => {
                         <div className="text-center space-y-4">
                             <h2 className="text-3xl font-extrabold text-accent tracking-tight">The AI Edge.</h2>
                             <p className="text-secondary text-base max-w-xl">
-                                We are the world's first dedicated AI render engine built specifically for the garden room and annexe sector.
+                                We are the UK's first dedicated AI render engine built specifically for the garden room and annexe sector.
                             </p>
                         </div>
 
