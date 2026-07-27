@@ -135,26 +135,21 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                 {/* 4. Dedicated Garden Room AI */}
                 <div className="w-full flex flex-col items-center text-center py-12 gap-10">
                     <div className="max-w-2xl space-y-6">
-                        <div className="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent mx-auto">
-                            <Box size={24} />
-                        </div>
-                        <h2 className="text-4xl font-bold tracking-tight text-accent w-fit inline-block">World's First AI Render Engine for Garden Rooms & Annexes</h2>
+                        <h2 className="text-4xl font-bold tracking-tight text-accent w-fit inline-block">The UK's First AI Render Engine for Garden Rooms & Annexes</h2>
                         <p className="text-secondary text-lg leading-relaxed">
-                            Modulr Studio is the world's first platform purposefully built for the garden room and annexe industry.
+                            Modulr Studio is the UK's first platform purposefully built for the garden room and annexe industry.
                             We combine deep AI with an understanding of real-world construction standards.
                         </p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl w-full text-left">
                         <div className="flex items-start gap-4">
-                            <div className="mt-1 bg-accent/20 p-1.5 rounded-lg text-accent shrink-0"><Maximize size={18} /></div>
                             <div>
                                 <h4 className="text-accent font-bold">CAD-Precision Foundation</h4>
                                 <p className="text-secondary text-sm">Your structural drawing is the master. We lock the AI to your specific geometry, ensuring that every pillar and window stays exactly where it was designed to be.</p>
                             </div>
                         </div>
                         <div className="flex items-start gap-4">
-                            <div className="mt-1 bg-accent/20 p-1.5 rounded-lg text-accent shrink-0"><Cpu size={18} /></div>
                             <div>
                                 <h4 className="text-accent font-bold">Industry-Trained Specifics</h4>
                                 <p className="text-secondary text-sm">Trained on Western Red Cedar, Siberian Larch, and Anthracite Grey profiles. We render with the knowledge of materials used in real-world UK construction projects.</p>
