@@ -5,7 +5,8 @@ import { useFrame } from '@react-three/fiber';
 import { Geometry, Base, Subtraction, Addition } from '@react-three/csg';
 import * as THREE from 'three';
 import { Text, Line, Html, Edges, Billboard } from '@react-three/drei';
-import { generateCladdingTextures, generateNoiseTexture, generateInteriorFloorTexture, generateSedumTexture } from '../../utils/textures';
+import { useRealMaterial } from '../../utils/materials';
+import { Suspense } from 'react';
 import { createWorldScaleBoxGeometry, createWorldScaleGableGeometry } from '../../utils/geometry';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -313,61 +314,17 @@ export function RoomGeometry() {
 
   // Base h for backward compatibility in variables
   const h = maxH; 
-  const colors: Record<string, { color: string; roughness: number; metalness: number }> = {
-    timber: { color: '#a67b5b', roughness: 0.9, metalness: 0.0 },
-    composite_grey: { color: '#545a5e', roughness: 0.8, metalness: 0.1 },
-    composite_brown: { color: '#3b2b24', roughness: 0.85, metalness: 0.05 },
-    charcoal: { color: '#2a2c2e', roughness: 0.8, metalness: 0.1 },
-    cedar: { color: '#975d41', roughness: 0.85, metalness: 0.0 },
-    box_metal_grey: { color: '#4a4d50', roughness: 0.3, metalness: 0.8 },
-    box_metal_black: { color: '#1c1e1f', roughness: 0.3, metalness: 0.8 },
-    corrugated_metal: { color: '#808285', roughness: 0.4, metalness: 0.7 },
-    fire_board_grey: { color: '#8c9298', roughness: 0.9, metalness: 0.0 },
-  };
-  const claddingProps = colors[room.cladding] || colors.timber;
-  const texFront = useCladdingTextures(room.claddingFront || room.cladding, room.claddingOrientation, room.claddingWidthMm);
-  const texBack = useCladdingTextures(room.claddingBack || room.cladding, room.claddingOrientation, room.claddingWidthMm);
-  const texLeft = useCladdingTextures(room.claddingLeft || room.cladding, room.claddingOrientation, room.claddingWidthMm);
-  const texRight = useCladdingTextures(room.claddingRight || room.cladding, room.claddingOrientation, room.claddingWidthMm);
-  const propsFront = colors[room.claddingFront || room.cladding] || colors.timber;
-  const propsBack = colors[room.claddingBack || room.cladding] || colors.timber;
-  const propsLeft = colors[room.claddingLeft || room.cladding] || colors.timber;
-  const propsRight = colors[room.claddingRight || room.cladding] || colors.timber;
   
-  const { map: claddingMap, bumpMap: claddingBumpMap, roughnessMap: claddingRoughnessMap } = texFront; // Fallback
+  const rot = room.claddingOrientation === 'vertical' ? Math.PI / 2 : 0;
+  const texFront = useRealMaterial(room.claddingFront || room.cladding || 'timber', w, frontH, rot);
+  const texBack = useRealMaterial(room.claddingBack || room.cladding || 'timber', w, backH, rot);
+  const texLeft = useRealMaterial(room.claddingLeft || room.cladding || 'timber', d, maxH, rot);
+  const texRight = useRealMaterial(room.claddingRight || room.cladding || 'timber', d, maxH, rot);
+  const texRoof = useRealMaterial(room.roofMaterial || 'epdm', roofW, roofD, 0);
+  const texBase = useRealMaterial(room.baseMaterial || 'concrete', baseW, baseD, 0);
+  const texDecking = useRealMaterial(room.deckingMaterial || room.cladding || 'timber', baseW, deckFront, 0);
+  const texFloor = useRealMaterial(room.interiorFloorType || 'oak', w, d, 0);
 
-  const noiseMap = useMemo(() => generateNoiseTexture(0.2), []);
-
-    const baseSedumMaps = useMemo(() => generateSedumTexture(isNight), [isNight]);
-  const sedumTexture = useMemo(() => {
-    return {
-      map: baseSedumMaps.map.clone(),
-      bumpMap: baseSedumMaps.bumpMap.clone()
-    };
-  }, [baseSedumMaps]);
-  
-  
-  useMemo(() => {
-    sedumTexture.map.repeat.set(Math.max(2, w), Math.max(2, d));
-    sedumTexture.bumpMap.repeat.set(Math.max(2, w), Math.max(2, d));
-  }, [sedumTexture, w, d]);
-
-    const baseFloorMaps = useMemo(() => generateInteriorFloorTexture(room.interiorFloorType || 'oak'), [room.interiorFloorType]);
-  
-  const floorMaps = useMemo(() => {
-    return {
-      map: baseFloorMaps.map.clone(),
-      bumpMap: baseFloorMaps.bumpMap.clone()
-    };
-  }, [baseFloorMaps]);
-  
-  
-  useMemo(() => {
-    floorMaps.map.repeat.set(w * 0.5, d * 0.5);
-    floorMaps.bumpMap.repeat.set(w * 0.5, d * 0.5);
-  }, [floorMaps, w, d]);
-  
-  const { map: floorMap, bumpMap: floorBumpMap } = floorMaps;
 
   const isDeckingMaterial = room.hasDecking || room.hasPictureFrame || room.baseMaterial === 'timber_decking' || room.baseMaterial === 'composite_decking';
   const deckingTexture = useCladdingTextures(room.deckingMaterial || room.cladding || 'timber', 'horizontal', 150);
@@ -525,27 +482,27 @@ export function RoomGeometry() {
             {/* Main block */}
             <Base position={[0, (h + 0.05)/2, 0]}>
               <primitive object={claddingBoxGeom} attach="geometry" />
-              <meshStandardMaterial key="mat-0" attach="material-0" color="#ffffff" map={texRight.map} roughnessMap={texRight.roughnessMap} metalness={propsRight.metalness} bumpMap={texRight.bumpMap} bumpScale={0.1} />
-              <meshStandardMaterial key="mat-1" attach="material-1" color="#ffffff" map={texLeft.map} roughnessMap={texLeft.roughnessMap} metalness={propsLeft.metalness} bumpMap={texLeft.bumpMap} bumpScale={0.1} />
-              <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" map={texFront.map} roughnessMap={texFront.roughnessMap} metalness={propsFront.metalness} bumpMap={texFront.bumpMap} bumpScale={0.1} />
-              <meshStandardMaterial key="mat-3" attach="material-3" color="#ffffff" map={texFront.map} roughnessMap={texFront.roughnessMap} metalness={propsFront.metalness} bumpMap={texFront.bumpMap} bumpScale={0.1} />
-              <meshStandardMaterial attach="material-4" color="#ffffff" map={texFront.map} roughnessMap={texFront.roughnessMap} metalness={propsFront.metalness} bumpMap={texFront.bumpMap} bumpScale={0.1} />
-              <meshStandardMaterial attach="material-5" color="#ffffff" map={texBack.map} roughnessMap={texBack.roughnessMap} metalness={propsBack.metalness} bumpMap={texBack.bumpMap} bumpScale={0.1} />
+              <meshStandardMaterial key="mat-0" attach="material-0" color="#ffffff" {...texRight}  metalness={propsRight.metalness}  bumpScale={0.1} />
+              <meshStandardMaterial key="mat-1" attach="material-1" color="#ffffff" {...texLeft}  metalness={propsLeft.metalness}  bumpScale={0.1} />
+              <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
+              <meshStandardMaterial key="mat-3" attach="material-3" color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
+              <meshStandardMaterial attach="material-4" color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
+              <meshStandardMaterial attach="material-5" color="#ffffff" {...texBack}  metalness={propsBack.metalness}  bumpScale={0.1} />
             </Base>
 
             {room.hasPictureFrame && (
               <>
                 <Addition position={[-w/2 + wallThickness/2, isGable ? (h+roofH)/2 : (h+0.05)/2, d/2 + ohFront/2 - 0.005]}>
                   <primitive object={pfLeftGeom} attach="geometry" />
-                  <meshStandardMaterial color="#ffffff" map={texFront.map} roughnessMap={texFront.roughnessMap} metalness={propsFront.metalness} bumpMap={texFront.bumpMap} bumpScale={0.1} />
+                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
                 </Addition>
                 <Addition position={[w/2 - wallThickness/2, isGable ? (h+roofH)/2 : (h+0.05)/2, d/2 + ohFront/2 - 0.005]}>
                   <primitive object={pfRightGeom} attach="geometry" />
-                  <meshStandardMaterial color="#ffffff" map={texFront.map} roughnessMap={texFront.roughnessMap} metalness={propsFront.metalness} bumpMap={texFront.bumpMap} bumpScale={0.1} />
+                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
                 </Addition>
                 <Addition position={[0, pfHeight - 0.15, d/2 + ohFront/2 - 0.005]}>
                   <primitive object={pfTopGeom} attach="geometry" />
-                  <meshStandardMaterial color="#ffffff" map={texFront.map} roughnessMap={texFront.roughnessMap} metalness={propsFront.metalness} bumpMap={texFront.bumpMap} bumpScale={0.1} />
+                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
                 </Addition>
               </>
             )}
@@ -556,10 +513,10 @@ export function RoomGeometry() {
                 <primitive object={lShapeCutOuterGeom} attach="geometry" />
                 <meshStandardMaterial 
                   color="#ffffff"
-                  map={claddingMap}
-                  roughnessMap={claddingRoughnessMap} 
+                  {...texFront}
+                   
                   metalness={claddingProps.metalness} 
-                  bumpMap={claddingBumpMap} 
+                   
                   bumpScale={0.1} 
                 />
               </Subtraction>
@@ -586,7 +543,7 @@ export function RoomGeometry() {
                   <primitive object={gableTriangleGeom} attach="geometry" />
 
           
-                  <meshStandardMaterial color="#ffffff" map={texFront.map} roughnessMap={texFront.roughnessMap} metalness={propsFront.metalness} bumpMap={texFront.bumpMap} bumpScale={0.1} />
+                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
 
           
                 </Addition>
@@ -598,7 +555,7 @@ export function RoomGeometry() {
                   <primitive object={gableTriangleGeom} attach="geometry" />
 
           
-                  <meshStandardMaterial color="#ffffff" map={texBack.map} roughnessMap={texBack.roughnessMap} metalness={propsBack.metalness} bumpMap={texBack.bumpMap} bumpScale={0.1} />
+                  <meshStandardMaterial color="#ffffff" {...texBack}  metalness={propsBack.metalness}  bumpScale={0.1} />
 
           
                 </Addition>
@@ -726,7 +683,7 @@ export function RoomGeometry() {
 
         {/* Internal Floor */}
         <mesh position={[0, 0.005, 0]} receiveShadow>
-          <meshStandardMaterial map={floorMap} bumpMap={floorBumpMap} bumpScale={0.05} roughness={0.7} />
+          <meshStandardMaterial {...texFloor}  bumpScale={0.05} roughness={0.7} />
           <Geometry>
              <Base>
                <boxGeometry args={[w - wallThickness*2, 0.01, d - wallThickness*2]} />
@@ -754,7 +711,7 @@ export function RoomGeometry() {
                   if (room.fasciaMaterial === 'match_cladding') {
                     const tex = side === 'front' ? texFront : side === 'back' ? texBack : side === 'left' ? texLeft : texRight;
                     const props = side === 'front' ? propsFront : side === 'back' ? propsBack : side === 'left' ? propsLeft : propsRight;
-                    return <meshStandardMaterial key={matKey} color="#ffffff" map={tex.map} roughnessMap={tex.roughnessMap} metalness={props.metalness} bumpMap={tex.bumpMap} bumpScale={0.1} />;
+                    return <meshStandardMaterial key={matKey} color="#ffffff" map={tex.map}  metalness={props.metalness}  bumpScale={0.1} />;
                   } else if (room.fasciaMaterial === 'white') {
                     return <meshStandardMaterial key={matKey} color="#ffffff" roughness={0.6} metalness={0.1} />;
                   } else if (room.fasciaMaterial === 'grey') {
@@ -766,10 +723,10 @@ export function RoomGeometry() {
                   }
                 };
                 return [
-                  <meshStandardMaterial key="mat-0" attach="material-0" color={roofColorHex} metalness={0.3} roughness={0.6} bumpMap={noiseMap} bumpScale={0.1} />, // Right
-                  <meshStandardMaterial key="mat-1" attach="material-1" color={roofColorHex} metalness={0.3} roughness={0.6} bumpMap={noiseMap} bumpScale={0.1} />, // Left
-                  <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6} bumpMap={noiseMap} bumpScale={0.1} />, // Top
-                  <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6} bumpMap={noiseMap} bumpScale={0.1} />, // Bottom
+                  <meshStandardMaterial key="mat-0" attach="material-0" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Right
+                  <meshStandardMaterial key="mat-1" attach="material-1" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Left
+                  <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
+                  <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
                   React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }), // Front fascia
                   React.cloneElement(getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }), // Back fascia
                 ];
@@ -786,7 +743,7 @@ export function RoomGeometry() {
                   if (room.fasciaMaterial === 'match_cladding') {
                     const tex = side === 'front' ? texFront : side === 'back' ? texBack : side === 'left' ? texLeft : texRight;
                     const props = side === 'front' ? propsFront : side === 'back' ? propsBack : side === 'left' ? propsLeft : propsRight;
-                    return <meshStandardMaterial key={matKey} color="#ffffff" map={tex.map} roughnessMap={tex.roughnessMap} metalness={props.metalness} bumpMap={tex.bumpMap} bumpScale={0.1} />;
+                    return <meshStandardMaterial key={matKey} color="#ffffff" map={tex.map}  metalness={props.metalness}  bumpScale={0.1} />;
                   } else if (room.fasciaMaterial === 'white') {
                     return <meshStandardMaterial key={matKey} color="#ffffff" roughness={0.6} metalness={0.1} />;
                   } else if (room.fasciaMaterial === 'grey') {
@@ -798,10 +755,10 @@ export function RoomGeometry() {
                   }
                 };
                 return [
-                  <meshStandardMaterial key="mat-0" attach="material-0" color={roofColorHex} metalness={0.3} roughness={0.6} bumpMap={noiseMap} bumpScale={0.1} />, // Right
-                  <meshStandardMaterial key="mat-1" attach="material-1" color={roofColorHex} metalness={0.3} roughness={0.6} bumpMap={noiseMap} bumpScale={0.1} />, // Left
-                  <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6} bumpMap={noiseMap} bumpScale={0.1} />, // Top
-                  <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6} bumpMap={noiseMap} bumpScale={0.1} />, // Bottom
+                  <meshStandardMaterial key="mat-0" attach="material-0" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Right
+                  <meshStandardMaterial key="mat-1" attach="material-1" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Left
+                  <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
+                  <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
                   React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }), // Front fascia
                   React.cloneElement(getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }), // Back fascia
                 ];
@@ -812,11 +769,11 @@ export function RoomGeometry() {
               <>
                 <mesh position={[-w/4 - ohLeft/2 - 0.06 * Math.sin(gablePitch), roofH/2 - ohLeft * Math.tan(gablePitch)/2 + 0.06 * Math.cos(gablePitch), 0]} rotation={[0, 0, gablePitch]} castShadow receiveShadow>
                    <boxGeometry args={[(w/2 + ohLeft) / Math.cos(gablePitch), 0.02, roofD + 0.18]} />
-                   <meshStandardMaterial color="#ffffff" map={sedumTexture.map} bumpMap={sedumTexture.bumpMap} bumpScale={0.1} roughness={0.9} />
+                   <meshStandardMaterial color="#ffffff" {...texRoof}  bumpScale={0.1} roughness={0.9} />
                 </mesh>
                 <mesh position={[w/4 + ohRight/2 + 0.06 * Math.sin(gablePitch), roofH/2 - ohRight * Math.tan(gablePitch)/2 + 0.06 * Math.cos(gablePitch), 0]} rotation={[0, 0, -gablePitch]} castShadow receiveShadow>
                    <boxGeometry args={[(w/2 + ohRight) / Math.cos(gablePitch), 0.02, roofD + 0.18]} />
-                   <meshStandardMaterial color="#ffffff" map={sedumTexture.map} bumpMap={sedumTexture.bumpMap} bumpScale={0.1} roughness={0.9} />
+                   <meshStandardMaterial color="#ffffff" {...texRoof}  bumpScale={0.1} roughness={0.9} />
                 </mesh>
               </>
             )}
@@ -852,7 +809,7 @@ export function RoomGeometry() {
                   if (room.fasciaMaterial === 'match_cladding') {
                     const tex = side === 'front' ? texFront : side === 'back' ? texBack : side === 'left' ? texLeft : texRight;
                     const props = side === 'front' ? propsFront : side === 'back' ? propsBack : side === 'left' ? propsLeft : propsRight;
-                    return <meshStandardMaterial key={matKey} color="#ffffff" map={tex.map} roughnessMap={tex.roughnessMap} metalness={props.metalness} bumpMap={tex.bumpMap} bumpScale={0.1} />;
+                    return <meshStandardMaterial key={matKey} color="#ffffff" map={tex.map}  metalness={props.metalness}  bumpScale={0.1} />;
                   } else if (room.fasciaMaterial === 'white') {
                     return <meshStandardMaterial key={matKey} color="#ffffff" roughness={0.6} metalness={0.1} />;
                   } else if (room.fasciaMaterial === 'grey') {
@@ -866,8 +823,8 @@ export function RoomGeometry() {
                 return [
                   React.cloneElement(getFasciaMat('right'), { key: 'mat-0', attach: 'material-0' }),
                   React.cloneElement(getFasciaMat('left'), { key: 'mat-1', attach: 'material-1' }),
-                  <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6} bumpMap={noiseMap} bumpScale={0.1} />, // Top
-                  <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6} bumpMap={noiseMap} bumpScale={0.1} />, // Bottom
+                  <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
+                  <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
                   React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }),
                   React.cloneElement(getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }),
                 ];
@@ -929,7 +886,7 @@ export function RoomGeometry() {
           </mesh>
           {room.roofMaterial === 'sedum' && (
             <mesh position={[0, roofH/2 + 0.02, 0]} receiveShadow>
-              <meshStandardMaterial color="#ffffff" map={sedumTexture.map} bumpMap={sedumTexture.bumpMap} bumpScale={0.1} roughness={0.9} />
+              <meshStandardMaterial color="#ffffff" {...texRoof}  bumpScale={0.1} roughness={0.9} />
               <Geometry>
                 <Base>
                   <boxGeometry args={[roofW + 0.18, 0.02, roofD + 0.18]} />

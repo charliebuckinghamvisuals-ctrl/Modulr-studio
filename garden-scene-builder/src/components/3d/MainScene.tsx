@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import { CameraControls, Environment, Plane, Text, Grid as DreiGrid, SoftShadows, PerspectiveCamera, OrthographicCamera } from '@react-three/drei';
 import * as THREE from 'three';
@@ -7,7 +7,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { RoomGeometry } from './RoomGeometry';
 import { SceneObjects } from './SceneObjects';
 import { ObjectType } from '../../types';
-import { generateGrassTexture } from '../../utils/textures';
+
 
 function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
   const { camera } = useThree();
@@ -203,8 +203,7 @@ export function MainScene() {
 
   const isNight = false;
   
-  const grassMap = useMemo(() => generateGrassTexture(isNight), [isNight]);
-
+  
   useFrame((_, delta) => {
     if (isSpinning && controlsRef.current) {
       controlsRef.current.azimuthAngle += delta * 0.3;
@@ -259,7 +258,7 @@ export function MainScene() {
           position={[0, -0.01, 0]}
           onClick={handlePointerUp}
         >
-          <meshStandardMaterial map={grassMap} roughness={0.8} metalness={0} />
+          <meshStandardMaterial color="#2e4225" roughness={0.8} metalness={0} />
         </Plane>
         
         <DreiGrid
@@ -284,7 +283,9 @@ export function MainScene() {
         scale={viewMode === 'render' ? renderTransform.scale : 1}
       >
         {/* The Garden Room */}
-        <RoomGeometry />
+        <Suspense fallback={null}>
+          <RoomGeometry />
+        </Suspense>
 
         {/* Garden Objects */}
         <SceneObjects />
