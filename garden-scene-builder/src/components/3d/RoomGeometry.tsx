@@ -389,16 +389,16 @@ export function RoomGeometry() {
   const renderBaseMeshes = () => {
     const materialProps = isDeckingMaterial ? {
       color: "#ffffff",
-      map: deckingTexture.map,
-      roughnessMap: deckingTexture.roughnessMap,
-      bumpMap: deckingTexture.bumpMap,
-      bumpScale: 0.05
+      map: texDecking.map,
+      roughnessMap: texDecking.roughnessMap,
+      normalMap: texDecking.normalMap, aoMap: texDecking.aoMap,
+      
     } : {
       color: baseColorHex,
       roughness: 0.9,
       metalness: 0.1,
       bumpMap: noiseMap,
-      bumpScale: 0.05
+      
     };
 
     const pointerEvents = {
