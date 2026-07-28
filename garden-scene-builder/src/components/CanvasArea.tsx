@@ -118,7 +118,14 @@ export function CanvasArea() {
           className="pointer-events-auto"
           shadows 
           camera={{ position: [10, 10, 15], fov: 50 }}
-          gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}
+          gl={{ 
+            preserveDrawingBuffer: true, 
+            antialias: true, 
+            alpha: true, 
+            toneMapping: THREE.ACESFilmicToneMapping, 
+            toneMappingExposure: 1.2,
+            outputColorSpace: THREE.SRGBColorSpace 
+          }}
           dpr={window.devicePixelRatio ? Math.min(1.5, window.devicePixelRatio) : 1.5}
         >
           <MainScene />

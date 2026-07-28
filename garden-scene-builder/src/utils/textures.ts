@@ -260,7 +260,6 @@ export function generateCladdingTextures(claddingType: string, heightMeters: num
   map.wrapT = THREE.RepeatWrapping;
   map.colorSpace = THREE.SRGBColorSpace;
   map.repeat.set(isRender ? 4 : 1, repeatCount);
-  map.anisotropy = 4;
   map.needsUpdate = true;
 
   const bumpMap = new THREE.CanvasTexture(bumpCanvas);
@@ -268,8 +267,8 @@ export function generateCladdingTextures(claddingType: string, heightMeters: num
   bumpMap.minFilter = THREE.LinearMipmapLinearFilter;
   bumpMap.wrapS = THREE.MirroredRepeatWrapping;
   bumpMap.wrapT = THREE.RepeatWrapping;
+  bumpMap.colorSpace = THREE.LinearSRGBColorSpace;
   bumpMap.repeat.set(isRender ? 4 : 1, repeatCount);
-  bumpMap.anisotropy = 4;
   bumpMap.needsUpdate = true;
 
   const roughnessMap = new THREE.CanvasTexture(roughnessCanvas);
@@ -277,8 +276,8 @@ export function generateCladdingTextures(claddingType: string, heightMeters: num
   roughnessMap.minFilter = THREE.LinearMipmapLinearFilter;
   roughnessMap.wrapS = THREE.MirroredRepeatWrapping;
   roughnessMap.wrapT = THREE.RepeatWrapping;
+  roughnessMap.colorSpace = THREE.LinearSRGBColorSpace;
   roughnessMap.repeat.set(isRender ? 4 : 1, repeatCount);
-  roughnessMap.anisotropy = 4;
   roughnessMap.needsUpdate = true;
 
   const result = { map, bumpMap, roughnessMap };
@@ -457,6 +456,7 @@ export function generateSedumTexture(isNight: boolean) {
   const bumpTexture = new THREE.CanvasTexture(bumpCanvas);
   bumpTexture.wrapS = THREE.RepeatWrapping;
   bumpTexture.wrapT = THREE.RepeatWrapping;
+  bumpTexture.colorSpace = THREE.LinearSRGBColorSpace;
   bumpTexture.needsUpdate = true;
   
   const result = { map: texture, bumpMap: bumpTexture };
@@ -603,6 +603,7 @@ export function generateInteriorFloorTexture(floorType: string) {
   bumpMap.minFilter = THREE.LinearMipmapLinearFilter;
   bumpMap.wrapS = THREE.MirroredRepeatWrapping;
   bumpMap.wrapT = THREE.RepeatWrapping;
+  bumpMap.colorSpace = THREE.LinearSRGBColorSpace;
 
   const result = { map, bumpMap };
   floorCache.set(floorType, result);
