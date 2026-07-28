@@ -172,7 +172,7 @@ export function Sidebar() {
           <>
             <CollapsibleSection title="Base Model & Features" defaultOpen={true}>
               <div className="grid grid-cols-2 gap-2">
-                {['Box', 'LShape', 'Gable'].map((shape) => (
+                {['Box', 'Gable'].map((shape) => (
                   <div key={shape} onClick={() => updateRoom({ shape: shape as any })} className={`p-3 rounded-xl text-center cursor-pointer transition-all ${room.shape === shape ? 'bg-[#3b4d4a] text-white shadow-md' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
                     <span className="text-[11px] font-semibold tracking-wide">{shape}</span>
                   </div>
@@ -361,7 +361,7 @@ export function Sidebar() {
             <CollapsibleSection title="Internal Walls">
               <div className="flex gap-2 mb-4">
                 <button onClick={wrap(store.addPartition)} className="flex-1 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm">+ Wall</button>
-                <button onClick={wrap(store.addLShapeWall)} className="flex-1 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm">+ L-Shape</button>
+                
                 <button onClick={wrap(store.addInteriorDoor)} className="flex-1 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm">+ Door</button>
               </div>
               <div className="space-y-3">
@@ -678,11 +678,7 @@ export function Sidebar() {
                   </div>
                 </div>
               </div>
-              {room.shape === 'LShape' && (
-                <div className="space-y-3 mt-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-gray-600 w-28">L-Shape Width</span>
-                    <DeferredInput type="number" value={room.lShapeCutoutWidthMm ?? 2000} onChange={(e) => updateRoom({ lShapeCutoutWidthMm: parseInt(e.target.value) || 0 })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
+              } className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-gray-600 w-28">L-Shape Depth</span>
