@@ -10,7 +10,7 @@ export function ActionButtons() {
   return (
     <>
       {(viewMode === '3d' || viewMode === 'walking') && !isExporting && (
-        <div className="absolute bottom-8 right-8 z-10 flex flex-col md:flex-row gap-4 items-end">
+        <div className="absolute bottom-24 right-8 z-10 flex flex-col md:flex-row gap-4 items-end">
           <button 
             onClick={() => setShowExportModal(true)}
             className="bg-white/90 backdrop-blur-md text-[#3b4d4a] border border-[#3b4d4a]/20 px-6 py-3 rounded-full font-semibold shadow-sm hover:bg-[#3b4d4a] hover:text-white transition-all flex items-center gap-2"

@@ -11,7 +11,7 @@ export function PricingPanel() {
     return (
       <button 
         onClick={() => setIsOpen(true)}
-        className="absolute bottom-8 right-8 bg-white/80 backdrop-blur-md p-3 rounded-full shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] border border-black/5 text-gray-500 hover:text-[#3b4d4a] hover:bg-white transition-all z-20"
+        className="absolute bottom-24 right-8 bg-white/80 backdrop-blur-md p-3 rounded-full shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] border border-black/5 text-gray-500 hover:text-[#3b4d4a] hover:bg-white transition-all z-20"
         title="Pricing Settings"
       >
         <Settings size={20} />
@@ -20,7 +20,7 @@ export function PricingPanel() {
   }
 
   return (
-    <div className="absolute bottom-8 right-8 bg-white/95 backdrop-blur-2xl rounded-2xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] border border-black/5 p-5 w-80 z-20 max-h-[80vh] overflow-y-auto flex flex-col gap-4">
+    <div className="absolute bottom-24 right-8 bg-white/95 backdrop-blur-2xl rounded-2xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] border border-black/5 p-5 w-80 z-20 max-h-[80vh] overflow-y-auto flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-[#3b4d4a] tracking-tight">Pricing Config</h3>
         <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
