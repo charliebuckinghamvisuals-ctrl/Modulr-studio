@@ -361,7 +361,6 @@ export function Sidebar() {
             <CollapsibleSection title="Internal Walls">
               <div className="flex gap-2 mb-4">
                 <button onClick={wrap(store.addPartition)} className="flex-1 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm">+ Wall</button>
-                
                 <button onClick={wrap(store.addInteriorDoor)} className="flex-1 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm">+ Door</button>
               </div>
               <div className="space-y-3">
@@ -678,14 +677,6 @@ export function Sidebar() {
                   </div>
                 </div>
               </div>
-              } className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-gray-600 w-28">L-Shape Depth</span>
-                    <DeferredInput type="number" value={room.lShapeCutoutDepthMm ?? 1500} onChange={(e) => updateRoom({ lShapeCutoutDepthMm: parseInt(e.target.value) || 0 })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
-                  </div>
-                </div>
-              )}
               {room.shape === 'Gable' && (
                 <div className="space-y-3 mt-4">
                   <div className="flex items-center gap-2">
