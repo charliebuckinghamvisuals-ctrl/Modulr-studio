@@ -194,43 +194,6 @@ function AnimatedDoorLeaves({ door, frameColorHex, frameThickness, sashThickness
   );
 }
 
-function useCladdingTextures(cladding: string, orientation: string | undefined, widthMm: number | undefined) {
-  const baseMaps = useMemo(() => generateCladdingTextures(cladding, 1), [cladding]);
-  
-  const clonedMaps = useMemo(() => {
-    const maps = {
-        map: baseMaps.map.clone(),
-        bumpMap: baseMaps.bumpMap.clone(),
-        roughnessMap: baseMaps.roughnessMap.clone() 
-    };
-
-    const numBoards = 16;
-    const boardW = (widthMm ?? 100) / 1000;
-    const texTotalWidth = numBoards * boardW;
-    
-    const yRepeat = 1 / texTotalWidth; 
-    const xRepeat = 1 / 4; 
-
-    const isVert = orientation === 'vertical';
-    const rotation = isVert ? Math.PI / 2 : 0;
-
-    const configureMap = (m: THREE.Texture) => {
-        m.repeat.set(xRepeat, yRepeat);
-        m.center.set(0.5, 0.5);
-        m.rotation = rotation;
-    };
-
-    configureMap(maps.map);
-    configureMap(maps.bumpMap);
-    configureMap(maps.roughnessMap);
-
-    return maps;
-  }, [baseMaps, orientation, widthMm]);
-  
-  
-  return clonedMaps;
-}
-
 export function RoomGeometry() {
   const roomStore = useStore(s => s.scene.room);
   const viewModeStore = useStore(s => s.viewMode);
@@ -312,6 +275,12 @@ export function RoomGeometry() {
 
   // Quba mono-pitch slope
   const isQuba = room.shape === 'Quba';
+  const isTShape = false;
+  const isCornerCut = false;
+  const tCutW = 0;
+  const tCutD = 0;
+  const cornerCutSize = 0;
+
 
   // Base h for backward compatibility in variables
   const h = maxH; 
@@ -336,7 +305,6 @@ export function RoomGeometry() {
 
 
   const isDeckingMaterial = room.hasDecking || room.hasPictureFrame || room.baseMaterial === 'timber_decking' || room.baseMaterial === 'composite_decking';
-  const deckingTexture = useCladdingTextures(room.deckingMaterial || room.cladding || 'timber', 'horizontal', 150);
 
   const baseMaterialColors: Record<string, string> = { concrete: '#8a8d8f', timber_decking: '#a3794a', composite_decking: '#545a5e' };
   const roofMaterialColors: Record<string, string> = { epdm: '#222222', sedum: '#2d3032', upvc: '#d3d5d7', metal: '#6a6d70' };
@@ -397,7 +365,7 @@ export function RoomGeometry() {
       color: baseColorHex,
       roughness: 0.9,
       metalness: 0.1,
-      bumpMap: noiseMap,
+      
       
     };
 
@@ -491,27 +459,27 @@ export function RoomGeometry() {
             {/* Main block */}
             <Base position={[0, (h + 0.05)/2, 0]}>
               <primitive object={claddingBoxGeom} attach="geometry" />
-              <meshStandardMaterial key="mat-0" attach="material-0" color="#ffffff" {...texRight}  metalness={propsRight.metalness}  bumpScale={0.1} />
-              <meshStandardMaterial key="mat-1" attach="material-1" color="#ffffff" {...texLeft}  metalness={propsLeft.metalness}  bumpScale={0.1} />
-              <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
-              <meshStandardMaterial key="mat-3" attach="material-3" color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
-              <meshStandardMaterial attach="material-4" color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
-              <meshStandardMaterial attach="material-5" color="#ffffff" {...texBack}  metalness={propsBack.metalness}  bumpScale={0.1} />
+              <meshStandardMaterial key="mat-0" attach="material-0" color="#ffffff" {...texRight}  metalness={0.1}  bumpScale={0.1} />
+              <meshStandardMaterial key="mat-1" attach="material-1" color="#ffffff" {...texLeft}  metalness={0.1}  bumpScale={0.1} />
+              <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
+              <meshStandardMaterial key="mat-3" attach="material-3" color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
+              <meshStandardMaterial attach="material-4" color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
+              <meshStandardMaterial attach="material-5" color="#ffffff" {...texBack}  metalness={0.1}  bumpScale={0.1} />
             </Base>
 
             {room.hasPictureFrame && (
               <>
                 <Addition position={[-w/2 + wallThickness/2, isGable ? (h+roofH)/2 : (h+0.05)/2, d/2 + ohFront/2 - 0.005]}>
                   <primitive object={pfLeftGeom} attach="geometry" />
-                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
+                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
                 </Addition>
                 <Addition position={[w/2 - wallThickness/2, isGable ? (h+roofH)/2 : (h+0.05)/2, d/2 + ohFront/2 - 0.005]}>
                   <primitive object={pfRightGeom} attach="geometry" />
-                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
+                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
                 </Addition>
                 <Addition position={[0, pfHeight - 0.15, d/2 + ohFront/2 - 0.005]}>
                   <primitive object={pfTopGeom} attach="geometry" />
-                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
+                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
                 </Addition>
               </>
             )}
@@ -552,7 +520,7 @@ export function RoomGeometry() {
                   <primitive object={gableTriangleGeom} attach="geometry" />
 
           
-                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={propsFront.metalness}  bumpScale={0.1} />
+                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
 
           
                 </Addition>
@@ -564,7 +532,7 @@ export function RoomGeometry() {
                   <primitive object={gableTriangleGeom} attach="geometry" />
 
           
-                  <meshStandardMaterial color="#ffffff" {...texBack}  metalness={propsBack.metalness}  bumpScale={0.1} />
+                  <meshStandardMaterial color="#ffffff" {...texBack}  metalness={0.1}  bumpScale={0.1} />
 
           
                 </Addition>
