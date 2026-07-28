@@ -27,10 +27,10 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
     
     // Step 3: Use real photographic CC0 PBR sets
     const textures = useTexture({
-        map: `/textures/${def.prefix}_color.jpg`,
-        normalMap: `/textures/${def.prefix}_normal.jpg`,
-        roughnessMap: `/textures/${def.prefix}_roughness.jpg`,
-        aoMap: `/textures/${def.prefix}_ao.jpg`,
+        map: `./textures/${def.prefix}_color.jpg`,
+        normalMap: `./textures/${def.prefix}_normal.jpg`,
+        roughnessMap: `./textures/${def.prefix}_roughness.jpg`,
+        aoMap: `./textures/${def.prefix}_ao.jpg`,
     });
 
     const cloned = useMemo(() => {
