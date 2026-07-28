@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
-import { CameraControls, Environment, Plane, Text, Grid as DreiGrid, SoftShadows, PerspectiveCamera, OrthographicCamera } from '@react-three/drei';
+import { CameraControls, Environment, ContactShadows, Plane, Text, Grid as DreiGrid, SoftShadows, PerspectiveCamera, OrthographicCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -228,7 +228,7 @@ export function MainScene() {
 
       {/* Lighting and Environment */}
       {/* <SoftShadows size={20} samples={16} focus={0.5} /> */}
-      <ambientLight intensity={isNight ? 0.3 : 0.6} />
+      
       <directionalLight 
         castShadow 
         position={[20, 40, 20]} 

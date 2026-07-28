@@ -8,6 +8,7 @@ import { Text, Line, Html, Edges, Billboard } from '@react-three/drei';
 import { useRealMaterial } from '../../utils/materials';
 import { Suspense } from 'react';
 import { createWorldScaleBoxGeometry, createWorldScaleGableGeometry } from '../../utils/geometry';
+import { createCladdingGeometry, createDeckingGeometry } from '../../utils/geometryUtils';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { DragHandle } from './DragHandles';
@@ -324,6 +325,14 @@ export function RoomGeometry() {
   const texBase = useRealMaterial(room.baseMaterial || 'concrete', baseW, baseD, 0);
   const texDecking = useRealMaterial(room.deckingMaterial || room.cladding || 'timber', baseW, deckFront, 0);
   const texFloor = useRealMaterial(room.interiorFloorType || 'oak', w, d, 0);
+
+  const isVert = room.claddingOrientation === 'vertical';
+  const geomFrontWall = useMemo(() => createCladdingGeometry(w, frontH, isVert), [w, frontH, isVert]);
+  const geomBackWall = useMemo(() => createCladdingGeometry(w, backH, isVert), [w, backH, isVert]);
+  const geomLeftWall = useMemo(() => createCladdingGeometry(d, maxH, isVert), [d, maxH, isVert]);
+  const geomRightWall = useMemo(() => createCladdingGeometry(d, maxH, isVert), [d, maxH, isVert]);
+  const geomDecking = useMemo(() => createDeckingGeometry(baseW, deckFront), [baseW, deckFront]);
+
 
 
   const isDeckingMaterial = room.hasDecking || room.hasPictureFrame || room.baseMaterial === 'timber_decking' || room.baseMaterial === 'composite_decking';
