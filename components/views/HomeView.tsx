@@ -105,7 +105,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                                 },
                                 {
                                     title: "3D Configurator",
-                                    desc: "Design custom garden rooms directly in your browser. Experiment with dimensions and styles in an interactive 3D builder, ready to render instantly."
+                                    desc: "A streamlined, free builder for standard footprints. Define your structure in minutes, then send it straight to the Render Engine for photorealistic magic."
                                 }
                             ].map((tool, idx) => (
                                 <div key={idx} className="glass-panel p-6 rounded-3xl border border-border bg-white/60 backdrop-blur-xl hover:border-accent/40 hover:shadow-xl transition-all duration-300 group flex flex-col h-full text-left">
@@ -188,7 +188,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                             />
                             <FeatureCard
                                 title="3D Configurator"
-                                description="Design custom garden rooms directly in your browser. Experiment with dimensions and styles in a free interactive 3D builder, ready to render instantly."
+                                description="A focused, fast builder for standard building types (Box, L-Shape, Gable). Define the footprint quickly, render it beautifully—no overcomplicated design tools needed."
                             />
                         </div>
                     </div>

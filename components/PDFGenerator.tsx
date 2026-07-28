@@ -4,6 +4,7 @@ import html2canvas from 'html2canvas';
 import { Download, FileText } from 'lucide-react';
 import { Button } from './Button';
 import { toast } from 'react-hot-toast';
+import { useBranding } from '../hooks/useBranding';
 
 interface PDFGeneratorProps {
     originalImage: string | null;
@@ -15,6 +16,7 @@ interface PDFGeneratorProps {
 export const PDFGenerator: React.FC<PDFGeneratorProps> = ({ originalImage, renderedImage, materials, prompt }) => {
     const printRef = useRef<HTMLDivElement>(null);
     const [isExporting, setIsExporting] = useState(false);
+    const { branding } = useBranding();
 
     const handleExportPDF = async () => {
         if (!printRef.current || !originalImage || !renderedImage) {
@@ -79,15 +81,22 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({ originalImage, rende
                 <div ref={printRef} className="w-[800px] h-[1131px] bg-white p-12 flex flex-col font-sans text-slate-900 relative">
 
                     {/* Header */}
-                    <div className="flex justify-between items-end border-b-2 border-slate-200 pb-6 mb-8">
-                        <div>
-                            <h1 className="text-4xl font-black tracking-tight text-slate-900 leading-tight uppercase font-heading">
-                                MODULR <span className="font-sans font-light">STUDIO</span>
-                            </h1>
-                            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-1">Presentation Board</p>
+                    <div className="flex justify-between items-end border-b-2 border-slate-200 pb-6 mb-8" style={{ borderBottomColor: branding.primaryColor }}>
+                        <div className="flex items-center gap-4">
+                            {branding.logo && (
+                                <img src={branding.logo} alt="Company Logo" className="h-12 w-auto object-contain" />
+                            )}
+                            <div>
+                                {!branding.logo && (
+                                    <h1 className="text-4xl font-black tracking-tight text-slate-900 leading-tight uppercase font-heading" style={{ color: branding.primaryColor }}>
+                                        MODULR <span className="font-sans font-light">STUDIO</span>
+                                    </h1>
+                                )}
+                                <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-1">Presentation Board</p>
+                            </div>
                         </div>
                         <div className="text-right">
-                            <p className="text-xs text-slate-400 font-medium">Generated via Neural Architecture Engine</p>
+                            <p className="text-xs text-slate-400 font-medium whitespace-pre-wrap">{branding.contactInfo || 'Generated via Neural Architecture Engine'}</p>
                             <p className="text-xs text-slate-400 font-medium mt-1">{new Date().toLocaleDateString()}</p>
                         </div>
                     </div>

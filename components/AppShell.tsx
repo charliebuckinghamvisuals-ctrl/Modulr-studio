@@ -139,9 +139,16 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap ${isActive ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
+                className={`px-4 py-2.5 text-xs ${
+                  item.id === AppStage.RENDER_ENGINE 
+                    ? 'font-bold uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap ' + (isActive ? 'bg-green-400 text-slate-900 shadow-[0_0_15px_rgba(74,222,128,0.3)]' : 'bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20')
+                    : 'font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap ' + (isActive ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10')
+                }`}
               >
-                <span className="relative z-10 whitespace-nowrap">{item.label}</span>
+                <span className="relative z-10 whitespace-nowrap">
+                  {item.id === AppStage.RENDER_ENGINE && !isActive && <Sparkles size={12} className="inline mr-1 mb-0.5" />}
+                  {item.label}
+                </span>
               </button>
             );
           })}

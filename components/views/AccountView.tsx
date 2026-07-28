@@ -11,6 +11,7 @@ import { auth } from '../../services/firebase';
 import { signOut, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { useAuth } from '../../hooks/useAuth';
 import { useCredits } from '../../hooks/useCredits';
+import { useBranding } from '../../hooks/useBranding';
 import { AppStage } from '../../types';
 
 interface AccountViewProps {
@@ -21,6 +22,7 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
     const engine = useAppEngine();
     const { user } = useAuth();
     const { credits, plan, refreshCredits } = useCredits();
+    const { branding, setBranding } = useBranding();
 
     // Editable display name
     const [editableName, setEditableName] = React.useState(user?.displayName || '');
@@ -342,40 +344,89 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                     </div>
                 </div>
 
-                {/* Brand Materials Section — COMING SOON */}
-                <div className="pt-12 animate-in fade-in slide-in-from-bottom-16 duration-1000 delay-600 relative">
-                    {/* Coming Soon overlay */}
-                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-[2.5rem] bg-white/80 backdrop-blur-md border-2 border-dashed border-accent/20">
-                        <div className="flex flex-col items-center gap-4 text-center px-6">
-                            <div className="w-16 h-16 rounded-3xl bg-accent/10 border border-accent/20 flex items-center justify-center">
-                                <Lock size={28} className="text-accent/60" />
-                            </div>
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-accent/50 mb-2">Coming Soon</p>
-                                <h3 className="text-3xl font-black text-accent tracking-tight">Brand Materials</h3>
-                                <p className="text-secondary text-sm mt-2 max-w-sm">We're building something powerful here. Your custom material library and official presets are in development and will be available in the next Studio update.</p>
-                            </div>
+                {/* Company Branding Section */}
+                <div className="pt-12 animate-in fade-in slide-in-from-bottom-16 duration-1000 delay-600">
+                    <div className="space-y-8">
+                        <div className="flex items-baseline gap-4">
+                            <h2 className="text-2xl font-bold text-accent tracking-tight">Company Branding</h2>
+                            <div className="flex-1 h-px bg-border"></div>
                         </div>
-                    </div>
-
-                    {/* Blurred content underneath */}
-                    <div className="filter blur-sm pointer-events-none select-none opacity-40">
-                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-slate-100 mb-12">
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-[10px] font-bold text-accent uppercase tracking-[0.4em]">
-                                    <Sparkles size={12} className="animate-pulse" />
-                                    Modulr Studio Pro
+                        <p className="text-sm text-secondary font-medium">Customize the branding for your PDF Presentation exports.</p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                            {/* Logo & Color */}
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/40 pl-1">Company Logo</label>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-24 h-24 rounded-2xl bg-slate-50 border border-dashed border-border flex items-center justify-center overflow-hidden">
+                                            {branding.logo ? (
+                                                <img src={branding.logo} alt="Company Logo" className="w-full h-full object-contain p-2" />
+                                            ) : (
+                                                <Grid size={24} className="text-slate-300" />
+                                            )}
+                                        </div>
+                                        <label className="px-4 py-2 rounded-xl bg-accent/5 text-accent text-xs font-bold uppercase tracking-widest hover:bg-accent/10 transition-all cursor-pointer">
+                                            Upload Logo
+                                            <input 
+                                                type="file" 
+                                                accept="image/*" 
+                                                className="hidden" 
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        const reader = new FileReader();
+                                                        reader.onload = (ev) => {
+                                                            if (ev.target?.result) {
+                                                                setBranding({ logo: ev.target.result as string });
+                                                            }
+                                                        };
+                                                        reader.readAsDataURL(file);
+                                                    }
+                                                }} 
+                                            />
+                                        </label>
+                                        {branding.logo && (
+                                            <button 
+                                                onClick={() => setBranding({ logo: null })}
+                                                className="px-4 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-bold uppercase tracking-widest hover:bg-red-100 transition-all"
+                                            >
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                                <h2 className="text-4xl md:text-5xl font-black text-accent tracking-tighter">Brand Materials</h2>
-                                <p className="text-sm text-secondary font-medium">Manage your custom architectural specs and official presets.</p>
+                                
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/40 pl-1">Primary Color</label>
+                                    <div className="flex items-center gap-4">
+                                        <input 
+                                            type="color" 
+                                            value={branding.primaryColor}
+                                            onChange={(e) => setBranding({ primaryColor: e.target.value })}
+                                            className="w-12 h-12 rounded-xl border-none cursor-pointer bg-transparent"
+                                        />
+                                        <input 
+                                            type="text" 
+                                            value={branding.primaryColor}
+                                            onChange={(e) => setBranding({ primaryColor: e.target.value })}
+                                            className="px-4 py-2 rounded-xl bg-slate-50 border border-border outline-none focus:ring-2 focus:ring-accent/30 text-sm font-bold uppercase"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Contact Info */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/40 pl-1">Contact Information (Header)</label>
+                                <textarea
+                                    value={branding.contactInfo}
+                                    onChange={(e) => setBranding({ contactInfo: e.target.value })}
+                                    placeholder="e.g. Website: www.yourcompany.com | Phone: 01234 567 890 | Email: hello@yourcompany.com"
+                                    className="w-full h-32 p-4 rounded-2xl bg-slate-50 border border-border outline-none focus:ring-2 focus:ring-accent/30 transition-all text-sm text-accent shadow-inner resize-none"
+                                />
                             </div>
                         </div>
-                        <div className="space-y-6 mb-16">
-                            <div className="p-12 rounded-[2.5rem] bg-slate-50 border border-dashed border-slate-200 text-center">
-                                <p className="text-[11px] font-bold text-secondary/50 uppercase tracking-[0.2em]">Save materials from the builder to see them here</p>
-                            </div>
-                        </div>
-                        <div className="h-40 bg-slate-50 rounded-3xl border border-slate-100"></div>
                     </div>
                 </div>
 
