@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
-import { CameraControls, Environment, Sky, Plane, Text, Grid as DreiGrid, SoftShadows, PerspectiveCamera, OrthographicCamera } from '@react-three/drei';
+import { CameraControls, Environment, Plane, Text, Grid as DreiGrid, SoftShadows, PerspectiveCamera, OrthographicCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -244,21 +244,12 @@ export function MainScene() {
       />
       
       <group name="environment-background" visible={viewMode !== 'render'}>
-        <Environment preset={isNight ? "night" : "city"} background={false} />
-        {!isNight && (
-          <>
-            <Sky sunPosition={[20, 40, 20]} inclination={0.2} azimuth={0.25} />
-          </>
-        )}
-        
-        {isNight ? (
-          <>
-            <mesh position={[10, 20, 10]}>
-               <sphereGeometry args={[2, 32, 32]} />
-               <meshBasicMaterial color="#a0b0d0" />
-            </mesh>
-          </>
-        ) : null}
+        <Environment 
+          files={isNight ? "/textures/night.hdr" : "/textures/outdoor.hdr"} 
+          background 
+          blur={0.05} 
+          environmentIntensity={isNight ? 0.3 : 1.0} 
+        />
 
         {/* Ground Plane */}
         <Plane 
