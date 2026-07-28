@@ -1,4 +1,4 @@
-export type ShapeType = 'Box' | 'Quba' | 'LShape' | 'Gable' | 'TShape' | 'CornerCut';
+export type ShapeType = 'Box' | 'LShape' | 'Gable';
 export type CladdingType = 'timber' | 'composite_wood' | 'composite_black' | 'composite_grey' | 'composite_brown' | 'oak' | 'cedar' | 'charred_wood' | 'render_white' | 'box_metal_grey' | 'box_metal_black' | 'corrugated_metal' | 'fire_board_grey';
 export type BaseMaterialType = 'concrete' | 'timber_decking' | 'composite_decking';
 export type DeckingMaterialType = 'timber' | 'composite_grey' | 'composite_oak' | 'composite_cedar' | 'composite_brown' | 'composite_black';

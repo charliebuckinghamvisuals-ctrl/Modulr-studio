@@ -284,25 +284,26 @@ export function RoomGeometry() {
   const cutW = isLShape ? Math.min(((room.lShapeCutoutWidthMm ?? 2000) / 1000), w - 0.35) : 0;
   const cutD = isLShape ? Math.min(((room.lShapeCutoutDepthMm ?? 1500) / 1000), d - 0.35) : 0;
 
-  // TShape dimensions
-  const isTShape = room.shape === 'TShape';
-  const tCutW = isTShape ? Math.min(((room.lShapeCutoutWidthMm ?? 1000) / 1000), w/2 - 0.35) : 0;
-  const tCutD = isTShape ? Math.min(((room.lShapeCutoutDepthMm ?? 1000) / 1000), d - 0.35) : 0;
-
-  // CornerCut dimensions
-  const isCornerCut = room.shape === 'CornerCut';
-  const cornerCutSize = isCornerCut ? Math.min(((room.lShapeCutoutWidthMm ?? 1000) / 1000), Math.min(w, d) - 0.35) : 0;
 
   // Heights and pitch
-  const frontH = room.heightMm / 1000;
-  const backH = (room.backHeightMm ?? room.heightMm) / 1000;
-  const isPitched = Math.abs(frontH - backH) > 0.001;
-  const roofPitch = isPitched ? Math.atan2(backH - frontH, d) : (room.shape === 'Quba' ? -0.06 : 0);
-  const maxH = Math.max(frontH, backH);
-
-  // Gable calculations
   const isGable = room.shape === 'Gable';
-  const gablePitch = isGable ? Math.atan2((room.roofHeightMm ?? 200)/1000, w/2) : 0;
+  const roofHRaw = (room.roofHeightMm ?? 200) / 1000;
+
+  // For Gable, room.heightMm is the TOTAL height (base + wall + roof)
+  // Therefore wall height = total height - base - roof
+  const frontH = isGable 
+    ? (room.heightMm / 1000) - baseH - roofHRaw
+    : room.heightMm / 1000;
+
+  const backH = isGable
+    ? frontH
+    : (room.backHeightMm ?? room.heightMm) / 1000;
+
+  const isPitched = Math.abs(frontH - backH) > 0.001;
+  const roofPitch = isPitched ? Math.atan2(backH - frontH, d) : 0;
+  const maxH = Math.max(frontH, backH);
+  const gablePitch = isGable ? Math.atan2(roofHRaw, w/2) : 0;
+
   
   const hoveredElementId = useStore((s) => s.hoveredElementId);
   const isHoveredRoom = hoveredElementId === 'room';
@@ -565,26 +566,10 @@ export function RoomGeometry() {
             )}
 
             {/* TShape Outer Cutout */}
-            {isTShape && (
-              <>
-                <Subtraction position={[w/2 - tCutW/2 + 0.1, h/2, d/2 - tCutD/2 + 0.1]}>
-                  <boxGeometry args={[tCutW + 0.2, h + 1, tCutD + 0.2]} />
-                  <meshStandardMaterial color="#ffffff" map={claddingMap} roughnessMap={claddingRoughnessMap} metalness={claddingProps.metalness} bumpMap={claddingBumpMap} bumpScale={0.1} />
-                </Subtraction>
-                <Subtraction position={[-w/2 + tCutW/2 - 0.1, h/2, d/2 - tCutD/2 + 0.1]}>
-                  <boxGeometry args={[tCutW + 0.2, h + 1, tCutD + 0.2]} />
-                  <meshStandardMaterial color="#ffffff" map={claddingMap} roughnessMap={claddingRoughnessMap} metalness={claddingProps.metalness} bumpMap={claddingBumpMap} bumpScale={0.1} />
-                </Subtraction>
-              </>
-            )}
+            
 
             {/* CornerCut Outer Cutout */}
-            {isCornerCut && (
-              <Subtraction position={[w/2, h/2, d/2]} rotation={[0, Math.PI/4, 0]}>
-                <boxGeometry args={[cornerCutSize * 1.5, h + 1, cornerCutSize * 1.5]} />
-                <meshStandardMaterial color="#ffffff" map={claddingMap} roughnessMap={claddingRoughnessMap} metalness={claddingProps.metalness} bumpMap={claddingBumpMap} bumpScale={0.1} />
-              </Subtraction>
-            )}
+            
 
             {/* Gable Roof Cuts */}
             {/* gable subtractions removed temporarily */}
@@ -648,51 +633,9 @@ export function RoomGeometry() {
               </>
             )}
 
-            {isTShape && (
-              <>
-                {/* Back part of the T */}
-                <Subtraction position={[0, h/2, -tCutD/2]}>
-                  <boxGeometry args={[w - wallThickness*2, h + 0.1, d - tCutD - wallThickness*2]} />
-                  <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
-                </Subtraction>
-                {/* Front center part of the T */}
-                <Subtraction position={[0, h/2, d/2 - tCutD/2 - wallThickness]}>
-                  <boxGeometry args={[w - tCutW*2 - wallThickness*2, h + 0.1, tCutD + wallThickness*2]} />
-                  <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
-                </Subtraction>
-              </>
-            )}
+            
 
-            {isCornerCut && (
-              <>
-                {/* For CornerCut without nested geometry, we create the hollow interior using 2 overlapping boxes to make an L-shape,
-                    then a rotated box to cut the diagonal part. 
-                    Wait, if we use Subtractions on the main solid, they hollow out the room.
-                    We can hollow out the left part, the back part, and the diagonal part! 
-                    Overlapping subtractions are perfectly fine! */ }
-                
-                {/* Left part of the room */}
-                <Subtraction position={[-cornerCutSize/2, h/2, 0]}>
-                  <boxGeometry args={[w - cornerCutSize - wallThickness*2, h + 0.1, d - wallThickness*2]} />
-                  <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
-                </Subtraction>
-                
-                {/* Back part of the room */}
-                <Subtraction position={[0, h/2, -cornerCutSize/2]}>
-                  <boxGeometry args={[w - wallThickness*2, h + 0.1, d - cornerCutSize - wallThickness*2]} />
-                  <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
-                </Subtraction>
-
-                {/* Diagonal part of the room */}
-                <Subtraction position={[w/2, h/2, d/2]} rotation={[0, Math.PI/4, 0]}>
-                  {/* The outer cutout is size * 1.5. The inner cutout should be smaller by wallThickness on all sides? 
-                      Actually, we can just position it slightly inward. 
-                      Let's use the exact same size but shifted inward by wallThickness * sqrt(2) */ }
-                  <boxGeometry args={[(cornerCutSize - wallThickness * 1.414) * 1.5, h + 0.1, (cornerCutSize - wallThickness * 1.414) * 1.5]} />
-                  <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
-                </Subtraction>
-              </>
-            )}
+            
 
             {/* Top Cutout for flat roofs to enforce wall top color */}
             {!isPitched && !isGable && (
@@ -793,21 +736,8 @@ export function RoomGeometry() {
                   <boxGeometry args={[cutW + 0.2, 0.02, cutD + 0.2]} />
                 </Subtraction>
              )}
-             {isTShape && (
-               <>
-                 <Subtraction position={[w/2 - tCutW/2 + 0.1, 0, d/2 - tCutD/2 + 0.1]}>
-                   <boxGeometry args={[tCutW + 0.2, 0.02, tCutD + 0.2]} />
-                 </Subtraction>
-                 <Subtraction position={[-w/2 + tCutW/2 - 0.1, 0, d/2 - tCutD/2 + 0.1]}>
-                   <boxGeometry args={[tCutW + 0.2, 0.02, tCutD + 0.2]} />
-                 </Subtraction>
-               </>
-             )}
-             {isCornerCut && (
-               <Subtraction position={[w/2, 0, d/2]} rotation={[0, Math.PI/4, 0]}>
-                 <boxGeometry args={[cornerCutSize * 1.5, 0.02, cornerCutSize * 1.5]} />
-               </Subtraction>
-             )}
+             
+             
           </Geometry>
         </mesh>
 
@@ -911,7 +841,7 @@ export function RoomGeometry() {
         {/* Roof Fascia & EPDM flat roof */}
         {!isPlanView && (
           <group 
-            position={[roofX, isGable ? h + roofH/2 : (frontH + backH)/2 + roofH/2 - (isQuba ? 0.05 : 0), roofZ]} 
+            position={[roofX, isGable ? h + roofH/2 : (frontH + backH)/2 + roofH/2, roofZ]} 
             rotation={[isPitched && !isGable ? roofPitch : 0, 0, 0]}
           >
             <mesh castShadow receiveShadow position={[0, 0, 0]}>
@@ -951,21 +881,8 @@ export function RoomGeometry() {
                     <boxGeometry args={[cutBoxSize, roofH + 0.5, cutBoxSize]} />
                   </Subtraction>
                 )}
-                {isTShape && (
-                  <>
-                    <Subtraction position={[tCutBoxPosXRight, 0, tCutBoxPosZ]}>
-                      <boxGeometry args={[cutBoxSize, roofH + 0.5, cutBoxSize]} />
-                    </Subtraction>
-                    <Subtraction position={[tCutBoxPosXLeft, 0, tCutBoxPosZ]}>
-                      <boxGeometry args={[cutBoxSize, roofH + 0.5, cutBoxSize]} />
-                    </Subtraction>
-                  </>
-                )}
-                {isCornerCut && (
-                  <Subtraction position={[cornerCutBoxPosX, 0, cornerCutBoxPosZ]} rotation={[0, Math.PI/4, 0]}>
-                    <boxGeometry args={[cornerCutSize * 1.5, roofH + 0.5, cornerCutSize * 1.5]} />
-                  </Subtraction>
-                )}
+                
+                
                 {isGable && (
                   <>
                     <Subtraction position={[-w/4 - roofX - Math.sin(gablePitch)*(w)/2, Math.cos(gablePitch)*(w)/2, -roofZ]} rotation={[0, 0, gablePitch]}><boxGeometry args={[w*2, w, roofD + 2]} />
@@ -993,21 +910,8 @@ export function RoomGeometry() {
                   <boxGeometry args={[cutBoxSize, 0.5, cutBoxSize]} />
                 </Subtraction>
               )}
-              {isTShape && (
-                <>
-                  <Subtraction position={[tCutBoxPosXRight, 0, tCutBoxPosZ]}>
-                    <boxGeometry args={[cutBoxSize, 0.5, cutBoxSize]} />
-                  </Subtraction>
-                  <Subtraction position={[tCutBoxPosXLeft, 0, tCutBoxPosZ]}>
-                    <boxGeometry args={[cutBoxSize, 0.5, cutBoxSize]} />
-                  </Subtraction>
-                </>
-              )}
-              {isCornerCut && (
-                <Subtraction position={[cornerCutBoxPosX, 0, cornerCutBoxPosZ]} rotation={[0, Math.PI/4, 0]}>
-                  <boxGeometry args={[cornerCutSize * 1.5, 0.5, cornerCutSize * 1.5]} />
-                </Subtraction>
-              )}
+              
+              
               {isGable && (
                   <>
                     <Subtraction position={[-w/4 - roofX - Math.sin(gablePitch)*(w)/2, -roofH/2 + Math.cos(gablePitch)*(w)/2, -roofZ]} rotation={[0, 0, gablePitch]}><boxGeometry args={[w*2, w, roofD + 2]} />
@@ -1035,21 +939,8 @@ export function RoomGeometry() {
                     <boxGeometry args={[cutBoxSize, 0.5, cutBoxSize]} />
                   </Subtraction>
                 )}
-                {isTShape && (
-                  <>
-                    <Subtraction position={[tCutBoxPosXRight, 0, tCutBoxPosZ]}>
-                      <boxGeometry args={[cutBoxSize, 0.5, cutBoxSize]} />
-                    </Subtraction>
-                    <Subtraction position={[tCutBoxPosXLeft, 0, tCutBoxPosZ]}>
-                      <boxGeometry args={[cutBoxSize, 0.5, cutBoxSize]} />
-                    </Subtraction>
-                  </>
-                )}
-                {isCornerCut && (
-                  <Subtraction position={[cornerCutBoxPosX, 0, cornerCutBoxPosZ]} rotation={[0, Math.PI/4, 0]}>
-                    <boxGeometry args={[cornerCutSize * 1.5, 0.5, cornerCutSize * 1.5]} />
-                  </Subtraction>
-                )}
+                
+                
                 {isGable && (
                   <>
                     <Subtraction position={[-w/4 - roofX - Math.sin(gablePitch)*(w)/2, -roofH/2 + Math.cos(gablePitch)*(w)/2, -roofZ]} rotation={[0, 0, gablePitch]}><boxGeometry args={[w*2, w, roofD + 2]} />

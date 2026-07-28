@@ -7,7 +7,7 @@ export default function BuilderPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[#fafaf9] text-[#1d1d1f] overflow-hidden font-sans antialiased selection:bg-[#3b4d4a]/30">
+    <div className="flex flex-col h-[100dvh] w-full bg-[#fafaf9] text-[#1d1d1f] overflow-hidden font-sans antialiased selection:bg-[#3b4d4a]/30">
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden relative">
         <div className="flex-1 relative order-2 md:order-1 h-full bg-transparent">
           <CanvasArea />
@@ -28,11 +28,11 @@ export default function BuilderPage() {
         </div>
 
         <div 
-          className={`bg-white/95 backdrop-blur-3xl shadow-[-4px_0_20px_rgba(0,0,0,0.08)] border-l border-black/5 z-10 flex flex-col order-1 md:order-2 transition-all duration-300 ease-in-out ${
+          className={`shrink-0 bg-white/95 backdrop-blur-3xl shadow-[-4px_0_20px_rgba(0,0,0,0.08)] border-l border-black/5 z-10 flex flex-col order-1 md:order-2 transition-all duration-300 ease-in-out ${
             isSidebarOpen ? 'h-[40vh] md:h-full md:w-[380px]' : 'h-0 md:h-full md:w-0 overflow-hidden'
           }`}
         >
-          <div className="w-full md:w-[380px] h-full flex flex-col min-w-[380px]">
+          <div className="w-full md:w-[380px] h-full flex flex-col">
             <Sidebar />
           </div>
         </div>

@@ -39,11 +39,20 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
     };
 
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    
+    // Lock scroll on the main page when configurator is active
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      document.body.style.overflow = 'auto';
+      document.documentElement.style.overflow = 'auto';
+    };
   }, [engine]);
 
   return (
-    <div className="w-full flex-1 flex flex-col min-h-[calc(100vh-96px)] bg-[#0F1110]">
+    <div className="w-full h-[100dvh] flex flex-col bg-[#0F1110]">
       <iframe 
         src="/3d-config/index.html" 
         className="w-full flex-1 border-none"

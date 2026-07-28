@@ -521,34 +521,6 @@ export const useStore = create<AppState>((set, get) => ({
       const cutoutArea = cutoutW * cutoutD;
       floorArea -= cutoutArea;
       roofArea -= cutoutArea;
-    } else if (room.shape === 'TShape' && room.lShapeCutoutWidthMm && room.lShapeCutoutDepthMm) {
-      const tCutW = room.lShapeCutoutWidthMm / 1000;
-      const tCutD = room.lShapeCutoutDepthMm / 1000;
-      const cutoutArea = tCutW * tCutD * 2;
-      floorArea -= cutoutArea;
-      roofArea -= cutoutArea;
-      wallArea += (tCutD * h * 2);
-    } else if (room.shape === 'CornerCut' && room.lShapeCutoutWidthMm) {
-      const cutSize = room.lShapeCutoutWidthMm / 1000;
-      const cutoutArea = (cutSize * cutSize) / 2;
-      floorArea -= cutoutArea;
-      roofArea -= cutoutArea;
-      const diagonal = Math.sqrt(cutSize * cutSize * 2);
-      wallArea = wallArea - (cutSize * 2 * h) + (diagonal * h);
-    } else if (room.shape === 'TShape' && room.lShapeCutoutWidthMm && room.lShapeCutoutDepthMm) {
-      const tCutW = room.lShapeCutoutWidthMm / 1000;
-      const tCutD = room.lShapeCutoutDepthMm / 1000;
-      const cutoutArea = tCutW * tCutD * 2;
-      floorArea -= cutoutArea;
-      roofArea -= cutoutArea;
-      wallArea += (tCutD * h * 2);
-    } else if (room.shape === 'CornerCut' && room.lShapeCutoutWidthMm) {
-      const cutSize = room.lShapeCutoutWidthMm / 1000;
-      const cutoutArea = (cutSize * cutSize) / 2;
-      floorArea -= cutoutArea;
-      roofArea -= cutoutArea;
-      const diagonal = Math.sqrt(cutSize * cutSize * 2);
-      wallArea = wallArea - (cutSize * 2 * h) + (diagonal * h);
     }
 
     let deckingArea = 0;

@@ -172,7 +172,7 @@ export function Sidebar() {
           <>
             <CollapsibleSection title="Base Model & Features" defaultOpen={true}>
               <div className="grid grid-cols-2 gap-2">
-                {['Box', 'Quba', 'LShape', 'Gable', 'TShape', 'CornerCut'].map((shape) => (
+                {['Box', 'LShape', 'Gable'].map((shape) => (
                   <div key={shape} onClick={() => updateRoom({ shape: shape as any })} className={`p-3 rounded-xl text-center cursor-pointer transition-all ${room.shape === shape ? 'bg-[#3b4d4a] text-white shadow-md' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
                     <span className="text-[11px] font-semibold tracking-wide">{shape}</span>
                   </div>
@@ -690,23 +690,11 @@ export function Sidebar() {
                   </div>
                 </div>
               )}
-              {room.shape === 'TShape' && (
+              {room.shape === 'Gable' && (
                 <div className="space-y-3 mt-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-gray-600 w-28">T-Cutout Width</span>
-                    <DeferredInput type="number" value={room.lShapeCutoutWidthMm ?? 1000} onChange={(e) => updateRoom({ lShapeCutoutWidthMm: parseInt(e.target.value) || 0 })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-gray-600 w-28">T-Cutout Depth</span>
-                    <DeferredInput type="number" value={room.lShapeCutoutDepthMm ?? 1000} onChange={(e) => updateRoom({ lShapeCutoutDepthMm: parseInt(e.target.value) || 0 })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
-                  </div>
-                </div>
-              )}
-              {room.shape === 'CornerCut' && (
-                <div className="space-y-3 mt-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-gray-600 w-28">Corner Cut Size</span>
-                    <DeferredInput type="number" value={room.lShapeCutoutWidthMm ?? 1000} onChange={(e) => updateRoom({ lShapeCutoutWidthMm: parseInt(e.target.value) || 0 })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
+                    <span className="text-xs font-medium text-gray-600 w-28">Roof Height</span>
+                    <DeferredInput type="number" value={room.roofHeightMm ?? 200} onChange={(e) => updateRoom({ roofHeightMm: parseInt(e.target.value) || 0 })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
                   </div>
                 </div>
               )}
