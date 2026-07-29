@@ -21,7 +21,7 @@ interface AccountViewProps {
 export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
     const engine = useAppEngine();
     const { user } = useAuth();
-    const { credits, plan, refreshCredits } = useCredits();
+    const { credits, plan, rendersLeft, refreshCredits } = useCredits();
     const { branding, setBranding } = useBranding();
 
     // Editable display name
@@ -97,21 +97,22 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
         if (p?.toLowerCase() === 'master') return '∞';
         if (p?.includes('business') || p?.includes('price_1TKI8')) return 15500;
         if (p?.includes('standard') || p?.includes('price_1TKI6') || p?.includes('price_1TKI7')) return 1500;
-        return 30;
+        return 5;
     };
 
     const isUnlimited = credits === 'Unlimited';
-    const totalCreditsForBar = getCreditTotal(plan);
-    const progressPercent = isUnlimited ? 100 : (typeof credits === 'number' && typeof totalCreditsForBar === 'number' ? Math.min((credits / totalCreditsForBar) * 100, 100) : 0);
-
     const isPaidPlan = plan && (plan.includes('business') || plan.includes('standard') || plan.toLowerCase() === 'master');
+    const totalCreditsForBar = getCreditTotal(plan);
+    const progressPercent = isUnlimited ? 100 : (typeof credits === 'number' && typeof totalCreditsForBar === 'number' ? Math.min((credits / totalCreditsForBar) * 100, 100) : (rendersLeft !== null ? Math.min((rendersLeft / 5) * 100, 100) : 0));
 
     const userDisplay = {
         name: user?.displayName || "No Name Set",
         email: user?.email || "No Email",
         plan: getPlanName(plan),
         credits: {
-            remaining: isUnlimited ? 'Unlimited' : (credits !== null ? credits : '...'),
+            remaining: isPaidPlan 
+                ? (isUnlimited ? 'Unlimited' : (credits !== null ? credits : '...'))
+                : (rendersLeft !== null ? rendersLeft : 0),
             total: totalCreditsForBar,
         },
     };
@@ -198,7 +199,7 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                                     </div>
                                     {!isPaidPlan && (
                                         <p className="text-[10px] text-secondary mt-1">
-                                            Each trial render costs 5 credits. Upgrade for more.
+                                            Free trial limited to 5 renders per day. Upgrade for more.
                                         </p>
                                     )}
                                 </div>

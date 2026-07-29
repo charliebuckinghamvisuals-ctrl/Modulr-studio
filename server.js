@@ -204,12 +204,16 @@ const enforceRenderAccess = async (req, creditCost) => {
     }
 
     if (userPlan === 'free') {
-        // Block all free trial users
-        return {
-            allowed: false,
-            status: 402,
-            body: { error: "Free trials are currently suspended. Please upgrade to a paid plan to generate renders.", upgradeRequired: true }
-        };
+        // Trial path — no credits deducted, daily count enforced
+        const trialCheck = await checkTrialRender(req.user);
+        if (!trialCheck.allowed) {
+            return {
+                allowed: false,
+                status: 402,
+                body: { error: trialCheck.error, upgradeRequired: true }
+            };
+        }
+        return { allowed: true, rendersLeft: trialCheck.rendersLeft };
     }
 
     // Paid path — deduct credits
@@ -1213,26 +1217,57 @@ app.get('/api/user/credits', async (req, res) => {
         const userRef = db.collection('users').doc(req.user.uid);
         const userDoc = await userRef.get();
         if (!userDoc.exists) {
-            await userRef.set({
-                credits: 0, plan: 'free',
-                trialBlocked: true,
-                createdAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-            return res.json({ credits: 0, plan: 'free', rendersLeft: 0, rendersPerDay: 0, trialDaysLeft: 0, trialBlocked: true });
+            // Device/IP fingerprint check to prevent trial abuse via new accounts
+            const clientIp = String(req.ip || req.headers['x-forwarded-for'] || 'unknown');
+            const { createHash } = await import('crypto');
+            const ipHash = createHash('sha256').update(clientIp).digest('hex');
+            
+            const trialFingerprintRef = db.collection('trial_fingerprints').doc(ipHash);
+            const existingTrial = await trialFingerprintRef.get();
+            
+            if (existingTrial.exists) {
+                console.warn(`[TRIAL ABUSE] Blocked repeat trial from IP hash: ${ipHash.slice(0, 8)}...`);
+                await userRef.set({
+                    credits: 0, plan: 'free', trialBlocked: true,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                return res.json({ credits: 0, plan: 'free', rendersLeft: 0, rendersPerDay: RENDERS_PER_DAY, trialDaysLeft: 0, trialBlocked: true });
+            }
+
+            const starterCredits = 0; // Removed starter credits so they can't spam other credit endpoints, but can still use trial renders.
+            await Promise.all([
+                userRef.set({
+                    credits: starterCredits, plan: 'free',
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                }),
+                trialFingerprintRef.set({
+                    uid: req.user.uid,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                })
+            ]);
+            return res.json({ credits: starterCredits, plan: 'free', rendersLeft: RENDERS_PER_DAY, rendersPerDay: RENDERS_PER_DAY, trialDaysLeft: TRIAL_DAYS, trialBlocked: false });
         }
         
         const data = userDoc.data();
         const plan = data.plan || 'free';
 
-        // For free/trial plan: return 0 renders since free trial is suspended
+        // For free/trial plan: enrich response with daily render info
         if (plan === 'free') {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const trialStart = data.trialStartDate || todayStr;
+            const daysSinceStart = Math.floor((Date.now() - new Date(trialStart).getTime()) / 86400000);
+            const trialDaysLeft = Math.max(0, TRIAL_DAYS - daysSinceStart);
+            const renderDate = data.trialRenderDate || '';
+            const rendersToday = renderDate === todayStr ? (data.trialRendersToday || 0) : 0;
+            const rendersLeft = Math.max(0, RENDERS_PER_DAY - rendersToday);
+            
             return res.json({
                 credits: data.credits || 0,
                 plan,
-                rendersLeft: 0,
-                rendersPerDay: 0,
-                trialDaysLeft: 0,
-                trialBlocked: true
+                rendersLeft,
+                rendersPerDay: RENDERS_PER_DAY,
+                trialDaysLeft,
+                trialBlocked: rendersLeft <= 0 || trialDaysLeft <= 0
             });
         }
 
