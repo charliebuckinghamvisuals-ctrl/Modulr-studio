@@ -80,21 +80,19 @@ const deductCredits = async (user, amount) => {
     try {
         const userDoc = await userRef.get();
 
-        // If user doc doesn't exist yet, create it with starter credits
+        // If user doc doesn't exist yet, create it with no credits and block
         if (!userDoc.exists) {
-            const starterCredits = 10;
-            if (starterCredits < amount) {
-                await userRef.set({ credits: starterCredits, plan: 'free', createdAt: admin.firestore.FieldValue.serverTimestamp() });
-                return { success: false, balance: starterCredits, error: "Insufficient credits" };
-            }
-            const newBalance = starterCredits - amount;
-            await userRef.set({ credits: newBalance, plan: 'free', createdAt: admin.firestore.FieldValue.serverTimestamp() });
-            return { success: true, balance: newBalance };
+            await userRef.set({ credits: 0, plan: 'free', createdAt: admin.firestore.FieldValue.serverTimestamp() });
+            return { success: false, balance: 0, error: "Free accounts are currently suspended. Please upgrade to a paid plan." };
         }
 
         const data = userDoc.data();
         const plan = data.plan || 'free';
         const currentCredits = typeof data.credits === 'number' ? data.credits : 0;
+
+        if (plan === 'free' && user.email !== 'charlie@napc.uk') {
+            return { success: false, balance: currentCredits, error: "Free accounts are currently suspended. Please upgrade to a paid plan." };
+        }
 
         // Feature gate: 4K requires Business plan
         if (amount === CREDIT_COSTS.UHD_4K && plan !== 'business' && plan !== 'master') {
@@ -201,17 +199,17 @@ const enforceRenderAccess = async (req, creditCost) => {
         } catch (_) { /* default to free on DB error */ }
     }
 
+    if (userPlan === 'master') {
+        return { allowed: true };
+    }
+
     if (userPlan === 'free') {
-        // Trial path — no credits deducted, daily count enforced
-        const trialCheck = await checkTrialRender(req.user);
-        if (!trialCheck.allowed) {
-            return {
-                allowed: false,
-                status: 402,
-                body: { error: trialCheck.error, upgradeRequired: true }
-            };
-        }
-        return { allowed: true, rendersLeft: trialCheck.rendersLeft };
+        // Block all free trial users
+        return {
+            allowed: false,
+            status: 402,
+            body: { error: "Free trials are currently suspended. Please upgrade to a paid plan to generate renders.", upgradeRequired: true }
+        };
     }
 
     // Paid path — deduct credits
@@ -1215,55 +1213,26 @@ app.get('/api/user/credits', async (req, res) => {
         const userRef = db.collection('users').doc(req.user.uid);
         const userDoc = await userRef.get();
         if (!userDoc.exists) {
-            // Device/IP fingerprint check to prevent trial abuse via new accounts
-            const clientIp = String(req.ip || req.headers['x-forwarded-for'] || 'unknown');
-            const { createHash } = await import('crypto');
-            const ipHash = createHash('sha256').update(clientIp).digest('hex');
-            
-            const trialFingerprintRef = db.collection('trial_fingerprints').doc(ipHash);
-            const existingTrial = await trialFingerprintRef.get();
-            
-            if (existingTrial.exists) {
-                console.warn(`[TRIAL ABUSE] Blocked repeat trial from IP hash: ${ipHash.slice(0, 8)}...`);
-                await userRef.set({
-                    credits: 0, plan: 'free', trialBlocked: true,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-                return res.json({ credits: 0, plan: 'free', rendersLeft: 0, rendersPerDay: RENDERS_PER_DAY, trialDaysLeft: 0, trialBlocked: true });
-            }
-
-            const starterCredits = 5;
-            await Promise.all([
-                userRef.set({
-                    credits: starterCredits, plan: 'free',
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                }),
-                trialFingerprintRef.set({
-                    uid: req.user.uid,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                })
-            ]);
-            return res.json({ credits: starterCredits, plan: 'free', rendersLeft: RENDERS_PER_DAY, rendersPerDay: RENDERS_PER_DAY, trialDaysLeft: TRIAL_DAYS, trialBlocked: false });
+            await userRef.set({
+                credits: 0, plan: 'free',
+                trialBlocked: true,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            return res.json({ credits: 0, plan: 'free', rendersLeft: 0, rendersPerDay: 0, trialDaysLeft: 0, trialBlocked: true });
         }
+        
         const data = userDoc.data();
         const plan = data.plan || 'free';
 
-        // For free/trial plan: enrich response with daily render info
+        // For free/trial plan: return 0 renders since free trial is suspended
         if (plan === 'free') {
-            const todayStr = new Date().toISOString().slice(0, 10);
-            const trialStart = data.trialStartDate || todayStr;
-            const daysSinceStart = Math.floor((Date.now() - new Date(trialStart).getTime()) / 86400000);
-            const trialDaysLeft = Math.max(0, TRIAL_DAYS - daysSinceStart);
-            const renderDate = data.trialRenderDate || '';
-            const rendersToday = renderDate === todayStr ? (data.trialRendersToday || 0) : 0;
-            const rendersLeft = Math.max(0, RENDERS_PER_DAY - rendersToday);
             return res.json({
                 credits: data.credits || 0,
                 plan,
-                rendersLeft,
-                rendersPerDay: RENDERS_PER_DAY,
-                trialDaysLeft,
-                trialBlocked: data.trialBlocked || false
+                rendersLeft: 0,
+                rendersPerDay: 0,
+                trialDaysLeft: 0,
+                trialBlocked: true
             });
         }
 

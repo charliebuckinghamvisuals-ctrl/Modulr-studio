@@ -244,7 +244,7 @@ export function MainScene() {
       
       <group name="environment-background" visible={viewMode !== 'render'}>
         <Environment 
-          files={isNight ? "./textures/night.hdr" : "./textures/outdoor.hdr"} 
+          files={isNight ? "textures/night.hdr" : "textures/garden_nook.hdr"} 
           background 
           blur={0.05} 
           environmentIntensity={isNight ? 0.3 : 1.0} 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export function createWorldScaleBoxGeometry(width: number, height: number, depth: number, multiMaterial = true, offsetX = 0, offsetY = 0, offsetZ = 0) {
+export function createWorldScaleBoxGeometry(width: number, height: number, depth: number, multiMaterial = true, offsetX = 0, offsetY = 0, offsetZ = 0, isVertical = false) {
   const geom = new THREE.BoxGeometry(width, height, depth);
   const uvs = geom.attributes.uv;
 
@@ -14,27 +14,27 @@ export function createWorldScaleBoxGeometry(width: number, height: number, depth
     
     // Group 0: Right (px)
     if (i >= 0 && i < 4) {
-      uvs.setXY(i, -v.z - offsetZ, v.y + height/2 + offsetY);
+      uvs.setXY(i, isVertical ? v.y + height/2 + offsetY : -v.z - offsetZ, isVertical ? -v.z - offsetZ : v.y + height/2 + offsetY);
     }
     // Group 1: Left (nx)
     else if (i >= 4 && i < 8) {
-      uvs.setXY(i, v.z + offsetZ, v.y + height/2 + offsetY);
+      uvs.setXY(i, isVertical ? v.y + height/2 + offsetY : v.z + offsetZ, isVertical ? v.z + offsetZ : v.y + height/2 + offsetY);
     }
     // Group 2: Top (py)
     else if (i >= 8 && i < 12) {
-      uvs.setXY(i, v.x + offsetX, v.z + offsetZ);
+      uvs.setXY(i, isVertical ? v.z + offsetZ : v.x + offsetX, isVertical ? v.x + offsetX : v.z + offsetZ);
     }
     // Group 3: Bottom (ny)
     else if (i >= 12 && i < 16) {
-      uvs.setXY(i, v.x + offsetX, -v.z - offsetZ);
+      uvs.setXY(i, isVertical ? -v.z - offsetZ : v.x + offsetX, isVertical ? v.x + offsetX : -v.z - offsetZ);
     }
     // Group 4: Front (pz)
     else if (i >= 16 && i < 20) {
-      uvs.setXY(i, v.x + offsetX, v.y + height/2 + offsetY);
+      uvs.setXY(i, isVertical ? v.y + height/2 + offsetY : v.x + offsetX, isVertical ? v.x + offsetX : v.y + height/2 + offsetY);
     }
     // Group 5: Back (nz)
     else if (i >= 20 && i < 24) {
-      uvs.setXY(i, -v.x - offsetX, v.y + height/2 + offsetY);
+      uvs.setXY(i, isVertical ? v.y + height/2 + offsetY : -v.x - offsetX, isVertical ? -v.x - offsetX : v.y + height/2 + offsetY);
     }
   }
 
@@ -54,7 +54,7 @@ export function createWorldScaleBoxGeometry(width: number, height: number, depth
   return geom;
 }
 
-export function createWorldScaleGableGeometry(width: number, height: number, depth: number, offsetX = 0, offsetY = 0, offsetZ = 0) {
+export function createWorldScaleGableGeometry(width: number, height: number, depth: number, offsetX = 0, offsetY = 0, offsetZ = 0, isVertical = false) {
   // A triangular prism for the gable ends.
   // Shape is a triangle on the XY plane: (0, height), (-width/2, 0), (width/2, 0)
   // Extruded along Z by depth.
@@ -89,11 +89,11 @@ export function createWorldScaleGableGeometry(width: number, height: number, dep
     }
     
     if (Math.abs(normal.z) > 0.5) {
-        uvs.setXY(i, v.x + offsetX, v.y + height/2 + offsetY);
+        uvs.setXY(i, isVertical ? v.y + height/2 + offsetY : v.x + offsetX, isVertical ? v.x + offsetX : v.y + height/2 + offsetY);
     } else if (Math.abs(normal.x) > 0.5) {
-        uvs.setXY(i, -v.z - offsetZ, v.y + height/2 + offsetY);
+        uvs.setXY(i, isVertical ? v.y + height/2 + offsetY : -v.z - offsetZ, isVertical ? -v.z - offsetZ : v.y + height/2 + offsetY);
     } else {
-        uvs.setXY(i, v.x + offsetX, v.z + offsetZ);
+        uvs.setXY(i, isVertical ? v.z + offsetZ : v.x + offsetX, isVertical ? v.x + offsetX : v.z + offsetZ);
     }
   }
   uvs.needsUpdate = true;

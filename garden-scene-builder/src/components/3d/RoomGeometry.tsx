@@ -285,11 +285,11 @@ export function RoomGeometry() {
   // Base h for backward compatibility in variables
   const h = maxH; 
   
-  const rot = room.claddingOrientation === 'vertical' ? Math.PI / 2 : 0;
-  const texFront = useRealMaterial(room.claddingFront || room.cladding || 'timber', w, frontH, rot);
-  const texBack = useRealMaterial(room.claddingBack || room.cladding || 'timber', w, backH, rot);
-  const texLeft = useRealMaterial(room.claddingLeft || room.cladding || 'timber', d, maxH, rot);
-  const texRight = useRealMaterial(room.claddingRight || room.cladding || 'timber', d, maxH, rot);
+  const isVertical = room.claddingOrientation === 'vertical';
+  const texFront = useRealMaterial(room.claddingFront || room.cladding || 'timber', w, frontH, 0);
+  const texBack = useRealMaterial(room.claddingBack || room.cladding || 'timber', w, backH, 0);
+  const texLeft = useRealMaterial(room.claddingLeft || room.cladding || 'timber', d, maxH, 0);
+  const texRight = useRealMaterial(room.claddingRight || room.cladding || 'timber', d, maxH, 0);
   const texRoof = useRealMaterial(room.roofMaterial || 'epdm', roofW, roofD, 0);
   const texBase = useRealMaterial(room.baseMaterial || 'concrete', baseW, baseD, 0);
   const texDecking = useRealMaterial(room.deckingMaterial || room.cladding || 'timber', baseW, deckFront, 0);
@@ -342,13 +342,13 @@ export function RoomGeometry() {
   const lShapeBaseCutGeom = useMemo(() => createWorldScaleBoxGeometry(cutBoxSize, baseH + 1, cutBoxSize, false, 0, 0, 0), [cutBoxSize, baseH]);
   
   const pfHeight = isGable ? h+roofH : h+0.05;
-  const pfLeftGeom = useMemo(() => createWorldScaleBoxGeometry(wallThickness + 0.002, pfHeight + 0.002, ohFront + 0.01, false, -w/2 + wallThickness/2, 0, d/2 + ohFront/2 - 0.005), [wallThickness, pfHeight, ohFront, w, d]);
-  const pfRightGeom = useMemo(() => createWorldScaleBoxGeometry(wallThickness + 0.002, pfHeight + 0.002, ohFront + 0.01, false, w/2 - wallThickness/2, 0, d/2 + ohFront/2 - 0.005), [wallThickness, pfHeight, ohFront, w, d]);
-  const pfTopGeom = useMemo(() => createWorldScaleBoxGeometry(w + 0.002, 0.3 + 0.002, ohFront + 0.01, false, 0, pfHeight - 0.3, d/2 + ohFront/2 - 0.005), [w, ohFront, pfHeight, d]);
+  const pfLeftGeom = useMemo(() => createWorldScaleBoxGeometry(wallThickness + 0.002, pfHeight + 0.002, ohFront + 0.01, false, -w/2 + wallThickness/2, 0, d/2 + ohFront/2 - 0.005, isVertical), [wallThickness, pfHeight, ohFront, w, d, isVertical]);
+  const pfRightGeom = useMemo(() => createWorldScaleBoxGeometry(wallThickness + 0.002, pfHeight + 0.002, ohFront + 0.01, false, w/2 - wallThickness/2, 0, d/2 + ohFront/2 - 0.005, isVertical), [wallThickness, pfHeight, ohFront, w, d, isVertical]);
+  const pfTopGeom = useMemo(() => createWorldScaleBoxGeometry(w + 0.002, 0.3 + 0.002, ohFront + 0.01, false, 0, pfHeight - 0.3, d/2 + ohFront/2 - 0.005, isVertical), [w, ohFront, pfHeight, d, isVertical]);
 
-  const claddingBoxGeom = useMemo(() => createWorldScaleBoxGeometry(w, h + 0.05, d, true, 0, 0, 0), [w, h, d]);
-  const gableTriangleGeom = useMemo(() => createWorldScaleGableGeometry(w, roofH, wallThickness, 0, h + 0.05, 0), [w, roofH, wallThickness, h]);
-  const lShapeCutOuterGeom = useMemo(() => createWorldScaleBoxGeometry(cutW + 0.2, h + 1, cutD + 0.2, false, 0, 0, 0), [cutW, cutD, h, roofH, isGable]);
+  const claddingBoxGeom = useMemo(() => createWorldScaleBoxGeometry(w, h + 0.05, d, true, 0, 0, 0, isVertical), [w, h, d, isVertical]);
+  const gableTriangleGeom = useMemo(() => createWorldScaleGableGeometry(w, roofH, wallThickness, 0, h + 0.05, 0, isVertical), [w, roofH, wallThickness, h, isVertical]);
+  const lShapeCutOuterGeom = useMemo(() => createWorldScaleBoxGeometry(cutW + 0.2, h + 1, cutD + 0.2, false, 0, 0, 0, isVertical), [cutW, cutD, h, roofH, isGable, isVertical]);
   const roofFlatGeom = useMemo(() => createWorldScaleBoxGeometry(roofW + 0.2, roofH, roofD + 0.2, false, 0, 0, 0), [roofW, roofH, roofD]);
   const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohLeft) / Math.cos(gablePitch), 0.1, roofD + 0.2, false, 0, 0, 0), [w, ohLeft, gablePitch, roofD]);
   const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohRight) / Math.cos(gablePitch), 0.1, roofD + 0.2, false, 0, 0, 0), [w, ohRight, gablePitch, roofD]);
