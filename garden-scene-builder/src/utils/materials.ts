@@ -23,44 +23,72 @@ export const MATERIAL_DEF = {
   metal: { prefix: 'slate_roof', tileSize: 2.0, roughness: 0.4, color: '#777777' },
   slate: { prefix: 'slate_roof', tileSize: 1.0, roughness: 0.9, color: '#ffffff' },
   concrete: { prefix: 'sedum', tileSize: 4.0, roughness: 1.0, color: '#aaaaaa' },
+  black_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.7, color: '#262729' },
+  grey_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.6, color: '#6e737b' },
+  cedar_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.6, color: '#be7847' },
+  oak_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.6, color: '#cca278' },
+  cedar_cladding: { prefix: 'Cedar Timber Cladding', tileSize: 2.0, roughness: 1.0, color: '#ffffff', ext: 'png', singleMap: true },
+  oak_cladding: { prefix: 'Oak timber cladding', tileSize: 2.0, roughness: 1.0, color: '#ffffff', ext: 'png', singleMap: true },
   default: { prefix: 'larch', tileSize: 2.0, roughness: 1.0, color: '#ffffff' }
 };
 
 export function useRealMaterial(materialKey: string, widthMeters: number, heightMeters: number, rotation: number = 0) {
   const claddingWidthMm = useStore(state => state.scene.room.claddingWidthMm) || 100;
+  const claddingOrientation = useStore(state => state.scene.room.claddingOrientation);
   
   const def = MATERIAL_DEF[materialKey as keyof typeof MATERIAL_DEF] || MATERIAL_DEF.default;
     
     // Step 3: Use real photographic CC0 PBR sets
-    const textures = useTexture({
-        map: `./textures/${def.prefix}_color.${(def as any).ext || 'jpg'}`,
-        normalMap: `./textures/${def.prefix}_normal.${(def as any).ext || 'jpg'}`,
-        roughnessMap: `./textures/${def.prefix}_roughness.${(def as any).ext || 'jpg'}`,
-        aoMap: `./textures/${def.prefix}_ao.${(def as any).ext || 'jpg'}`,
-    });
+    const texturePaths: any = {};
+    if ((def as any).singleMap) {
+        texturePaths.map = `./textures/${def.prefix}.${(def as any).ext || 'jpg'}`;
+    } else {
+        texturePaths.map = `./textures/${def.prefix}_color.${(def as any).ext || 'jpg'}`;
+        texturePaths.normalMap = `./textures/${def.prefix}_normal.${(def as any).ext || 'jpg'}`;
+        texturePaths.roughnessMap = `./textures/${def.prefix}_roughness.${(def as any).ext || 'jpg'}`;
+        if (def.prefix !== 'synthetic_wood') {
+            texturePaths.aoMap = `./textures/${def.prefix}_ao.${(def as any).ext || 'jpg'}`;
+        }
+    }
+    const textures: any = useTexture(texturePaths);
 
     const cloned = useMemo(() => {
-        const maps = {
-            map: textures.map.clone(),
-            normalMap: textures.normalMap.clone(),
-            roughnessMap: textures.roughnessMap.clone(),
-            aoMap: textures.aoMap.clone()
-        };
+        const maps: any = {};
+        if (textures.map) maps.map = textures.map.clone();
+        if (textures.normalMap) maps.normalMap = textures.normalMap.clone();
+        if (textures.roughnessMap) maps.roughnessMap = textures.roughnessMap.clone();
+        if (textures.aoMap && def.prefix !== 'synthetic_wood') maps.aoMap = textures.aoMap.clone();
 
-        const setupMap = (m: THREE.Texture, isColor: boolean) => {
+        const setupMap = (m: THREE.Texture | undefined, isColor: boolean) => {
             if (!m) return;
             m.wrapS = THREE.RepeatWrapping;
             m.wrapT = THREE.RepeatWrapping;
             m.colorSpace = isColor ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
-            m.anisotropy = 16; // Step 3: Set anisotropy to max
+            m.anisotropy = 4; // Optimized anisotropy to prevent lag on 4K textures
             
-            // Step 4: World-space UV scaling
-            // Scale based on claddingWidthMm (100 = 1x scale, 50 = 2x repeat, 200 = 0.5x repeat).
+            // World-space board scaling
             const isCladding = def.prefix !== 'slate_roof' && def.prefix !== 'sedum';
-            const scale = isCladding ? claddingWidthMm / 100 : 1;
             
-            let s = 1 / (def.tileSize * scale);
-            m.repeat.set(s, s);
+            let s_x = 1 / (def.tileSize * (isCladding ? claddingWidthMm / 100 : 1));
+            let s_y = 1 / (def.tileSize * (isCladding ? claddingWidthMm / 100 : 1));
+            
+            if (isCladding) {
+                // Force all cladding materials to stretch full length up the wall height (0 horizontal cut lines)
+                const wallHeight = heightMeters > 0 ? heightMeters : 2.5;
+                s_y = 1 / wallHeight;
+
+                if (def.prefix === 'synthetic_wood') {
+                    const singleBoardMeters = claddingWidthMm / 1000;
+                    const textureWidthMeters = 16 * singleBoardMeters;
+                    s_x = 1 / textureWidthMeters;
+                } else if ((def as any).singleMap) {
+                    const singleBoardMeters = claddingWidthMm / 1000;
+                    const textureWidthMeters = 12 * singleBoardMeters;
+                    s_x = 1 / textureWidthMeters;
+                }
+            }
+            
+            m.repeat.set(s_x, s_y);
             m.center.set(0.5, 0.5);
             m.rotation = rotation;
             m.needsUpdate = true;
@@ -72,7 +100,7 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
         setupMap(maps.aoMap, false);
 
         return maps;
-    }, [textures, widthMeters, heightMeters, rotation, def]);
+    }, [textures, widthMeters, heightMeters, rotation, def, claddingWidthMm, claddingOrientation]);
 
     return { 
         ...cloned, 

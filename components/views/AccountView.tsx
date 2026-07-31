@@ -89,19 +89,17 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
         if (!p) return "Free Trial";
         if (p.toLowerCase() === 'master') return 'Modulr Master';
         if (p.includes('business') || p.includes('price_1TKI8')) return 'Business Plan';
-        if (p.includes('standard') || p.includes('price_1TKI6') || p.includes('price_1TKI7')) return 'Standard Plan';
         return 'Free Trial';
     };
 
     const getCreditTotal = (p: string | null) => {
         if (p?.toLowerCase() === 'master') return '∞';
         if (p?.includes('business') || p?.includes('price_1TKI8')) return 15500;
-        if (p?.includes('standard') || p?.includes('price_1TKI6') || p?.includes('price_1TKI7')) return 1500;
         return 5;
     };
 
     const isUnlimited = credits === 'Unlimited';
-    const isPaidPlan = plan && (plan.includes('business') || plan.includes('standard') || plan.toLowerCase() === 'master');
+    const isPaidPlan = plan && (plan.includes('business') || plan.toLowerCase() === 'master');
     const totalCreditsForBar = getCreditTotal(plan);
     const progressPercent = isUnlimited ? 100 : (typeof credits === 'number' && typeof totalCreditsForBar === 'number' ? Math.min((credits / totalCreditsForBar) * 100, 100) : (rendersLeft !== null ? Math.min((rendersLeft / 5) * 100, 100) : 0));
 

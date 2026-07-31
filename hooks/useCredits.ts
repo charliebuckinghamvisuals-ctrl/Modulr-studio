@@ -11,6 +11,7 @@ interface CreditsData {
     rendersPerDay?: number;
     trialDaysLeft?: number;
     trialBlocked?: boolean;
+    trialExpiresAt?: string;
 }
 
 export function useCredits() {
@@ -21,6 +22,7 @@ export function useCredits() {
     const [rendersPerDay, setRendersPerDay] = useState<number | null>(null);
     const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
     const [trialBlocked, setTrialBlocked] = useState(false);
+    const [trialExpiresAt, setTrialExpiresAt] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     const fetchCredits = async () => {
@@ -39,6 +41,7 @@ export function useCredits() {
             setRendersPerDay(data.rendersPerDay ?? null);
             setTrialDaysLeft(data.trialDaysLeft ?? null);
             setTrialBlocked(data.trialBlocked ?? false);
+            setTrialExpiresAt(data.trialExpiresAt ?? null);
         } catch (error) {
             console.error("Error fetching credits:", error);
         } finally {
@@ -56,12 +59,13 @@ export function useCredits() {
             setRendersPerDay(null);
             setTrialDaysLeft(null);
             setTrialBlocked(false);
+            setTrialExpiresAt(null);
             setLoading(false);
         }
     }, [user]);
 
     return {
         credits, plan, loading, refreshCredits: fetchCredits,
-        rendersLeft, rendersPerDay, trialDaysLeft, trialBlocked
+        rendersLeft, rendersPerDay, trialDaysLeft, trialBlocked, trialExpiresAt
     };
 }

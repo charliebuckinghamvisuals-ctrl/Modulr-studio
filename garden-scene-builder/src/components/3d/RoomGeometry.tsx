@@ -285,7 +285,7 @@ export function RoomGeometry() {
   // Base h for backward compatibility in variables
   const h = maxH; 
   
-  const isVertical = room.claddingOrientation === 'vertical';
+  const isVertical = room.claddingOrientation !== 'vertical';
   const texFront = useRealMaterial(room.claddingFront || room.cladding || 'timber', w, frontH, 0);
   const texBack = useRealMaterial(room.claddingBack || room.cladding || 'timber', w, backH, 0);
   const texLeft = useRealMaterial(room.claddingLeft || room.cladding || 'timber', d, maxH, 0);
@@ -295,7 +295,7 @@ export function RoomGeometry() {
   const texDecking = useRealMaterial(room.deckingMaterial || room.cladding || 'timber', baseW, deckFront, 0);
   const texFloor = useRealMaterial(room.interiorFloorType || 'oak', w, d, 0);
 
-  const isVert = room.claddingOrientation === 'vertical';
+  const isVert = room.claddingOrientation !== 'vertical';
   const geomFrontWall = useMemo(() => createCladdingGeometry(w, frontH, isVert), [w, frontH, isVert]);
   const geomBackWall = useMemo(() => createCladdingGeometry(w, backH, isVert), [w, backH, isVert]);
   const geomLeftWall = useMemo(() => createCladdingGeometry(d, maxH, isVert), [d, maxH, isVert]);

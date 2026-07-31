@@ -60,6 +60,11 @@ const CREDIT_COSTS = {
     ANALYSIS: 2        // Basic visual analysis
 };
 
+// Try Before You Buy Trial Constants
+const RENDERS_PER_DAY = 5;    // Max renders during trial
+const TRIAL_HOURS = 24;       // Trial window in hours (1 day)
+const TRIAL_DAYS = 1;         // Legacy compat — 1 day
+
 /**
  * Helper to check and deduct credits from a user's account
  * @param {object} user - Firebase User Object
@@ -120,54 +125,50 @@ const deductCredits = async (user, amount) => {
  * Trial: 5 renders/day for 3 days. No credits involved.
  */
 const checkTrialRender = async (user) => {
-    if (!db) return { allowed: true }; // dev mode bypass
+    if (!db) return { allowed: true };
     if (user.email === 'charlie@napc.uk') return { allowed: true };
 
     const userRef = db.collection('users').doc(user.uid);
-    const RENDERS_PER_DAY = 5;
-    const TRIAL_DAYS = 3;
 
     try {
         const userDoc = await userRef.get();
-        const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        const now = Date.now();
 
         if (!userDoc.exists) {
+            const trialExpiresAt = new Date(now + TRIAL_HOURS * 3600000).toISOString();
             await userRef.set({
                 plan: 'free',
-                trialStartDate: todayStr,
-                trialRenderDate: todayStr,
-                trialRendersToday: 1,
-                trialRendersTotal: 1,
+                trialStartTimestamp: now,
+                trialExpiresAt: trialExpiresAt,
+                trialRendersUsed: 1,
                 createdAt: admin.firestore.FieldValue.serverTimestamp()
             });
             return { allowed: true, rendersLeft: RENDERS_PER_DAY - 1 };
         }
 
         const data = userDoc.data();
-        const trialStart = data.trialStartDate || todayStr;
-        const daysSinceStart = Math.floor((Date.now() - new Date(trialStart).getTime()) / 86400000);
+        const trialStart = data.trialStartTimestamp || now;
+        const trialExpiresAt = data.trialExpiresAt || new Date(trialStart + TRIAL_HOURS * 3600000).toISOString();
+        const msElapsed = now - trialStart;
 
-        if (daysSinceStart >= TRIAL_DAYS) {
-            return { allowed: false, error: 'Your 3-day free trial has ended. Upgrade to keep rendering.' };
+        if (msElapsed >= TRIAL_HOURS * 3600000) {
+            return { allowed: false, error: 'Your 24-hour trial has ended. Upgrade to the Business Plan to continue rendering.' };
         }
 
-        const renderDate = data.trialRenderDate || '';
-        const rendersToday = renderDate === todayStr ? (data.trialRendersToday || 0) : 0;
+        const rendersUsed = data.trialRendersUsed || 0;
 
-        if (rendersToday >= RENDERS_PER_DAY) {
-            return { allowed: false, error: 'Daily limit reached (5 renders/day on trial). Resets at midnight or upgrade your plan.' };
+        if (rendersUsed >= RENDERS_PER_DAY) {
+            return { allowed: false, error: 'Trial limit reached (5 renders). Upgrade to Business for unlimited access.' };
         }
 
         await userRef.update({
-            trialRenderDate: todayStr,
-            trialRendersToday: rendersToday + 1,
-            trialRendersTotal: admin.firestore.FieldValue.increment(1)
+            trialRendersUsed: rendersUsed + 1
         });
-        return { allowed: true, rendersLeft: RENDERS_PER_DAY - (rendersToday + 1) };
+        return { allowed: true, rendersLeft: RENDERS_PER_DAY - (rendersUsed + 1) };
 
     } catch (e) {
         console.error('[TRIAL] Check failed:', e.message || e);
-        return { allowed: true }; // fail open - never block renders on DB issues
+        return { allowed: true }; // fail open
     }
 };
 
@@ -1246,9 +1247,13 @@ app.get('/api/user/credits', async (req, res) => {
             }
 
             const starterCredits = 0; // Removed starter credits so they can't spam other credit endpoints, but can still use trial renders.
+            const now = Date.now();
+            const trialExpiresAt = new Date(now + TRIAL_HOURS * 3600000).toISOString();
             await Promise.all([
                 userRef.set({
                     credits: starterCredits, plan: 'free',
+                    trialStartTimestamp: now,
+                    trialExpiresAt: trialExpiresAt,
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 }),
                 trialFingerprintRef.set({
@@ -1256,7 +1261,7 @@ app.get('/api/user/credits', async (req, res) => {
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 })
             ]);
-            return res.json({ credits: starterCredits, plan: 'free', rendersLeft: RENDERS_PER_DAY, rendersPerDay: RENDERS_PER_DAY, trialDaysLeft: TRIAL_DAYS, trialBlocked: false });
+            return res.json({ credits: starterCredits, plan: 'free', rendersLeft: RENDERS_PER_DAY, rendersPerDay: RENDERS_PER_DAY, trialDaysLeft: 1, trialExpiresAt, trialBlocked: false });
         }
         
         const data = userDoc.data();
@@ -1264,21 +1269,22 @@ app.get('/api/user/credits', async (req, res) => {
 
         // For free/trial plan: enrich response with daily render info
         if (plan === 'free') {
-            const todayStr = new Date().toISOString().slice(0, 10);
-            const trialStart = data.trialStartDate || todayStr;
-            const daysSinceStart = Math.floor((Date.now() - new Date(trialStart).getTime()) / 86400000);
-            const trialDaysLeft = Math.max(0, TRIAL_DAYS - daysSinceStart);
-            const renderDate = data.trialRenderDate || '';
-            const rendersToday = renderDate === todayStr ? (data.trialRendersToday || 0) : 0;
-            const rendersLeft = Math.max(0, RENDERS_PER_DAY - rendersToday);
+            const now = Date.now();
+            const trialStart = data.trialStartTimestamp || now;
+            const trialExpiresAt = data.trialExpiresAt || new Date(trialStart + TRIAL_HOURS * 3600000).toISOString();
+            const msElapsed = now - trialStart;
+            const trialExpired = msElapsed >= TRIAL_HOURS * 3600000;
+            const rendersUsed = data.trialRendersUsed || 0;
+            const rendersLeft = Math.max(0, RENDERS_PER_DAY - rendersUsed);
             
             return res.json({
                 credits: data.credits || 0,
                 plan,
                 rendersLeft,
                 rendersPerDay: RENDERS_PER_DAY,
-                trialDaysLeft,
-                trialBlocked: rendersLeft <= 0 || trialDaysLeft <= 0
+                trialDaysLeft: trialExpired ? 0 : 1,
+                trialExpiresAt: trialExpiresAt,
+                trialBlocked: rendersLeft <= 0 || trialExpired
             });
         }
 

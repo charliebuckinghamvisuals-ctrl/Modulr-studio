@@ -105,14 +105,18 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                                 },
                                 {
                                     title: "3D Configurator",
-                                    desc: "A streamlined, free builder for standard footprints. Define your structure in minutes, then send it straight to the Render Engine for photorealistic magic."
+                                    desc: "A streamlined, free builder for standard footprints. Define your structure in minutes, then send it straight to the Render Engine for photorealistic magic.",
+                                    comingSoon: true
                                 }
                             ].map((tool, idx) => (
-                                <div key={idx} className="glass-panel p-6 rounded-3xl border border-border bg-white/60 backdrop-blur-xl hover:border-accent/40 hover:shadow-xl transition-all duration-300 group flex flex-col h-full text-left">
+                                <div key={idx} className="relative glass-panel p-6 rounded-3xl border border-border bg-white/60 backdrop-blur-xl hover:border-accent/40 hover:shadow-xl transition-all duration-300 group flex flex-col h-full text-left">
                                     <h4 className="text-accent font-bold text-xl mb-3">{tool.title}</h4>
                                     <p className="text-slate-600 leading-relaxed text-sm flex-1">
                                         {tool.desc}
                                     </p>
+                                    {tool.comingSoon && (
+                                        <span className="absolute top-4 right-4 text-[8px] font-bold uppercase tracking-wider bg-[#405a56]/10 text-[#405a56] px-2 py-1 rounded-full z-10">Coming Soon</span>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -186,10 +190,13 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                                 title="Architectural Intelligence"
                                 description="Trained on UK garden room construction: timber frame, SIPs, glazing systems, flat and pitched roofs. Our engine understands the details that matter to your clients."
                             />
-                            <FeatureCard
-                                title="3D Configurator"
-                                description="A focused, fast builder for standard building types (Box, L-Shape, Gable). Define the footprint quickly, render it beautifully—no overcomplicated design tools needed."
-                            />
+                            <div className="relative">
+                                <FeatureCard
+                                    title="3D Configurator"
+                                    description="A focused, fast builder for standard building types (Box, L-Shape, Gable). Define the footprint quickly, render it beautifully—no overcomplicated design tools needed."
+                                />
+                                <span className="absolute top-4 right-4 text-[8px] font-bold uppercase tracking-wider bg-[#405a56]/10 text-[#405a56] px-2 py-1 rounded-full z-10 pointer-events-none">Coming Soon</span>
+                            </div>
                         </div>
                     </div>
             </div >

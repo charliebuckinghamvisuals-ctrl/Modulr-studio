@@ -40,7 +40,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
         }
 
         setLoadingPlan(priceId);
-        trackBeginCheckout(planName, isOneTime ? creditsAmount / 100 : (planName === 'business' ? 189.99 : 35));
+        trackBeginCheckout(planName, isOneTime ? creditsAmount / 100 : 189.99);
         try {
 
             const token = await user.getIdToken();
@@ -136,16 +136,16 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                 </div>
 
                 {/* Pricing Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl items-center pb-20 mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl items-stretch pb-20 mx-auto">
 
                     {/* Free Trial Entry */}
                     <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-surface/40 hover:bg-surface/60 transition-all duration-300 relative group shadow-[0_20px_50px_rgba(0,0,0,0.1)]">
                         <div className="mb-6 text-white">
-                            <h3 className="text-xl font-extrabold text-accent mb-2 flex items-center gap-2">Free Trial</h3>
-                            <p className="text-sm text-secondary min-h-[40px]">Test the engine with 1080p high definition output.</p>
+                            <h3 className="text-xl font-extrabold text-accent mb-2 flex items-center gap-2">Try Before You Buy</h3>
+                            <p className="text-sm text-secondary min-h-[40px]">Experience the full power of our engine. No card required.</p>
                         </div>
                         <div className="mb-8 font-black text-4xl text-primary dark:text-white">
-                            3 Days
+                            24 Hours
                         </div>
 
                         <Button 
@@ -158,11 +158,11 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         <div className="space-y-4 flex-1">
                             <div className="text-xs font-bold uppercase tracking-widest text-secondary mb-2">The Taster Package</div>
                             {[
-                                '5 Renders / Day (3 Days)',
-                                '1080p High Definition only',
-                                'Standard & Pro Modes included',
-                                'Access All Tools (Taster)',
-                                'Refinement Studio'
+                                '5 Renders (24-Hour Window)',
+                                '1080p High Definition Output',
+                                'Standard & Pro Modes Included',
+                                'Access All Core Tools',
+                                'Refinement Studio Access'
                             ].map((feature, i) => (
                                 <div key={i} className="flex items-start gap-3">
                                     <Sparkles size={18} className="text-accent shrink-0 mt-0.5" />
@@ -172,55 +172,6 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         </div>
                     </div>
 
-                    {/* Standard Plan */}
-                    <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-surface/40 hover:bg-surface/60 transition-all duration-300 relative group shadow-[0_20px_50px_rgba(0,0,0,0.1)]">
-                        <div className="mb-6">
-                            <h3 className="text-xl font-extrabold text-primary mb-2 flex items-center gap-2">Standard</h3>
-                            <p className="text-sm text-secondary min-h-[40px]">Perfect for smaller projects and high-volume basic visuals.</p>
-                        </div>
-                        <div className="mb-8">
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-4xl font-black text-primary dark:text-white">
-                                    £{billingCycle === 'monthly' ? '35' : '315'}
-                                </span>
-                                <span className="text-xs font-bold text-secondary uppercase tracking-tighter self-end mb-1">inc VAT</span>
-                            </div>
-                            <span className="text-secondary font-medium"> / {billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
-                            {billingCycle === 'yearly' && (
-                                <div className="text-[10px] font-bold text-green-500 uppercase mt-1">
-                                    £26.25 effective monthly
-                                </div>
-                            )}
-                        </div>
-
-                        <Button 
-                            className="w-full mb-8 shadow-xl" 
-                            onClick={() => handleUpgrade(
-                                'standard', 
-                                billingCycle === 'monthly' ? 'price_1TM28BHtB5liiqHx3i4x0Gkp' : 'price_1TM2OfHtB5liiqHxRwZoscAa',
-                                1500
-                            )}
-                            disabled={loadingPlan !== null}
-                        >
-                            {loadingPlan === (billingCycle === 'monthly' ? 'price_1TM28BHtB5liiqHx3i4x0Gkp' : 'price_1TM2OfHtB5liiqHxRwZoscAa') ? <Loader2 className="animate-spin" /> : 'Upgrade Now'}
-                        </Button>
-
-                        <div className="space-y-4 flex-1">
-                            <div className="text-xs font-bold uppercase tracking-widest text-secondary mb-2">Everything in Free, plus:</div>
-                            {[
-                                '1,500 Credits / mo (50 Renders)',
-                                'Standard & Pro Engine Modes',
-                                'Strictly 1080p Resolution only',
-                                'Line Converter & Refinement',
-                                'No Brand Material Presets'
-                            ].map((feature, i) => (
-                                <div key={i} className="flex items-start gap-3">
-                                    <Check size={18} className="text-accent shrink-0 mt-0.5" />
-                                    <span className="text-sm text-primary/80 leading-tight">{feature}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
 
                     {/* Business Plan (Highlighted) */}
                     <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-gradient-to-b from-surface/80 to-accent/5 relative transition-all duration-500 shadow-[0_30px_60px_rgba(139,92,246,0.15)] group">
@@ -360,11 +311,11 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             <div className="flex flex-wrap justify-center lg:justify-start gap-3 text-sm">
                                 <div className="flex items-center gap-2 py-2 px-4 rounded-2xl bg-slate-50 border border-border">
                                     <span className="font-black text-accent">30 Credits</span>
-                                    <span className="text-secondary text-xs font-medium">Standard (1080p)</span>
+                                    <span className="text-secondary text-xs font-medium">HD Render (1080p)</span>
                                 </div>
                                 <div className="flex items-center gap-2 py-2 px-4 rounded-2xl bg-slate-50 border border-border">
                                     <span className="font-black text-accent">60 Credits</span>
-                                    <span className="text-secondary text-xs font-medium">Ultra HD (4K) — Business only</span>
+                                    <span className="text-secondary text-xs font-medium">Ultra HD (4K)</span>
                                 </div>
                             </div>
                             <p className="text-[10px] text-secondary/60 uppercase tracking-widest font-black mt-2">100% Transparency • No Hidden Fees</p>

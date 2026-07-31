@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
 import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, Info, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool, ShieldCheck } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { AppStage } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useCredits } from '../hooks/useCredits';
@@ -87,8 +88,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     setIsMobileMenuOpen(false);
   }, [activeStage]);
 
-  const toolItems = [
-    { id: AppStage.DESIGNER, label: '3D Config' },
+  const toolItems: Array<{ id: AppStage; label: string; comingSoon?: boolean; icon?: React.ReactNode }> = [
+    { id: AppStage.DESIGNER, label: '3D Config', comingSoon: true },
     { id: AppStage.RENDER_ENGINE, label: 'Render Engine' },
     { id: AppStage.LINE_CONVERT, label: 'Line Converter' },
     { id: AppStage.EDITOR, label: 'Refinement Studio' },
@@ -138,16 +139,23 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
             return (
               <button
                 key={item.id}
-                onClick={() => onNavigate(item.id)}
+                onClick={() => {
+                  if (item.comingSoon) {
+                    toast('3D Configurator is coming soon!', { icon: '🚀' });
+                  } else {
+                    onNavigate(item.id);
+                  }
+                }}
                 className={`px-4 py-2.5 text-xs ${
                   item.id === AppStage.RENDER_ENGINE 
                     ? 'font-bold uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap ' + (isActive ? 'bg-green-400 text-slate-900 shadow-[0_0_15px_rgba(74,222,128,0.3)]' : 'bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20')
                     : 'font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap ' + (isActive ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10')
-                }`}
+                } ${item.comingSoon ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <span className="relative z-10 whitespace-nowrap">
+                <span className="relative z-10 whitespace-nowrap flex items-center">
                   {item.id === AppStage.RENDER_ENGINE && !isActive && <Sparkles size={12} className="inline mr-1 mb-0.5" />}
                   {item.label}
+                  {item.comingSoon && <span className="text-[8px] font-bold uppercase tracking-wider bg-[#405a56]/10 text-[#405a56] px-1.5 py-0.5 rounded-full ml-1">Soon</span>}
                 </span>
               </button>
             );
@@ -313,11 +321,20 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           {toolItems.map(item => (
             <button
               key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className="w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-medium text-secondary/40 hover:bg-slate-50 transition-all"
+              onClick={() => {
+                if (item.comingSoon) {
+                  toast('3D Configurator is coming soon!', { icon: '🚀' });
+                } else {
+                  onNavigate(item.id);
+                }
+              }}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-medium transition-all ${item.comingSoon ? 'opacity-50 cursor-not-allowed text-secondary/40' : 'text-secondary/40 hover:bg-slate-50'}`}
             >
               <span className="shrink-0 opacity-40">{item.icon}</span>
-              <span>{item.label}</span>
+              <span className="flex items-center">
+                {item.label}
+                {item.comingSoon && <span className="text-[8px] font-bold uppercase tracking-wider bg-[#405a56]/10 text-[#405a56] px-1.5 py-0.5 rounded-full ml-2">Soon</span>}
+              </span>
               <span className="ml-auto text-[9px] font-black uppercase bg-slate-100 text-secondary/50 px-2 py-0.5 rounded-full tracking-widest whitespace-nowrap">Desktop</span>
             </button>
           ))}

@@ -509,16 +509,10 @@ export function Sidebar() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {[
-                            { id: 'composite_wood', color: 'bg-[#a07446]', name: 'Wood Composite' },
-                            { id: 'composite_black', color: 'bg-[#2a2c2e]', name: 'Black Composite' },
-                            { id: 'composite_grey', color: 'bg-[#5c5c5c]', name: 'Grey Composite' },
-                            { id: 'oak', color: 'bg-[#a37e54]', name: 'Natural Oak' },
-                            { id: 'cedar', color: 'bg-[#b67a53]', name: 'Cedar' },
-                            { id: 'render_white', color: 'bg-[#f4efe0] border border-black/10', name: 'White Render' },
-                            { id: 'box_metal_grey', color: 'bg-[#4a4d50]', name: 'Box Metal (Grey)' },
-                            { id: 'box_metal_black', color: 'bg-[#1c1e1f]', name: 'Box Metal (Black)' },
-                            { id: 'corrugated_metal', color: 'bg-[#808285]', name: 'Corrugated Metal' },
-                            { id: 'fire_board_grey', color: 'bg-[#8c9298]', name: 'Fire Board (Grey)' },
+                            { id: 'cedar_composite', color: 'bg-[#be7847]', name: 'Cedar Composite' },
+                            { id: 'oak_composite', color: 'bg-[#cca278]', name: 'Oak Composite' },
+                            { id: 'black_composite', color: 'bg-[#262729]', name: 'Black Composite' },
+                            { id: 'grey_composite', color: 'bg-[#6e737b]', name: 'Grey Composite' },
                           ].map((cladding) => {
                             const isActive = field.key === 'cladding' 
                                ? room.cladding === cladding.id 
