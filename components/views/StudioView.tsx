@@ -19,22 +19,7 @@ export const StudioView: React.FC<StudioViewProps> = ({ engine, selectedBatchInd
 
     const studioControls = (
         <div className="flex flex-col h-full space-y-4">
-            <div className="flex flex-col gap-2 w-full">
-                <ToggleSwitch 
-                    isOn={engine.isHighQuality} 
-                    onToggle={() => engine.setIsHighQuality(!engine.isHighQuality)} 
-                    label={engine.isHighQuality ? '4K Ultra HD' : 'Standard HD'}
-                    icon={<Sparkles size={14} className={engine.isHighQuality ? 'text-accent' : 'text-slate-400'} />}
-                    activeColor="bg-accent"
-                />
-                <ToggleSwitch 
-                    isOn={engine.isProMode} 
-                    onToggle={() => engine.setIsProMode(!engine.isProMode)} 
-                    label={engine.isProMode ? 'Pro Mode' : 'Standard'}
-                    icon={<Zap size={14} className={engine.isProMode ? 'text-accent' : 'text-slate-400'} />}
-                    activeColor="bg-accent"
-                />
-            </div>
+
 
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Studio Background</label>

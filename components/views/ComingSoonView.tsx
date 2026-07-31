@@ -164,12 +164,14 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                             <p className="text-[11px] text-slate-500 leading-tight">Elevate SketchUp, CAD, and line drawings into scenes.</p>
                         </div>
 
-                        <div className="p-4 rounded-2xl bg-white/60 border border-[#405a56]/10 space-y-1">
-                            <div className="flex items-center gap-2 text-[#405a56] text-xs font-bold uppercase tracking-wider">
-                                <Hexagon size={12} />
-                                <span>3D Config</span>
+                        <div className="p-4 rounded-2xl bg-white/60 border border-[#405a56]/10 space-y-1 relative">
+                            <div className="flex items-center justify-between text-[#405a56] text-xs font-bold uppercase tracking-wider">
+                                <div className="flex items-center gap-2">
+                                    <Hexagon size={12} />
+                                    <span>3D Config</span>
+                                </div>
                             </div>
-                            <p className="text-[11px] text-slate-500 leading-tight">Interactive real-time 3D garden room designer.</p>
+                            <p className="text-[11px] text-slate-500 leading-tight">In Development — launch date TBD.</p>
                         </div>
                     </div>
 

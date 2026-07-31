@@ -190,13 +190,11 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                                 title="Architectural Intelligence"
                                 description="Trained on UK garden room construction: timber frame, SIPs, glazing systems, flat and pitched roofs. Our engine understands the details that matter to your clients."
                             />
-                            <div className="relative">
-                                <FeatureCard
-                                    title="3D Configurator"
-                                    description="A focused, fast builder for standard building types (Box, L-Shape, Gable). Define the footprint quickly, render it beautifully—no overcomplicated design tools needed."
-                                />
-                                <span className="absolute top-4 right-4 text-[8px] font-bold uppercase tracking-wider bg-[#405a56]/10 text-[#405a56] px-2 py-1 rounded-full z-10 pointer-events-none">Coming Soon</span>
-                            </div>
+                            <FeatureCard
+                                title="3D Configurator"
+                                description="A focused, fast builder for standard building types (Box, L-Shape, Gable). Define the footprint quickly, render it beautifully—no overcomplicated design tools needed."
+                                badge="In Development"
+                            />
                         </div>
                     </div>
             </div >
@@ -295,13 +293,21 @@ interface FeatureCardProps {
     features?: string[];
     actionLabel?: string;
     onAction?: () => void;
+    badge?: string;
 }
 
-const FeatureCard: React.FC<FeatureCardProps> = ({ title, description, features, actionLabel, onAction }) => (
-    <div className="p-10 rounded-[35px] glass-panel bg-white/95 shadow-[0_15px_40px_rgba(0,0,0,0.1)] relative overflow-hidden group border border-slate-300 hover:border-accent/60 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_25px_60px_rgba(0,0,0,0.2)] backdrop-blur-xl">
+const FeatureCard: React.FC<FeatureCardProps> = ({ title, description, features, actionLabel, onAction, badge }) => (
+    <div className="p-10 rounded-[35px] glass-panel bg-white/95 shadow-[0_15px_40px_rgba(0,0,0,0.1)] relative overflow-hidden group border border-slate-300 hover:border-accent/60 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_25px_60px_rgba(0,0,0,0.2)] backdrop-blur-xl h-full flex flex-col justify-between">
+        {badge && (
+            <span className="absolute top-6 right-6 text-[9px] font-bold uppercase tracking-wider bg-accent/10 text-accent border border-accent/20 px-3 py-1 rounded-full z-10">
+                {badge}
+            </span>
+        )}
         <div className="absolute top-0 right-0 w-24 h-24 bg-accent/10 rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-accent/20 transition-colors"></div>
-        <h3 className="text-accent font-bold text-lg mb-2">{title}</h3>
-        <p className="text-secondary text-sm leading-relaxed">{description}</p>
+        <div>
+            <h3 className="text-accent font-bold text-lg mb-2 pr-20">{title}</h3>
+            <p className="text-secondary text-sm leading-relaxed">{description}</p>
+        </div>
 
         {features && (
             <ul className="mt-4 space-y-2 text-left w-full relative z-10">

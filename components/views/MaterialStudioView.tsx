@@ -65,22 +65,6 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                     </p>
                 </div>
 
-                <div className="flex flex-col gap-2 w-full mt-2 border-b border-accent/10 pb-6">
-                    <ToggleSwitch 
-                        isOn={isHighQuality} 
-                        onToggle={() => setIsHighQuality(!isHighQuality)} 
-                        label={isHighQuality ? '4K Ultra HD' : 'Standard HD'}
-                        icon={<Sparkles size={14} className={isHighQuality ? 'text-accent' : 'text-slate-400'} />}
-                        activeColor="bg-accent"
-                    />
-                    <ToggleSwitch 
-                        isOn={isProMode} 
-                        onToggle={() => setIsProMode(!isProMode)} 
-                        label={isProMode ? 'Pro Mode' : 'Standard'}
-                        icon={<Zap size={14} className={isProMode ? 'text-accent' : 'text-slate-400'} />}
-                        activeColor="bg-accent"
-                    />
-                </div>
 
                 {/* Selection Area */}
                 {detectedDetails.length > 0 ? (
