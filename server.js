@@ -449,8 +449,19 @@ const verifyFirebaseToken = async (req, res, next) => {
     }
 };
 
-// Protect all API routes
-app.use('/api', verifyFirebaseToken);
+const MASTER_EMAIL = process.env.MASTER_EMAIL || 'charlie@napc.uk';
+
+// Pre-launch lock middleware: restrict API operations to master account only
+const enforceMasterLock = (req, res, next) => {
+    const isMaster = req.user && req.user.email && req.user.email.toLowerCase().trim() === MASTER_EMAIL.toLowerCase();
+    if (!isMaster) {
+        return res.status(403).json({ error: 'Access restricted: App is currently in pre-launch mode for Master Account access only.' });
+    }
+    next();
+};
+
+// Protect all API routes and enforce master lock
+app.use('/api', verifyFirebaseToken, enforceMasterLock);
 
 const apiKey = process.env.VITE_GEMINI_API_KEY;
 

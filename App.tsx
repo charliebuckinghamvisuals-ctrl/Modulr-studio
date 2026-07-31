@@ -23,10 +23,13 @@ import { GalleryView } from './components/views/GalleryView';
 import { AuthView } from './components/views/AuthView';
 import { AccountView } from './components/views/AccountView';
 import { DesignerView } from './components/views/DesignerView';
+import { ComingSoonView } from './components/views/ComingSoonView';
+import { useAuth } from './hooks/useAuth';
 
 
 const App: React.FC = () => {
     const engine = useAppEngine();
+    const { isMaster } = useAuth();
     const [maskImage, setMaskImage] = React.useState<string | null>(null);
     const [isAppLoaded, setIsAppLoaded] = React.useState(false);
     const [selectedBatchIndex, setSelectedBatchIndex] = React.useState(0);
@@ -895,6 +898,10 @@ const App: React.FC = () => {
 
     if (!isAppLoaded) {
         return <StartupLoader onFinish={() => setIsAppLoaded(true)} />;
+    }
+
+    if (!isMaster) {
+        return <ComingSoonView onUnlockSuccess={() => engine.setActiveStage(AppStage.HOME)} />;
     }
 
     return (

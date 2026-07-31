@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, Info, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool } from 'lucide-react';
+import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, Info, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool, ShieldCheck } from 'lucide-react';
 import { AppStage } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useCredits } from '../hooks/useCredits';
@@ -71,7 +71,7 @@ const DesktopOnlyScreen: React.FC<{ onNavigate: (stage: AppStage) => void }> = (
 
 // ─── Main AppShell ─────────────────────────────────────────────────────────────
 export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNavigate, onReset, headerActions }) => {
-  const { user } = useAuth();
+  const { user, isMaster } = useAuth();
   const { credits, plan, loading: creditsLoading, rendersLeft, rendersPerDay, trialDaysLeft } = useCredits();
   const [isAboutDropdownOpen, setIsAboutDropdownOpen] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
@@ -208,6 +208,14 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
               <span className="text-[10px] font-black uppercase tracking-widest leading-none">
                 {typeof credits === 'number' ? credits.toLocaleString() : credits} <span className="opacity-60">Credits</span>
               </span>
+            </div>
+          )}
+
+          {/* Master Access Badge */}
+          {isMaster && (
+            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-400/20 border border-amber-400/30 text-amber-300 text-[10px] font-bold tracking-widest uppercase mr-2 shadow-sm">
+              <ShieldCheck size={14} className="text-amber-400" />
+              <span>Master Access</span>
             </div>
           )}
 
