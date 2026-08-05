@@ -36,9 +36,20 @@ service cloud.firestore {
                          .affectedKeys()
                          .hasOnly(['materialLibrary', 'branding']);
 
-      // Account documents are created and deleted by the server only.
-      // The client never needs to do either.
-      allow create, delete: if false;
+      // A user document may not exist yet - the server only creates one on the
+      // first render. Saving branding or a material library before then is a
+      // CREATE, not an update, so blocking create outright meant a new user
+      // could never save either.
+      //
+      // Create is therefore allowed, but restricted to exactly the same
+      // presentation fields as update. hasOnly() on the full key set is what
+      // stops someone creating their own document with credits or a plan.
+      allow create: if isOwner()
+                    && request.resource.data.keys()
+                         .hasOnly(['materialLibrary', 'branding']);
+
+      // Deleting an account record stays server-only.
+      allow delete: if false;
     }
 
     // Projects — client directory of jobs, clients, values and attached files.

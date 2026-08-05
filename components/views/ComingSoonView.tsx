@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Sparkles, Layers, ArrowRight, ShieldCheck, Mail, KeyRound, Chrome, X, Loader2, Wand2, Hexagon, CheckCircle2 } from 'lucide-react';
 import { auth } from '../../services/firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { toast } from 'react-hot-toast';
 import { useAuth, isMasterAccount, MASTER_EMAIL } from '../../hooks/useAuth';
 
@@ -15,6 +15,54 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+
+    /**
+     * Create a master account.
+     *
+     * The lock screen previously only offered sign-in, so a new team member had
+     * no way to get an account at all. The email is checked against the
+     * allowlist BEFORE calling Firebase, so an unrecognised address never
+     * creates a dormant account.
+     *
+     * This is still only a UI gate. Rendering requires the uid to be added to
+     * MASTER_UIDS on the server.
+     */
+    const handleMasterSignUp = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!email || !password) {
+            toast.error('Please enter both email and password');
+            return;
+        }
+        if (!isMasterAccount(email)) {
+            toast.error('That email is not approved for master access.');
+            return;
+        }
+        if (password.length < 8) {
+            toast.error('Please choose a password of at least 8 characters.');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            await createUserWithEmailAndPassword(auth, email.trim(), password);
+            toast.success('Master account created');
+            setShowLoginModal(false);
+            if (onUnlockSuccess) onUnlockSuccess();
+        } catch (error: any) {
+            if (error?.code === 'auth/email-already-in-use') {
+                toast.error('That account already exists - use Sign In instead.');
+                setMode('signin');
+            } else if (error?.code === 'auth/weak-password') {
+                toast.error('Password too weak. Use at least 8 characters.');
+            } else {
+                toast.error(error?.message || 'Could not create the account');
+            }
+            console.error('Sign-up error:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleMasterLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -208,13 +256,33 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                                 <ShieldCheck size={14} />
                                 Restricted Master Login
                             </div>
-                            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Master Account Access</h2>
+                            <h2 className="text-2xl font-black text-slate-800 tracking-tight">
+                                {mode === 'signup' ? 'Create Master Account' : 'Master Account Access'}
+                            </h2>
                             <p className="text-xs text-slate-500">
-                                Enter your master credentials ({MASTER_EMAIL}) to unlock the application environment.
+                                {mode === 'signup'
+                                    ? 'Create an account using your approved NAPC email address.'
+                                    : 'Enter your master credentials to unlock the application environment.'}
                             </p>
                         </div>
 
-                        <form onSubmit={handleMasterLogin} className="space-y-4">
+                        {/* Sign in / Create account toggle */}
+                        <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-slate-100">
+                            {(['signin', 'signup'] as const).map(m => (
+                                <button
+                                    key={m}
+                                    type="button"
+                                    onClick={() => setMode(m)}
+                                    className={`py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+                                        mode === m ? 'bg-white text-[#405a56] shadow-sm' : 'text-slate-500 hover:text-[#405a56]'
+                                    }`}
+                                >
+                                    {m === 'signin' ? 'Sign In' : 'Create Account'}
+                                </button>
+                            ))}
+                        </div>
+
+                        <form onSubmit={mode === 'signup' ? handleMasterSignUp : handleMasterLogin} className="space-y-4">
                             <div className="space-y-1 text-left">
                                 <label className="text-[10px] font-bold uppercase tracking-wider text-[#5c7b77] pl-1">Email Address</label>
                                 <div className="relative">
@@ -253,11 +321,11 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                                 {isLoading ? (
                                     <>
                                         <Loader2 size={16} className="animate-spin" />
-                                        <span>Authenticating...</span>
+                                        <span>{mode === 'signup' ? 'Creating account...' : 'Authenticating...'}</span>
                                     </>
                                 ) : (
                                     <>
-                                        <span>Unlock Application</span>
+                                        <span>{mode === 'signup' ? 'Create Account' : 'Unlock Application'}</span>
                                         <ArrowRight size={16} />
                                     </>
                                 )}
