@@ -1,13 +1,31 @@
 import React, { useState } from 'react';
 import { Lock, Sparkles, Layers, ArrowRight, ShieldCheck, Mail, KeyRound, Chrome, X, Loader2, Wand2, Hexagon, CheckCircle2 } from 'lucide-react';
 import { auth } from '../../services/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, User } from 'firebase/auth';
 import { toast } from 'react-hot-toast';
 import { useAuth, isMasterAccount, MASTER_EMAIL } from '../../hooks/useAuth';
 
 interface ComingSoonViewProps {
     onUnlockSuccess?: () => void;
 }
+
+/**
+ * Ask the server whether this signed-in account may use the app.
+ *
+ * /api/user/credits sits behind the pre-launch lock, so a 200 means "allowed"
+ * and a 403 means "not enabled". Using the server as the source of truth is
+ * what lets testers in without duplicating TESTER_EMAILS into the bundle.
+ */
+const serverGrantsAccess = async (user: User): Promise<boolean> => {
+    try {
+        const token = await user.getIdToken();
+        const res = await fetch('/api/user/credits', { headers: { Authorization: `Bearer ${token}` } });
+        return res.ok;
+    } catch (e) {
+        console.error('Access check failed', e);
+        return false;
+    }
+};
 
 export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess }) => {
     const { user } = useAuth();
@@ -32,10 +50,6 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
         e.preventDefault();
         if (!email || !password) {
             toast.error('Please enter both email and password');
-            return;
-        }
-        if (!isMasterAccount(email)) {
-            toast.error('That email is not approved for master access.');
             return;
         }
         if (password.length < 8) {
@@ -74,12 +88,15 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
         setIsLoading(true);
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            if (isMasterAccount(userCredential.user.email)) {
-                toast.success("Master Account authenticated!");
+            // Ask the SERVER whether this account is allowed in. It is the only
+            // thing that knows the master UID allowlist and the tester list, so
+            // checking the email here would have locked out testers entirely.
+            if (await serverGrantsAccess(userCredential.user)) {
+                toast.success('Signed in');
                 setShowLoginModal(false);
                 if (onUnlockSuccess) onUnlockSuccess();
             } else {
-                toast.error("Access restricted: App is locked to Master Account only during pre-launch.");
+                toast.error('Access restricted: this account is not enabled during pre-launch.');
                 await signOut(auth);
             }
         } catch (error: any) {
@@ -95,12 +112,12 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
         try {
             const provider = new GoogleAuthProvider();
             const result = await signInWithPopup(auth, provider);
-            if (isMasterAccount(result.user.email)) {
-                toast.success("Master Account authenticated!");
+            if (await serverGrantsAccess(result.user)) {
+                toast.success('Signed in');
                 setShowLoginModal(false);
                 if (onUnlockSuccess) onUnlockSuccess();
             } else {
-                toast.error("Access restricted: App is locked to Master Account only during pre-launch.");
+                toast.error('Access restricted: this account is not enabled during pre-launch.');
                 await signOut(auth);
             }
         } catch (error: any) {

@@ -32,6 +32,15 @@ export function useCredits() {
     const [trialBlocked, setTrialBlocked] = useState(false);
     const [trialExpiresAt, setTrialExpiresAt] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    /**
+     * Whether this account may use the app at all.
+     *
+     * null while unknown. The SERVER decides - it is the only thing that knows
+     * the master UID allowlist and the tester email list. Duplicating either in
+     * the client would mean maintaining the same list twice and, worse, letting
+     * the two disagree.
+     */
+    const [hasApiAccess, setHasApiAccess] = useState<boolean | null>(null);
 
     const fetchCredits = async () => {
         if (!user) return;
@@ -40,6 +49,15 @@ export function useCredits() {
             const response = await fetch('/api/user/credits', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+
+            // 403 is the pre-launch lock refusing this account.
+            if (response.status === 403) {
+                setHasApiAccess(false);
+                return;
+            }
+            setHasApiAccess(response.ok);
+            if (!response.ok) return;
+
             const data: CreditsData = await response.json();
             setCredits(data.credits);
             setPlan(data.plan);
@@ -68,12 +86,14 @@ export function useCredits() {
             setTrialDaysLeft(null);
             setTrialBlocked(false);
             setTrialExpiresAt(null);
+            setHasApiAccess(null);
             setLoading(false);
         }
     }, [user]);
 
     return {
         credits, plan, loading, refreshCredits: fetchCredits,
-        rendersLeft, rendersPerDay, trialDaysLeft, trialBlocked, trialExpiresAt
+        rendersLeft, rendersPerDay, trialDaysLeft, trialBlocked, trialExpiresAt,
+        hasApiAccess
     };
 }

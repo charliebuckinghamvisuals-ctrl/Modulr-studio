@@ -27,11 +27,13 @@ import { AccountView } from './components/views/AccountView';
 import { DesignerView } from './components/views/DesignerView';
 import { ComingSoonView } from './components/views/ComingSoonView';
 import { useAuth } from './hooks/useAuth';
+import { useCredits } from './hooks/useCredits';
 
 
 const App: React.FC = () => {
     const engine = useAppEngine();
     const { isMaster } = useAuth();
+    const { hasApiAccess } = useCredits();
     const [maskImage, setMaskImage] = React.useState<string | null>(null);
     const [isAppLoaded, setIsAppLoaded] = React.useState(false);
     const [selectedBatchIndex, setSelectedBatchIndex] = React.useState(0);
@@ -956,7 +958,14 @@ const App: React.FC = () => {
         return <StartupLoader onFinish={() => setIsAppLoaded(true)} />;
     }
 
-    if (!isMaster) {
+    // Access is decided by the SERVER, not by the email claim. isMaster is a
+    // fast local shortcut so the three master addresses do not wait on a round
+    // trip; anyone else (testers, and later beta users) is admitted only once
+    // /api/user/credits confirms the pre-launch lock lets them through.
+    // hasApiAccess is null while that check is still in flight.
+    const hasAccess = isMaster || hasApiAccess === true;
+
+    if (!hasAccess) {
         return <ComingSoonView onUnlockSuccess={() => engine.setActiveStage(AppStage.HOME)} />;
     }
 
