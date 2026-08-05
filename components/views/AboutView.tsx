@@ -43,7 +43,7 @@ const TOOLS: Tool[] = [
     {
         icon: <Box size={22} />,
         name: '3D Configurator',
-        image: '/gallery-1.jpg.png',
+        image: '/gallery-1.jpg',
         tagline: 'Design the building before you render it',
         body:
             'Build a garden room or annexe to real dimensions in your browser - footprint, wall and ridge heights, roof form, glazing, internal walls, decking and cladding. Because the geometry is real rather than generated, what you see is what gets built, and every view stays consistent with every other view.',
@@ -59,7 +59,7 @@ const TOOLS: Tool[] = [
     {
         icon: <Layers size={22} />,
         name: 'Render Engine',
-        image: '/gallery-4.jpg.png',
+        image: '/gallery-4.jpg',
         tagline: 'Photoreal exteriors from a drawing or a photo',
         body:
             'The core of the platform. Feed it a SketchUp screenshot, a CAD elevation, a line drawing or a site photograph and it returns a finished architectural visual - correct materials, believable light, real context. Built specifically around the language of garden rooms and annexes rather than generic architecture.',
@@ -74,7 +74,7 @@ const TOOLS: Tool[] = [
     {
         icon: <PenTool size={22} />,
         name: 'Line Converter',
-        image: '/demo-line-drawing.png',
+        image: '/demo-line-drawing.jpg',
         tagline: 'Clean architectural line work from any model',
         body:
             'Turn a messy model screenshot or a photograph into crisp, presentable line work. Useful on its own for drawings and planning documents, and as the cleanest possible starting point for the Render Engine - the tighter the line work, the more faithful the final render.',
@@ -88,7 +88,7 @@ const TOOLS: Tool[] = [
     {
         icon: <Palette size={22} />,
         name: 'Material Studio',
-        image: '/gallery-8.jpg.png',
+        image: '/gallery-8.jpg',
         tagline: 'Change the specification, keep the building',
         body:
             'Swap cladding, roofing, glazing, doors and ground treatment on an existing scheme without redrawing it. Show a client the same building in charcoal composite, western red cedar and painted render inside a single meeting, and build a reusable library of the finishes you actually specify.',
@@ -102,7 +102,7 @@ const TOOLS: Tool[] = [
     {
         icon: <CloudSun size={22} />,
         name: 'Weather Lab',
-        image: '/gallery-6.jpg.png',
+        image: '/gallery-6.jpg',
         tagline: 'The same scheme, in every light',
         body:
             'Change the weather, season and atmosphere of a finished render while the building itself stays exactly as it is. Show a client their garden room in July sun and January frost, or give a planning submission a neutral overcast light instead of a flattering sunset.',
@@ -116,7 +116,7 @@ const TOOLS: Tool[] = [
     {
         icon: <FolderOpen size={22} />,
         name: 'Projects',
-        image: '/gallery-11.jpg.png',
+        image: '/gallery-11.jpg',
         tagline: 'Every job, client and file in one place',
         body:
             'A directory for the work itself. Client name, address, value and status alongside the renders, floor plans and documents that belong to the job - so a scheme lives in one place rather than scattered across folders, inboxes and desktops.',
@@ -178,7 +178,7 @@ export const AboutView: React.FC = () => {
                             box sizes to its content, so tiles came out uneven and
                             the staggered offsets made that read as misalignment. */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {['/gallery-2.jpg.png', '/gallery-5.jpg.png', '/gallery-7.jpg.png', '/gallery-10.jpg.png'].map(src => (
+                            {['/gallery-2.jpg', '/gallery-5.jpg', '/gallery-7.jpg', '/gallery-10.jpg'].map(src => (
                                 <div
                                     key={src}
                                     className="aspect-[4/5] rounded-2xl overflow-hidden border border-border bg-slate-100 group"

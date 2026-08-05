@@ -62,8 +62,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                     <div className="w-[calc(100vw-0px)] relative left-1/2 -translate-x-1/2 rounded-none overflow-hidden border-y border-border bg-surface/10 backdrop-blur-md shadow-2xl relative group">
                         <div className="absolute inset-0 bg-accent/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <CompareSlider
-                            beforeImage="/demo-line-drawing.png"
-                            afterImage="/demo-render.png"
+                            beforeImage="/demo-line-drawing.jpg"
+                            afterImage="/demo-render.jpg"
                             beforeLabel="Structural Plan"
                             afterLabel="Proposed Concept"
                         />
@@ -87,7 +87,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                         misaligned rather than dynamic, so every tile is now the
                         same size on a single baseline. */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        {['/gallery-3.jpg.png', '/gallery-5.jpg.png', '/gallery-9.jpg.png', '/gallery-12.jpg.png'].map(src => (
+                        {['/gallery-3.jpg', '/gallery-5.jpg', '/gallery-9.jpg', '/gallery-12.jpg'].map(src => (
                             <div
                                 key={src}
                                 className="aspect-[4/5] rounded-3xl overflow-hidden border border-border bg-slate-100 shadow-lg group"
@@ -197,31 +197,31 @@ const ScatteredBackground: React.FC = () => {
 
     const galleryImages = [
         // Section 1: Hero
-        { src: "/gallery-4.jpg.png", top: "-2%", left: "-12%", size: "w-[48rem]", rotate: "-8deg", speed: 0.05 },
-        { src: "/gallery-8.jpg.png", top: "2%", right: "-15%", size: "w-[52rem]", rotate: "6deg", speed: 0.1 },
-        { src: "/gallery-1.jpg.png", top: "15%", left: "5%", size: "w-[45rem]", rotate: "12deg", speed: 0.08 },
+        { src: "/gallery-4.jpg", top: "-2%", left: "-12%", size: "w-[48rem]", rotate: "-8deg", speed: 0.05 },
+        { src: "/gallery-8.jpg", top: "2%", right: "-15%", size: "w-[52rem]", rotate: "6deg", speed: 0.1 },
+        { src: "/gallery-1.jpg", top: "15%", left: "5%", size: "w-[45rem]", rotate: "12deg", speed: 0.08 },
         
         // Section 2: Before/After & Comparison
-        { src: "/gallery-2.jpg.png", top: "45%", right: "-5%", size: "w-[50rem]", rotate: "-4deg", speed: 0.12 },
-        { src: "/gallery-3.jpg.png", top: "60%", left: "-8%", size: "w-[42rem]", rotate: "15deg", speed: 0.04 },
-        { src: "/gallery-5.jpg.png", top: "75%", right: "2%", size: "w-[48rem]", rotate: "-9deg", speed: 0.14 },
-        { src: "/gallery-7.jpg.png", top: "90%", left: "20%", size: "w-[38rem]", rotate: "5deg", speed: 0.06 },
+        { src: "/gallery-2.jpg", top: "45%", right: "-5%", size: "w-[50rem]", rotate: "-4deg", speed: 0.12 },
+        { src: "/gallery-3.jpg", top: "60%", left: "-8%", size: "w-[42rem]", rotate: "15deg", speed: 0.04 },
+        { src: "/gallery-5.jpg", top: "75%", right: "2%", size: "w-[48rem]", rotate: "-9deg", speed: 0.14 },
+        { src: "/gallery-7.jpg", top: "90%", left: "20%", size: "w-[38rem]", rotate: "5deg", speed: 0.06 },
 
         // Section 3: Why Modulr / Features
-        { src: "/gallery-9.jpg.png", top: "120%", left: "-10%", size: "w-[55rem]", rotate: "4deg", speed: 0.15 },
-        { src: "/gallery-10.jpg.png", top: "135%", right: "-12%", size: "w-[58rem]", rotate: "-12deg", speed: 0.07 },
-        { src: "/gallery-11.jpg.png", top: "155%", left: "10%", size: "w-[48rem]", rotate: "8deg", speed: 0.11 },
-        { src: "/gallery-12.jpg.png", top: "180%", right: "5%", size: "w-[45rem]", rotate: "-6deg", speed: 0.09 },
+        { src: "/gallery-9.jpg", top: "120%", left: "-10%", size: "w-[55rem]", rotate: "4deg", speed: 0.15 },
+        { src: "/gallery-10.jpg", top: "135%", right: "-12%", size: "w-[58rem]", rotate: "-12deg", speed: 0.07 },
+        { src: "/gallery-11.jpg", top: "155%", left: "10%", size: "w-[48rem]", rotate: "8deg", speed: 0.11 },
+        { src: "/gallery-12.jpg", top: "180%", right: "5%", size: "w-[45rem]", rotate: "-6deg", speed: 0.09 },
         
         // Section 4: Garden Rooms Specifics
-        { src: "/gallery-13-after.jpg.png", top: "220%", left: "-15%", size: "w-[52rem]", rotate: "-4deg", speed: 0.14 },
-        { src: "/gallery-14-after.jpg.png", top: "245%", right: "-8%", size: "w-[55rem]", rotate: "10deg", speed: 0.08 },
-        { src: "/gallery-15-after.jpg.png", top: "270%", left: "5%", size: "w-[48rem]", rotate: "-15deg", speed: 0.12 },
+        { src: "/gallery-13-after.jpg", top: "220%", left: "-15%", size: "w-[52rem]", rotate: "-4deg", speed: 0.14 },
+        { src: "/gallery-14-after.jpg", top: "245%", right: "-8%", size: "w-[55rem]", rotate: "10deg", speed: 0.08 },
+        { src: "/gallery-15-after.jpg", top: "270%", left: "5%", size: "w-[48rem]", rotate: "-15deg", speed: 0.12 },
         
         // Section 5: Features Grid
-        { src: "/gallery-16-after.jpg.png", top: "320%", right: "-10%", size: "auto w-[50rem]", rotate: "8deg", speed: 0.05 },
-        { src: "/gallery-17-after.jpg.png", top: "350%", left: "-5%", size: "w-[52rem]", rotate: "-10deg", speed: 0.1 },
-        { src: "/gallery-12-after.jpg.png", top: "380%", right: "12%", size: "w-[48rem]", rotate: "15deg", speed: 0.07 }
+        { src: "/gallery-16-after.jpg", top: "320%", right: "-10%", size: "auto w-[50rem]", rotate: "8deg", speed: 0.05 },
+        { src: "/gallery-17-after.jpg", top: "350%", left: "-5%", size: "w-[52rem]", rotate: "-10deg", speed: 0.1 },
+        { src: "/gallery-12-after.jpg", top: "380%", right: "12%", size: "w-[48rem]", rotate: "15deg", speed: 0.07 }
     ];
 
     return (

@@ -9,12 +9,12 @@ export const GalleryView: React.FC = () => {
     const renderItems = [
         ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((id) => ({
             id: `gallery-${id}`,
-            image: `/gallery-${id}.jpg.png`,
+            image: `/gallery-${id}.jpg`,
         })),
         // Newer renders exported from the app.
-        { id: 'export-1', image: '/modulr-export-1778575329402.png' },
-        { id: 'export-2', image: '/modulr-export-1777560096490.png' },
-        { id: 'export-3', image: '/modulr-export-1777554992095.png' },
+        { id: 'export-1', image: '/modulr-export-1778575329402.jpg' },
+        { id: 'export-2', image: '/modulr-export-1777560096490.jpg' },
+        { id: 'export-3', image: '/modulr-export-1777554992095.jpg' },
     ];
 
     /**
@@ -24,23 +24,23 @@ export const GalleryView: React.FC = () => {
      * and a square tile rather than being forced into the landscape render grid.
      */
     const materialItems = [
-        '/MaterialStudio-1782396007318.png',
-        '/MaterialStudio-1780410234937.png',
-        '/MaterialStudio-1778843455110.png',
-        '/MaterialStudio-1778763890421.png',
-        '/MaterialStudio-1778575685286.png',
-        '/MaterialStudio-1777628198241.png',
-        '/MaterialStudio-1777555175817.png',
-        '/MaterialStudio-1776354529259.png',
-        '/MaterialStudio-1776354030035.png',
-        '/MaterialStudio-1775819212919.png',
+        '/MaterialStudio-1782396007318.jpg',
+        '/MaterialStudio-1780410234937.jpg',
+        '/MaterialStudio-1778843455110.jpg',
+        '/MaterialStudio-1778763890421.jpg',
+        '/MaterialStudio-1778575685286.jpg',
+        '/MaterialStudio-1777628198241.jpg',
+        '/MaterialStudio-1777555175817.jpg',
+        '/MaterialStudio-1776354529259.jpg',
+        '/MaterialStudio-1776354030035.jpg',
+        '/MaterialStudio-1775819212919.jpg',
     ].map((image, i) => ({ id: `material-${i + 1}`, image }));
 
     const sliderItems = [12, 13, 14, 15, 16, 17].map((id) => ({
         id,
         type: 'slider' as const,
-        before: `/gallery-${id}-before.jpg.png`,
-        after: `/gallery-${id}-after.jpg.png`
+        before: `/gallery-${id}-before.jpg`,
+        after: `/gallery-${id}-after.jpg`
     }));
 
     return (

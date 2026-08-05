@@ -41,7 +41,7 @@ const USE_CASES: UseCase[] = [
             'Carousel-ready sets: one scheme, multiple finishes',
             'Seasonal variations of a design you have already posted',
         ],
-        image: '/gallery-14-after.jpg.png',
+        image: '/gallery-14-after.jpg',
     },
     {
         icon: <PoundSterling size={22} />,
@@ -54,7 +54,7 @@ const USE_CASES: UseCase[] = [
             'Show two or three specification options side by side',
             'Justify a premium price by showing the premium finish',
         ],
-        image: '/gallery-5.jpg.png',
+        image: '/gallery-5.jpg',
     },
     {
         icon: <Camera size={22} />,
@@ -67,7 +67,7 @@ const USE_CASES: UseCase[] = [
             '4K output suitable for print and large-format display',
             'Full commercial rights on everything you generate',
         ],
-        image: '/gallery-9.jpg.png',
+        image: '/gallery-9.jpg',
     },
     {
         icon: <FileCheck size={22} />,
@@ -80,7 +80,7 @@ const USE_CASES: UseCase[] = [
             'Consistent elevations straight from the 3D Configurator',
             'Backed by NAPC planning expertise',
         ],
-        image: '/demo-line-drawing.png',
+        image: '/demo-line-drawing.jpg',
     },
     {
         icon: <Users size={22} />,
@@ -93,7 +93,7 @@ const USE_CASES: UseCase[] = [
             'Settle specification decisions before quoting',
             'Fewer rounds of "can we see it in a different colour"',
         ],
-        image: '/gallery-11.jpg.png',
+        image: '/gallery-11.jpg',
     },
     {
         icon: <Repeat size={22} />,
@@ -106,7 +106,7 @@ const USE_CASES: UseCase[] = [
             'Find last year\'s scheme for a returning client in seconds',
             'Available on any device you sign in from',
         ],
-        image: '/gallery-12.jpg.png',
+        image: '/gallery-12.jpg',
     },
 ];
 
@@ -231,7 +231,7 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
 
                         <div className="lg:col-span-4 aspect-[4/5] rounded-[2rem] overflow-hidden border border-border bg-slate-100 shadow-xl">
                             <img
-                                src="/gallery-13-after.jpg.png"
+                                src="/gallery-13-after.jpg"
                                 alt="Garden room visualisation produced with Modulr Studio"
                                 loading="lazy"
                                 className="w-full h-full object-cover"
