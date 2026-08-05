@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Smartphone, Zap, Grid, Layers, ShieldCheck, Cpu, Maximize, FileText, CheckCircle2, Sparkles, PenTool, CloudSun, ArrowRight, Image as ImageIcon, Palette, Briefcase } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { AppStage } from '../../types';
 import { CompareSlider } from '../CompareSlider';
 import { Button } from '../Button';
@@ -56,7 +56,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                     <div className="text-center space-y-4 max-w-[100vw] overflow-x-hidden md:max-w-4xl mx-auto px-4">
                         <h2 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-accent font-bold whitespace-nowrap w-fit inline-block">From Plan to Perfection</h2>
                         <p className="text-secondary text-lg">
-                            Swipe to see how our engine transforms technical geometry into stunning 4K visualizations—all created within Modulr Studio.
+                            Swipe to see how our engine transforms technical geometry into stunning 4K visualizations-all created within Modulr Studio.
                         </p>
                     </div>
                     <div className="w-[calc(100vw-0px)] relative left-1/2 -translate-x-1/2 rounded-none overflow-hidden border-y border-border bg-surface/10 backdrop-blur-md shadow-2xl relative group">
@@ -73,60 +73,44 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
 
             {/* Wide Section for Overview Grid - Broken out of max-w-6xl */}
             <div className="w-full max-w-[1500px] mx-auto px-6 my-16 relative z-10">
-                <section className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
-                                <Grid className="text-accent" size={20} />
-                            </div>
-                            <h2 className="text-2xl font-extrabold text-accent tracking-tight">Modulr Studio Tools Overview</h2>
-                        </div>
+                {/* Showcase. Nothing argues for the product as well as its own
+                    output, so the work appears before the feature list. */}
+                <section className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+                    <div className="flex items-baseline justify-between gap-4 flex-wrap">
+                        <h2 className="text-2xl font-extrabold text-accent tracking-tight">Made with Modulr Studio</h2>
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-secondary/60">
+                            Every image generated in-app
+                        </span>
+                    </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6">
-                            {[
-                                {
-                                    icon: <Sparkles size={24} />,
-                                    title: "Render Engine",
-                                    desc: "The core engine. Import structural drawings or SketchUp screenshots, auto-detect exterior materials, and generate stunning 4K photorealistic architectural visualizations."
-                                },
-                                {
-                                    icon: <PenTool size={24} />,
-                                    title: "Smart Editor",
-                                    desc: "Refine existing renders without starting over. Make surgical textual edits ('Make the grass greener') or apply drastic weather changes like 'Winter Snow' or 'Golden Hour'."
-                                },
-                                {
-                                    icon: <Palette size={24} />,
-                                    title: "Line Converter",
-                                    desc: "Clean up messy hand-drawn sketches or raw CAD geometry, outputting crisp black-and-white architectural drawings. Perfect for structural planning applications."
-                                },
-                                {
-                                    icon: <Layers size={24} />,
-                                    title: "Material Studio",
-                                    desc: "Dynamically generate a 2x2 presentation sheet spotlighting extreme close-up details—ideal for showing off timber cladding grains, zinc seams, and composite deck textures to clients."
-                                },
-                                {
-                                    title: "3D Configurator",
-                                    desc: "A streamlined, free builder for standard footprints. Define your structure in minutes, then send it straight to the Render Engine for photorealistic magic.",
-                                    comingSoon: true
-                                }
-                            ].map((tool, idx) => (
-                                <div key={idx} className="relative glass-panel p-6 rounded-3xl border border-border bg-white/60 backdrop-blur-xl hover:border-accent/40 hover:shadow-xl transition-all duration-300 group flex flex-col h-full text-left">
-                                    <h4 className="text-accent font-bold text-xl mb-3">{tool.title}</h4>
-                                    <p className="text-slate-600 leading-relaxed text-sm flex-1">
-                                        {tool.desc}
-                                    </p>
-                                    {tool.comingSoon && (
-                                        <span className="absolute top-4 right-4 text-[8px] font-bold uppercase tracking-wider bg-[#405a56]/10 text-[#405a56] px-2 py-1 rounded-full z-10">Coming Soon</span>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
+                    {/* Uniform tiles. The staggered offsets made the row look
+                        misaligned rather than dynamic, so every tile is now the
+                        same size on a single baseline. */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        {['/gallery-3.jpg.png', '/gallery-5.jpg.png', '/gallery-9.jpg.png', '/gallery-12.jpg.png'].map(src => (
+                            <div
+                                key={src}
+                                className="aspect-[4/5] rounded-3xl overflow-hidden border border-border bg-slate-100 shadow-lg group"
+                            >
+                                <img
+                                    src={src}
+                                    alt="Architectural visualisation produced with Modulr Studio"
+                                    loading="lazy"
+                                    className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                <section className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
 
                         {/* Ultimate Package Banner */}
-                        <div className="mt-8 glass-panel p-10 md:p-14 rounded-[2.5rem] border border-border bg-gradient-to-br from-white/80 to-accent/5 backdrop-blur-3xl hover:border-accent/30 hover:shadow-2xl transition-all duration-500 group flex flex-col md:flex-row items-center justify-start gap-10 overflow-hidden relative text-left">
+                        <div className="mt-8 glass-panel p-10 md:p-14 rounded-[2.5rem] border border-border bg-gradient-to-br from-white/80 to-accent/5 backdrop-blur-3xl hover:border-accent/30 hover:shadow-2xl transition-all duration-500 group overflow-hidden relative text-center">
                             <div className="absolute top-0 right-0 w-96 h-96 bg-accent/5 blur-[100px] -mr-48 -mt-48 pointer-events-none group-hover:bg-accent/10 transition-all duration-500"></div>
-                            <div className="space-y-4 relative z-10 w-full">
+                            <div className="space-y-4 relative z-10 max-w-3xl mx-auto">
                                 <h4 className="text-accent font-bold text-3xl">The Ultimate Quoting Package</h4>
-                                <p className="text-slate-600 leading-relaxed text-lg max-w-4xl">
+                                <p className="text-slate-600 leading-relaxed text-lg">
                                     By combining environmental renders, crisp studio backgrounds, and detailed material sheets, you instantly arm yourself with the ultimate quoting package. Perfectly curated to dominate social media algorithms and win over high-ticket clients.
                                 </p>
                             </div>
@@ -175,8 +159,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                                 description="Upload a CAD export or structural line drawing and receive a photorealistic 4K visualisation in seconds, with your geometry as the foundation."
                             />
                             <FeatureCard
-                                title="Refinement Studio"
-                                description="Change the weather, swap the environment, update cladding and materials, or add people and pets to bring your renders to life. Powerful AI-driven edits with a simple text prompt."
+                                title="Weather Lab"
+                                description="Change the weather, season and atmosphere of any render. Show the same scheme in July sun or January frost, while the building itself stays exactly as designed."
                             />
                             <FeatureCard
                                 title="Material Studio"
@@ -192,7 +176,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                             />
                             <FeatureCard
                                 title="3D Configurator"
-                                description="A focused, fast builder for standard building types (Box, L-Shape, Gable). Define the footprint quickly, render it beautifully—no overcomplicated design tools needed."
+                                description="A focused, fast builder for standard building types (Box, L-Shape, Gable). Define the footprint quickly, render it beautifully-no overcomplicated design tools needed."
                                 badge="In Development"
                             />
                         </div>

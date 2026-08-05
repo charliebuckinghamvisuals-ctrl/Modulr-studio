@@ -21,7 +21,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
 
     const handleStartTrial = () => {
         if (user) {
-            // Already signed in — they already have their free trial credits
+            // Already signed in - they already have their free trial credits
             toast.success('Your free trial is active! Start rendering.');
             trackFeatureUsage('start_trial');
             onNavigate?.(AppStage.RENDER_ENGINE);
@@ -162,7 +162,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                 '1080p High Definition Output',
                                 'Standard & Pro Modes Included',
                                 'Access All Core Tools',
-                                'Refinement Studio Access'
+                                'Weather Lab Access'
                             ].map((feature, i) => (
                                 <div key={i} className="flex items-start gap-3">
                                     <Sparkles size={18} className="text-accent shrink-0 mt-0.5" />
@@ -204,7 +204,9 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             onClick={() => handleUpgrade(
                                 'business', 
                                 billingCycle === 'monthly' ? 'price_1TM28kHtB5liiqHxBZvK7pjm' : 'price_1TM2OGHtB5liiqHx2RQXMxO3',
-                                15500
+                                // Business is unlimited - no credit grant. The server
+                                // ignores this value anyway and reads its own catalogue.
+                                0
                             )}
                             disabled={loadingPlan !== null}
                         >
@@ -214,8 +216,8 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         <div className="space-y-4 flex-1">
                             <div className="text-xs font-bold uppercase tracking-widest text-primary dark:text-white mb-2">The Complete Architectural Toolkit:</div>
                             {[
-                                '15,500 Premium Credits / mo (250 4K Renders)',
-                                '4K Ultra HD Resolution Support',
+                                'Unlimited Renders',
+                                '4K Ultra HD - Every Render',
                                 'All Tools (Material Studio + Refinement)',
                                 'Primary Brand Material Presets',
                                 'Full Commercial Rights',
@@ -231,52 +233,10 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
 
                 </div>
 
-                {/* Unified ROI, Managed Service, and Credits Bubble */}
-                <div className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-[3rem] shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16 space-y-16 divide-y-2 divide-border/30">
-                    
-                    {/* ROI Comparison Section */}
-                    <div className="pt-0 group border-none">
-                        <div className="flex flex-col md:flex-row items-center gap-10">
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2 text-accent font-black uppercase tracking-widest text-xs mb-4">
-                                    <TrendingUp size={14} />
-                                    The Modulr Advantage
-                                </div>
-                                <h4 className="text-3xl font-black text-accent mb-4 leading-tight">
-                                    An Investment that Pays for Itself, <span className="text-accent underline decoration-accent/30 underline-offset-8">Every Single Month.</span>
-                                </h4>
-                                <p className="text-secondary text-sm leading-relaxed max-w-xl">
-                                    Traditional CGI studios charge between <span className="font-bold text-primary">£200 - £300 per 4K render</span>, with a 3-5 day wait.
-                                    With the Modulr Studio Business Plan, you get <span className="font-bold text-primary text-lg">250 renders included</span> instantly—giving you
-                                    a total monthly value of over <span className="font-black text-accent text-xl italic underline transform transition-transform group-hover:scale-110 inline-block px-1">£62,500+</span>.
-                                </p>
-                            </div>
+                {/* Managed Service */}
+                <div className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-[3rem] shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
 
-                            <div className="grid grid-cols-2 gap-4 w-full md:w-auto shrink-0">
-                                <div className="p-6 rounded-2xl bg-slate-50 border border-border shadow-sm flex flex-col items-center justify-center text-center group-hover:shadow-md transition-all">
-                                    <span className="text-xs font-bold text-secondary uppercase mb-1 text-[10px]">Traditional Cost</span>
-                                    <span className="text-2xl font-black text-red-500 line-through">
-                                        £{billingCycle === 'monthly' ? '62.5k' : '750k'}
-                                    </span>
-                                    <span className="text-[10px] text-secondary/60">
-                                        {billingCycle === 'monthly' ? '250 Renders' : '3,000 Renders'}
-                                    </span>
-                                </div>
-                                <div className="p-6 rounded-2xl bg-accent text-white shadow-xl flex flex-col items-center justify-center text-center transform scale-110 group-hover:scale-115 transition-all">
-                                    <span className="text-xs font-bold opacity-80 uppercase mb-1 text-[10px]">Modulr Price</span>
-                                    <span className="text-3xl font-black text-white">
-                                        £{billingCycle === 'monthly' ? '189.99' : '1,710'}
-                                    </span>
-                                    <span className="text-[10px] opacity-80 uppercase font-black text-white">
-                                        {billingCycle === 'monthly' ? '320x Value' : '430x Value'}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Managed Service Section */}
-                    <div className="pt-16 pb-0 border-none">
+                    <div className="pt-0 pb-0 border-none">
                         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
                             <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-3">
@@ -302,25 +262,6 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         </div>
                     </div>
 
-                    {/* Credit Cost Key */}
-                    <div className="pt-16 border-none">
-                        <div className="flex flex-col items-center lg:items-start gap-4 p-0">
-                            <div className="flex items-center gap-2 text-primary font-bold">
-                                <span className="text-lg font-black text-accent uppercase tracking-tight">Usage Guide</span>
-                            </div>
-                            <div className="flex flex-wrap justify-center lg:justify-start gap-3 text-sm">
-                                <div className="flex items-center gap-2 py-2 px-4 rounded-2xl bg-slate-50 border border-border">
-                                    <span className="font-black text-accent">30 Credits</span>
-                                    <span className="text-secondary text-xs font-medium">HD Render (1080p)</span>
-                                </div>
-                                <div className="flex items-center gap-2 py-2 px-4 rounded-2xl bg-slate-50 border border-border">
-                                    <span className="font-black text-accent">60 Credits</span>
-                                    <span className="text-secondary text-xs font-medium">Ultra HD (4K)</span>
-                                </div>
-                            </div>
-                            <p className="text-[10px] text-secondary/60 uppercase tracking-widest font-black mt-2">100% Transparency • No Hidden Fees</p>
-                        </div>
-                    </div>
                 </div>
 
                 {/* Footer FAQ Teaser */}

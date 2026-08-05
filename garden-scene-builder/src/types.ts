@@ -1,5 +1,15 @@
 export type ShapeType = 'Box' | 'LShape' | 'Gable';
-export type CladdingType = 'timber' | 'composite_wood' | 'composite_black' | 'composite_grey' | 'composite_brown' | 'oak' | 'cedar' | 'charred_wood' | 'render_white' | 'box_metal_grey' | 'box_metal_black' | 'corrugated_metal' | 'fire_board_grey';
+export type CladdingType =
+  // Composite range offered in the sidebar picker. These must match the keys in
+  // MATERIAL_DEF, or the swatch applies a value that falls back to 'default'.
+  | 'cedar_composite' | 'oak_composite' | 'black_composite'
+  | 'dark_grey_composite' | 'light_grey_composite'
+  | 'slate_blue_composite' | 'sage_composite' | 'clay_composite'
+  | 'grey_composite'
+  // Legacy values retained so previously saved scenes still resolve.
+  | 'timber' | 'composite_wood' | 'composite_black' | 'composite_grey'
+  | 'composite_brown' | 'oak' | 'cedar' | 'charred_wood' | 'render_white'
+  | 'box_metal_grey' | 'box_metal_black' | 'corrugated_metal' | 'fire_board_grey';
 export type BaseMaterialType = 'concrete' | 'timber_decking' | 'composite_decking';
 export type DeckingMaterialType = 'timber' | 'composite_grey' | 'composite_oak' | 'composite_cedar' | 'composite_brown' | 'composite_black';
 export type RoofMaterialType = 'epdm' | 'sedum' | 'upvc' | 'metal';
@@ -73,6 +83,8 @@ export interface Room {
   claddingRight?: CladdingType;
   claddingGable?: CladdingType;
   fasciaMaterial?: 'match_cladding' | 'black' | 'anthracite' | 'white' | 'grey';
+  /** Explicit roof colour. Undefined means follow the roof material's own colour. */
+  roofColor?: string;
   claddingOrientation?: 'horizontal' | 'vertical';
   claddingWidthMm?: number;
   baseMaterial: BaseMaterialType;

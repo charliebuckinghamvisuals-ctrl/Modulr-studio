@@ -3,8 +3,16 @@ import { useAuth } from './useAuth';
 import { trackUserPlan } from '../services/analytics';
 
 
+/**
+ * `credits` is the literal string 'Unlimited' for master accounts - see the
+ * /api/user/credits handler. It was previously typed as `number`, which made
+ * the `credits === 'Unlimited'` check in AccountView a type error that the
+ * build never surfaced because TypeScript was not being run.
+ */
+type CreditBalance = number | 'Unlimited';
+
 interface CreditsData {
-    credits: number;
+    credits: CreditBalance;
     plan: string;
     // Free trial fields
     rendersLeft?: number;
@@ -16,7 +24,7 @@ interface CreditsData {
 
 export function useCredits() {
     const { user } = useAuth();
-    const [credits, setCredits] = useState<number | null>(null);
+    const [credits, setCredits] = useState<CreditBalance | null>(null);
     const [plan, setPlan] = useState<string | null>(null);
     const [rendersLeft, setRendersLeft] = useState<number | null>(null);
     const [rendersPerDay, setRendersPerDay] = useState<number | null>(null);

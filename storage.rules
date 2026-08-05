@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// Modulr Studio — Firebase Storage security rules
+//
+// Project assets are laid out as:
+//   projects/{uid}/{projectId}/{fileName}
+//
+// The uid is the first path segment so ownership is a prefix match, which is
+// the one thing Storage rules express well. Anything not matched below is
+// denied — Storage, like Firestore, is deny-by-default only if you never write
+// a permissive catch-all, so don't add one.
+//
+// Deploy:  firebase deploy --only storage
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /projects/{uid}/{projectId}/{fileName} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+
+      // Only the owner reads directly. Clients viewing a shared project never
+      // hit Storage with these rules — the server issues time-limited signed
+      // URLs for that, so revoking a share actually revokes file access too.
+      allow read: if isOwner();
+
+      // Size and type are enforced here as well as in the client, because the
+      // client check is a convenience and this is the control. Without it,
+      // anyone with the public Firebase config could upload arbitrary files of
+      // arbitrary size to their own prefix and run up the storage bill.
+      allow write: if isOwner()
+                   && request.resource.size < 25 * 1024 * 1024
+                   && (
+                        request.resource.contentType.matches('image/(png|jpeg|webp)')
+                        || request.resource.contentType == 'application/pdf'
+                      );
+
+      allow delete: if isOwner();
+    }
+
+    // Everything else is denied.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

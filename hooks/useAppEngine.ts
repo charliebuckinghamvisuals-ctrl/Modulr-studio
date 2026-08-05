@@ -98,7 +98,18 @@ export const useAppEngine = () => {
     const [studioBackground, setStudioBackground] = useState<string>('Pure White Studio');
     const [selectedAngle, setSelectedAngle] = useState<string>('Front');
 
-    const [materials, setMaterials] = useState({
+    /**
+     * Material Studio operates in one of two modes, chosen after upload:
+     *   'closeup' - the original 2x2 macro detail sheet
+     *   'change' - detect the building's materials and swap them
+     * null means an image is loaded but the user hasn't chosen yet.
+     */
+    const [materialStudioMode, setMaterialStudioMode] = useState<'closeup' | 'change' | null>(null);
+
+    // Typed as MaterialConfig so the optional `orientation` field is part of the
+    // state's type. Without the annotation TypeScript inferred a narrower shape
+    // from the initial value, and the code that sets orientation was an error.
+    const [materials, setMaterials] = useState<MaterialConfig>({
         walls: 'none',
         roof: 'none',
         windows: 'none',
@@ -152,27 +163,52 @@ export const useAppEngine = () => {
         return unsubscribe;
     }, []);
 
+    /**
+     * Persist the library and report honestly whether it stuck.
+     *
+     * The previous version swallowed the error and showed a success toast
+     * regardless, so a failed write told the user their material was saved when
+     * it was not - and they only discovered the loss on next sign-in. Firestore
+     * caps documents at 1 MB and library items carry base64 images, so this
+     * failure mode is reached in normal use, not just in outages.
+     */
+    const persistLibrary = async (next: MaterialLibrary): Promise<boolean> => {
+        try {
+            if (auth.currentUser) {
+                await setDoc(doc(db, 'users', auth.currentUser.uid), { materialLibrary: next }, { merge: true });
+            } else {
+                localStorage.setItem('modulr_material_library', JSON.stringify(next));
+            }
+            return true;
+        } catch (e) {
+            console.error("Library save error", e);
+            return false;
+        }
+    };
+
     const addToLibrary = async (category: keyof MaterialLibrary, item: Omit<LibraryMaterialItem, 'id'>) => {
         const newItem: LibraryMaterialItem = {
             ...item,
-            id: Date.now().toString()
+            // crypto.randomUUID, not Date.now: two items added in the same
+            // millisecond shared an id, and removeFromLibrary filters by id - 
+            // so deleting one silently deleted both.
+            id: crypto.randomUUID()
         };
 
         const next = {
             ...materialLibrary,
             [category]: [...materialLibrary[category], newItem]
         };
-        
+
+        const previous = materialLibrary;
         setMaterialLibrary(next);
-        
-        if (auth.currentUser) {
-            try {
-                await setDoc(doc(db, 'users', auth.currentUser.uid), { materialLibrary: next }, { merge: true });
-            } catch(e) { console.error("Save error", e); }
+
+        if (await persistLibrary(next)) {
+            toast.success(`Added to ${category} library`);
         } else {
-            localStorage.setItem('modulr_material_library', JSON.stringify(next));
+            setMaterialLibrary(previous); // keep the UI honest about what was stored
+            toast.error("Couldn't save to your library. Your library may be full - try removing an item.");
         }
-        toast.success(`Added to ${category} library`);
     };
 
     const removeFromLibrary = async (category: keyof MaterialLibrary, id: string) => {
@@ -180,17 +216,16 @@ export const useAppEngine = () => {
             ...materialLibrary,
             [category]: materialLibrary[category].filter(item => item.id !== id)
         };
-        
+
+        const previous = materialLibrary;
         setMaterialLibrary(next);
 
-        if (auth.currentUser) {
-            try {
-                await setDoc(doc(db, 'users', auth.currentUser.uid), { materialLibrary: next }, { merge: true });
-            } catch(e) { console.error("Save error", e); }
+        if (await persistLibrary(next)) {
+            toast.success("Removed from library");
         } else {
-            localStorage.setItem('modulr_material_library', JSON.stringify(next));
+            setMaterialLibrary(previous);
+            toast.error("Couldn't update your library. Please try again.");
         }
-        toast.success("Removed from library");
     };
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -291,10 +326,15 @@ export const useAppEngine = () => {
                 if (targetStage === AppStage.LINE_CONVERT) {
                     setLineSourceImage(base64Data);
                 } else if (targetStage === AppStage.MATERIAL_STUDIO) {
-                    await handleAnalyzeForMaterialStudio(base64Data);
+                    // Do NOT analyse yet. Material Studio now has two modes, and
+                    // they need different analyses - close-up detail extraction
+                    // vs. component material detection. Running one on upload
+                    // would waste a call and a credit whenever the user picked
+                    // the other. The view prompts for a mode first.
+                    setMaterialStudioMode(null);
                 } else if (targetStage === AppStage.RENDER_ENGINE) {
                     setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
-                    // Always auto-detect materials — works for photos, B&W line drawings, and SketchUp models
+                    // Always auto-detect materials - works for photos, B&W line drawings, and SketchUp models
                     await handleAnalyzeForRenderEngine(base64Data);
                 } else if (targetStage === AppStage.EDITOR) {
                     await handleAnalyzeForEditor(base64Data);
@@ -709,7 +749,7 @@ export const useAppEngine = () => {
             const result = await applyWeather(source, weather, isHighQuality, isProMode);
             setFinalImage(result);
             await saveToHistory({
-                stage: AppStage.EDITOR,
+                stage: AppStage.WEATHER_LAB,
                 image: result,
                 originalImage: originalImage,
                 prompt: `Weather condition applied: ${weather.condition}`,
@@ -718,6 +758,79 @@ export const useAppEngine = () => {
             window.dispatchEvent(new Event('aiarchviz-history-updated'));
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Failed to apply weather');
+        } finally {
+            setProcessing({ isLoading: false, message: '' });
+        }
+    };
+
+    /**
+     * Commit to a Material Studio mode and run the analysis that mode needs.
+     *
+     * 'closeup' extracts architectural focal points for the 2x2 detail sheet.
+     * 'change'  detects the building's existing components (walls, roof,
+     *           windows, doors, decking) so each can be swapped - the same
+     *           analysis the Render Engine uses.
+     */
+    const startMaterialStudioMode = async (mode: 'closeup' | 'change') => {
+        const source = stageImages[AppStage.MATERIAL_STUDIO];
+        if (!source) return;
+
+        setMaterialStudioMode(mode);
+        setMaterialStudioImage(null);
+
+        if (mode === 'closeup') {
+            setDetectedDetails([]);
+            setSelectedDetails([]);
+            await handleAnalyzeForMaterialStudio(source);
+            return;
+        }
+
+        setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
+        setProcessing({ isLoading: true, message: 'Analysing the building’s materials...' });
+        setIsAnalyzingMaterials(true);
+        try {
+            const detected = await analyzeComponents(source);
+            setMaterials(detected);
+            toast.success('Materials detected - change any of them below.');
+        } catch (error) {
+            console.error(error);
+            toast.error('Could not analyse the materials in this image.');
+        } finally {
+            setIsAnalyzingMaterials(false);
+            setProcessing({ isLoading: false, message: '' });
+        }
+    };
+
+    /** Re-render the uploaded image with the user's chosen materials. */
+    const handleMaterialStudioApply = async () => {
+        const source = stageImages[AppStage.MATERIAL_STUDIO];
+        if (!source) return;
+
+        setProcessing({ isLoading: true, message: 'Applying new materials...' });
+        try {
+            const result = await renderBuilding(
+                source,
+                materials,
+                additionalPrompt,
+                isHighQuality,
+                isProMode,
+                undefined,
+                isSketchUpMode,
+                undefined
+            );
+            trackFeatureUsage('material_studio_change');
+            setMaterialStudioImage(result);
+
+            await saveToHistory({
+                stage: AppStage.MATERIAL_STUDIO,
+                image: result,
+                originalImage: source,
+                prompt: additionalPrompt || 'Material change',
+                settings: materials
+            });
+            window.dispatchEvent(new Event('aiarchviz-history-updated'));
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to apply materials');
         } finally {
             setProcessing({ isLoading: false, message: '' });
         }
@@ -776,6 +889,7 @@ export const useAppEngine = () => {
         materialLibrary, addToLibrary, removeFromLibrary,
         activeProfileId, setActiveProfileId,
         handleGenerateLineDrawing, handleAnalyzeMaterials, handleRender, handleBatchRender, handleRefineRender, handleEditImage, handleWeather, handleMaterialStudio, handleAnalyzeForEditor, handleAnalyzeForMaterialStudio, handleAnalyzeForRenderEngine,
+        materialStudioMode, setMaterialStudioMode, startMaterialStudioMode, handleMaterialStudioApply,
         handleSlotImageUpload,
         getRenderUrl
     };

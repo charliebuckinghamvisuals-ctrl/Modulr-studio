@@ -5,7 +5,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import admin from 'firebase-admin';
 import Stripe from 'stripe';
 import helmet from 'helmet';
@@ -60,10 +60,129 @@ const CREDIT_COSTS = {
     ANALYSIS: 2        // Basic visual analysis
 };
 
+/**
+ * Authoritative price catalogue.
+ *
+ * What a customer receives is decided HERE, on the server, keyed on the Stripe
+ * price ID. It is never read from the request body. Previously the client sent
+ * its own `planName` and `creditsAmount`, which were copied verbatim into the
+ * Stripe metadata that the webhook then honoured — so anyone could check out
+ * with the cheapest real price while claiming 999,999 credits and the business
+ * plan, and the webhook would grant it.
+ *
+ * Adding a plan means adding a row here. An unknown price ID is rejected.
+ */
+const PRICE_CATALOG = {
+    // Business — monthly. Unlimited renders, so no credits are awarded; access
+    // is granted by plan (see UNLIMITED_PLANS) rather than metered by balance.
+    'price_1TM28kHtB5liiqHxBZvK7pjm': { plan: 'business',        credits: 0, mode: 'subscription' },
+    // Business — yearly
+    'price_1TM2OGHtB5liiqHx2RQXMxO3': { plan: 'business',        credits: 0, mode: 'subscription' },
+    // Managed service add-on (no credits — service is delivered manually)
+    'price_1TMS40HtB5liiqHxq6XkJGK4': { plan: 'managed_service', credits: 0, mode: 'subscription' },
+};
+
+/**
+ * Modulr house style.
+ *
+ * The look every render should land on, shared by both the photo/line-drawing
+ * path and the 3D-model path so output is consistent whichever tool produced
+ * the source. Previously each prompt described quality in its own words, which
+ * is why results drifted in feel between tools.
+ *
+ * The defining characteristic is subject isolation: the building is the hero,
+ * rendered sharp, with the garden and neighbouring context present but falling
+ * away. That is what separates an architectural photograph from a wide shot of
+ * a garden that happens to contain a building.
+ */
+const MODULR_HOUSE_STYLE = `
+      HOUSE STYLE - APPLY TO EVERY RENDER:
+
+      CAMERA & FOCUS:
+      - Full-frame DSLR, 35-50mm lens, eye level, natural three-quarter viewpoint.
+      - Shallow-to-moderate depth of field. The BUILDING IS THE SUBJECT and must be
+        tack sharp from corner to corner.
+      - The background - fences, neighbouring rooflines, distant planting - falls
+        gently out of focus. Soft, natural bokeh. Never blur the building itself.
+      - Foreground grass immediately nearest the camera may soften slightly. Keep
+        the frame clear of clutter; nothing should compete with the building.
+
+      LIGHTING:
+      - Soft, bright, overcast daylight. Diffuse and even, no harsh direct sun,
+        no blown highlights, no heavy black shadows.
+      - Gentle ambient occlusion under the eaves, soffits and decking edge.
+      - Subtle, believable contact shadow where the structure meets the ground.
+
+      COMPOSITION & CONTEXT:
+      - A realistic UK domestic rear garden: mown lawn, timber fence panels with
+        concrete posts, mature planting, neighbouring rooftops soft in the distance.
+      - The building occupies the majority of the frame with comfortable breathing
+        space. Not a wide landscape shot.
+      - Horizon level, verticals true, no wide-angle distortion or converging walls.
+
+      FINISH:
+      - Neutral, true-to-life colour grade. Materials read at their real colour.
+      - No oversaturation, no HDR halos, no heavy vignette, no lens flare.
+      - Crisp micro-texture: timber grain, board joints, glass reflections, grass blades.
+`;
+
+/**
+ * Plans with unmetered rendering.
+ *
+ * These bypass credit deduction entirely — the plan itself is the entitlement.
+ * Keeping this as a plan-level rule (rather than an "unlimited" flag threaded
+ * through Stripe metadata) means an existing subscriber is upgraded the moment
+ * this deploys, with no webhook replay or data migration needed.
+ */
+const UNLIMITED_PLANS = new Set(['business', 'master']);
+
 // Try Before You Buy Trial Constants
 const RENDERS_PER_DAY = 5;    // Max renders during trial
 const TRIAL_HOURS = 24;       // Trial window in hours (1 day)
 const TRIAL_DAYS = 1;         // Legacy compat — 1 day
+
+/**
+ * Master account allowlist, keyed on Firebase UID rather than the email claim.
+ *
+ * Email is the wrong key for an authorisation decision: it is not guaranteed
+ * unique across providers and the master address is public in this repo. UIDs
+ * are issued by Firebase and cannot be chosen by the user.
+ *
+ * Override in production with MASTER_UIDS="uid1,uid2". The literal below is the
+ * current owner account and exists so a missing env var can never lock the
+ * owner out of their own application. A UID is an identifier, not a credential.
+ */
+const MASTER_UIDS = (process.env.MASTER_UIDS || 'b4ARwo7cCQfS9iiu2L3bYl7DCqf1')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
+/** True only for allowlisted master UIDs. */
+const isMasterUser = (user) => !!user && MASTER_UIDS.includes(user.uid);
+
+/**
+ * Tester allowlist, by email.
+ *
+ * Testers sign themselves up, so there is no UID to allowlist in advance -
+ * email is the only identifier we have before they exist. That is acceptable
+ * here where it would not be for MASTER_UIDS, because a tester's privileges are
+ * strictly bounded (a fixed number of renders, for a fixed number of days) and
+ * Firebase will not let a second account claim an email that is already taken.
+ *
+ * Set TESTER_EMAILS="a@b.com,c@d.com" in the environment.
+ */
+const TESTER_EMAILS = (process.env.TESTER_EMAILS || '')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean);
+
+const isTesterUser = (user) =>
+    !!user && !!user.email && TESTER_EMAILS.includes(user.email.toLowerCase().trim());
+
+// Tester allowance. 40 renders is roughly £5 of 4K image generation at current
+// Gemini rates, which is the budget agreed per tester.
+const TESTER_RENDERS = 40;
+const TESTER_DAYS = 7;
 
 /**
  * Helper to check and deduct credits from a user's account
@@ -75,7 +194,7 @@ const deductCredits = async (user, amount) => {
     if (!db) return { success: true, balance: 9999 }; // Dev mode safety (no Firebase locally)
 
     // Master Account Override — unlimited renders
-    if (user.email === 'charlie@napc.uk') {
+    if (isMasterUser(user)) {
         return { success: true, balance: 999999 };
     }
 
@@ -83,39 +202,46 @@ const deductCredits = async (user, amount) => {
     const userRef = db.collection('users').doc(uid);
 
     try {
-        const userDoc = await userRef.get();
+        // The balance check and the decrement MUST happen inside one transaction.
+        // Reading, checking, then writing leaves a window in which N concurrent
+        // requests all observe the same balance, all pass the check, and all
+        // decrement — letting a user spend credits they do not have.
+        return await db.runTransaction(async (transaction) => {
+            const userDoc = await transaction.get(userRef);
 
-        // If user doc doesn't exist yet, create it with no credits and block
-        if (!userDoc.exists) {
-            await userRef.set({ credits: 0, plan: 'free', createdAt: admin.firestore.FieldValue.serverTimestamp() });
-            return { success: false, balance: 0, error: "Free accounts are currently suspended. Please upgrade to a paid plan." };
-        }
+            // If user doc doesn't exist yet, create it with no credits and block
+            if (!userDoc.exists) {
+                transaction.set(userRef, { credits: 0, plan: 'free', createdAt: admin.firestore.FieldValue.serverTimestamp() });
+                return { success: false, balance: 0, error: "Free accounts are currently suspended. Please upgrade to a paid plan." };
+            }
 
-        const data = userDoc.data();
-        const plan = data.plan || 'free';
-        const currentCredits = typeof data.credits === 'number' ? data.credits : 0;
+            const data = userDoc.data();
+            const plan = data.plan || 'free';
+            const currentCredits = typeof data.credits === 'number' ? data.credits : 0;
 
-        if (plan === 'free' && user.email !== 'charlie@napc.uk') {
-            return { success: false, balance: currentCredits, error: "Free accounts are currently suspended. Please upgrade to a paid plan." };
-        }
+            if (plan === 'free') {
+                return { success: false, balance: currentCredits, error: "Free accounts are currently suspended. Please upgrade to a paid plan." };
+            }
 
-        // Feature gate: 4K requires Business plan
-        if (amount === CREDIT_COSTS.UHD_4K && plan !== 'business' && plan !== 'master') {
-            return { success: false, balance: currentCredits, error: "4K Ultra HD requires the Business Plan" };
-        }
+            // Feature gate: 4K requires Business plan
+            if (amount === CREDIT_COSTS.UHD_4K && plan !== 'business' && plan !== 'master') {
+                return { success: false, balance: currentCredits, error: "4K Ultra HD requires the Business Plan" };
+            }
 
-        if (currentCredits < amount) {
-            return { success: false, balance: currentCredits, error: "Insufficient credits" };
-        }
+            if (currentCredits < amount) {
+                return { success: false, balance: currentCredits, error: "Insufficient credits" };
+            }
 
-        // Atomic decrement — no transaction needed for a single-document update
-        await userRef.update({ credits: admin.firestore.FieldValue.increment(-amount) });
-        return { success: true, balance: currentCredits - amount };
+            transaction.update(userRef, { credits: admin.firestore.FieldValue.increment(-amount) });
+            return { success: true, balance: currentCredits - amount };
+        });
 
     } catch (e) {
         console.error("[CREDITS] Deduction failed for uid:", uid, "| Error:", e.message || e);
-        // Resilient fallback: If Firestore fails, allow the request but log the error
-        return { success: true, balance: 0, warning: "Credit system temporarily unavailable" };
+        // Fail CLOSED. Granting the render on a database error turns any Firestore
+        // outage — or anything an attacker can do to induce one — into unmetered
+        // billable AI usage on our own API key.
+        return { success: false, balance: 0, status: 503, error: "Credit system temporarily unavailable. Please try again shortly." };
     }
 };
 
@@ -126,49 +252,53 @@ const deductCredits = async (user, amount) => {
  */
 const checkTrialRender = async (user) => {
     if (!db) return { allowed: true };
-    if (user.email === 'charlie@napc.uk') return { allowed: true };
+    if (isMasterUser(user)) return { allowed: true };
 
     const userRef = db.collection('users').doc(user.uid);
 
     try {
-        const userDoc = await userRef.get();
-        const now = Date.now();
+        // Same reasoning as deductCredits: the read of trialRendersUsed and the
+        // write of trialRendersUsed + 1 must be one atomic unit, or parallel
+        // requests all read the same count and blow straight past the cap.
+        return await db.runTransaction(async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            const now = Date.now();
 
-        if (!userDoc.exists) {
-            const trialExpiresAt = new Date(now + TRIAL_HOURS * 3600000).toISOString();
-            await userRef.set({
-                plan: 'free',
-                trialStartTimestamp: now,
-                trialExpiresAt: trialExpiresAt,
-                trialRendersUsed: 1,
-                createdAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-            return { allowed: true, rendersLeft: RENDERS_PER_DAY - 1 };
-        }
+            if (!userDoc.exists) {
+                const trialExpiresAt = new Date(now + TRIAL_HOURS * 3600000).toISOString();
+                transaction.set(userRef, {
+                    plan: 'free',
+                    trialStartTimestamp: now,
+                    trialExpiresAt: trialExpiresAt,
+                    trialRendersUsed: 1,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                return { allowed: true, rendersLeft: RENDERS_PER_DAY - 1 };
+            }
 
-        const data = userDoc.data();
-        const trialStart = data.trialStartTimestamp || now;
-        const trialExpiresAt = data.trialExpiresAt || new Date(trialStart + TRIAL_HOURS * 3600000).toISOString();
-        const msElapsed = now - trialStart;
+            const data = userDoc.data();
+            const trialStart = data.trialStartTimestamp || now;
+            const msElapsed = now - trialStart;
 
-        if (msElapsed >= TRIAL_HOURS * 3600000) {
-            return { allowed: false, error: 'Your 24-hour trial has ended. Upgrade to the Business Plan to continue rendering.' };
-        }
+            if (msElapsed >= TRIAL_HOURS * 3600000) {
+                return { allowed: false, error: 'Your 24-hour trial has ended. Upgrade to the Business Plan to continue rendering.' };
+            }
 
-        const rendersUsed = data.trialRendersUsed || 0;
+            const rendersUsed = data.trialRendersUsed || 0;
 
-        if (rendersUsed >= RENDERS_PER_DAY) {
-            return { allowed: false, error: 'Trial limit reached (5 renders). Upgrade to Business for unlimited access.' };
-        }
+            if (rendersUsed >= RENDERS_PER_DAY) {
+                return { allowed: false, error: 'Trial limit reached (5 renders). Upgrade to Business for unlimited access.' };
+            }
 
-        await userRef.update({
-            trialRendersUsed: rendersUsed + 1
+            transaction.update(userRef, { trialRendersUsed: rendersUsed + 1 });
+            return { allowed: true, rendersLeft: RENDERS_PER_DAY - (rendersUsed + 1) };
         });
-        return { allowed: true, rendersLeft: RENDERS_PER_DAY - (rendersUsed + 1) };
 
     } catch (e) {
         console.error('[TRIAL] Check failed:', e.message || e);
-        return { allowed: true }; // fail open
+        // Fail CLOSED — see deductCredits. A database error must never become
+        // free unmetered AI usage.
+        return { allowed: false, status: 503, error: 'Render service temporarily unavailable. Please try again shortly.' };
     }
 };
 
@@ -185,23 +315,88 @@ app.set('trust proxy', 1); // Enable proxy trust for Render load balancers
  *   { allowed: false, status: 402, body: {...} }  → endpoint should return this immediately
  *   { allowed: true, rendersLeft?: number }       → endpoint may proceed
  */
+/**
+ * Tester allowance: a fixed number of renders within a fixed window.
+ *
+ * Same transactional, fail-closed shape as checkTrialRender - the read of the
+ * counter and the write of counter + 1 must be atomic or parallel requests all
+ * observe the same value and blow past the cap.
+ */
+const checkTesterRender = async (user) => {
+    if (!db) return { allowed: true };
+
+    const userRef = db.collection('users').doc(user.uid);
+    try {
+        return await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(userRef);
+            const now = Date.now();
+            const data = snap.exists ? snap.data() : null;
+
+            // The clock starts on first use, not on account creation, so a
+            // tester who signs up early does not lose days before starting.
+            const startedAt = data?.testerStartedAt || now;
+            const expiresAt = startedAt + TESTER_DAYS * 86400000;
+            const used = data?.testerRendersUsed || 0;
+
+            if (now >= expiresAt) {
+                return { allowed: false, status: 402, error: `Your ${TESTER_DAYS}-day tester access has ended.` };
+            }
+            if (used >= TESTER_RENDERS) {
+                return { allowed: false, status: 402, error: `Tester limit reached (${TESTER_RENDERS} renders).` };
+            }
+
+            transaction.set(userRef, {
+                plan: 'tester',
+                testerStartedAt: startedAt,
+                testerExpiresAt: expiresAt,
+                testerRendersUsed: used + 1,
+            }, { merge: true });
+
+            return { allowed: true, rendersLeft: TESTER_RENDERS - (used + 1) };
+        });
+    } catch (e) {
+        console.error('[TESTER] Check failed:', e.message || e);
+        return { allowed: false, status: 503, error: 'Render service temporarily unavailable. Please try again shortly.' };
+    }
+};
+
 const enforceRenderAccess = async (req, creditCost) => {
-    // Master account — always allowed
-    if (req.user.email === 'charlie@napc.uk') {
+    // Master account — always allowed. Keyed on UID allowlist, never on the
+    // email claim, and never on a Firestore field the user's document controls.
+    if (isMasterUser(req.user)) {
         return { allowed: true };
     }
 
-    // Read plan from Firestore
+    // Testers are metered by render count and an expiry date, not by credits.
+    if (isTesterUser(req.user)) {
+        const testerCheck = await checkTesterRender(req.user);
+        if (!testerCheck.allowed) {
+            return { allowed: false, status: testerCheck.status || 402, body: { error: testerCheck.error } };
+        }
+        return { allowed: true, rendersLeft: testerCheck.rendersLeft };
+    }
+
+    // Read plan from Firestore. A read failure must NOT silently degrade to the
+    // free/trial path — that path used to fail open, so a DB blip granted
+    // everyone unlimited renders. Refuse instead.
     let userPlan = 'free';
     if (db) {
         try {
             const uDoc = await db.collection('users').doc(req.user.uid).get();
             userPlan = uDoc.exists ? (uDoc.data().plan || 'free') : 'free';
-        } catch (_) { /* default to free on DB error */ }
+        } catch (e) {
+            console.error('[ACCESS] Plan lookup failed for uid:', req.user.uid, '|', e.message || e);
+            return {
+                allowed: false,
+                status: 503,
+                body: { error: 'Render service temporarily unavailable. Please try again shortly.' }
+            };
+        }
     }
 
-    if (userPlan === 'master') {
-        return { allowed: true };
+    // Unlimited plans render without metering.
+    if (UNLIMITED_PLANS.has(userPlan)) {
+        return { allowed: true, unlimited: true };
     }
 
     if (userPlan === 'free') {
@@ -210,8 +405,8 @@ const enforceRenderAccess = async (req, creditCost) => {
         if (!trialCheck.allowed) {
             return {
                 allowed: false,
-                status: 402,
-                body: { error: trialCheck.error, upgradeRequired: true }
+                status: trialCheck.status || 402,
+                body: { error: trialCheck.error, upgradeRequired: !trialCheck.status }
             };
         }
         return { allowed: true, rendersLeft: trialCheck.rendersLeft };
@@ -222,21 +417,24 @@ const enforceRenderAccess = async (req, creditCost) => {
     if (!creditCheck.success) {
         return {
             allowed: false,
-            status: 402,
+            status: creditCheck.status || 402,
             body: { error: creditCheck.error, balance: creditCheck.balance }
         };
     }
     return { allowed: true, creditBalance: creditCheck.balance };
 };
 
-const port = process.env.PORT || 3005;
+// API_PORT lets local dev pin the API to 3005 (where vite.config proxies /api)
+// even when a tool injects PORT for the front end. Production is unaffected:
+// hosts set PORT and leave API_PORT unset.
+const port = process.env.API_PORT || process.env.PORT || 3005;
 
 console.log("--- SERVER STARTUP DEBUG ---");
 console.log("CWD:", process.cwd());
 console.log("DIRNAME:", __dirname);
 console.log("PORT ENV:", process.env.PORT);
 console.log("PORT SELECT:", port);
-console.log("API KEY STATUS:", process.env.VITE_GEMINI_API_KEY ? "EXISTS (SAFE)" : "MISSING");
+console.log("API KEY STATUS:", (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY) ? "EXISTS (SAFE)" : "MISSING");
 
 const distPath = path.join(__dirname, 'dist');
 if (fs.existsSync(distPath)) {
@@ -268,7 +466,11 @@ const aiLimiter = rateLimit({
 const userAiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000,
     max: 5, // max 5 renders per minute per individual user
-    keyGenerator: (req) => req.user?.uid || req.ip || 'unknown',
+    // Authenticated requests key on the Firebase UID. The IP fallback must go
+    // through ipKeyGenerator, which normalises IPv6 to its /64 prefix — a raw
+    // req.ip lets an IPv6 client hop addresses within its own allocation and
+    // get a fresh limit bucket on every request.
+    keyGenerator: (req) => req.user?.uid || ipKeyGenerator(req.ip) || 'unknown',
     message: { error: "You have reached your individual render limit. Please wait a minute." },
     standardHeaders: true,
     legacyHeaders: false,
@@ -313,14 +515,22 @@ const allowedOrigins = [
     'https://www.modulrstudio.co.uk'
 ].filter(Boolean);
 
-app.use(cors({
+// CORS applies to the API only. Applying it to every route is actively harmful:
+// browsers do not send an Origin header on top-level navigation, so rejecting
+// origin-less requests globally would reject ordinary page loads and the host's
+// health checks, taking the whole site down.
+//
+// Origin-less requests are therefore allowed. CORS is a browser-enforced control
+// and cannot stop a scripted client regardless; the Firebase token check in
+// verifyFirebaseToken is the actual gate on these endpoints.
+app.use('/api', cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        // OR allow if the origin is in our allowed list
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            const err = new Error('Not allowed by CORS');
+            err.status = 403;
+            callback(err);
         }
     },
     methods: ['GET', 'POST', 'OPTIONS'],
@@ -353,7 +563,11 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
         // For invoice.paid, we might need to look up uid by customerId if metadata isn't on the invoice
         let uid = object.metadata?.firebase_uid;
         let creditsToAward = parseInt(object.metadata?.credits || "0");
-        let plan = object.metadata?.plan || 'free';
+        // NOTE: no 'free' default. Defaulting to 'free' meant that if metadata
+        // ever went missing on a renewal we would DOWNGRADE a paying customer
+        // at the exact moment their payment succeeded. Unknown plan => leave the
+        // stored plan untouched.
+        let plan = object.metadata?.plan || null;
         let customerId = object.customer;
 
         // If it's an invoice, we need to extract line item metadata or look up the subscription
@@ -363,13 +577,21 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
                 const subscription = await stripe.subscriptions.retrieve(object.subscription);
                 uid = subscription.metadata?.firebase_uid;
                 creditsToAward = parseInt(subscription.metadata?.credits || "0");
-                plan = subscription.metadata?.plan || 'free';
+                plan = subscription.metadata?.plan || null;
             } catch (err) {
                 console.error("[STRIPE] Error retrieving subscription for invoice:", err.message);
             }
         }
 
-        if (uid && creditsToAward > 0) {
+        if (!uid) {
+            console.error('[STRIPE] PAYMENT WITHOUT firebase_uid — manual reconciliation needed. event:', event.id, 'customer:', customerId);
+        }
+
+        // Process whenever we know who paid. Previously this also required
+        // creditsToAward > 0, so a zero-credit plan (e.g. the managed service
+        // add-on) recorded nothing at all — no plan, no stripeCustomerId, which
+        // also left the billing portal unusable for those customers.
+        if (uid) {
             try {
                 // IDEMPOTENCY CHECK: Ensure we haven't processed this exact event before
                 const eventRef = db.collection('stripe_events').doc(event.id);
@@ -391,12 +613,18 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
                     
                     // Award credits
                     const userRef = db.collection('users').doc(uid);
-                    transaction.set(userRef, {
-                        credits: admin.firestore.FieldValue.increment(creditsToAward),
-                        plan: plan,
+                    const update = {
                         stripeCustomerId: customerId,
-                        lastPaymentAt: admin.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
+                        lastPaymentAt: admin.firestore.FieldValue.serverTimestamp(),
+                        subscriptionStatus: 'active'
+                    };
+                    if (creditsToAward > 0) {
+                        update.credits = admin.firestore.FieldValue.increment(creditsToAward);
+                    }
+                    if (plan) {
+                        update.plan = plan;
+                    }
+                    transaction.set(userRef, update, { merge: true });
                 });
                 
                 console.log(`[STRIPE] ${event.type} processed: Awarded ${creditsToAward} credits to ${uid}`);
@@ -406,31 +634,91 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
         }
     }
 
+    /**
+     * Subscription ended, or payment permanently failed → revoke access.
+     *
+     * Without this, nothing in the application ever downgrades a plan: a
+     * customer could subscribe once, cancel or let their card lapse, and retain
+     * Business access and their credit balance indefinitely.
+     */
+    if (event.type === 'customer.subscription.deleted' || event.type === 'invoice.payment_failed') {
+        const object = event.data.object;
+        let uid = object.metadata?.firebase_uid;
+        const customerId = object.customer;
+
+        // invoice.payment_failed carries the invoice, not the subscription, so
+        // the uid usually has to come from the subscription it belongs to.
+        if (!uid && object.subscription) {
+            try {
+                const subscription = await stripe.subscriptions.retrieve(object.subscription);
+                uid = subscription.metadata?.firebase_uid;
+            } catch (err) {
+                console.error('[STRIPE] Could not retrieve subscription for revocation:', err.message);
+            }
+        }
+
+        // Last resort: find the user by the Stripe customer ID we stored on purchase.
+        if (!uid && customerId && db) {
+            try {
+                const match = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
+                if (!match.empty) uid = match.docs[0].id;
+            } catch (err) {
+                console.error('[STRIPE] Customer lookup failed:', err.message);
+            }
+        }
+
+        if (!uid) {
+            console.error('[STRIPE] Could not resolve a user to revoke for event:', event.id, '| customer:', customerId);
+        } else if (db) {
+            try {
+                await db.collection('users').doc(uid).set({
+                    plan: 'free',
+                    subscriptionStatus: event.type === 'customer.subscription.deleted' ? 'cancelled' : 'past_due',
+                    accessRevokedAt: admin.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                console.log(`[STRIPE] ${event.type}: revoked paid access for ${uid}`);
+            } catch (error) {
+                console.error('[STRIPE] Failed to revoke access for', uid, error);
+            }
+        }
+    }
+
     res.json({ received: true });
 });
 
 app.use(express.json({ limit: '20mb' })); // Reduced from 100mb for DoS protection (Images compress to ~1MB max client-side)
-app.use(globalLimiter);
 
-// Error handler for JSON parsing or payload limits
+// Scope the IP limiter to the API only. Applied globally it also counted every
+// static asset and page refresh against the 100-request budget, so anyone behind
+// shared NAT — an office, a campus, a mobile carrier — would be served JSON
+// errors where HTML and JavaScript should be, and the site would look broken.
+app.use('/api', globalLimiter);
+
+// Error handler for JSON parsing or payload limits.
+// Registered here so it catches body-parser failures; a second, final handler is
+// registered after the routes to catch errors thrown inside route handlers.
 app.use((err, req, res, next) => {
     if (err) {
         console.error("Express middleware error:", err.message);
-        return res.status(err.status || 500).json({ error: err.message || "Internal Server Error" });
+        const status = err.status || err.statusCode || 500;
+        // Do not echo internal error text to clients on a 5xx.
+        return res.status(status).json({
+            error: status >= 500 ? "Internal Server Error" : (err.message || "Bad Request")
+        });
     }
     next();
 });
 
 // Middleware to verify Firebase JWT
 const verifyFirebaseToken = async (req, res, next) => {
-    // 🔥 DEVELOPMENT BYPASS: Set to true only for local feature testing. IMPORTANT: MUST BE FALSE IN PRODUCTION.
-    const MOCK_AUTH = false;
-    
-    if (MOCK_AUTH) {
-        if (process.env.NODE_ENV === 'production') {
-            throw new Error("CRITICAL SECURITY FATAL: MOCK_AUTH is enabled in a production environment!");
-        }
-        req.user = { uid: "testuser", email: "charlie@napc.uk" };
+    // Development-only auth bypass. This is deliberately driven by the
+    // environment rather than a hardcoded constant: a constant sitting in the
+    // source is one stray keystroke away from disabling authentication for the
+    // entire API in production. It cannot switch on unless BOTH an explicit
+    // opt-in flag is set AND we are demonstrably not in production.
+    if (process.env.ALLOW_MOCK_AUTH === 'true' && process.env.NODE_ENV !== 'production') {
+        console.warn('[AUTH] MOCK AUTH ACTIVE — all requests run as the master test user.');
+        req.user = { uid: MASTER_UIDS[0], email: 'dev@localhost', email_verified: true };
         return next();
     }
 
@@ -450,24 +738,35 @@ const verifyFirebaseToken = async (req, res, next) => {
     }
 };
 
-const MASTER_EMAIL = process.env.MASTER_EMAIL || 'charlie@napc.uk';
-
-// Pre-launch lock middleware: restrict API operations to master account only
+/**
+ * Pre-launch lock: restrict API operations to the master account.
+ *
+ * Keyed on the Firebase UID allowlist, not the email claim. The email claim is
+ * user-facing data — the master address is published in this repository, is not
+ * verified on the current owner account, and is not guaranteed unique across
+ * auth providers. The UID is assigned by Firebase and cannot be chosen.
+ */
 const enforceMasterLock = (req, res, next) => {
-    const isMaster = req.user && req.user.email && req.user.email.toLowerCase().trim() === MASTER_EMAIL.toLowerCase();
-    if (!isMaster) {
-        return res.status(403).json({ error: 'Access restricted: App is currently in pre-launch mode for Master Account access only.' });
+    // Testers are let through the pre-launch lock. Their usage is still bounded
+    // by enforceRenderAccess, which caps renders and expires the account.
+    if (isMasterUser(req.user) || isTesterUser(req.user)) {
+        return next();
     }
-    next();
+    return res.status(403).json({ error: 'Access restricted: App is currently in pre-launch mode for Master Account access only.' });
 };
 
 // Protect all API routes and enforce master lock
 app.use('/api', verifyFirebaseToken, enforceMasterLock);
 
-const apiKey = process.env.VITE_GEMINI_API_KEY;
+// Prefer the non-VITE name. The VITE_ prefix is kept only as a fallback for
+// existing deployments — Vite inlines any VITE_* var into the client bundle,
+// so this key must be migrated to GEMINI_API_KEY and the old name deleted.
+const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
 if (!apiKey) {
-    console.warn("WARNING: Missing VITE_GEMINI_API_KEY environment variable. AI features will not work.");
+    console.warn("WARNING: Missing GEMINI_API_KEY environment variable. AI features will not work.");
+} else if (!process.env.GEMINI_API_KEY && process.env.VITE_GEMINI_API_KEY) {
+    console.warn("WARNING: Using deprecated VITE_GEMINI_API_KEY. Rename this env var to GEMINI_API_KEY.");
 }
 
 // Initialize Gemini Client via v1beta for early access preview models
@@ -678,13 +977,6 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
             decking: sanitizeString(rawMats.decking, 200),
         };
 
-        // Access control: trial users get 5 renders/day for 3 days (no credits).
-        // Paid plans (standard/business/master) use the credit system.
-        const isPaidRender = req.user.email === 'charlie@napc.uk' || (() => {
-            // We'll check from the deductCredits path which already reads the plan
-            return false;
-        })();
-
         // Enforce render access (trial for free users, credit deduction for paid)
         const access = await enforceRenderAccess(req, isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES);
         if (!access.allowed) {
@@ -702,25 +994,81 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
 
         const deckingValue = materials.decking && materials.decking.trim().toLowerCase() !== 'none' ? materials.decking : null;
 
+        /**
+         * Material instruction for CGI-model sources (3D Configurator, SketchUp).
+         *
+         * Deliberately different from buildMaterialInstruction. For a photograph,
+         * "preserve the original material" is right. For a flat-shaded 3D model
+         * it is the bug: it tells the model to keep the configurator's plastic
+         * look, which is exactly what we are trying to replace. When no material
+         * is specified we want the COLOUR intent honoured but rendered as a real
+         * physical surface.
+         */
+        const buildCgiMaterialInstruction = (label, value) => {
+            if (!value || value.trim() === '' || value.toLowerCase() === 'none') {
+                return `- ${label}: Keep the colour and intent shown in the model, but render it as a REAL physical material with authentic texture, grain, seams, edge wear and light response. Do NOT reproduce the model's flat fill colour.`;
+            }
+            return `- ${label}: ${value}`;
+        };
+
         const sketchUpPrompt = `
-      RENDER ENGINE: Nano Banana Pro (V3.2) — ENHANCE / UPSCALE MODE ONLY.
-      
-      ABSOLUTE CRITICAL RULE:
-      The input image is a coloured 3D model screenshot with pre-applied materials.
-      Your ONLY task is to ENHANCE and UPSCALE it to photorealistic quality by applying lighting, reflections, and textures.\n      GEOMETRY MUST BE PIXEL-LOCKED. Do NOT redraw, re-compose, or extend any geometry.\n      DO NOT invent structures, decking, patios, porches, or raised platforms.\n      DO NOT change the roof pitch, shape, or modify any architectural elements.\n      PRESERVE the environment exactly as shown.
-      IGNORE 3D GRID LINES: The source image has a 3D floor grid visible on the ground/grass. IGNORE THESE COMPLETELY. Do NOT render these grid lines into the final image, render a natural, seamless ground/grass instead.
-      
+      RENDER ENGINE SETTINGS:
+      - Engine: Nano Banana Pro (V3.2).
+      - Target: 8K-UHD Photograph-Quality Architectural Visualization.
+      - Quality: Ultra-realistic, Physically Based Rendering (PBR), sharp focus, hyper-detailed micro-textures.
+
+      WHAT THE INPUT IS:
+      The source is a flat-shaded 3D model preview (CAD / SketchUp / configurator).
+      Treat it STRICTLY as a geometry, layout and composition reference. It is NOT
+      a photograph and its appearance must NOT be preserved.
+
+      TASK: Produce a full photorealistic architectural render of this exact building.
+      This is a COMPLETE RE-RENDER, not an upscale, filter or enhancement pass.
+
+      YOU MUST REPLACE, NOT PRESERVE:
+      - Discard the model's flat fill colours, uniform shading and plastic CGI look entirely.
+      - Discard hard, aliased CG edges. Real materials have thickness, bevels and shadow lines.
+      - Rebuild all lighting from scratch: real sun angle, soft sky fill, global illumination,
+        contact shadows, ambient occlusion in every recess and reveal.
+      - Add authentic surface detail: timber grain and board joints, metal seams and standing
+        ribs, glass with real reflections, refraction and interior falloff, subtle dirt and
+        weathering at ground level.
+      - Materials must respond physically to light: correct roughness, specularity and
+        reflectance for each surface.
+
+      GEOMETRY & CONTEXT RULES - CRITICAL:
+      - STRICT GEOMETRY LOCK: reproduce the EXACT structure, proportions, roof pitch, and
+        window and door positions shown. Changing the appearance is required; changing the
+        DESIGN is forbidden.
+      - NO HALLUCINATIONS: do NOT invent structures, decking, patios, porches or raised
+        platforms that are not present in the source.
+      - PRESERVE THE COMPOSITION: keep the same camera angle and framing.
+      - IGNORE 3D GRID LINES: the source may show a floor grid on the ground. Never render
+        these. Replace with natural, seamless ground or grass.
+
       MATERIAL ASSIGNMENTS:
-      ${buildMaterialInstruction('Walls', materials.walls)}
-      ${buildMaterialInstruction('Roof', materials.roof)}
-      ${buildMaterialInstruction('Windows', materials.windows)}
-      ${buildMaterialInstruction('Doors', materials.doors)}
-      ${buildMaterialInstruction('Decking/Ground', materials.decking)}
-      
+      ${buildCgiMaterialInstruction('Walls', materials.walls)}
+      ${buildCgiMaterialInstruction('Roof', materials.roof)}
+      ${buildCgiMaterialInstruction('Windows', materials.windows)}
+      ${buildCgiMaterialInstruction('Doors', materials.doors)}
+      ${buildCgiMaterialInstruction('Decking/Ground', materials.decking)}
+
+      COLOR & LIGHTING PRECISION:
+      - If a colour like "Black", "Charred", "Anthracite" or "Dark" is specified, render it as a
+        deep, rich, non-reflective tone. DO NOT wash out to grey.
+      - Keep contrast controlled and natural. Depth comes from soft directional falloff
+        and ambient occlusion, not from hard shadows or crushed blacks.
+
+      ${MODULR_HOUSE_STYLE}
+
       SCENE MODIFICATIONS: ${additionalPrompt || 'None'}
-      ${studioBackground ? `\n      STUDIO OVERRIDE: Render this building completely isolated on a ${studioBackground}. Do NOT render grass, trees, fences, skies, or any natural environment. Pure studio lighting only.` : ''}
+      ${studioBackground ? `\n      STUDIO OVERRIDE - THIS SUPERSEDES THE HOUSE STYLE COMPOSITION AND CONTEXT RULES ABOVE: Render this building completely isolated on a ${studioBackground}. Do NOT render grass, trees, fences, skies, or any natural environment. Pure studio lighting only. Keep the house style's camera, focus and finish guidance - the building must still be tack sharp with true-to-life material colour.` : ''}
       ${isBatchSequence ? `\n      BATCH SEQUENCE CONTINUITY: This image is part of a multi-angle batch sequence. You MUST maintain exactly the same surrounding landscape, garden design, driveway, sky, trees, and general environment style as the other angles of this property.` : ''}
-      FINAL OUTPUT: 4K UHD Photorealistic.
+
+      FINAL OUTPUT: The result must be indistinguishable from a real architectural photograph
+      (DSLR quality). It must NOT look like a 3D model, a game engine screenshot, or a
+      retouched CAD export.
+      CRITICAL: Output resolution 3840 x 2160 pixels (4K UHD).
     `;
 
         const standardPrompt = `
@@ -747,10 +1095,13 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
 
       COLOR & LIGHTING PRECISION:
       - If a colour like "Black", "Charred", "Anthracite", or "Dark" is specified, render it as deep, rich, non-reflective tone. DO NOT wash out to grey.
-      - Use high-contrast architectural lighting with crisp shadows.
+      - Keep contrast controlled and natural. Depth comes from soft directional falloff
+        and ambient occlusion, not from hard shadows or crushed blacks.
+
+      ${MODULR_HOUSE_STYLE}
 
       SCENE MODIFICATIONS: ${additionalPrompt || 'None'}
-      ${studioBackground ? `\n      STUDIO OVERRIDE: Render this building completely isolated on a ${studioBackground}. Do NOT render grass, trees, fences, skies, or any natural environment. Pure studio lighting only.` : ''}
+      ${studioBackground ? `\n      STUDIO OVERRIDE - THIS SUPERSEDES THE HOUSE STYLE COMPOSITION AND CONTEXT RULES ABOVE: Render this building completely isolated on a ${studioBackground}. Do NOT render grass, trees, fences, skies, or any natural environment. Pure studio lighting only. Keep the house style's camera, focus and finish guidance - the building must still be tack sharp with true-to-life material colour.` : ''}
       ${isBatchSequence ? `\n      BATCH SEQUENCE CONTINUITY: This image is part of a multi-angle batch sequence. You MUST maintain exactly the same surrounding landscape, garden design, driveway, sky, trees, and general environment style as the other angles of this property.` : ''}
 
       FINAL OUTPUT: The result must be indistinguishable from a real architectural photograph (DSLR quality).
@@ -767,7 +1118,10 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
             config: {
                 outputMimeType: "image/jpeg",
                 imageConfig: {
-                    aspectRatio: (isHighQuality && !isSketchUpMode) ? "16:9" : ratio,
+                    // CGI-model sources keep the source framing rather than being
+                    // forced to 16:9, so the composition the user set up in the
+                    // configurator survives. Fallback guards against an empty ratio.
+                    aspectRatio: (isHighQuality && !isSketchUpMode) ? "16:9" : (ratio || "16:9"),
                     imageSize: isHighQuality ? "4K" : "1K",
                     ...(seed !== undefined && !isNaN(seed) && { seed })
                 },
@@ -873,10 +1227,13 @@ app.post('/api/analyzeMaterials', userAiLimiter, async (req, res) => {
     try {
         const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
 
-        // Phase 2: Analysis deduction
-        const creditCheck = await deductCredits(req.user, CREDIT_COSTS.ANALYSIS);
-        if (!creditCheck.success) {
-            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        // Route through the same gate as every other AI endpoint. Calling
+        // deductCredits directly meant trial users hit the paid-only path and
+        // were told "Free accounts are currently suspended" for a feature the
+        // trial is supposed to include.
+        const access = await enforceRenderAccess(req, CREDIT_COSTS.ANALYSIS);
+        if (!access.allowed) {
+            return res.status(access.status).json(access.body);
         }
 
         const imagePart = fileToGenerativePart(base64Image, "image/png");
@@ -943,10 +1300,13 @@ app.post('/api/analyzeScene', userAiLimiter, async (req, res) => {
     try {
         const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
 
-        // Phase 2: Analysis deduction
-        const creditCheck = await deductCredits(req.user, CREDIT_COSTS.ANALYSIS);
-        if (!creditCheck.success) {
-            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        // Route through the same gate as every other AI endpoint. Calling
+        // deductCredits directly meant trial users hit the paid-only path and
+        // were told "Free accounts are currently suspended" for a feature the
+        // trial is supposed to include.
+        const access = await enforceRenderAccess(req, CREDIT_COSTS.ANALYSIS);
+        if (!access.allowed) {
+            return res.status(access.status).json(access.body);
         }
 
         const imagePart = fileToGenerativePart(base64Image, "image/png");
@@ -1072,10 +1432,13 @@ app.post('/api/analyzeExteriorDetails', userAiLimiter, async (req, res) => {
     try {
         const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
 
-        // Phase 2: Analysis deduction
-        const creditCheck = await deductCredits(req.user, CREDIT_COSTS.ANALYSIS);
-        if (!creditCheck.success) {
-            return res.status(402).json({ error: creditCheck.error, balance: creditCheck.balance });
+        // Route through the same gate as every other AI endpoint. Calling
+        // deductCredits directly meant trial users hit the paid-only path and
+        // were told "Free accounts are currently suspended" for a feature the
+        // trial is supposed to include.
+        const access = await enforceRenderAccess(req, CREDIT_COSTS.ANALYSIS);
+        if (!access.allowed) {
+            return res.status(access.status).json(access.body);
         }
 
         const imagePart = fileToGenerativePart(base64Image, "image/png");
@@ -1222,8 +1585,28 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
 
 app.get('/api/user/credits', async (req, res) => {
     try {
-        if (req.user.email === 'charlie@napc.uk') {
+        if (isMasterUser(req.user)) {
             return res.json({ credits: 'Unlimited', plan: 'master' });
+        }
+
+        // Tester: report the remaining renders and days so the account page can
+        // show a countdown.
+        if (isTesterUser(req.user)) {
+            const snap = await db.collection('users').doc(req.user.uid).get();
+            const data = snap.exists ? snap.data() : {};
+            const used = data.testerRendersUsed || 0;
+            const startedAt = data.testerStartedAt || Date.now();
+            const expiresAt = startedAt + TESTER_DAYS * 86400000;
+            const msLeft = Math.max(0, expiresAt - Date.now());
+            return res.json({
+                credits: Math.max(0, TESTER_RENDERS - used),
+                plan: 'tester',
+                rendersLeft: Math.max(0, TESTER_RENDERS - used),
+                rendersPerDay: TESTER_RENDERS,
+                trialDaysLeft: Math.ceil(msLeft / 86400000),
+                trialExpiresAt: new Date(expiresAt).toISOString(),
+                trialBlocked: used >= TESTER_RENDERS || msLeft <= 0,
+            });
         }
 
         const userRef = db.collection('users').doc(req.user.uid);
@@ -1288,6 +1671,12 @@ app.get('/api/user/credits', async (req, res) => {
             });
         }
 
+        // Unlimited plans report a sentinel rather than a balance — the UI
+        // renders an infinity symbol for any non-numeric value.
+        if (UNLIMITED_PLANS.has(plan)) {
+            return res.json({ credits: 'Unlimited', plan });
+        }
+
         res.json({ credits: data.credits || 0, plan });
     } catch (error) {
         console.error("Error fetching user credits:", error);
@@ -1297,40 +1686,47 @@ app.get('/api/user/credits', async (req, res) => {
 
 app.post('/api/create-checkout-session', async (req, res) => {
     try {
-        const { priceId, planName, creditsAmount, isOneTime } = req.body;
-        
         if (!stripe) throw new Error("Stripe is not configured on the server");
+
+        // The price ID is the ONLY thing we accept from the client, and it must
+        // match a known catalogue entry. Plan, credit quantity and billing mode
+        // all come from the server-side catalogue — never from the request.
+        const priceId = sanitizeString(req.body.priceId, 200);
+        const entry = PRICE_CATALOG[priceId];
+
+        if (!entry) {
+            console.warn('[STRIPE] Rejected checkout for unknown priceId:', priceId, '| uid:', req.user.uid);
+            return res.status(400).json({ error: 'Unknown or unavailable plan.' });
+        }
+
+        // Never interpolate the client-controlled Origin header into a redirect
+        // target — that is an open redirect off the back of a real payment flow.
+        const origin = allowedOrigins.includes(req.headers.origin)
+            ? req.headers.origin
+            : (process.env.VITE_APP_URL || 'https://modulrstudio.co.uk');
+
+        const purchaseMetadata = {
+            firebase_uid: req.user.uid,
+            plan: entry.plan,
+            credits: String(entry.credits)
+        };
 
         const sessionPayload = {
             payment_method_types: ['card'],
-            line_items: [
-                {
-                    price: priceId,
-                    quantity: 1,
-                },
-            ],
-            mode: isOneTime ? 'payment' : 'subscription',
+            line_items: [{ price: priceId, quantity: 1 }],
+            mode: entry.mode,
             automatic_tax: { enabled: true },
-            success_url: `${req.headers.origin}/account?success=true`,
-            cancel_url: `${req.headers.origin}/pricing?canceled=true`,
-            metadata: {
-                firebase_uid: req.user.uid,
-                plan: planName || 'credits_pack',
-                credits: String(creditsAmount)
-            },
+            success_url: `${origin}/account?success=true`,
+            cancel_url: `${origin}/pricing?canceled=true`,
+            client_reference_id: req.user.uid,
+            metadata: purchaseMetadata,
         };
 
         // For subscriptions, also set metadata on the Subscription object itself.
         // This is CRITICAL for invoice.paid renewal events to work — invoices
         // inherit metadata from the Subscription, not the checkout Session.
-        if (!isOneTime) {
-            sessionPayload.subscription_data = {
-                metadata: {
-                    firebase_uid: req.user.uid,
-                    plan: planName || 'credits_pack',
-                    credits: String(creditsAmount)
-                }
-            };
+        if (entry.mode === 'subscription') {
+            sessionPayload.subscription_data = { metadata: purchaseMetadata };
         }
 
         const session = await stripe.checkout.sessions.create(sessionPayload);
@@ -1338,7 +1734,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
         res.json({ sessionId: session.id, url: session.url });
     } catch (error) {
         console.error("Stripe Checkout Error:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: "Could not start checkout. Please try again." });
     }
 });
 
@@ -1354,15 +1750,21 @@ app.post('/api/create-portal-session', async (req, res) => {
             return res.status(400).json({ error: "No active Stripe customer found. Please subscribe to a plan first." });
         }
 
+        // Same open-redirect reasoning as the checkout session — never trust the
+        // client-supplied Origin header as a redirect target.
+        const origin = allowedOrigins.includes(req.headers.origin)
+            ? req.headers.origin
+            : (process.env.VITE_APP_URL || 'https://modulrstudio.co.uk');
+
         const portalSession = await stripe.billingPortal.sessions.create({
             customer: customerId,
-            return_url: `${req.headers.origin}/account`,
+            return_url: `${origin}/account`,
         });
 
         res.json({ url: portalSession.url });
     } catch (error) {
         console.error("Portal error:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: "Could not open the billing portal. Please try again." });
     }
 });
 
@@ -1378,6 +1780,17 @@ app.use((req, res, next) => {
         }
     }
     next();
+});
+
+/**
+ * Final error handler. Must be registered AFTER every route — Express only
+ * routes errors to handlers declared later than the code that threw, so the
+ * early handler above never saw anything thrown inside a route.
+ */
+app.use((err, req, res, next) => {
+    console.error('[UNHANDLED]', req.method, req.path, '|', err?.stack || err?.message || err);
+    if (res.headersSent) return next(err);
+    res.status(500).json({ error: 'Internal Server Error' });
 });
 
 const server = app.listen(port, '0.0.0.0', () => {

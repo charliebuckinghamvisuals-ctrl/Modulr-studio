@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface StartupLoaderProps {
     onFinish: () => void;
@@ -6,6 +6,16 @@ interface StartupLoaderProps {
 
 export const StartupLoader: React.FC<StartupLoaderProps> = ({ onFinish }) => {
     const [progress, setProgress] = useState(0);
+
+    // Callers pass an inline arrow for onFinish, so its identity changes on
+    // every parent render. With `onFinish` in the dependency array below, each
+    // of those renders - auth resolving, credits loading - cleared the interval
+    // and restarted the countdown from zero, stretching a 2.5s splash out
+    // indefinitely. Hold it in a ref so the timer is created exactly once.
+    const onFinishRef = useRef(onFinish);
+    useEffect(() => {
+        onFinishRef.current = onFinish;
+    }, [onFinish]);
 
     useEffect(() => {
         // Enforce dark theme on loader
@@ -15,6 +25,7 @@ export const StartupLoader: React.FC<StartupLoaderProps> = ({ onFinish }) => {
         const intervalTime = 30; // Update every 30ms
         const steps = duration / intervalTime;
         let currentStep = 0;
+        let finishTimer: ReturnType<typeof setTimeout> | undefined;
 
         const timer = setInterval(() => {
             currentStep++;
@@ -29,12 +40,15 @@ export const StartupLoader: React.FC<StartupLoaderProps> = ({ onFinish }) => {
             if (currentStep >= steps) {
                 clearInterval(timer);
                 // Brief pause at 100% before transitioning out
-                setTimeout(onFinish, 400);
+                finishTimer = setTimeout(() => onFinishRef.current(), 400);
             }
         }, intervalTime);
 
-        return () => clearInterval(timer);
-    }, [onFinish]);
+        return () => {
+            clearInterval(timer);
+            if (finishTimer) clearTimeout(finishTimer);
+        };
+    }, []);
 
     return (
         <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center pt-10 pb-20 animate-in fade-in duration-500">

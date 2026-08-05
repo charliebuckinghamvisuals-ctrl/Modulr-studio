@@ -21,7 +21,7 @@ interface AccountViewProps {
 export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
     const engine = useAppEngine();
     const { user } = useAuth();
-    const { credits, plan, rendersLeft, refreshCredits } = useCredits();
+    const { credits, plan, rendersLeft, rendersPerDay, trialDaysLeft, refreshCredits } = useCredits();
     const { branding, setBranding } = useBranding();
 
     // Editable display name
@@ -84,24 +84,37 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
         }
     };
 
+    const isTester = plan === 'tester';
+
     const getPlanName = (p: string | null) => {
         if (p === null) return "Free Trial"; // null = loaded but no plan set
         if (!p) return "Free Trial";
         if (p.toLowerCase() === 'master') return 'Modulr Master';
+        if (p.toLowerCase() === 'tester') return 'Tester Access';
         if (p.includes('business') || p.includes('price_1TKI8')) return 'Business Plan';
         return 'Free Trial';
     };
 
+    // Business is unlimited - it is no longer metered by a credit balance, so
+    // there is no total to show or fill a progress bar against.
     const getCreditTotal = (p: string | null) => {
         if (p?.toLowerCase() === 'master') return '∞';
-        if (p?.includes('business') || p?.includes('price_1TKI8')) return 15500;
+        if (p?.toLowerCase() === 'tester') return rendersPerDay ?? 40;
+        if (p?.includes('business') || p?.includes('price_1TKI8')) return '∞';
         return 5;
     };
 
-    const isUnlimited = credits === 'Unlimited';
+    const isUnlimited = credits === 'Unlimited' || getCreditTotal(plan) === '∞';
     const isPaidPlan = plan && (plan.includes('business') || plan.toLowerCase() === 'master');
     const totalCreditsForBar = getCreditTotal(plan);
-    const progressPercent = isUnlimited ? 100 : (typeof credits === 'number' && typeof totalCreditsForBar === 'number' ? Math.min((credits / totalCreditsForBar) * 100, 100) : (rendersLeft !== null ? Math.min((rendersLeft / 5) * 100, 100) : 0));
+    // Testers fall through the numeric branch below: credits holds the renders
+    // remaining and totalCreditsForBar holds their allowance, so the same
+    // calculation applies without a special case.
+    const progressPercent = isUnlimited
+        ? 100
+        : (typeof credits === 'number' && typeof totalCreditsForBar === 'number'
+            ? Math.min((credits / totalCreditsForBar) * 100, 100)
+            : (rendersLeft !== null ? Math.min((rendersLeft / 5) * 100, 100) : 0));
 
     const userDisplay = {
         name: user?.displayName || "No Name Set",
@@ -175,7 +188,7 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                         </div>
                     </div>
 
-                    {/* Credits Card — no Refill Balance */}
+                    {/* Credits Card - no Refill Balance */}
                     <div className="glass-panel p-8 rounded-[2.5rem] border border-border bg-white shadow-xl flex flex-col justify-between group transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
                         <div className="space-y-6">
                             <div className="flex justify-between items-start">
@@ -189,13 +202,19 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                             <div className="space-y-4">
                                 <div>
                                     <p className="text-[10px] font-bold text-accent/50 uppercase tracking-[0.2em]">
-                                        {isPaidPlan ? 'Credits Remaining' : 'Trial Renders Remaining'}
+                                        {isTester ? 'Tester Renders Remaining' : isPaidPlan ? 'Credits Remaining' : 'Trial Renders Remaining'}
                                     </p>
                                     <div className="flex items-baseline gap-2">
                                         <h3 className="text-3xl font-bold text-accent tracking-tight">{userDisplay.credits.remaining}</h3>
-                                        {!isUnlimited && <span className="text-secondary font-medium text-sm">/ {userDisplay.credits.total} {!isPaidPlan ? 'renders' : 'credits'}</span>}
+                                        {!isUnlimited && <span className="text-secondary font-medium text-sm">/ {userDisplay.credits.total} {!isPaidPlan || isTester ? 'renders' : 'credits'}</span>}
                                     </div>
-                                    {!isPaidPlan && (
+                                    {isTester ? (
+                                        <p className="text-[10px] text-secondary mt-1">
+                                            {trialDaysLeft !== null && trialDaysLeft > 0
+                                                ? `Tester access - ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} remaining.`
+                                                : 'Your tester access has ended.'}
+                                        </p>
+                                    ) : !isPaidPlan && (
                                         <p className="text-[10px] text-secondary mt-1">
                                             Free trial limited to 5 renders per day. Upgrade for more.
                                         </p>
@@ -263,7 +282,7 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                                     </button>
                                 </div>
                             </div>
-                            {/* Email — read only */}
+                            {/* Email - read only */}
                             <div className="space-y-2 group">
                                 <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/40 pl-1">Systems Access Email</label>
                                 <div className="relative">
@@ -282,7 +301,7 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                         <p className="text-[10px] text-slate-500 pl-1 italic">Identity verification managed by Modulr Intelligence Security Layer.</p>
                     </div>
 
-                    {/* System Controls — only Update Password */}
+                    {/* System Controls - only Update Password */}
                     <div className="space-y-8">
                         <div className="flex items-baseline gap-4">
                             <h2 className="text-2xl font-bold text-accent tracking-tight">System Controls</h2>

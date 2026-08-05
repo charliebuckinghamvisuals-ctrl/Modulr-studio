@@ -4,11 +4,37 @@ import { CompareSlider } from '../CompareSlider';
 import { DraftingBackground } from '../DraftingBackground';
 
 export const GalleryView: React.FC = () => {
-    const renderItems = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((id) => ({
-        id,
-        type: 'render' as const,
-        image: `/gallery-${id}.jpg.png`
-    }));
+    // 12 is deliberately excluded: it already appears below as a before/after
+    // pair, so listing it here as well showed the same render twice.
+    const renderItems = [
+        ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((id) => ({
+            id: `gallery-${id}`,
+            image: `/gallery-${id}.jpg.png`,
+        })),
+        // Newer renders exported from the app.
+        { id: 'export-1', image: '/modulr-export-1778575329402.png' },
+        { id: 'export-2', image: '/modulr-export-1777560096490.png' },
+        { id: 'export-3', image: '/modulr-export-1777554992095.png' },
+    ];
+
+    /**
+     * Material Studio close-up sheets.
+     *
+     * These are 2x2 macro grids and are square, so they get their own section
+     * and a square tile rather than being forced into the landscape render grid.
+     */
+    const materialItems = [
+        '/MaterialStudio-1782396007318.png',
+        '/MaterialStudio-1780410234937.png',
+        '/MaterialStudio-1778843455110.png',
+        '/MaterialStudio-1778763890421.png',
+        '/MaterialStudio-1778575685286.png',
+        '/MaterialStudio-1777628198241.png',
+        '/MaterialStudio-1777555175817.png',
+        '/MaterialStudio-1776354529259.png',
+        '/MaterialStudio-1776354030035.png',
+        '/MaterialStudio-1775819212919.png',
+    ].map((image, i) => ({ id: `material-${i + 1}`, image }));
 
     const sliderItems = [12, 13, 14, 15, 16, 17].map((id) => ({
         id,
@@ -40,7 +66,7 @@ export const GalleryView: React.FC = () => {
                             Studio Gallery
                         </h1>
                         <p className="text-lg text-secondary max-w-2xl mx-auto font-medium">
-                            A curated selection of photorealistic 4K renders, technical line drawings, and before/after transformations—all created using Modulr Studio.
+                            A curated selection of photorealistic 4K renders, technical line drawings, and before/after transformations-all created using Modulr Studio.
                         </p>
                         
                         <div className="mt-12 flex justify-center">
@@ -137,7 +163,8 @@ export const GalleryView: React.FC = () => {
                                         </div>
                                         <img 
                                             src={item.image} 
-                                            alt={`Modulr Gallery - Render ${item.id}`}
+                                            alt="Garden room exterior visualisation produced with Modulr Studio"
+                                            loading="lazy"
                                             className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 relative z-10"
                                         />
                                         <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 z-20 transform translate-y-4 group-hover:translate-y-0">
@@ -149,6 +176,51 @@ export const GalleryView: React.FC = () => {
                                                 <div className="p-3 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white">
                                                     <Sparkles size={16} />
                                                 </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+
+                    {/* Section 3: Material Close-Ups */}
+                    <section className="space-y-12">
+                        <div className="flex flex-col items-center text-center space-y-4">
+                            <h2 className="text-2xl md:text-4xl font-bold text-accent tracking-tight">Material Close-Ups</h2>
+                            <p className="text-secondary text-sm max-w-xl">
+                                Macro detail sheets generated in Material Studio, showing the actual
+                                grain, seam and finish of every specified surface.
+                            </p>
+                            <div className="h-px w-24 bg-accent/20"></div>
+                        </div>
+
+                        {/* Square tiles: these are 2x2 grids, so a landscape crop
+                            would cut two of the four panels off. */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 py-8">
+                            {materialItems.map((item, idx) => (
+                                <div
+                                    key={item.id}
+                                    className="group relative glass-panel rounded-[2.5rem] border border-border bg-white shadow-2xl overflow-hidden aspect-square transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-4 animate-in fade-in slide-in-from-bottom-12"
+                                    style={{ animationDelay: `${idx * 80}ms` }}
+                                >
+                                    <div className="absolute inset-0 bg-slate-100 flex items-center justify-center text-slate-300">
+                                        <ImageIcon size={48} />
+                                    </div>
+                                    <img
+                                        src={item.image}
+                                        alt="Material Studio close-up detail sheet"
+                                        loading="lazy"
+                                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 z-10"
+                                    />
+                                    <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 z-20 transform translate-y-4 group-hover:translate-y-0">
+                                        <div className="flex items-center justify-between">
+                                            <div className="space-y-1">
+                                                <span className="text-white text-[10px] uppercase font-bold tracking-[0.3em] block">Material Studio</span>
+                                                <span className="text-white/80 text-xs font-medium">2x2 Macro Detail Sheet</span>
+                                            </div>
+                                            <div className="p-3 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white">
+                                                <Sparkles size={16} />
                                             </div>
                                         </div>
                                     </div>

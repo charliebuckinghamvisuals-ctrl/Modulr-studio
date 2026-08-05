@@ -1,8 +1,11 @@
 import React from 'react';
-import { Grid, Download, CheckCircle, Circle, Loader2, Upload, Sparkles, Zap } from 'lucide-react';
-import { ToggleSwitch } from '../ToggleSwitch';
+import { Grid, Download, CheckCircle, Circle, Loader2, Upload, Layers, Palette, X } from 'lucide-react';
 import { Button } from '../Button';
-import { SkeletonLoader } from '../SkeletonLoader';
+import { MaterialVisualPicker } from '../MaterialVisualPicker';
+import { PRESET_MATERIALS } from '../../constants';
+import { MaterialConfig, MaterialLibrary } from '../../types';
+
+export type MaterialStudioMode = 'closeup' | 'change';
 
 interface MaterialStudioViewProps {
     detectedDetails: string[];
@@ -23,7 +26,27 @@ interface MaterialStudioViewProps {
     isProMode: boolean;
     setIsProMode: (val: boolean) => void;
     userPlan?: string;
+
+    // Mode selection
+    mode: MaterialStudioMode | null;
+    onChooseMode: (mode: MaterialStudioMode) => void;
+    onResetMode: () => void;
+
+    // 'change' mode
+    materials: MaterialConfig;
+    setMaterials: React.Dispatch<React.SetStateAction<MaterialConfig>>;
+    materialLibrary?: MaterialLibrary;
+    onApplyMaterials: () => void;
+    isAnalyzingMaterials?: boolean;
 }
+
+const MATERIAL_CATEGORIES: Array<{ key: keyof MaterialLibrary; label: string }> = [
+    { key: 'walls', label: 'Cladding / Walls' },
+    { key: 'roof', label: 'Roof' },
+    { key: 'windows', label: 'Windows' },
+    { key: 'doors', label: 'Doors' },
+    { key: 'decking', label: 'Decking / Ground' },
+];
 
 export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
     detectedDetails,
@@ -42,8 +65,23 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
     isHighQuality,
     setIsHighQuality,
     isProMode,
-    setIsProMode
+    setIsProMode,
+    mode,
+    onChooseMode,
+    onResetMode,
+    materials,
+    setMaterials,
+    materialLibrary,
+    onApplyMaterials,
+    isAnalyzingMaterials,
 }) => {
+    /** Presets plus anything the user saved to their own library. */
+    const optionsFor = (key: keyof MaterialLibrary): string[] => {
+        const presets = (PRESET_MATERIALS as any)[key] as string[] | undefined;
+        const saved = (materialLibrary?.[key] || []).map(item => item.text || item.name);
+        return Array.from(new Set([...(presets || []), ...saved]));
+    };
+
     const getImageUrl = (img: string | null) => {
         if (!img) return '';
         if (img.startsWith('http') || img.startsWith('blob:') || img.startsWith('data:')) {
@@ -59,15 +97,52 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
 
             <div className="w-full md:w-80 flex flex-col gap-6 relative z-10 p-6 m-4 md:m-4 bg-white/95 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-y-auto border border-white">
                 <div className="space-y-4">
-                    <h2 className="text-[6vw] md:text-xl lg:text-2xl font-bold text-accent w-fit inline-block">Material Studio</h2>
+                    <h2 className="text-[7vw] md:text-2xl lg:text-3xl font-bold text-accent w-fit inline-block leading-tight">Material Studio</h2>
                     <p className="text-slate-600 text-sm leading-relaxed">
-                        Architectural material detail sheet generator. The engine compiles a 4K 2x2 presentation grid based on your specific material focal points.
+                        {mode === 'change'
+                            ? 'Swap the cladding, roof, glazing, doors and ground treatment on your building - the structure stays exactly as uploaded.'
+                            : 'Architectural material detail sheet generator. The engine compiles a 4K 2x2 presentation grid based on your specific material focal points.'}
                     </p>
+                    {mode && originalImage && (
+                        <button
+                            onClick={onResetMode}
+                            className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 hover:text-accent transition-colors"
+                        >
+                            ← Switch mode
+                        </button>
+                    )}
                 </div>
 
-
-                {/* Selection Area */}
-                {detectedDetails.length > 0 ? (
+                {/* ── Change Materials mode ── */}
+                {mode === 'change' ? (
+                    <div className="flex-1 flex flex-col gap-5">
+                        {isAnalyzingMaterials ? (
+                            <div className="flex flex-col items-center gap-4 py-10">
+                                <Loader2 className="w-8 h-8 animate-spin text-accent" />
+                                <span className="text-accent font-medium animate-pulse text-sm">Analysing materials…</span>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-400">
+                                    Detected materials - change any
+                                </div>
+                                <div className="flex flex-col gap-4">
+                                    {MATERIAL_CATEGORIES.map(cat => (
+                                        <MaterialVisualPicker
+                                            key={cat.key}
+                                            label={cat.label}
+                                            options={optionsFor(cat.key)}
+                                            value={(materials as any)[cat.key] || 'none'}
+                                            onChange={val =>
+                                                setMaterials(prev => ({ ...prev, [cat.key]: val }))
+                                            }
+                                        />
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                ) : detectedDetails.length > 0 ? (
                     <div className="flex-1 flex flex-col gap-5">
                         <div className="flex justify-between items-center text-[10px] uppercase tracking-[0.2em] font-bold text-white/50">
                             <span>Select 4 Focus Details</span>
@@ -123,7 +198,20 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                 )}
 
                 <div className="mt-auto pt-6 border-t border-white/10">
-                    {selectedDetails.length === 4 && (
+                    {mode === 'change' && !isAnalyzingMaterials && (
+                        <div className="pt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <Button
+                                className="w-full"
+                                onClick={onApplyMaterials}
+                                disabled={isLoading}
+                                icon={<Palette size={16} />}
+                            >
+                                Apply Materials
+                            </Button>
+                        </div>
+                    )}
+
+                    {mode === 'closeup' && selectedDetails.length === 4 && (
                         <div className="pt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <Button
                                 className="w-full"
@@ -214,6 +302,65 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                     <div className="absolute bottom-6 left-6 right-6 z-20 flex justify-center">
                         <div className="w-full max-w-5xl">
                             {historyFooter}
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Mode picker ──
+                    Shown once an image is loaded but no mode has been chosen.
+                    The two modes need different analyses, so we ask before
+                    spending a call rather than guessing. */}
+                {originalImage && !mode && !isLoading && (
+                    <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-6 animate-in fade-in duration-300">
+                        <div className="w-full max-w-2xl bg-white rounded-[2rem] shadow-2xl border border-white p-8 md:p-10 space-y-8 relative animate-in zoom-in-95 duration-300">
+                            <button
+                                onClick={onOpenSceneUpload}
+                                aria-label="Choose a different image"
+                                className="absolute top-5 right-5 w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:text-accent hover:border-accent/40 transition-colors"
+                            >
+                                <X size={16} />
+                            </button>
+
+                            <div className="space-y-2">
+                                <h3 className="text-2xl font-bold text-accent tracking-tight">What would you like to do?</h3>
+                                <p className="text-slate-600 text-sm">
+                                    Your image is ready. Choose how Material Studio should work with it.
+                                </p>
+                            </div>
+
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <button
+                                    onClick={() => onChooseMode('closeup')}
+                                    className="group text-left p-6 rounded-2xl border border-slate-200 hover:border-accent/50 hover:bg-accent/5 transition-all space-y-3"
+                                >
+                                    <div className="w-12 h-12 rounded-2xl bg-accent/8 border border-accent/15 flex items-center justify-center text-accent">
+                                        <Grid size={22} />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <h4 className="font-bold text-accent">Material Close-up</h4>
+                                        <p className="text-xs text-slate-500 leading-relaxed">
+                                            Pick four focal points and generate a 2x2 macro detail sheet of the
+                                            materials - ideal for specification pages.
+                                        </p>
+                                    </div>
+                                </button>
+
+                                <button
+                                    onClick={() => onChooseMode('change')}
+                                    className="group text-left p-6 rounded-2xl border border-slate-200 hover:border-accent/50 hover:bg-accent/5 transition-all space-y-3"
+                                >
+                                    <div className="w-12 h-12 rounded-2xl bg-accent/8 border border-accent/15 flex items-center justify-center text-accent">
+                                        <Layers size={22} />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <h4 className="font-bold text-accent">Change Materials</h4>
+                                        <p className="text-xs text-slate-500 leading-relaxed">
+                                            The AI analyses the building and detects its cladding, roof, glazing,
+                                            doors and ground - then swap any of them.
+                                        </p>
+                                    </div>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

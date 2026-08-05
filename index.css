@@ -70,7 +70,15 @@
 }
 
 html {
-  font-size: 70%; /* Increased zoom-out effect as 80% was not sufficient */
+  /* Global scale for the whole interface.
+   *
+   * Tailwind sizes type AND spacing in rem, so this single number scales text,
+   * padding, gaps and rounded corners together — which is why adjusting it here
+   * keeps everything proportional instead of leaving text large inside boxes
+   * built for smaller text. It is the one place to tune overall density.
+   *
+   * Was 70%, which read as cramped on standard displays. */
+  font-size: 78%;
   -webkit-text-size-adjust: 100%;
 }
 

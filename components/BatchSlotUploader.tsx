@@ -44,7 +44,7 @@ export const BatchSlotUploader: React.FC<BatchSlotUploaderProps> = ({ batchImage
                                 type="file" 
                                 className="hidden" 
                                 accept="image/*"
-                                ref={el => fileInputs.current[index] = el}
+                                ref={el => { fileInputs.current[index] = el; }}
                                 onChange={(e) => handleFileSelect(e, index)}
                             />
 

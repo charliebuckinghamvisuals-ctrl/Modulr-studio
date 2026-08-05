@@ -3,12 +3,39 @@ import { useAppEngine, compressImageFile } from '../../hooks/useAppEngine';
 import { AppStage } from '../../types';
 import { useCredits } from '../../hooks/useCredits';
 import { Construction } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { createProject } from '../../services/projectService';
 
 export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Allow messages from the local origin or the iframe origin
+      // Only trust messages from our own origin. The configurator is served from
+      // the same host, so anything from elsewhere is not ours.
+      if (event.origin !== window.location.origin) return;
+
+      // Save Design in the configurator hands the scene up to here, because the
+      // iframe has no Firebase client of its own.
+      if (event.data && event.data.type === 'SAVE_3D_DESIGN') {
+        (async () => {
+          try {
+            const { scene, price } = event.data;
+            const room = scene?.room || {};
+            const name = `Garden room ${room.widthMm || '?'} x ${room.depthMm || '?'}mm`;
+            await createProject({
+              name,
+              estimateValue: typeof price === 'number' ? Math.round(price) : null,
+              notes: `Created from the 3D Configurator.\n\n${JSON.stringify(scene?.room ?? {}, null, 2)}`,
+            });
+            toast.success('Design saved to your projects');
+          } catch (err: any) {
+            console.error('Failed to save 3D design', err);
+            toast.error(err?.message || 'Could not save the design to your projects.');
+          }
+        })();
+        return;
+      }
+
       if (event.data && event.data.type === 'RENDER_3D_SCENE') {
         const dataUrl = event.data.image;
         
@@ -63,35 +90,8 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
     );
   }
 
-  const isMasterAccount = plan?.toLowerCase() === 'master';
-
-  if (!isMasterAccount) {
-      return (
-          <div className="w-full h-[100dvh] flex flex-col items-center justify-center bg-[#0F1110] relative overflow-hidden">
-              <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-[#61ffb8]/5 rounded-full blur-[150px] pointer-events-none"></div>
-              <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-[#61ffb8]/5 rounded-full blur-[120px] pointer-events-none"></div>
-              
-              <div className="z-10 flex flex-col items-center text-center space-y-6 max-w-md p-10 bg-white/5 backdrop-blur-md rounded-[2.5rem] border border-white/10 shadow-2xl">
-                  <div className="w-20 h-20 rounded-3xl bg-[#61ffb8]/10 flex items-center justify-center text-[#61ffb8] border border-[#61ffb8]/20">
-                      <Construction size={40} />
-                  </div>
-                  <div className="space-y-3">
-                      <h2 className="text-3xl font-bold text-white tracking-tighter">Under Construction</h2>
-                      <p className="text-slate-400 text-sm leading-relaxed">The 3D Configurator is currently being built and is strictly accessible to Master accounts only.</p>
-                  </div>
-                  <button 
-                      onClick={() => engine.setActiveStage(AppStage.HOME)} 
-                      className="mt-4 px-8 py-4 rounded-xl bg-[#61ffb8] text-slate-900 text-xs font-bold uppercase tracking-widest hover:bg-[#61ffb8]/90 transition-all w-full"
-                  >
-                      Return to Dashboard
-                  </button>
-              </div>
-          </div>
-      );
-  }
-
   return (
-    <div className="w-full h-[100dvh] flex flex-col bg-[#0F1110]">
+    <div className="w-full h-[calc(100dvh-6rem)] flex flex-col bg-[#0F1110]">
       <iframe 
         src="/3d-config/index.html" 
         className="w-full flex-1 border-none"

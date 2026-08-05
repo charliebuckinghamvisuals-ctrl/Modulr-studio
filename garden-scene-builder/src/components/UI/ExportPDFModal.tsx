@@ -13,6 +13,7 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
   const { scene } = useStore();
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle');
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -146,7 +147,110 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      
+
+      // ── Branding ──────────────────────────────────────────────────────────
+      // Read from the host app. The configurator runs in a same-origin iframe,
+      // so it can read the branding the user saved in Account Management. Until
+      // now the PDF ignored this entirely and hardcoded Modulr's own colour,
+      // which is why no customer logo or colour ever appeared.
+      const brand = (() => {
+        const fallback = { logo: null as string | null, primaryColor: '#3b4d4a', contactInfo: '' };
+        try {
+          const raw = localStorage.getItem('modulr_branding');
+          return raw ? { ...fallback, ...JSON.parse(raw) } : fallback;
+        } catch { return fallback; }
+      })();
+
+      const hexToRgb = (hex: string): [number, number, number] => {
+        const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex.trim());
+        return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [59, 77, 74];
+      };
+      const BRAND = hexToRgb(brand.primaryColor);
+      const INK: [number, number, number] = [38, 42, 45];
+      const MUTED: [number, number, number] = [122, 130, 134];
+      const HAIRLINE: [number, number, number] = [222, 226, 228];
+
+      // Single source of truth for the page grid, so every page lines up.
+      const M = 18;                       // page margin
+      const CONTENT_W = pageWidth - M * 2;
+      const HEADER_H = 26;
+      const FOOTER_Y = pageHeight - 12;
+
+      // Measure the logo once so it can be placed at its true aspect ratio.
+      let logoMeta: { data: string; fmt: string; ratio: number } | null = null;
+      if (brand.logo) {
+        try {
+          const dims = await new Promise<{ w: number; h: number }>((res, rej) => {
+            const im = new Image();
+            im.onload = () => res({ w: im.naturalWidth, h: im.naturalHeight });
+            im.onerror = rej;
+            im.src = brand.logo as string;
+          });
+          const fmt = /^data:image\/jpe?g/i.test(brand.logo) ? 'JPEG' : 'PNG';
+          logoMeta = { data: brand.logo, fmt, ratio: dims.w / Math.max(1, dims.h) };
+        } catch { logoMeta = null; }
+      }
+
+      const drawHeader = (title: string) => {
+        pdf.setFillColor(...BRAND);
+        pdf.rect(0, 0, pageWidth, HEADER_H, 'F');
+
+        if (logoMeta) {
+          const h = 12;
+          const w = Math.min(48, h * logoMeta.ratio);
+          try { pdf.addImage(logoMeta.data, logoMeta.fmt, M, (HEADER_H - h) / 2, w, h); } catch { /* skip bad logo */ }
+        } else {
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(12);
+          pdf.text('MODULR STUDIO', M, HEADER_H / 2 + 1.5);
+        }
+
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9);
+        pdf.text(title.toUpperCase(), pageWidth - M, HEADER_H / 2 + 1, { align: 'right' });
+      };
+
+      const drawFooter = (page: number) => {
+        pdf.setDrawColor(...HAIRLINE);
+        pdf.setLineWidth(0.2);
+        pdf.line(M, FOOTER_Y - 4, pageWidth - M, FOOTER_Y - 4);
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(...MUTED);
+        pdf.setFont('helvetica', 'normal');
+        const left = brand.contactInfo || 'Generated with Modulr Studio';
+        pdf.text(left.slice(0, 90), M, FOOTER_Y);
+        pdf.text(String(page), pageWidth - M, FOOTER_Y, { align: 'right' });
+      };
+
+      /** Section heading with a rule under it. */
+      const sectionTitle = (label: string, y: number) => {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(11);
+        pdf.setTextColor(...BRAND);
+        pdf.text(label.toUpperCase(), M, y);
+        pdf.setDrawColor(...BRAND);
+        pdf.setLineWidth(0.5);
+        pdf.line(M, y + 1.8, M + 14, y + 1.8);
+        return y + 9;
+      };
+
+      /** Key/value row with a hairline separator - reads as a spec table. */
+      const specRow = (label: string, value: string, x: number, y: number, w: number) => {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(...MUTED);
+        pdf.text(label, x, y);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(...INK);
+        pdf.text(value, x + w, y, { align: 'right' });
+        pdf.setDrawColor(...HAIRLINE);
+        pdf.setLineWidth(0.15);
+        pdf.line(x, y + 2.2, x + w, y + 2.2);
+        return y + 7;
+      };
+
       const drawImageFit = (shot: ShotResult, x: number, y: number, maxW: number, maxH: number) => {
         const ratio = Math.min(maxW / shot.width, maxH / shot.height);
         const w = shot.width * ratio;
@@ -156,139 +260,240 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
         pdf.addImage(shot.dataUrl, 'PNG', cx, cy, w, h);
       };
 
-      // -- Page 1: Title, Info & 3D View --
-      pdf.setFontSize(24);
-      pdf.setTextColor(59, 77, 74); // #3b4d4a
-      pdf.text(formData.projectName, 20, 30);
-      
-      pdf.setFontSize(12);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text(`Prepared for: ${formData.name}`, 20, 40);
-      pdf.text(`Address: ${formData.address}`, 20, 48);
-      pdf.text(`Date: ${new Date().toLocaleDateString()}`, 20, 56);
-      
-      // 3D Perspective Image
-      drawImageFit(perspectiveImg, 20, 70, pageWidth - 40, (pageWidth - 40) * 0.6);
-      
-      // Room Details Summary
-      pdf.setFontSize(14);
-      pdf.setTextColor(59, 77, 74);
-      pdf.text('Structural Specifications', 20, 190);
-      pdf.setFontSize(10);
-      pdf.setTextColor(80, 80, 80);
-      pdf.text(`Shape: ${scene.room.shape}`, 20, 200);
-      pdf.text(`Dimensions: ${scene.room.widthMm}mm (W) x ${scene.room.depthMm}mm (D)`, 20, 206);
-      pdf.text(`Height: ${scene.room.heightMm + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200)}mm (Front) / ${((scene.room.backHeightMm ?? scene.room.heightMm) + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200))}mm (Back)`, 20, 212);
-      if (scene.room.lShapeCutoutWidthMm && scene.room.shape !== 'Box' && scene.room.shape !== 'Quba' && scene.room.shape !== 'Gable') {
-        pdf.text(`Cutout Width: ${scene.room.lShapeCutoutWidthMm}mm`, 20, 218);
-      }
-      
+      const totalHeightFront = scene.room.heightMm + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
+      const totalHeightBack = (scene.room.backHeightMm ?? scene.room.heightMm) + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
       const totalPrice = useStore.getState().calculatePrice();
-      
-      pdf.setFontSize(14);
-      pdf.setTextColor(59, 77, 74);
-      
-      pdf.setFontSize(10);
-      pdf.setTextColor(80, 80, 80);
-      pdf.setFontSize(10);
-      const quoteText = `Based on your design, size, and materials, expect to pay somewhere around £${totalPrice.toLocaleString('en-GB', { maximumFractionDigits: 0 })}.`;
-      const quoteLines = pdf.splitTextToSize(quoteText, 80);
-      pdf.text(quoteLines, 110, 190);
-      
-      pdf.setFontSize(10);
-      pdf.setTextColor(120, 120, 120);
-      const splitNotes = pdf.splitTextToSize(`Notes: ${formData.notes}`, pageWidth - 40);
-      pdf.text(splitNotes, 20, 250);
+      const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-      // -- Page 2: Plan View & Materials --
+      // ── Page 1: Cover ─────────────────────────────────────────────────────
+      drawHeader('Design Proposal');
+
+      let y = HEADER_H + 18;
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(22);
+      pdf.setTextColor(...INK);
+      pdf.text(formData.projectName || 'Garden Room', M, y);
+
+      y += 9;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(...MUTED);
+      const meta = [
+        formData.name ? `Prepared for ${formData.name}` : null,
+        formData.address || null,
+        new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+      ].filter(Boolean).join('   ·   ');
+      pdf.text(meta, M, y);
+
+      // Hero image
+      y += 8;
+      const heroH = 92;
+      drawImageFit(perspectiveImg, M, y, CONTENT_W, heroH);
+      y += heroH + 12;
+
+      // Two columns: specification and estimate
+      const colGap = 10;
+      const colW = (CONTENT_W - colGap) / 2;
+
+      let leftY = sectionTitle('Specification', y);
+      leftY = specRow('Shape', String(scene.room.shape), M, leftY, colW);
+      leftY = specRow('Width', `${scene.room.widthMm} mm`, M, leftY, colW);
+      leftY = specRow('Depth', `${scene.room.depthMm} mm`, M, leftY, colW);
+      leftY = specRow('Height (front)', `${totalHeightFront} mm`, M, leftY, colW);
+      if (totalHeightBack !== totalHeightFront) {
+        leftY = specRow('Height (back)', `${totalHeightBack} mm`, M, leftY, colW);
+      }
+      if (scene.room.lShapeCutoutWidthMm && !['Box', 'Quba', 'Gable'].includes(scene.room.shape as string)) {
+        leftY = specRow('Cutout width', `${scene.room.lShapeCutoutWidthMm} mm`, M, leftY, colW);
+      }
+
+      const rightX = M + colW + colGap;
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.setTextColor(...BRAND);
+      pdf.text('ESTIMATE', rightX, y);
+      pdf.setDrawColor(...BRAND);
+      pdf.setLineWidth(0.5);
+      pdf.line(rightX, y + 1.8, rightX + 14, y + 1.8);
+
+      let rightY = y + 12;
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(21);
+      pdf.setTextColor(...INK);
+      pdf.text(`£${totalPrice.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`, rightX, rightY);
+
+      rightY += 7;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(...MUTED);
+      pdf.text(pdf.splitTextToSize('Indicative only, based on the design, size and materials selected. Not a formal quotation.', colW), rightX, rightY);
+
+      if (formData.notes) {
+        const notesY = Math.max(leftY, rightY + 14) + 6;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(...MUTED);
+        pdf.text('NOTES', M, notesY);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(...INK);
+        pdf.text(pdf.splitTextToSize(formData.notes, CONTENT_W), M, notesY + 5);
+      }
+
+      drawFooter(1);
+
+      // ── Page 2: Plan & Schedule ───────────────────────────────────────────
       pdf.addPage();
-      pdf.setFontSize(18);
-      pdf.setTextColor(59, 77, 74);
-      pdf.text('Plan View', 20, 20);
-      drawImageFit(topImg, 20, 30, pageWidth - 40, (pageWidth - 40) * 0.8);
-      
-      pdf.text('Material & Finish List', 20, 160);
-      pdf.setFontSize(10);
-      pdf.setTextColor(80, 80, 80);
-      let y = 170;
-      pdf.text(`Cladding: ${scene.room.cladding.replace('_', ' ').toUpperCase()}`, 20, y); y += 6;
-      pdf.text(`Base: ${scene.room.baseMaterial.replace('_', ' ').toUpperCase()}`, 20, y); y += 6;
-      pdf.text(`Roof: ${scene.room.roofMaterial.replace('_', ' ').toUpperCase()}`, 20, y); y += 6;
-      pdf.text(`Interior: ${scene.room.interiorColor || 'White'}`, 20, y); y += 6;
-      pdf.text(`Frames: ${scene.room.frameColor.toUpperCase()}`, 20, y); y += 10;
-      
-      pdf.setFontSize(14);
-      pdf.setTextColor(59, 77, 74);
-      pdf.text('Fixtures & Openings', 20, y); y += 10;
-      pdf.setFontSize(10);
-      pdf.setTextColor(80, 80, 80);
-      scene.objects.forEach((obj, idx) => {
-        pdf.text(`${idx + 1}. ${obj.type.toUpperCase()}`, 20, y); 
-        pdf.text(`Width: ${obj.widthMm || 0}mm`, 80, y);
-        y += 6;
-      });
+      drawHeader('Plan & Schedule');
 
-      // -- Page 3: Elevations --
+      let p2y = sectionTitle('Plan View', HEADER_H + 16);
+      const planH = 88;
+      drawImageFit(topImg, M, p2y, CONTENT_W, planH);
+      p2y += planH + 14;
+
+      // Finishes and openings side by side rather than one long stacked list.
+      let finY = sectionTitle('Finishes', p2y);
+      finY = specRow('Cladding', titleCase(String(scene.room.cladding)), M, finY, colW);
+      finY = specRow('Base', titleCase(String(scene.room.baseMaterial)), M, finY, colW);
+      finY = specRow('Roof', titleCase(String(scene.room.roofMaterial)), M, finY, colW);
+      finY = specRow('Interior', titleCase(String(scene.room.interiorColor || 'White')), M, finY, colW);
+      finY = specRow('Frames', titleCase(String(scene.room.frameColor)), M, finY, colW);
+      finY = specRow('Floor', titleCase(String(scene.room.interiorFloorType || 'Oak')), M, finY, colW);
+
+      let openY = sectionTitle('Openings & Fixtures', p2y);
+      // Group identical items so a schedule reads "3 x Window" rather than
+      // three near-identical lines.
+      const grouped = scene.objects.reduce((acc: Record<string, { count: number; width: number }>, o: any) => {
+        const key = titleCase(String(o.type));
+        if (!acc[key]) acc[key] = { count: 0, width: o.widthMm || 0 };
+        acc[key].count += 1;
+        return acc;
+      }, {});
+      const entries = Object.entries(grouped);
+      if (entries.length === 0) {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(...MUTED);
+        pdf.text('None specified.', rightX, openY);
+      } else {
+        entries.slice(0, 14).forEach(([name, info]) => {
+          openY = specRow(
+            info.count > 1 ? `${name} (x${info.count})` : name,
+            info.width ? `${info.width} mm` : '-',
+            rightX, openY, colW
+          );
+        });
+      }
+
+      drawFooter(2);
+
+      // ── Page 3: Elevations ────────────────────────────────────────────────
       pdf.addPage();
-      pdf.setFontSize(18);
-      pdf.setTextColor(59, 77, 74);
-      pdf.text('Elevations', 20, 20);
-      
-      const elWidth = (pageWidth - 60) / 2;
-      const elHeight = elWidth * 0.8;
-      
-      pdf.setFontSize(12);
-      pdf.text('Front Elevation', 20, 40);
-      drawImageFit(frontImg, 20, 45, elWidth, elHeight);
-      pdf.setFontSize(9);
-      pdf.text(`Width: ${scene.room.widthMm}mm | Height: ${scene.room.heightMm + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200)}mm (Front) / ${((scene.room.backHeightMm ?? scene.room.heightMm) + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200))}mm (Back)`, 20, 45 + elHeight + 5);
-      
-      pdf.setFontSize(12);
-      pdf.text('Rear Elevation', 40 + elWidth, 40);
-      drawImageFit(backImg, 40 + elWidth, 45, elWidth, elHeight);
-      pdf.setFontSize(9);
-      pdf.text(`Width: ${scene.room.widthMm}mm | Height: ${scene.room.heightMm + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200)}mm (Front) / ${((scene.room.backHeightMm ?? scene.room.heightMm) + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200))}mm (Back)`, 40 + elWidth, 45 + elHeight + 5);
-      
-      pdf.setFontSize(12);
-      pdf.text('Left Elevation', 20, 60 + elHeight + 10);
-      drawImageFit(leftImg, 20, 65 + elHeight + 10, elWidth, elHeight);
-      pdf.setFontSize(9);
-      pdf.text(`Depth: ${scene.room.depthMm}mm | Height: ${scene.room.heightMm + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200)}mm (Front) / ${((scene.room.backHeightMm ?? scene.room.heightMm) + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200))}mm (Back)`, 20, 65 + elHeight * 2 + 15);
-      
-      pdf.setFontSize(12);
-      pdf.text('Right Elevation', 40 + elWidth, 60 + elHeight + 10);
-      drawImageFit(rightImg, 40 + elWidth, 65 + elHeight + 10, elWidth, elHeight);
-      pdf.setFontSize(9);
-      pdf.text(`Depth: ${scene.room.depthMm}mm | Height: ${scene.room.heightMm + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200)}mm (Front) / ${((scene.room.backHeightMm ?? scene.room.heightMm) + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200))}mm (Back)`, 40 + elWidth, 65 + elHeight * 2 + 15);
+      drawHeader('Elevations');
 
-      // --- Page 3: Planning Advice ---
+      const elTop = sectionTitle('Elevations', HEADER_H + 16);
+
+      // Every caption previously repeated the full front AND back height, on all
+      // four panels. That is the same two numbers printed eight times, which is
+      // what made the sheet look cluttered. Each elevation now states only the
+      // dimension it actually shows, and the shared heights are given once in a
+      // single note underneath.
+      const elW = (CONTENT_W - 12) / 2;
+      const elH = elW * 0.62;
+      const rowGap = 16;
+
+      const elevation = (
+        img: ShotResult, label: string, dim: string, x: number, yTop: number
+      ) => {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(9);
+        pdf.setTextColor(...INK);
+        pdf.text(label, x, yTop);
+
+        // Light frame so each drawing reads as a discrete panel.
+        pdf.setDrawColor(...HAIRLINE);
+        pdf.setLineWidth(0.2);
+        pdf.rect(x, yTop + 3, elW, elH);
+        drawImageFit(img, x, yTop + 3, elW, elH);
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(...MUTED);
+        pdf.text(dim, x, yTop + elH + 8);
+      };
+
+      elevation(frontImg, 'Front Elevation', `Width ${scene.room.widthMm} mm`, M, elTop);
+      elevation(backImg, 'Rear Elevation', `Width ${scene.room.widthMm} mm`, M + elW + 12, elTop);
+
+      const row2 = elTop + elH + rowGap + 6;
+      elevation(leftImg, 'Left Elevation', `Depth ${scene.room.depthMm} mm`, M, row2);
+      elevation(rightImg, 'Right Elevation', `Depth ${scene.room.depthMm} mm`, M + elW + 12, row2);
+
+      // Shared heights, stated once.
+      const noteY = row2 + elH + 18;
+      pdf.setDrawColor(...HAIRLINE);
+      pdf.setLineWidth(0.2);
+      pdf.line(M, noteY - 6, pageWidth - M, noteY - 6);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(...MUTED);
+      const heightNote = totalHeightBack !== totalHeightFront
+        ? `Overall height ${totalHeightFront} mm at the front, ${totalHeightBack} mm at the rear. All dimensions in millimetres.`
+        : `Overall height ${totalHeightFront} mm. All dimensions in millimetres.`;
+      pdf.text(heightNote, M, noteY);
+
+      drawFooter(3);
+
+      // ── Page 4: Planning Guidance ─────────────────────────────────────────
+      let pageNo = 3;
       if (planningAdvice) {
         pdf.addPage();
-        pdf.setFontSize(18);
-        pdf.setTextColor(59, 77, 74);
-        pdf.text('Design Statement & Guidance', 20, 20);
-        
-        pdf.setFontSize(9);
-        pdf.setTextColor(120, 120, 120);
-        pdf.text('This is an automated statement based on your design. Although accurate, we recommend consulting with NAPC (www.napc.uk) for final verification.', 20, 28, { maxWidth: pageWidth - 40 });
+        pageNo += 1;
+        drawHeader('Planning Guidance');
 
-        pdf.setFontSize(10);
-        pdf.setTextColor(80, 80, 80);
-        const splitText = pdf.splitTextToSize(planningAdvice, pageWidth - 40);
-        
-        let yPos = 40;
+        let pgY = sectionTitle('Planning Guidance', HEADER_H + 16);
+
+        // Disclaimer, boxed so it cannot be mistaken for the advice itself.
+        // Previously this claimed the statement was "accurate", which is not a
+        // claim to make about automatically generated planning guidance.
+        pdf.setFillColor(248, 249, 250);
+        pdf.setDrawColor(...HAIRLINE);
+        pdf.setLineWidth(0.2);
+        const discl = pdf.splitTextToSize(
+          'Indicative guidance generated from your design. It is not planning advice and should not be relied upon. Confirm your proposal with NAPC (www.napc.uk) before proceeding.',
+          CONTENT_W - 8
+        );
+        const disclH = discl.length * 4 + 7;
+        pdf.rect(M, pgY - 4, CONTENT_W, disclH, 'FD');
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(...MUTED);
+        pdf.text(discl, M + 4, pgY + 1);
+        pgY += disclH + 6;
+
+        pdf.setFontSize(9);
+        pdf.setTextColor(...INK);
+        const splitText = pdf.splitTextToSize(planningAdvice, CONTENT_W);
         for (let i = 0; i < splitText.length; i++) {
-          if (yPos > pageHeight - 20) {
+          if (pgY > FOOTER_Y - 12) {
+            drawFooter(pageNo);
             pdf.addPage();
-            yPos = 20;
+            pageNo += 1;
+            drawHeader('Planning Guidance');
+            pgY = HEADER_H + 16;
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(9);
+            pdf.setTextColor(...INK);
           }
-          pdf.text(splitText[i], 20, yPos);
-          yPos += 5;
+          pdf.text(splitText[i], M, pgY);
+          pgY += 4.6;
         }
+        drawFooter(pageNo);
       }
 
       // Save PDF
-      pdf.save('modulr_design_document.pdf');
+      const safeName = (formData.projectName || 'modulr-design')
+        .replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+      pdf.save(`${safeName || 'modulr-design'}.pdf`);
       
       // Reset Camera
       window.dispatchEvent(new CustomEvent('camera-set-view', { detail: { view: 'perspective', snap: false } }));
@@ -328,13 +533,34 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
           <h2 className="text-2xl font-bold text-[#3b4d4a] mb-2">Design Downloaded!</h2>
           <p className="text-gray-600 mb-8">Your 3D design and guidance PDF has been generated successfully.</p>
           <div className="flex flex-col gap-3 w-full">
-            <button 
+            {/*
+              Saves the design to the host app so it can be attached to a
+              Project. The configurator runs in an iframe with no storage of its
+              own, so it hands the scene to the parent window.
+
+              This button previously only called alert('Design saved
+              successfully!') and wrote nothing anywhere, so a design the user
+              believed was saved was silently lost.
+            */}
+            <button
               onClick={() => {
-                alert('Design saved successfully!');
+                try {
+                  window.parent.postMessage({
+                    type: 'SAVE_3D_DESIGN',
+                    scene: useStore.getState().scene,
+                    price: useStore.getState().calculatePrice(),
+                    savedAt: Date.now(),
+                  }, window.location.origin);
+                  setSaveState('saved');
+                } catch (e) {
+                  console.error('Could not hand the design to the host app', e);
+                  setSaveState('error');
+                }
               }}
-              className="w-full py-3 bg-[#3b4d4a] text-white rounded-lg font-semibold shadow-sm hover:bg-[#2d3a38] transition-colors"
+              disabled={saveState === 'saved'}
+              className="w-full py-3 bg-[#3b4d4a] text-white rounded-lg font-semibold shadow-sm hover:bg-[#2d3a38] disabled:opacity-60 transition-colors"
             >
-              Save Design
+              {saveState === 'saved' ? 'Saved to your projects' : saveState === 'error' ? 'Could not save - try again' : 'Save Design'}
             </button>
             <button 
               onClick={onClose}

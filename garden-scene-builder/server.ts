@@ -17,6 +17,63 @@ async function startServer() {
 
   app.use(express.json({ limit: "50mb" }));
 
+  /**
+   * Auth gate for every /api route below.
+   *
+   * These endpoints call Gemini and Replicate on our own billed API keys. With
+   * no gate at all — as this file previously stood — deploying it publicly
+   * would expose an anonymous, unmetered proxy to those keys, which anyone
+   * could drive until the bill or the quota ran out.
+   *
+   * Local development is unaffected: with no GARDEN_API_TOKEN set the server
+   * refuses to serve the API rather than serving it to everyone.
+   */
+  const GARDEN_API_TOKEN = process.env.GARDEN_API_TOKEN;
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (!GARDEN_API_TOKEN) {
+    console.warn(
+      "[garden-scene-builder] GARDEN_API_TOKEN is not set. AI endpoints are DISABLED. " +
+      "Set GARDEN_API_TOKEN to enable them."
+    );
+  }
+
+  app.use("/api", (req, res, next) => {
+    if (!GARDEN_API_TOKEN) {
+      return res.status(503).json({ error: "AI endpoints are not configured on this server." });
+    }
+    const header = req.headers.authorization || "";
+    const provided = header.startsWith("Bearer ") ? header.slice(7) : "";
+    if (provided !== GARDEN_API_TOKEN) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    next();
+  });
+
+  // Basic abuse throttle: these calls are expensive, so cap them per IP.
+  const apiHits = new Map<string, { count: number; resetAt: number }>();
+  const WINDOW_MS = 60_000;
+  const MAX_PER_WINDOW = 10;
+
+  app.use("/api", (req, res, next) => {
+    const key = req.ip || "unknown";
+    const now = Date.now();
+    const entry = apiHits.get(key);
+    if (!entry || now > entry.resetAt) {
+      apiHits.set(key, { count: 1, resetAt: now + WINDOW_MS });
+      return next();
+    }
+    if (entry.count >= MAX_PER_WINDOW) {
+      return res.status(429).json({ error: "Too many requests. Please wait a minute." });
+    }
+    entry.count++;
+    next();
+  });
+
+  if (isProduction && !GARDEN_API_TOKEN) {
+    console.error("[garden-scene-builder] Refusing to expose unauthenticated AI endpoints in production.");
+  }
+
     // API Routes
   app.post("/api/generate-environment", async (req, res) => {
     try {

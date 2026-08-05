@@ -164,8 +164,9 @@ export const HistoryFooter: React.FC<HistoryFooterProps> = ({ currentStage, onLo
 function formatStageName(stage: AppStage): string {
     switch (stage) {
         case AppStage.RENDER_ENGINE: return 'Render';
-        case AppStage.EDITOR: return 'Refinement Studio';
-        case AppStage.WEATHER_LAB: return 'Weather';
+        // EDITOR is retired, but older history entries still carry the stage.
+        case AppStage.EDITOR: return 'Edit';
+        case AppStage.WEATHER_LAB: return 'Weather Lab';
         case AppStage.LINE_CONVERT: return 'Line Art';
         case AppStage.MATERIAL_STUDIO: return 'Material Studio';
         default: return stage;

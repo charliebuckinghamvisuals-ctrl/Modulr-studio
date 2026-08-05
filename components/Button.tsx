@@ -3,17 +3,29 @@ import React from 'react';
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'glass' | 'outline';
   icon?: React.ReactNode;
+  /** Drops the border and background chrome. */
+  borderless?: boolean;
+  /** Compact padding/type scale. */
+  size?: 'sm' | 'md';
 }
 
 export const Button: React.FC<ButtonProps> = ({
   children,
   variant = 'primary',
   icon,
+  // `borderless` and `size` were being passed by callers but were not declared
+  // on ButtonProps, so they fell through into {...props} and were spread onto
+  // the underlying <button> as unknown DOM attributes - React logged a warning,
+  // the attributes appeared in the HTML, and the intended styling never applied.
+  // They are destructured here so they are consumed, not forwarded to the DOM.
+  borderless = false,
+  size = 'md',
   className = '',
   style,
   ...props
 }) => {
-  const baseStyles = "px-6 py-3 rounded-full font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm group";
+  const sizeStyles = size === 'sm' ? "px-4 py-2 text-xs" : "px-6 py-3 text-sm";
+  const baseStyles = `${sizeStyles} rounded-full font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group`;
 
   if (variant === 'primary') {
     return (
@@ -23,8 +35,10 @@ export const Button: React.FC<ButtonProps> = ({
           background: 'linear-gradient(145deg, rgba(255,255,255,0.72) 0%, rgba(235,242,245,0.55) 50%, rgba(245,250,252,0.68) 100%)',
           backdropFilter: 'blur(28px) saturate(180%) brightness(105%)',
           WebkitBackdropFilter: 'blur(28px) saturate(180%) brightness(105%)',
-          boxShadow: '0 4px 28px rgba(0,0,0,0.10), 0 1px 2px rgba(255,255,255,1.0) inset, 0 -1px 2px rgba(0,0,0,0.07) inset, 0 0 0 1px rgba(255,255,255,0.6)',
-          border: '1px solid rgba(255,255,255,0.90)',
+          boxShadow: borderless
+            ? 'none'
+            : '0 4px 28px rgba(0,0,0,0.10), 0 1px 2px rgba(255,255,255,1.0) inset, 0 -1px 2px rgba(0,0,0,0.07) inset, 0 0 0 1px rgba(255,255,255,0.6)',
+          border: borderless ? 'none' : '1px solid rgba(255,255,255,0.90)',
           color: '#1a2530',
           ...style,
         }}
@@ -59,7 +73,8 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <button
-      className={`${baseStyles} ${variants[variant]} ${className}`}
+      className={`${baseStyles} ${variants[variant]} ${borderless ? 'border-0 shadow-none' : ''} ${className}`}
+      style={style}
       {...props}
     >
       {icon && <span className="w-5 h-5 flex items-center justify-center">{icon}</span>}

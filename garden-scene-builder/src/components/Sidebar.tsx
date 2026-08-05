@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Settings, Plus, Box, Tent, Trees, Map, Settings2, Trash2, DoorOpen, DoorClosed, ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react';
+import { Settings, Plus, Box, Tent, Trees, Map, Settings2, Trash2, DoorOpen, DoorClosed, ArrowLeft, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Link } from 'react-router-dom';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
@@ -102,11 +102,25 @@ export function Sidebar() {
         </div>
       </div>
 
-      <div className="p-2 border-b border-black/5 bg-white">
+      <div className="p-3 border-b border-black/5 bg-white space-y-2">
         <div className="flex bg-gray-100 p-1 rounded-lg border border-black/5">
           <button onClick={() => setTab('building')} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${tab === 'building' ? 'bg-white shadow-sm text-[#1d1d1f]' : 'text-gray-400 hover:text-gray-600'}`}>Building</button>
           <button onClick={() => setTab('objects')} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${tab === 'objects' ? 'bg-white shadow-sm text-[#1d1d1f]' : 'text-gray-400 hover:text-gray-600'}`}>Objects</button>
         </div>
+
+        <button 
+          onClick={() => {
+            const canvas = document.querySelector('canvas');
+            if (canvas) {
+              const dataUrl = canvas.toDataURL('image/png');
+              window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl }, '*');
+            }
+          }}
+          className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer border border-emerald-400/30"
+        >
+          <Sparkles size={16} className="text-emerald-200" />
+          Render in Modulr
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -509,10 +523,17 @@ export function Sidebar() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {[
-                            { id: 'cedar_composite', color: 'bg-[#be7847]', name: 'Cedar Composite' },
-                            { id: 'oak_composite', color: 'bg-[#cca278]', name: 'Oak Composite' },
-                            { id: 'black_composite', color: 'bg-[#262729]', name: 'Black Composite' },
-                            { id: 'grey_composite', color: 'bg-[#6e737b]', name: 'Grey Composite' },
+                            // Swatch colours mirror MATERIAL_DEF exactly. If one is
+                            // changed there, change it here too or the picker lies
+                            // about what it is about to apply.
+                            { id: 'cedar_composite', color: 'bg-[#b0764b]', name: 'Cedar Composite' },
+                            { id: 'oak_composite', color: 'bg-[#c9a173]', name: 'Oak Composite' },
+                            { id: 'black_composite', color: 'bg-[#1f2123]', name: 'Black' },
+                            { id: 'dark_grey_composite', color: 'bg-[#4a5057]', name: 'Dark Grey' },
+                            { id: 'light_grey_composite', color: 'bg-[#a9aeb2]', name: 'Light Grey' },
+                            { id: 'slate_blue_composite', color: 'bg-[#7c93a6]', name: 'Slate Blue' },
+                            { id: 'sage_composite', color: 'bg-[#7e8c74]', name: 'Sage Green' },
+                            { id: 'clay_composite', color: 'bg-[#9a6b58]', name: 'Clay' },
                           ].map((cladding) => {
                             const isActive = field.key === 'cladding' 
                                ? room.cladding === cladding.id 
@@ -564,6 +585,33 @@ export function Sidebar() {
               </div>
 
               
+                <div>
+                  {/* Roof colour is separate from fascia so the two can differ.
+                      It previously followed the roof material with no way to
+                      change it independently. */}
+                  <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block mt-6">Roof Colour</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      { id: '', name: 'Match Material' },
+                      { id: '#1a1a1a', name: 'Black' },
+                      { id: '#2d3032', name: 'Anthracite' },
+                      { id: '#6a6d70', name: 'Grey' },
+                      { id: '#d3d5d7', name: 'Light Grey' },
+                    ].map(col => {
+                      const isActive = ((room as any).roofColor || '') === col.id;
+                      return (
+                        <button
+                          key={col.id || 'auto'}
+                          onClick={() => updateRoom({ roofColor: (col.id || undefined) } as any)}
+                          className={`px-3 py-1.5 rounded-xl text-[10px] font-semibold uppercase transition-colors ${isActive ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}
+                        >
+                          {col.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block mt-6">Fascia Finish</label>
                   <div className="flex gap-2 flex-wrap">
@@ -648,7 +696,7 @@ export function Sidebar() {
                 <div>
                   <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Base / Decking</label>
                   <div className="flex gap-2 flex-wrap">
-                    {['concrete', 'timber', 'composite_grey', 'composite_oak', 'composite_cedar', 'composite_brown', 'composite_black'].map(col => {
+                    {['concrete', 'timber', 'composite_cedar', 'composite_oak', 'composite_black', 'composite_dark_grey', 'composite_grey', 'composite_brown'].map(col => {
                       const isActive = col === 'concrete' ? room.baseMaterial === 'concrete' : (room.deckingMaterial || room.cladding || 'timber') === col && room.baseMaterial !== 'concrete';
                       return (
                         <button 
@@ -724,7 +772,7 @@ export function Sidebar() {
         )}
       </div>
       
-      <div className="p-4 border-t border-black/5 bg-white">
+      <div className="p-4 border-t border-black/10 bg-white shrink-0 shadow-lg z-20">
         <button 
           onClick={() => {
             const canvas = document.querySelector('canvas');
@@ -733,8 +781,9 @@ export function Sidebar() {
               window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl }, '*');
             }
           }}
-          className="w-full bg-[#3b4d4a] text-white py-3.5 rounded-xl text-sm font-semibold hover:bg-[#2d3a38] transition-all shadow-md flex items-center justify-center gap-2"
+          className="w-full bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white py-3.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer border border-emerald-400/30"
         >
+          <Sparkles size={18} className="text-emerald-200" />
           Render in Modulr
         </button>
       </div>

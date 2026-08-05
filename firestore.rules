@@ -1,0 +1,93 @@
+rules_version = '2';
+
+// Modulr Studio — Firestore security rules
+//
+// The governing constraint: the browser writes to users/{uid} directly (it saves
+// the material library there), but that SAME document holds `credits` and
+// `plan`, which the server reads to decide what a user is entitled to.
+//
+// So a blanket `allow write: if request.auth.uid == userId` would let any signed
+// in user open devtools and grant themselves unlimited credits and the business
+// plan — bypassing Stripe entirely. The client is therefore allowed to write
+// exactly one field, and everything billing-related is server-only via the
+// Admin SDK, which ignores these rules.
+//
+// Deploy:  firebase deploy --only firestore:rules
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{userId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      // A user may read their own record (credits, plan, trial state).
+      allow read: if isOwner();
+
+      // A user may update ONLY their own presentation settings. Any write that
+      // touches credits, plan, trial counters, or Stripe fields is rejected.
+      //
+      // `branding` holds the company logo and colours used on exported PDFs.
+      // It is presentation data with no billing meaning, so it is safe for the
+      // client to own - unlike anything the entitlement system reads.
+      allow update: if isOwner()
+                    && request.resource.data.diff(resource.data)
+                         .affectedKeys()
+                         .hasOnly(['materialLibrary', 'branding']);
+
+      // Account documents are created and deleted by the server only.
+      // The client never needs to do either.
+      allow create, delete: if false;
+    }
+
+    // Projects — client directory of jobs, clients, values and attached files.
+    //
+    // Unlike users/{uid}, this collection holds nothing the billing system
+    // trusts, so the owner may write it freely. The two things rules must
+    // guarantee are that a user can only reach their OWN projects, and that
+    // ownerUid can never be forged or reassigned — otherwise a user could
+    // create a project owned by someone else, or steal one by rewriting the
+    // field.
+    match /projects/{projectId} {
+      function isOwner() {
+        return request.auth != null && resource.data.ownerUid == request.auth.uid;
+      }
+
+      allow read, delete: if isOwner();
+
+      allow create: if request.auth != null
+                    && request.resource.data.ownerUid == request.auth.uid;
+
+      // ownerUid must survive every update unchanged.
+      allow update: if isOwner()
+                    && request.resource.data.ownerUid == resource.data.ownerUid;
+    }
+
+    // Share links — created and revoked by the server only. A client that could
+    // write here could mint a link to any project, or extend an expired one.
+    // Public viewing goes through the server, which checks expiry and revocation.
+    match /project_shares/{token} {
+      allow read, write: if false;
+    }
+
+    // Stripe webhook idempotency ledger — server only. If a client could write
+    // here it could pre-create an event ID and make a real payment be skipped
+    // as a "duplicate".
+    match /stripe_events/{eventId} {
+      allow read, write: if false;
+    }
+
+    // Trial anti-abuse fingerprints — server only. Readable by a client, these
+    // would leak which IPs have used a trial; writable, they would let a user
+    // clear their own block.
+    match /trial_fingerprints/{fingerprint} {
+      allow read, write: if false;
+    }
+
+    // Deny everything not explicitly matched above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

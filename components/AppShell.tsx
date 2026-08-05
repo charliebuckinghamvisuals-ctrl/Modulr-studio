@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, Info, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool, ShieldCheck } from 'lucide-react';
+import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { AppStage } from '../types';
 import { useAuth } from '../hooks/useAuth';
@@ -13,7 +13,7 @@ interface AppShellProps {
   headerActions?: ReactNode;
 }
 
-// Tool pages that require a full desktop — blocked on mobile
+// Tool pages that require a full desktop - blocked on mobile
 const DESKTOP_ONLY_STAGES = new Set([
   AppStage.RENDER_ENGINE,
   AppStage.LINE_CONVERT,
@@ -65,16 +65,16 @@ const DesktopOnlyScreen: React.FC<{ onNavigate: (stage: AppStage) => void }> = (
       </div>
     </div>
     <p className="text-[10px] text-secondary/60 font-medium max-w-xs">
-      You can still sign up and purchase a plan on mobile — but you'll need a desktop browser to render.
+      You can still sign up and purchase a plan on mobile - but you'll need a desktop browser to render.
     </p>
   </div>
 );
 
 // ─── Main AppShell ─────────────────────────────────────────────────────────────
 export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNavigate, onReset, headerActions }) => {
-  const { user, isMaster } = useAuth();
+  const { user } = useAuth();
   const { credits, plan, loading: creditsLoading, rendersLeft, rendersPerDay, trialDaysLeft } = useCredits();
-  const [isAboutDropdownOpen, setIsAboutDropdownOpen] = React.useState(false);
+  const [isToolsDropdownOpen, setIsToolsDropdownOpen] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -92,16 +92,29 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     { id: AppStage.DESIGNER, label: '3D Config', comingSoon: true },
     { id: AppStage.RENDER_ENGINE, label: 'Render Engine' },
     { id: AppStage.LINE_CONVERT, label: 'Line Converter' },
-    { id: AppStage.EDITOR, label: 'Refinement Studio' },
+    { id: AppStage.WEATHER_LAB, label: 'Weather Lab' },
     { id: AppStage.MATERIAL_STUDIO, label: 'Material Studio' },
   ];
 
-  const infoItems = [
+  // Top-level header items, in display order. Tools is injected between Home
+  // and Gallery as a dropdown; everything else is a flat link.
+  const navItemsBeforeTools = [
     { id: AppStage.HOME, label: 'Home' },
+    { id: AppStage.PROJECTS, label: 'Projects' },
+  ];
+
+  const navItemsAfterTools = [
+    { id: AppStage.WHY, label: 'Why Modulr' },
     { id: AppStage.GALLERY, label: 'Gallery' },
     { id: AppStage.GUIDE, label: 'Guide' },
-    { id: AppStage.PRICING, label: 'Pricing' },
     { id: AppStage.ABOUT, label: 'About' },
+    { id: AppStage.PRICING, label: 'Pricing' },
+  ];
+
+  // Kept for the mobile menu, which still lists everything in one column.
+  const infoItems = [
+    ...navItemsBeforeTools,
+    ...navItemsAfterTools,
     { id: AppStage.ACCOUNT, label: 'Account Dashboard' },
   ];
 
@@ -132,61 +145,53 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           <img src="/Logo.png" alt="Modulr Studio Logo" className="h-48 w-auto object-contain transition-transform duration-300 group-hover:scale-105" />
         </div>
 
-        {/* Desktop Tools Nav */}
-        <nav className="hidden lg:flex items-center justify-center gap-0.5 p-1.5 rounded-full border-none overflow-hidden shrink-0">
-          {toolItems.map(item => {
-            const isActive = activeStage === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  if (item.comingSoon) {
-                    toast('3D Configurator is coming soon!', { icon: '🚀' });
-                  } else {
-                    onNavigate(item.id);
-                  }
-                }}
-                className={`px-4 py-2.5 text-xs ${
-                  item.id === AppStage.RENDER_ENGINE 
-                    ? 'font-bold uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap ' + (isActive ? 'bg-green-400 text-slate-900 shadow-[0_0_15px_rgba(74,222,128,0.3)]' : 'bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20')
-                    : 'font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap ' + (isActive ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10')
-                } ${item.comingSoon ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <span className="relative z-10 whitespace-nowrap flex items-center">
-                  {item.id === AppStage.RENDER_ENGINE && !isActive && <Sparkles size={12} className="inline mr-1 mb-0.5" />}
-                  {item.label}
-                  {item.comingSoon && <span className="text-[8px] font-bold uppercase tracking-wider bg-[#405a56]/10 text-[#405a56] px-1.5 py-0.5 rounded-full ml-1">Soon</span>}
-                </span>
-              </button>
-            );
-          })}
-        </nav>
+        {/* Desktop Nav - Home · Tools ▾ · Gallery · Guide · About · Pricing.
+            Only the tool list is deep enough to need a dropdown; the rest are
+            flat so the common destinations are one click away. */}
+        <nav className="hidden lg:flex items-center justify-center gap-1 shrink-0">
+          {navItemsBeforeTools.map(item => (
+            <button
+              key={item.id}
+              onClick={() => onNavigate(item.id)}
+              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 whitespace-nowrap ${activeStage === item.id ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
+            >
+              {item.label}
+            </button>
+          ))}
 
-        <div className="flex flex-1 items-center justify-end gap-2 relative shrink-0">
-
-          {/* Desktop Info Dropdown */}
           <div
-            className="hidden lg:block relative"
-            onMouseEnter={() => setIsAboutDropdownOpen(true)}
-            onMouseLeave={() => setIsAboutDropdownOpen(false)}
+            className="relative"
+            onMouseEnter={() => setIsToolsDropdownOpen(true)}
+            onMouseLeave={() => setIsToolsDropdownOpen(false)}
           >
             <button
-              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 ${infoItems.some(item => activeStage === item.id) ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
+              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 ${toolItems.some(item => activeStage === item.id) ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
             >
-              <Info size={16} />
-              <span>About</span>
-              <ChevronDown size={14} className={`transition-transform duration-300 ${isAboutDropdownOpen ? 'rotate-180' : ''}`} />
+              <Layers size={16} />
+              <span>Tools</span>
+              <ChevronDown size={14} className={`transition-transform duration-300 ${isToolsDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
-            <div className={`absolute right-0 top-full pt-2 w-56 transition-all duration-300 z-[60] origin-top-right ${isAboutDropdownOpen ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-2 scale-95 pointer-events-none'}`}>
+            <div className={`absolute left-0 top-full pt-2 w-60 transition-all duration-300 z-[60] origin-top-left ${isToolsDropdownOpen ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-2 scale-95 pointer-events-none'}`}>
               <div className="p-2 rounded-2xl bg-white shadow-2xl border border-slate-200 flex flex-col gap-1">
-                {infoItems.map(item => {
+                {toolItems.map(item => {
+                  const isActive = activeStage === item.id;
                   return (
                     <button
                       key={item.id}
-                      onClick={() => { onNavigate(item.id); setIsAboutDropdownOpen(false); }}
-                      className="w-full px-4 py-2 text-xs font-semibold text-slate-700 hover:text-accent hover:bg-slate-50 flex items-center gap-2 transition-colors text-left"
+                      onClick={() => {
+                        // "Soon" is a label, not a lock. Tools still in
+                        // development stay reachable so they can be tested.
+                        onNavigate(item.id);
+                        setIsToolsDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-2 text-xs font-semibold flex items-center justify-between gap-2 transition-colors text-left rounded-lg ${
+                        isActive
+                          ? 'text-accent bg-slate-50'
+                          : 'text-slate-700 hover:text-accent hover:bg-slate-50'
+                      }`}
                     >
-                      {item.label}
+                      <span>{item.label}</span>
+                      {item.comingSoon && <span className="text-[8px] font-semibold uppercase tracking-wider text-slate-400">Soon</span>}
                     </button>
                   );
                 })}
@@ -194,12 +199,25 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
             </div>
           </div>
 
-          {/* Credit Badge — desktop */}
+          {navItemsAfterTools.map(item => (
+            <button
+              key={item.id}
+              onClick={() => onNavigate(item.id)}
+              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 whitespace-nowrap ${activeStage === item.id ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex flex-1 items-center justify-end gap-2 relative shrink-0">
+
+          {/* Credit Badge - desktop */}
           {user && !creditsLoading && plan === 'free' && rendersLeft !== null && rendersPerDay !== null && (
             <div
               className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 mr-2 cursor-pointer hover:bg-white/20 transition-all"
               onClick={() => onNavigate(AppStage.PRICING)}
-              title={`Free Trial — ${trialDaysLeft} day(s) remaining`}
+              title={`Free Trial - ${trialDaysLeft} day(s) remaining`}
             >
               <span className={`w-2 h-2 rounded-full shrink-0 ${rendersLeft === 0 ? 'bg-red-400' : rendersLeft === 1 ? 'bg-amber-400' : 'bg-green-400'}`} />
               <span className="text-[10px] font-black uppercase tracking-widest leading-none">
@@ -213,21 +231,20 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
               onClick={() => onNavigate(AppStage.ACCOUNT)}
             >
               <Coins size={14} className="text-yellow-400" />
-              <span className="text-[10px] font-black uppercase tracking-widest leading-none">
-                {typeof credits === 'number' ? credits.toLocaleString() : credits} <span className="opacity-60">Credits</span>
-              </span>
+              {typeof credits === 'number' ? (
+                <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                  {credits.toLocaleString()} <span className="opacity-60">Credits</span>
+                </span>
+              ) : (
+                // Unlimited: the symbol carries the meaning on its own, and the
+                // two-line "UNLIMITED CREDITS" pill was the widest thing in an
+                // already-crowded header.
+                <span className="text-sm font-black leading-none" title="Unlimited credits" aria-label="Unlimited credits">∞</span>
+              )}
             </div>
           )}
 
-          {/* Master Access Badge */}
-          {isMaster && (
-            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-400/20 border border-amber-400/30 text-amber-300 text-[10px] font-bold tracking-widest uppercase mr-2 shadow-sm">
-              <ShieldCheck size={14} className="text-amber-400" />
-              <span>Master Access</span>
-            </div>
-          )}
-
-          {/* Account / Sign In — desktop */}
+          {/* Account / Sign In - desktop */}
           {user ? (
             <button
               onClick={() => onNavigate(AppStage.ACCOUNT)}
@@ -316,7 +333,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
 
           {/* Desktop-only tools section */}
           <div className="pt-5 pb-2 px-2">
-            <p className="text-[9px] font-black text-secondary/50 uppercase tracking-[0.2em]">Studio Tools — Desktop Only</p>
+            <p className="text-[9px] font-black text-secondary/50 uppercase tracking-[0.2em]">Studio Tools - Desktop Only</p>
           </div>
           {toolItems.map(item => (
             <button
@@ -350,7 +367,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
 
       {/* ── Main Content ── */}
       <main className="flex-1 flex flex-col relative overflow-hidden min-h-screen">
-        {/* Children always render once — no duplicate refs */}
+        {/* Children always render once - no duplicate refs */}
         <div className={`flex-1 flex flex-col ${isDesktopOnly ? 'hidden lg:flex' : 'flex'}`}>
           {children}
         </div>

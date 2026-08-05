@@ -171,7 +171,7 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                                     <span>3D Config</span>
                                 </div>
                             </div>
-                            <p className="text-[11px] text-slate-500 leading-tight">In Development — launch date TBD.</p>
+                            <p className="text-[11px] text-slate-500 leading-tight">In Development - launch date TBD.</p>
                         </div>
                     </div>
 

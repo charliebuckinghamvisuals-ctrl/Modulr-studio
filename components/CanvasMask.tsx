@@ -18,7 +18,7 @@ export const CanvasMask: React.FC<CanvasMaskProps> = ({ baseImage, onMaskComplet
     const [mode, setMode] = useState<'draw' | 'erase'>('draw');
     const [brushSize, setBrushSize] = useState(30);
 
-    // Stable object URL for the background image — avoids embedding giant base64 in the DOM
+    // Stable object URL for the background image - avoids embedding giant base64 in the DOM
     const [bgObjectUrl, setBgObjectUrl] = useState<string>('');
 
     useEffect(() => {
@@ -46,7 +46,7 @@ export const CanvasMask: React.FC<CanvasMaskProps> = ({ baseImage, onMaskComplet
         }
     }, [baseImage]);
 
-    // Initialize canvas — only depends on baseImage (not onMaskComplete)
+    // Initialize canvas - only depends on baseImage (not onMaskComplete)
     const initCanvas = useCallback(() => {
         const canvas = canvasRef.current;
         const container = containerRef.current;
@@ -90,9 +90,9 @@ export const CanvasMask: React.FC<CanvasMaskProps> = ({ baseImage, onMaskComplet
             console.error('CanvasMask: failed to load base image');
         };
 
-        // Use a simple data URI just for size calculation — we don't draw the bg here
+        // Use a simple data URI just for size calculation - we don't draw the bg here
         img.src = `data:image/png;base64,${baseImage}`;
-    }, [baseImage]); // onMaskComplete intentionally omitted — use ref instead
+    }, [baseImage]); // onMaskComplete intentionally omitted - use ref instead
 
     useEffect(() => {
         initCanvas();
@@ -114,7 +114,7 @@ export const CanvasMask: React.FC<CanvasMaskProps> = ({ baseImage, onMaskComplet
         drawOnCanvas(e);
     };
 
-    // Export the mask — called only on pointer-up, not during every draw stroke
+    // Export the mask - called only on pointer-up, not during every draw stroke
     const exportMask = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;

@@ -26,5 +26,22 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": [
+    "App.tsx",
+    "index.tsx",
+    "types.ts",
+    "constants.ts",
+    "components/**/*",
+    "hooks/**/*",
+    "services/**/*",
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "garden-scene-builder",
+    "modulr-sketchup-plugin",
+    "temp-puppeteer"
+  ]
 }

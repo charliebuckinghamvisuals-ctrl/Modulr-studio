@@ -5,7 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import { Geometry, Base, Subtraction, Addition } from '@react-three/csg';
 import * as THREE from 'three';
 import { Text, Line, Html, Edges, Billboard } from '@react-three/drei';
-import { useRealMaterial } from '../../utils/materials';
+import { useRealMaterial, resolveDeckingKey } from '../../utils/materials';
 import { Suspense } from 'react';
 import { createWorldScaleBoxGeometry, createWorldScaleGableGeometry } from '../../utils/geometry';
 import { createCladdingGeometry, createDeckingGeometry } from '../../utils/geometryUtils';
@@ -254,9 +254,17 @@ export function RoomGeometry() {
   const isGable = room.shape === 'Gable';
   const roofHRaw = (room.roofHeightMm ?? 200) / 1000;
 
+  // baseH must be declared before the gable height calculation below uses it.
+  // It previously sat ~60 lines further down, which put this reference inside
+  // the const's temporal dead zone. Because the ternary short-circuits, the Box
+  // shape never evaluated that branch and looked fine — but selecting Gable
+  // threw "Cannot access 'baseH' before initialization" during render, which
+  // unmounted the whole 3D scene and left a black screen.
+  const baseH = (room.baseHeightMm ?? 100) / 1000;
+
   // For Gable, room.heightMm is the TOTAL height (base + wall + roof)
   // Therefore wall height = total height - base - roof
-  const frontH = isGable 
+  const frontH = isGable
     ? (room.heightMm / 1000) - baseH - roofHRaw
     : room.heightMm / 1000;
 
@@ -292,7 +300,10 @@ export function RoomGeometry() {
   const texRight = useRealMaterial(room.claddingRight || room.cladding || 'timber', d, maxH, 0);
   const texRoof = useRealMaterial(room.roofMaterial || 'epdm', roofW, roofD, 0);
   const texBase = useRealMaterial(room.baseMaterial || 'concrete', baseW, baseD, 0);
-  const texDecking = useRealMaterial(room.deckingMaterial || room.cladding || 'timber', baseW, deckFront, 0);
+  // Falls back to the cladding's DECKING equivalent, not the cladding key
+  // itself - see resolveDeckingKey. Reusing the cladding key laid the vertical
+  // slat texture across the deck instead of decking boards.
+  const texDecking = useRealMaterial(resolveDeckingKey(room.deckingMaterial, room.cladding), baseW, deckFront, 0);
   const texFloor = useRealMaterial(room.interiorFloorType || 'oak', w, d, 0);
 
   const isVert = room.claddingOrientation !== 'vertical';
@@ -311,10 +322,13 @@ export function RoomGeometry() {
   const frameColors: Record<string, string> = { anthracite: '#2d3032', black: '#1a1a1a', white: '#f0f0f0', silver: '#a0a4a8' };
   
   const baseColorHex = baseMaterialColors[room.baseMaterial as string] || '#8a8d8f';
-  const roofColorHex = roofMaterialColors[room.roofMaterial as string] || '#222222';
+  // An explicit roofColor overrides the colour implied by the roof material, so
+  // the roof and the fascia can be specified independently rather than the roof
+  // being locked to whatever its material happens to be.
+  const roofColorHex = (room as any).roofColor || roofMaterialColors[room.roofMaterial as string] || '#222222';
   const frameColorHex = frameColors[room.frameColor] || frameColors.anthracite;
 
-  const baseH = (room.baseHeightMm ?? 100) / 1000;
+  // baseH is declared with the other height calculations further up.
   const roofH = (room.roofHeightMm ?? 200) / 1000;
 
   const cutBoxSize = 50;
@@ -356,7 +370,10 @@ export function RoomGeometry() {
 
   const renderBaseMeshes = () => {
     const materialProps = isDeckingMaterial ? {
-      color: "#ffffff",
+      // Was hardcoded to "#ffffff", which discarded the chosen material's colour
+      // entirely - every decking option rendered as the untinted texture, so
+      // black composite came out pale.
+      color: texDecking.color,
       map: texDecking.map,
       roughnessMap: texDecking.roughnessMap,
       normalMap: texDecking.normalMap, aoMap: texDecking.aoMap,
@@ -687,8 +704,11 @@ export function RoomGeometry() {
                   const matKey = 'fascia-left-' + side + '-' + room.fasciaMaterial + '-' + room.cladding + '-' + room.claddingOrientation;
                   if (room.fasciaMaterial === 'match_cladding') {
                     const tex = side === 'front' ? texFront : side === 'back' ? texBack : side === 'left' ? texLeft : texRight;
-                    const props = side === 'front' ? propsFront : side === 'back' ? propsBack : side === 'left' ? propsLeft : propsRight;
-                    return <meshStandardMaterial key={matKey} color="#ffffff" map={tex.map}  metalness={props.metalness}  bumpScale={0.1} />;
+                    // propsFront/Back/Left/Right were referenced here but never
+                    // declared anywhere in this file, so choosing "Match Cladding"
+                    // threw a ReferenceError during render and blanked the scene.
+                    // The material values come from the cladding texture itself.
+                    return <meshStandardMaterial key={matKey} color={tex.color} map={tex.map} normalMap={tex.normalMap} roughnessMap={tex.roughnessMap} roughness={tex.roughness} metalness={0.05} bumpScale={0.1} />;
                   } else if (room.fasciaMaterial === 'white') {
                     return <meshStandardMaterial key={matKey} color="#ffffff" roughness={0.6} metalness={0.1} />;
                   } else if (room.fasciaMaterial === 'grey') {
@@ -719,8 +739,11 @@ export function RoomGeometry() {
                   const matKey = 'fascia-right-' + side + '-' + room.fasciaMaterial + '-' + room.cladding + '-' + room.claddingOrientation;
                   if (room.fasciaMaterial === 'match_cladding') {
                     const tex = side === 'front' ? texFront : side === 'back' ? texBack : side === 'left' ? texLeft : texRight;
-                    const props = side === 'front' ? propsFront : side === 'back' ? propsBack : side === 'left' ? propsLeft : propsRight;
-                    return <meshStandardMaterial key={matKey} color="#ffffff" map={tex.map}  metalness={props.metalness}  bumpScale={0.1} />;
+                    // propsFront/Back/Left/Right were referenced here but never
+                    // declared anywhere in this file, so choosing "Match Cladding"
+                    // threw a ReferenceError during render and blanked the scene.
+                    // The material values come from the cladding texture itself.
+                    return <meshStandardMaterial key={matKey} color={tex.color} map={tex.map} normalMap={tex.normalMap} roughnessMap={tex.roughnessMap} roughness={tex.roughness} metalness={0.05} bumpScale={0.1} />;
                   } else if (room.fasciaMaterial === 'white') {
                     return <meshStandardMaterial key={matKey} color="#ffffff" roughness={0.6} metalness={0.1} />;
                   } else if (room.fasciaMaterial === 'grey') {
@@ -785,8 +808,11 @@ export function RoomGeometry() {
                   const matKey = 'fascia-flat-' + side + '-' + room.fasciaMaterial + '-' + room.cladding + '-' + room.claddingOrientation;
                   if (room.fasciaMaterial === 'match_cladding') {
                     const tex = side === 'front' ? texFront : side === 'back' ? texBack : side === 'left' ? texLeft : texRight;
-                    const props = side === 'front' ? propsFront : side === 'back' ? propsBack : side === 'left' ? propsLeft : propsRight;
-                    return <meshStandardMaterial key={matKey} color="#ffffff" map={tex.map}  metalness={props.metalness}  bumpScale={0.1} />;
+                    // propsFront/Back/Left/Right were referenced here but never
+                    // declared anywhere in this file, so choosing "Match Cladding"
+                    // threw a ReferenceError during render and blanked the scene.
+                    // The material values come from the cladding texture itself.
+                    return <meshStandardMaterial key={matKey} color={tex.color} map={tex.map} normalMap={tex.normalMap} roughnessMap={tex.roughnessMap} roughness={tex.roughness} metalness={0.05} bumpScale={0.1} />;
                   } else if (room.fasciaMaterial === 'white') {
                     return <meshStandardMaterial key={matKey} color="#ffffff" roughness={0.6} metalness={0.1} />;
                   } else if (room.fasciaMaterial === 'grey') {

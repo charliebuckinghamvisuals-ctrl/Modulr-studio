@@ -2,9 +2,52 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { SceneObject } from '../../types';
 import * as THREE from 'three';
-import { useRef, useState } from 'react';
+import { useRef, useState, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from '@react-three/csg';
+import { useGLTF } from '@react-three/drei';
+
+/**
+ * Real bed model, replacing the previous box-built placeholder.
+ *
+ * Path is relative so it resolves correctly both in standalone dev (served at
+ * the site root) and when this app runs inside the /3d-config/ iframe, where an
+ * absolute path would miss.
+ */
+const BED_MODEL_URL = 'models/bed.glb';
+
+function BedModel() {
+    const { scene } = useGLTF(BED_MODEL_URL);
+
+    // Clone per instance. useGLTF caches one scene graph, so placing two beds
+    // without cloning would move the same object twice rather than showing two.
+    const model = useRef<THREE.Group>(null);
+    const cloned = useRef<THREE.Object3D | null>(null);
+    if (!cloned.current) {
+        cloned.current = scene.clone(true);
+        cloned.current.traverse(child => {
+            if ((child as THREE.Mesh).isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+    }
+
+    return <primitive ref={model} object={cloned.current} />;
+}
+
+// Warm the cache so the first bed placed does not stall the scene.
+useGLTF.preload(BED_MODEL_URL);
+
+/** Simple stand-in shown while the model streams in. */
+function BedFallback() {
+    return (
+        <mesh position={[0, 0.3, 0]}>
+            <boxGeometry args={[1.6, 0.6, 2.0]} />
+            <meshStandardMaterial color="#cbd5e1" roughness={1} />
+        </mesh>
+    );
+}
 
 export function SceneObjects() {
   const { objects, isExporting } = useStore(useShallow(s => ({
@@ -391,19 +434,9 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
 
     if (obj.type === 'bed') {
       return (
-        <group>
-          {/* Base */}
-          <mesh position={[0, 0.15, 0]} castShadow><boxGeometry args={[1.65, 0.25, 2.05]} /><meshStandardMaterial color="#333" roughness={0.8} /></mesh>
-          {/* Mattress */}
-          <mesh position={[0, 0.4, 0]} castShadow><boxGeometry args={[1.6, 0.25, 2.0]} /><meshStandardMaterial color="#fff" roughness={1.0} /></mesh>
-          {/* Duvet/Blanket */}
-          <mesh position={[0, 0.42, 0.2]} castShadow><boxGeometry args={[1.64, 0.26, 1.6]} /><meshStandardMaterial color="#94a3b8" roughness={0.9} /></mesh>
-          {/* Pillows */}
-          <mesh position={[-0.4, 0.6, -0.7]} castShadow rotation={[0.1, 0, 0]}><boxGeometry args={[0.6, 0.15, 0.4]} /><meshStandardMaterial color="#f1f5f9" roughness={0.9} /></mesh>
-          <mesh position={[0.4, 0.6, -0.7]} castShadow rotation={[0.1, 0, 0]}><boxGeometry args={[0.6, 0.15, 0.4]} /><meshStandardMaterial color="#f1f5f9" roughness={0.9} /></mesh>
-          {/* Headboard */}
-          <mesh position={[0, 0.6, -1.0]} castShadow><boxGeometry args={[1.7, 1.2, 0.1]} /><meshStandardMaterial color="#94a3b8" roughness={0.8} /></mesh>
-        </group>
+        <Suspense fallback={<BedFallback />}>
+          <BedModel />
+        </Suspense>
       );
     }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, Grid, Layers, Sparkles, PenTool, Image as ImageIcon, Settings, History, ChevronDown, Loader2, Upload } from 'lucide-react';
+import { Zap, Grid, Layers, Sparkles, PenTool, Image as ImageIcon, Settings, History, ChevronDown, Loader2, Upload, CloudSun } from 'lucide-react';
 import { ToggleSwitch } from './components/ToggleSwitch';
 import { Toaster, toast } from 'react-hot-toast';
 import { AppShell } from './components/AppShell';
@@ -9,7 +9,7 @@ import { LoadingOverlay } from './components/LoadingOverlay';
 import { HistoryFooter } from './components/HistoryFooter';
 import { CanvasMask } from './components/CanvasMask';
 import { AppStage, HistoryItem } from './types';
-import { WEATHER_CONDITIONS } from './constants';
+import { WEATHER_CONDITIONS, SEASONS } from './constants';
 import { useAppEngine } from './hooks/useAppEngine';
 import { HomeView } from './components/views/HomeView';
 import { MaterialStudioView } from './components/views/MaterialStudioView';
@@ -20,6 +20,8 @@ import { PricingView } from './components/views/PricingView';
 import { AboutView } from './components/views/AboutView';
 import { GuideView } from './components/views/GuideView';
 import { GalleryView } from './components/views/GalleryView';
+import { ProjectsView } from './components/views/ProjectsView';
+import { WhyModulrView } from './components/views/WhyModulrView';
 import { AuthView } from './components/views/AuthView';
 import { AccountView } from './components/views/AccountView';
 import { DesignerView } from './components/views/DesignerView';
@@ -309,36 +311,82 @@ const App: React.FC = () => {
         </>
     );
 
-    const editorControls = (
-        <div className="flex flex-col h-full space-y-4">
-            <div className="flex flex-col gap-2 w-full">
-                <QualityToggle />
-                <ProModelToggle />
+    /**
+     * Weather Lab controls.
+     *
+     * Scope is deliberately limited to weather, season and atmosphere. Anything
+     * that changes the building itself belongs in Material Studio, so the two
+     * tools stay distinct rather than overlapping the way the old Refinement
+     * Studio did.
+     */
+    const weatherControls = (
+        <div className="flex flex-col h-full space-y-5">
+            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-5">
+
+                <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></div>
+                        Weather Condition
+                    </label>
+                    <select
+                        value={engine.weather.condition}
+                        onChange={(e) => engine.setWeather(prev => ({ ...prev, condition: e.target.value }))}
+                        className="w-full bg-white border border-slate-300 text-sm font-bold text-accent rounded-xl px-3 py-2.5 outline-none shadow-sm focus:ring-2 focus:ring-accent/50"
+                    >
+                        <option value="auto">Auto (Natural Lighting)</option>
+                        {WEATHER_CONDITIONS.map(w => (
+                            <option key={w} value={w}>{w}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80">Season</label>
+                    <div className="grid grid-cols-2 gap-2">
+                        {SEASONS.map(season => {
+                            const active = engine.weather.season?.toLowerCase() === season.toLowerCase();
+                            return (
+                                <button
+                                    key={season}
+                                    onClick={() => engine.setWeather(prev => ({ ...prev, season: season.toLowerCase() }))}
+                                    className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                                        active
+                                            ? 'bg-accent text-white border-accent shadow-md'
+                                            : 'bg-white text-slate-600 border-slate-200 hover:border-accent/40 hover:text-accent'
+                                    }`}
+                                >
+                                    {season}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80">
+                        Environment Notes
+                    </label>
+                    <p className="text-[10px] text-slate-500 leading-relaxed italic">
+                        Describe the atmosphere or surroundings. The building itself stays as it is.
+                    </p>
+                    <textarea
+                        className="w-full p-4 rounded-2xl bg-white border border-accent/20 text-accent focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-accent/30 min-h-[120px] resize-none shadow-inner transition-all duration-300"
+                        placeholder="e.g. low evening sun through the trees, wet paving, mist across the garden"
+                        value={engine.additionalPrompt}
+                        onChange={(e) => engine.setAdditionalPrompt(e.target.value)}
+                    />
+                </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                <div className="space-y-4 mt-2">
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80 flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></div>
-                            Editing Prompt
-                        </label>
-                        <p className="text-[10px] text-slate-500 leading-relaxed pl-3.5 italic">
-                            Describe exactly what you want to change. The AI will perfectly preserve the rest of the image.
-                        </p>
-                    </div>
-
-                    <textarea
-                        className="w-full p-4 rounded-2xl bg-white border border-accent/20 text-accent focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-accent/30 min-h-[140px] resize-none shadow-inner transition-all duration-300"
-                        placeholder="e.g. Add a timber pergola, change the cladding to brick, make it snow..."
-                        value={engine.editorPrompt}
-                        onChange={(e) => engine.setEditorPrompt(e.target.value)}
-                    />
-
-                    <Button className="w-full mt-4" onClick={() => engine.handleEditImage(maskImage)} icon={<Sparkles size={16} />} disabled={!(engine.editorImage || engine.originalImage) || !engine.editorPrompt.trim()}>
-                        Apply Edit
-                    </Button>
-                </div>
+            <div className="mt-auto pt-4">
+                <Button
+                    className="w-full"
+                    onClick={engine.handleWeather}
+                    icon={<CloudSun size={16} />}
+                    disabled={!engine.originalImage || engine.processing.isLoading}
+                >
+                    Apply Weather
+                </Button>
             </div>
         </div>
     );
@@ -374,7 +422,7 @@ const App: React.FC = () => {
                 </button>
             </div>
 
-            {/* Drawing Style — shared between both modes */}
+            {/* Drawing Style - shared between both modes */}
             <div className="space-y-4">
                 <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></div>
@@ -763,6 +811,14 @@ const App: React.FC = () => {
                 <GalleryView />
             )}
 
+            {engine.activeStage === AppStage.PROJECTS && (
+                <ProjectsView />
+            )}
+
+            {engine.activeStage === AppStage.WHY && (
+                <WhyModulrView onNavigate={engine.setActiveStage} />
+            )}
+
             {engine.activeStage === AppStage.AUTH && (
                 <AuthView onNavigate={engine.setActiveStage} />
             )}
@@ -798,6 +854,14 @@ const App: React.FC = () => {
                     setIsHighQuality={engine.setIsHighQuality}
                     isProMode={engine.isProMode}
                     setIsProMode={engine.setIsProMode}
+                    mode={engine.materialStudioMode}
+                    onChooseMode={engine.startMaterialStudioMode}
+                    onResetMode={() => engine.setMaterialStudioMode(null)}
+                    materials={engine.materials}
+                    setMaterials={engine.setMaterials}
+                    materialLibrary={engine.materialLibrary}
+                    onApplyMaterials={engine.handleMaterialStudioApply}
+                    isAnalyzingMaterials={engine.isAnalyzingMaterials}
                 />
             )}
 
@@ -833,29 +897,21 @@ const App: React.FC = () => {
                 />
             )}
 
-            {engine.activeStage === AppStage.EDITOR && (
+            {engine.activeStage === AppStage.WEATHER_LAB && (
                 <WorkspaceView
-                    title="Editor"
-                    subtitle="Refine entourage and details."
-                    controls={editorControls}
-                    primaryImg={engine.getRenderUrl(engine.editorImage)}
+                    title="Weather Lab"
+                    subtitle="Change the weather, season and atmosphere."
+                    controls={weatherControls}
+                    primaryImg={engine.getRenderUrl(engine.finalImage)}
                     secondaryImg={engine.getRenderUrl(engine.originalImage)}
-                    customViewer={
-                        (engine.editorImage || engine.originalImage) ? (
-                            <CanvasMask
-                                baseImage={engine.getRenderUrl(engine.editorImage || engine.originalImage)!}
-                                onMaskComplete={setMaskImage}
-                            />
-                        ) : undefined
-                    }
-                    placeholder="Enter prompt to edit"
+                    placeholder="Upload a render to change its weather"
                     onDownload={engine.handleDownload}
                     onFormatChange={engine.setDownloadFormat}
                     downloadFormat={engine.downloadFormat}
                     onInputClick={() => engine.fileInputRef.current?.click()}
-                    isLoading={engine.activeStage === AppStage.EDITOR && engine.processing.isLoading}
+                    isLoading={engine.activeStage === AppStage.WEATHER_LAB && engine.processing.isLoading}
                     loadingMessage={engine.processing.message}
-                    historyFooter={<HistoryFooter currentStage={AppStage.EDITOR} onLoadHistoryItem={handleLoadHistory} />}
+                    historyFooter={<HistoryFooter currentStage={AppStage.WEATHER_LAB} onLoadHistoryItem={handleLoadHistory} />}
                 />
             )}
 

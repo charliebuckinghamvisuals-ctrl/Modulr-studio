@@ -146,7 +146,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
 
             <div className="w-full md:w-80 flex flex-col gap-6 relative z-10 p-6 m-4 md:m-4 bg-white/95 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-y-auto border border-white">
                 <div className="space-y-4">
-                    <h2 className="text-[6vw] md:text-xl lg:text-2xl font-bold text-accent w-fit inline-block">{title}</h2>
+                    <h2 className="text-[7vw] md:text-2xl lg:text-3xl font-bold text-accent w-fit inline-block leading-tight">{title}</h2>
                     <p className="text-slate-600 text-sm leading-relaxed">{subtitle}</p>
                 </div>
                 {controls}

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { useTexture } from '@react-three/drei';
+import { useThree } from '@react-three/fiber';
 import { useMemo } from 'react';
 import { useStore } from '../store';
 
@@ -8,13 +9,36 @@ import { useStore } from '../store';
 export const MATERIAL_DEF = {
   timber: { prefix: 'larch', tileSize: 2.0, roughness: 1.0, color: '#ffffff' },
   cedar: { prefix: 'larch', tileSize: 2.0, roughness: 1.0, color: '#f0c0a0' },
-  oak: { prefix: 'larch', tileSize: 2.0, roughness: 1.0, color: '#e5b985' },
+
+  // ── Interior floors ───────────────────────────────────────────────────────
+  // These previously all fell through to the 'larch' texture, which is rough,
+  // grey, weathered exterior board. Tinting that yellow produced the muddy
+  // "oak" floor. 'planks_clean' is a fine, tight, neutral plank surface, so a
+  // wood tint over it reads as a finished interior floor. isFloor keeps them
+  // out of the cladding board-width scaling, which is a wall concern.
+  // tileSize 6.0m: the texture holds 43 planks (measured), so one tile across
+  // 6.0m gives ~140mm boards, a common engineered floorboard width.
+  oak: { prefix: 'planks_clean', tileSize: 6.0, roughness: 0.55, color: '#d8b98f', isFloor: true },
+  pine: { prefix: 'planks_clean', tileSize: 6.0, roughness: 0.6, color: '#e8d3ac', isFloor: true },
+  walnut: { prefix: 'planks_clean', tileSize: 6.0, roughness: 0.5, color: '#8a6242', isFloor: true },
+  cherry: { prefix: 'planks_clean', tileSize: 6.0, roughness: 0.5, color: '#b07a55', isFloor: true },
   charcoal: { prefix: 'weathered_larch', tileSize: 2.0, roughness: 1.0, color: '#555555' },
   weathered_larch: { prefix: 'weathered_larch', tileSize: 2.0, roughness: 1.0, color: '#ffffff' },
-  composite_grey: { prefix: 'planks_clean', tileSize: 2.0, roughness: 0.8, color: '#909497' },
-  composite_brown: { prefix: 'planks_clean', tileSize: 2.0, roughness: 0.8, color: '#8b6b55' },
+  // ── Decking range ─────────────────────────────────────────────────────────
+  // Colours deliberately mirror the wall cladding range so a scheme reads as
+  // one product family. Painted tones use the colour-neutralised decking map
+  // for the same reason the cladding does: tinting light grey through a brown
+  // timber base produces mud rather than grey.
+  composite_cedar: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.75, color: '#b0764b' },
+  composite_oak: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.75, color: '#c9a173' },
+  composite_brown: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.8, color: '#8b6b55' },
+  composite_black: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.8, color: '#1f2123', neutral: true },
+  composite_dark_grey: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.78, color: '#4a5057', neutral: true },
+  composite_grey: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.75, color: '#a9aeb2', neutral: true },
+  composite_slate_blue: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.75, color: '#7c93a6', neutral: true },
+  composite_sage: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.76, color: '#7e8c74', neutral: true },
+  composite_clay: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.78, color: '#9a6b58', neutral: true },
   composite_wood: { prefix: 'planks_clean', tileSize: 2.0, roughness: 0.8, color: '#8b6b55' },
-  composite_black: { prefix: 'planks_clean', tileSize: 2.0, roughness: 0.8, color: '#2a2a2a' },
   charred_timber: { prefix: 'weathered_larch', tileSize: 2.0, roughness: 1.0, color: '#222222' },
   timber_decking: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 1.0, color: '#ffffff' },
   composite_decking: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.8, color: '#aaaaaa' },
@@ -23,18 +47,60 @@ export const MATERIAL_DEF = {
   metal: { prefix: 'slate_roof', tileSize: 2.0, roughness: 0.4, color: '#777777' },
   slate: { prefix: 'slate_roof', tileSize: 1.0, roughness: 0.9, color: '#ffffff' },
   concrete: { prefix: 'sedum', tileSize: 4.0, roughness: 1.0, color: '#aaaaaa' },
-  black_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.7, color: '#262729' },
-  grey_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.6, color: '#6e737b' },
-  cedar_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.6, color: '#be7847' },
-  oak_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.6, color: '#cca278' },
+  // ── Composite cladding range ──────────────────────────────────────────────
+  // All share the same board profile texture. Wood tones tint the natural
+  // timber map; painted finishes tint a colour-neutralised copy of the SAME
+  // map (neutral: true), because multiplying a light grey or blue through a
+  // brown wood base produces mud rather than the intended colour.
+  cedar_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.65, color: '#b0764b' },
+  oak_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.65, color: '#c9a173' },
+  black_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.7, color: '#1f2123', neutral: true },
+  dark_grey_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.68, color: '#4a5057', neutral: true },
+  light_grey_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.62, color: '#a9aeb2', neutral: true },
+  // Kept so existing saved scenes referencing grey_composite still resolve.
+  grey_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.65, color: '#767c84', neutral: true },
+  slate_blue_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.62, color: '#7c93a6', neutral: true },
+  sage_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.64, color: '#7e8c74', neutral: true },
+  clay_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.66, color: '#9a6b58', neutral: true },
   cedar_cladding: { prefix: 'Cedar Timber Cladding', tileSize: 2.0, roughness: 1.0, color: '#ffffff', ext: 'png', singleMap: true },
   oak_cladding: { prefix: 'Oak timber cladding', tileSize: 2.0, roughness: 1.0, color: '#ffffff', ext: 'png', singleMap: true },
   default: { prefix: 'larch', tileSize: 2.0, roughness: 1.0, color: '#ffffff' }
 };
 
+/**
+ * Cladding key -> matching decking key.
+ *
+ * When no decking material has been chosen the decking follows the wall
+ * cladding, which is the sensible default for a matched scheme. It must map to
+ * the DECKING equivalent rather than reusing the cladding key directly: the
+ * cladding materials are built on the vertical slat texture, so using one on a
+ * deck laid slats across the floor instead of decking boards.
+ */
+export const CLADDING_TO_DECKING: Record<string, string> = {
+  cedar_composite: 'composite_cedar',
+  oak_composite: 'composite_oak',
+  black_composite: 'composite_black',
+  dark_grey_composite: 'composite_dark_grey',
+  light_grey_composite: 'composite_grey',
+  grey_composite: 'composite_grey',
+  slate_blue_composite: 'composite_slate_blue',
+  sage_composite: 'composite_sage',
+  clay_composite: 'composite_clay',
+};
+
+/** Resolve the decking material, following the cladding when none is set. */
+export const resolveDeckingKey = (deckingMaterial?: string, cladding?: string): string => {
+  if (deckingMaterial) return deckingMaterial;
+  if (cladding && CLADDING_TO_DECKING[cladding]) return CLADDING_TO_DECKING[cladding];
+  return 'timber_decking';
+};
+
 export function useRealMaterial(materialKey: string, widthMeters: number, heightMeters: number, rotation: number = 0) {
   const claddingWidthMm = useStore(state => state.scene.room.claddingWidthMm) || 100;
   const claddingOrientation = useStore(state => state.scene.room.claddingOrientation);
+  // Hardware max, usually 16. Read from the renderer rather than hardcoded so a
+  // device that supports less is not asked for something it cannot do.
+  const maxAnisotropy = useThree(state => state.gl.capabilities.getMaxAnisotropy());
   
   const def = MATERIAL_DEF[materialKey as keyof typeof MATERIAL_DEF] || MATERIAL_DEF.default;
     
@@ -42,6 +108,12 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
     const texturePaths: any = {};
     if ((def as any).singleMap) {
         texturePaths.map = `./textures/${def.prefix}.${(def as any).ext || 'jpg'}`;
+    } else if ((def as any).neutral) {
+        // Colour-neutralised copy of the same board texture. Normal, roughness
+        // and AO maps are colourless, so they are shared with the wood tones.
+        texturePaths.map = `./textures/${def.prefix}_neutral_color.${(def as any).ext || 'jpg'}`;
+        texturePaths.normalMap = `./textures/${def.prefix}_normal.${(def as any).ext || 'jpg'}`;
+        texturePaths.roughnessMap = `./textures/${def.prefix}_roughness.${(def as any).ext || 'jpg'}`;
     } else {
         texturePaths.map = `./textures/${def.prefix}_color.${(def as any).ext || 'jpg'}`;
         texturePaths.normalMap = `./textures/${def.prefix}_normal.${(def as any).ext || 'jpg'}`;
@@ -64,13 +136,43 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
             m.wrapS = THREE.RepeatWrapping;
             m.wrapT = THREE.RepeatWrapping;
             m.colorSpace = isColor ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
-            m.anisotropy = 4; // Optimized anisotropy to prevent lag on 4K textures
+
+            // Anisotropic filtering. This was pinned to 4, which is what made the
+            // cladding grooves look jagged and shimmer: they are thin, high
+            // contrast vertical lines viewed at a glancing angle, which is the
+            // exact case anisotropy exists to solve. Use the hardware maximum
+            // (typically 16). It is a sampler setting, not extra geometry or
+            // texture memory, so the cost is negligible on any modern GPU.
+            m.anisotropy = maxAnisotropy;
+            m.minFilter = THREE.LinearMipmapLinearFilter;
+            m.magFilter = THREE.LinearFilter;
+            m.generateMipmaps = true;
             
-            // World-space board scaling
-            const isCladding = def.prefix !== 'slate_roof' && def.prefix !== 'sedum';
+            // World-space board scaling. Floors are excluded: the Board Width
+            // slider is a wall setting, and letting it drive the floor meant
+            // changing the cladding resized the floorboards too.
+            const isCladding = def.prefix !== 'slate_roof'
+                && def.prefix !== 'sedum'
+                && !(def as any).isFloor;
             
             let s_x = 1 / (def.tileSize * (isCladding ? claddingWidthMm / 100 : 1));
             let s_y = 1 / (def.tileSize * (isCladding ? claddingWidthMm / 100 : 1));
+
+            // Floors use a plain boxGeometry whose UVs run 0..1 across the whole
+            // face, whereas the walls use world-scaled UVs measured in metres.
+            // The repeat convention is therefore INVERTED between the two: walls
+            // want 1/tileSize, floors want size/tileSize. Applying the wall
+            // formula to the floor produced less than one tile across an entire
+            // room, which is why the boards looked enormous.
+            if ((def as any).isFloor) {
+                const floorW = widthMeters > 0 ? widthMeters : 4;
+                const floorD = heightMeters > 0 ? heightMeters : 4;
+                m.repeat.set(floorW / def.tileSize, floorD / def.tileSize);
+                m.center.set(0.5, 0.5);
+                m.rotation = rotation;
+                m.needsUpdate = true;
+                return;
+            }
             
             if (isCladding) {
                 // Force all cladding materials to stretch full length up the wall height (0 horizontal cut lines)
@@ -78,8 +180,15 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
                 s_y = 1 / wallHeight;
 
                 if (def.prefix === 'synthetic_wood') {
+                    // BOARDS_IN_TEXTURE must match the actual number of boards
+                    // across the texture image, or the Board Width slider lies.
+                    // Measured by counting grooves in synthetic_wood_color.jpg:
+                    // 34 boards across 1024px. This was previously 16, which
+                    // rendered every board at 16/34 (47%) of the requested
+                    // width, so a 200mm setting looked like roughly 94mm.
+                    const BOARDS_IN_TEXTURE = 34;
                     const singleBoardMeters = claddingWidthMm / 1000;
-                    const textureWidthMeters = 16 * singleBoardMeters;
+                    const textureWidthMeters = BOARDS_IN_TEXTURE * singleBoardMeters;
                     s_x = 1 / textureWidthMeters;
                 } else if ((def as any).singleMap) {
                     const singleBoardMeters = claddingWidthMm / 1000;
@@ -100,7 +209,7 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
         setupMap(maps.aoMap, false);
 
         return maps;
-    }, [textures, widthMeters, heightMeters, rotation, def, claddingWidthMm, claddingOrientation]);
+    }, [textures, widthMeters, heightMeters, rotation, def, claddingWidthMm, claddingOrientation, maxAnisotropy]);
 
     return { 
         ...cloned, 

@@ -28,6 +28,13 @@ dist-ssr
 *.sw?
 firebase-service-account.json
 
+# Internal audit notes — must never reach the public repo
+SECURITY-AUDIT.md
+
 # SketchUp Extension Development
 modulr-sketchup-plugin/
 
+
+# Large generated artefacts - not source
+MODULR_FULL_CODEBASE_FOR_AUDIT.txt
+bundle_code.js
