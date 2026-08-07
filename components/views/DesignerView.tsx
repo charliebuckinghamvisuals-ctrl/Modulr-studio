@@ -12,6 +12,9 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [savedDesigns, setSavedDesigns] = useState<Project[]>([]);
   const [designsOpen, setDesignsOpen] = useState(false);
+  // The configurator bundle is ~2MB; on a cold connection the iframe sat as a
+  // near-black empty box with no feedback, which testers read as "broken".
+  const [configLoaded, setConfigLoaded] = useState(false);
 
   /** Projects that carry a configurator scene — the loadable ones. */
   const refreshDesigns = async () => {
@@ -163,9 +166,17 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
           )}
         </div>
       )}
+      {!configLoaded && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-[#f8fafc]">
+          <div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-semibold text-accent">Loading 3D Configurator…</p>
+          <p className="text-xs text-slate-400">First load can take a few seconds</p>
+        </div>
+      )}
       <iframe
         ref={iframeRef}
         src="/3d-config/index.html"
+        onLoad={() => setConfigLoaded(true)}
         className="w-full flex-1 border-none"
         title="3D Configurator"
       />
