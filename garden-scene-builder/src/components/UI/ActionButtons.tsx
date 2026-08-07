@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DoorOpen, DoorClosed, FileText, Sparkles } from 'lucide-react';
+import { DoorOpen, DoorClosed, FileText } from 'lucide-react';
 import { useStore } from '../../store';
 import { ExportPDFModal } from './ExportPDFModal';
 
@@ -11,7 +11,11 @@ export function ActionButtons() {
     const canvas = document.querySelector('canvas');
     if (canvas) {
       const dataUrl = canvas.toDataURL('image/png');
-      window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl }, '*');
+      // The scene spec rides along with the screenshot so the AI renders the
+      // CONFIGURED building (exact door/window counts, styles, cladding)
+      // instead of guessing from pixels.
+      const { room } = useStore.getState().scene;
+      window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl, roomSpec: room }, window.location.origin);
     }
   };
 
@@ -19,12 +23,11 @@ export function ActionButtons() {
     <>
       {(viewMode === '3d' || viewMode === 'walking') && !isExporting && (
         <div className="absolute bottom-6 right-8 z-30 flex flex-col md:flex-row gap-3 items-center">
-          <button 
+          <button
             onClick={handleRenderInModulr}
-            className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white px-7 py-3 rounded-full font-bold shadow-xl hover:from-emerald-500 hover:to-teal-500 hover:scale-105 transition-all flex items-center gap-2 text-sm uppercase tracking-wider border border-emerald-400/30 cursor-pointer"
+            className="bg-[#3b4d4a] text-white px-7 py-3 rounded-full font-bold shadow-xl hover:bg-[#2d3a38] hover:scale-105 transition-all flex items-center gap-2 text-sm uppercase tracking-wider cursor-pointer"
           >
-            <Sparkles size={18} className="text-emerald-200 animate-spin-slow" />
-            Render in Modulr
+            Send to Render Engine
           </button>
           <button 
             onClick={() => setShowExportModal(true)}

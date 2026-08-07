@@ -65,14 +65,41 @@ service cloud.firestore {
         return request.auth != null && resource.data.ownerUid == request.auth.uid;
       }
 
+      /**
+       * Projects is a Business feature, and this is where that is enforced.
+       *
+       * The browser writes projects to Firestore directly, so hiding the button
+       * is decoration - anyone with the public Firebase config and devtools can
+       * call addDoc themselves and run up the storage bill on a free account.
+       *
+       * `projectsEnabled` is written ONLY by the server (the client may write
+       * exactly materialLibrary and branding on users/{uid}, see above), which
+       * is what makes it safe to trust here. It is a separate flag rather than a
+       * plan check because master and tester entitlement lives in environment
+       * variables that rules cannot see - the server resolves all three cases to
+       * this one boolean.
+       */
+      function hasProjectAccess() {
+        // Bound with let so this is ONE document read per write, not two. The
+        // null check short-circuits, so a user with no document yet - a brand
+        // new account - is refused rather than erroring.
+        let account = get(/databases/$(database)/documents/users/$(request.auth.uid));
+        return account != null && account.data.projectsEnabled == true;
+      }
+
+      // Read and delete stay open to the owner regardless of plan. A lapsed
+      // subscriber must still be able to see their client list and take their
+      // data out; revocation stops new work, it does not hold the old hostage.
       allow read, delete: if isOwner();
 
       allow create: if request.auth != null
-                    && request.resource.data.ownerUid == request.auth.uid;
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && hasProjectAccess();
 
       // ownerUid must survive every update unchanged.
       allow update: if isOwner()
-                    && request.resource.data.ownerUid == resource.data.ownerUid;
+                    && request.resource.data.ownerUid == resource.data.ownerUid
+                    && hasProjectAccess();
     }
 
     // Share links — created and revoked by the server only. A client that could

@@ -72,7 +72,7 @@ export const StartupLoader: React.FC<StartupLoaderProps> = ({ onFinish }) => {
                         <span className="text-[10px] font-bold tracking-widest uppercase text-secondary">
                             Initializing Engine
                         </span>
-                        <span className="text-sm font-black tracking-tighter text-primary">
+                        <span className="text-sm font-bold tracking-tighter text-primary">
                             {progress}%
                         </span>
                     </div>

@@ -22,6 +22,7 @@ const DESKTOP_ONLY_STAGES = new Set([
   AppStage.STUDIO,
   AppStage.UPLOAD,
   AppStage.WEATHER_LAB,
+  AppStage.ANIMATION_STUDIO,
 ]);
 
 // ─── Desktop-Only Screen shown on mobile for tool pages ───────────────────────
@@ -30,7 +31,7 @@ const DesktopOnlyScreen: React.FC<{ onNavigate: (stage: AppStage) => void }> = (
     <div className="w-24 h-24 rounded-3xl bg-accent/10 border border-accent/20 flex items-center justify-center mb-8 shadow-xl">
       <Monitor size={40} className="text-accent" />
     </div>
-    <h1 className="text-2xl font-black text-accent tracking-tight mb-3 leading-tight">
+    <h1 className="text-2xl font-bold text-accent tracking-tight mb-3 leading-tight">
       Desktop Required
     </h1>
     <p className="text-sm text-secondary leading-relaxed mb-8 max-w-xs">
@@ -41,7 +42,7 @@ const DesktopOnlyScreen: React.FC<{ onNavigate: (stage: AppStage) => void }> = (
       Mobile version coming soon
     </div>
     <div className="w-full max-w-xs bg-white rounded-2xl border border-border shadow-sm p-5 text-left mb-8">
-      <p className="text-[10px] font-black text-accent/60 uppercase tracking-widest mb-4">Available on mobile now</p>
+      <p className="text-[10px] font-bold text-accent/60 uppercase tracking-widest mb-4">Available on mobile now</p>
       <div className="space-y-3">
         {[
           { label: 'Browse the Homepage', stage: AppStage.HOME },
@@ -94,6 +95,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     { id: AppStage.LINE_CONVERT, label: 'Line Converter' },
     { id: AppStage.WEATHER_LAB, label: 'Weather Lab' },
     { id: AppStage.MATERIAL_STUDIO, label: 'Material Studio' },
+    { id: AppStage.ANIMATION_STUDIO, label: 'Animation Studio' },
   ];
 
   // Top-level header items, in display order. Tools is injected between Home
@@ -106,6 +108,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
   const navItemsAfterTools = [
     { id: AppStage.WHY, label: 'Why Modulr' },
     { id: AppStage.GALLERY, label: 'Gallery' },
+    { id: AppStage.ANIMATIONS, label: 'Animations' },
     { id: AppStage.GUIDE, label: 'Guide' },
     { id: AppStage.ABOUT, label: 'About' },
     { id: AppStage.PRICING, label: 'Pricing' },
@@ -123,6 +126,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     { id: AppStage.PRICING, label: 'Pricing' },
     { id: AppStage.GUIDE, label: 'Guide' },
     { id: AppStage.GALLERY, label: 'Gallery' },
+    { id: AppStage.ANIMATIONS, label: 'Animations' },
     { id: AppStage.ABOUT, label: 'About' },
     ...(user
       ? [{ id: AppStage.ACCOUNT, label: 'Account' }]
@@ -153,7 +157,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 whitespace-nowrap ${activeStage === item.id ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
+              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 hover:scale-105 whitespace-nowrap ${activeStage === item.id ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
             >
               {item.label}
             </button>
@@ -165,7 +169,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
             onMouseLeave={() => setIsToolsDropdownOpen(false)}
           >
             <button
-              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 ${toolItems.some(item => activeStage === item.id) ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
+              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 hover:scale-105 ${toolItems.some(item => activeStage === item.id) ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
             >
               <Layers size={16} />
               <span>Tools</span>
@@ -203,7 +207,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 whitespace-nowrap ${activeStage === item.id ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
+              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 hover:scale-105 whitespace-nowrap ${activeStage === item.id ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
             >
               {item.label}
             </button>
@@ -215,31 +219,31 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           {/* Credit Badge - desktop */}
           {user && !creditsLoading && plan === 'free' && rendersLeft !== null && rendersPerDay !== null && (
             <div
-              className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 mr-2 cursor-pointer hover:bg-white/20 transition-all"
+              className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 mr-2 cursor-pointer hover:bg-white/20 hover:scale-105 transition-all"
               onClick={() => onNavigate(AppStage.PRICING)}
               title={`Free Trial - ${trialDaysLeft} day(s) remaining`}
             >
               <span className={`w-2 h-2 rounded-full shrink-0 ${rendersLeft === 0 ? 'bg-red-400' : rendersLeft === 1 ? 'bg-amber-400' : 'bg-green-400'}`} />
-              <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+              <span className="text-[10px] font-bold uppercase tracking-widest leading-none">
                 {rendersLeft}<span className="opacity-50">/{rendersPerDay}</span> <span className="opacity-60">Renders Today</span>
               </span>
             </div>
           )}
           {user && !creditsLoading && plan !== 'free' && credits !== null && (
             <div
-              className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 mr-2 cursor-pointer hover:bg-white/20 transition-all"
+              className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 mr-2 cursor-pointer hover:bg-white/20 hover:scale-105 transition-all"
               onClick={() => onNavigate(AppStage.ACCOUNT)}
             >
               <Coins size={14} className="text-yellow-400" />
               {typeof credits === 'number' ? (
-                <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                <span className="text-[10px] font-bold uppercase tracking-widest leading-none">
                   {credits.toLocaleString()} <span className="opacity-60">Credits</span>
                 </span>
               ) : (
                 // Unlimited: the symbol carries the meaning on its own, and the
                 // two-line "UNLIMITED CREDITS" pill was the widest thing in an
                 // already-crowded header.
-                <span className="text-sm font-black leading-none" title="Unlimited credits" aria-label="Unlimited credits">∞</span>
+                <span className="text-sm font-bold leading-none" title="Unlimited credits" aria-label="Unlimited credits">∞</span>
               )}
             </div>
           )}
@@ -248,7 +252,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           {user ? (
             <button
               onClick={() => onNavigate(AppStage.ACCOUNT)}
-              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap hidden lg:flex ${activeStage === AppStage.ACCOUNT ? 'bg-accent text-white' : 'text-slate-900 bg-white/80 hover:bg-white'}`}
+              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 hover:scale-105 relative overflow-hidden whitespace-nowrap hidden lg:flex ${activeStage === AppStage.ACCOUNT ? 'bg-accent text-white' : 'text-slate-900 bg-white/80 hover:bg-white'}`}
             >
               <Settings size={16} />
               <span className="relative z-10 whitespace-nowrap font-bold">{user.displayName || 'Account'}</span>
@@ -256,7 +260,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           ) : (
             <button
               onClick={() => onNavigate(AppStage.AUTH)}
-              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 relative overflow-hidden whitespace-nowrap hidden lg:flex ${activeStage === AppStage.AUTH ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
+              className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 hover:scale-105 relative overflow-hidden whitespace-nowrap hidden lg:flex ${activeStage === AppStage.AUTH ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
             >
               <User size={16} />
               <span className="relative z-10 whitespace-nowrap underline underline-offset-4 decoration-white/20">Sign In</span>
@@ -268,7 +272,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           {onReset && activeStage !== AppStage.HOME && activeStage !== AppStage.PRICING && activeStage !== AppStage.ABOUT && activeStage !== AppStage.GALLERY && (
             <button
               onClick={onReset}
-              className="group hidden lg:flex items-center gap-2 text-sm text-white/80 hover:text-white transition-colors ml-2"
+              className="group hidden lg:flex items-center gap-2 text-sm text-white/80 hover:text-white transition-all duration-300 hover:scale-105 ml-2"
             >
               <span className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center group-hover:border-white/50 group-hover:bg-white/20 transition-all">
                 <Sparkles size={14} />
@@ -287,6 +291,21 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           </button>
         </div>
       </header>
+
+      {/* ── Mobile Floating Menu Button ──
+          The header is sticky, but on long pages a reader deep in the content
+          reported having to scroll back to the top for the menu. This button
+          is fixed to the viewport, so navigation is one thumb-tap away from
+          anywhere. Hidden while the drawer is open so it never overlaps it. */}
+      {!isMobileMenuOpen && (
+        <button
+          className="lg:hidden fixed bottom-5 right-5 z-[70] w-12 h-12 rounded-full bg-accent text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] border border-white/20 flex items-center justify-center active:scale-95 transition-transform"
+          onClick={() => setIsMobileMenuOpen(true)}
+          aria-label="Open navigation menu"
+        >
+          <Menu size={20} />
+        </button>
+      )}
 
       {/* ── Mobile Drawer Backdrop ── */}
       <div
@@ -310,7 +329,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
         {/* User Info */}
         {user && (
           <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
-            <p className="text-[10px] font-black uppercase tracking-widest text-secondary mb-0.5">Signed in as</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-secondary mb-0.5">Signed in as</p>
             <p className="text-sm font-bold text-accent truncate">{user.displayName || user.email}</p>
             <p className="text-[10px] text-secondary mt-0.5 font-medium capitalize">{plan || 'Free'} Plan</p>
           </div>
@@ -333,7 +352,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
 
           {/* Desktop-only tools section */}
           <div className="pt-5 pb-2 px-2">
-            <p className="text-[9px] font-black text-secondary/50 uppercase tracking-[0.2em]">Studio Tools - Desktop Only</p>
+            <p className="text-[9px] font-bold text-secondary/50 uppercase tracking-[0.2em]">Studio Tools - Desktop Only</p>
           </div>
           {toolItems.map(item => (
             <button
@@ -352,7 +371,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
                 {item.label}
                 {item.comingSoon && <span className="text-[8px] font-bold uppercase tracking-wider bg-[#405a56]/10 text-[#405a56] px-1.5 py-0.5 rounded-full ml-2">Soon</span>}
               </span>
-              <span className="ml-auto text-[9px] font-black uppercase bg-slate-100 text-secondary/50 px-2 py-0.5 rounded-full tracking-widest whitespace-nowrap">Desktop</span>
+              <span className="ml-auto text-[9px] font-bold uppercase bg-slate-100 text-secondary/50 px-2 py-0.5 rounded-full tracking-widest whitespace-nowrap">Desktop</span>
             </button>
           ))}
         </nav>

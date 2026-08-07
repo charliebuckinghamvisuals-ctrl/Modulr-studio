@@ -185,7 +185,7 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                         />
                     </div>
 
-                    <h1 className="text-4xl md:text-6xl font-black tracking-tight text-slate-800 mb-4 leading-none">
+                    <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-slate-800 mb-4 leading-none">
                         MODULR <span className="bg-gradient-to-r from-[#405a56] via-[#5c7b77] to-[#405a56] bg-clip-text text-transparent">STUDIO</span>
                     </h1>
 
@@ -273,7 +273,7 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                                 <ShieldCheck size={14} />
                                 Restricted Master Login
                             </div>
-                            <h2 className="text-2xl font-black text-slate-800 tracking-tight">
+                            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
                                 {mode === 'signup' ? 'Create Master Account' : 'Master Account Access'}
                             </h2>
                             <p className="text-xs text-slate-500">

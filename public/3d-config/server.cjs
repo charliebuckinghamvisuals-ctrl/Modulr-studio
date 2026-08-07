@@ -34,6 +34,44 @@ async function startServer() {
   const app = (0, import_express.default)();
   const PORT = 3e3;
   app.use(import_express.default.json({ limit: "50mb" }));
+  const GARDEN_API_TOKEN = process.env.GARDEN_API_TOKEN;
+  const isProduction = process.env.NODE_ENV === "production";
+  if (!GARDEN_API_TOKEN) {
+    console.warn(
+      "[garden-scene-builder] GARDEN_API_TOKEN is not set. AI endpoints are DISABLED. Set GARDEN_API_TOKEN to enable them."
+    );
+  }
+  app.use("/api", (req, res, next) => {
+    if (!GARDEN_API_TOKEN) {
+      return res.status(503).json({ error: "AI endpoints are not configured on this server." });
+    }
+    const header = req.headers.authorization || "";
+    const provided = header.startsWith("Bearer ") ? header.slice(7) : "";
+    if (provided !== GARDEN_API_TOKEN) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    next();
+  });
+  const apiHits = /* @__PURE__ */ new Map();
+  const WINDOW_MS = 6e4;
+  const MAX_PER_WINDOW = 10;
+  app.use("/api", (req, res, next) => {
+    const key = req.ip || "unknown";
+    const now = Date.now();
+    const entry = apiHits.get(key);
+    if (!entry || now > entry.resetAt) {
+      apiHits.set(key, { count: 1, resetAt: now + WINDOW_MS });
+      return next();
+    }
+    if (entry.count >= MAX_PER_WINDOW) {
+      return res.status(429).json({ error: "Too many requests. Please wait a minute." });
+    }
+    entry.count++;
+    next();
+  });
+  if (isProduction && !GARDEN_API_TOKEN) {
+    console.error("[garden-scene-builder] Refusing to expose unauthenticated AI endpoints in production.");
+  }
   app.post("/api/generate-environment", async (req, res) => {
     try {
       const { prompt, image } = req.body;

@@ -15,10 +15,10 @@ import { DraftingBackground } from '../DraftingBackground';
  * text-base and text-lg interchangeably, which reads as inconsistency.
  */
 const TYPE = {
-    eyebrow: 'text-[11px] font-black uppercase tracking-[0.25em] text-accent',
+    eyebrow: 'text-[11px] font-bold uppercase tracking-[0.25em] text-accent',
     h1: 'text-5xl md:text-6xl lg:text-7xl font-bold text-accent tracking-tight leading-[1.05]',
     h2: 'text-3xl md:text-4xl lg:text-5xl font-bold text-accent tracking-tight leading-[1.1]',
-    h3: 'text-xl md:text-2xl font-extrabold text-accent tracking-tight',
+    h3: 'text-xl md:text-2xl font-bold text-accent tracking-tight',
     h4: 'text-lg font-bold text-primary',
     lead: 'text-lg md:text-xl text-secondary leading-relaxed',
     body: 'text-base md:text-lg text-secondary leading-relaxed',
@@ -162,7 +162,7 @@ export const AboutView: React.FC = () => {
                                 { figure: 'UK', label: 'Built for our planning system' },
                             ].map(stat => (
                                 <div key={stat.label} className={`${CARD} p-5 md:p-6`}>
-                                    <div className="text-2xl md:text-3xl font-black text-accent tracking-tight">{stat.figure}</div>
+                                    <div className="text-2xl md:text-3xl font-bold text-accent tracking-tight">{stat.figure}</div>
                                     <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-secondary mt-1.5 leading-snug">
                                         {stat.label}
                                     </div>
@@ -268,7 +268,7 @@ export const AboutView: React.FC = () => {
                                         )}
                                     </div>
                                     <div className="space-y-1.5">
-                                        <h3 className="text-lg font-extrabold text-accent tracking-tight">{tool.name}</h3>
+                                        <h3 className="text-lg font-bold text-accent tracking-tight">{tool.name}</h3>
                                         <p className="text-sm font-semibold text-primary leading-snug">{tool.tagline}</p>
                                     </div>
                                     <p className={TYPE.small}>{tool.body}</p>
@@ -350,7 +350,7 @@ export const AboutView: React.FC = () => {
                                     <div className="w-11 h-11 rounded-xl bg-accent/8 border border-accent/15 flex items-center justify-center text-accent shrink-0">
                                         <FileText size={18} />
                                     </div>
-                                    <h3 className="text-lg font-extrabold text-accent tracking-tight">Terms of Service</h3>
+                                    <h3 className="text-lg font-bold text-accent tracking-tight">Terms of Service</h3>
                                 </div>
                                 <div className="space-y-3 text-sm md:text-base text-secondary leading-relaxed">
                                     <p><strong className="text-primary">Eligibility.</strong> You must be 18 or older and acting on behalf of a legitimate business.</p>
@@ -369,7 +369,7 @@ export const AboutView: React.FC = () => {
                                     <div className="w-11 h-11 rounded-xl bg-accent/8 border border-accent/15 flex items-center justify-center text-accent shrink-0">
                                         <Lock size={18} />
                                     </div>
-                                    <h3 className="text-lg font-extrabold text-accent tracking-tight">Privacy Policy</h3>
+                                    <h3 className="text-lg font-bold text-accent tracking-tight">Privacy Policy</h3>
                                 </div>
                                 <div className="space-y-3 text-sm md:text-base text-secondary leading-relaxed">
                                     <p><strong className="text-primary">Controller.</strong> NAPC Ltd is the data controller for personal data collected through Modulr Studio (info@napc.uk).</p>
@@ -388,7 +388,7 @@ export const AboutView: React.FC = () => {
                                     <div className="w-11 h-11 rounded-xl bg-accent/8 border border-accent/15 flex items-center justify-center text-accent shrink-0">
                                         <ShieldCheck size={18} />
                                     </div>
-                                    <h3 className="text-lg font-extrabold text-accent tracking-tight">GDPR &amp; UK GDPR</h3>
+                                    <h3 className="text-lg font-bold text-accent tracking-tight">GDPR &amp; UK GDPR</h3>
                                 </div>
                                 <div className="space-y-3 text-sm md:text-base text-secondary leading-relaxed">
                                     <p><strong className="text-primary">Compliance.</strong> Operated in compliance with UK GDPR and the Data Protection Act 2018.</p>

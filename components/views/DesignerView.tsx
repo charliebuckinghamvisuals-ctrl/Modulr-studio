@@ -1,12 +1,45 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAppEngine, compressImageFile } from '../../hooks/useAppEngine';
-import { AppStage } from '../../types';
+import { AppStage, Project } from '../../types';
 import { useCredits } from '../../hooks/useCredits';
-import { Construction } from 'lucide-react';
+import { Construction, FolderOpen, ChevronDown } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { createProject } from '../../services/projectService';
+import { createProject, listProjects } from '../../services/projectService';
+import { setConfigSpec } from '../../services/geminiService';
 
 export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
+
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [savedDesigns, setSavedDesigns] = useState<Project[]>([]);
+  const [designsOpen, setDesignsOpen] = useState(false);
+
+  /** Projects that carry a configurator scene — the loadable ones. */
+  const refreshDesigns = async () => {
+    try {
+      const projects = await listProjects();
+      setSavedDesigns(projects.filter(p => !!p.scene3d));
+    } catch {
+      // Signed-out or projects unavailable: the picker just stays empty.
+      setSavedDesigns([]);
+    }
+  };
+
+  useEffect(() => { refreshDesigns(); }, []);
+
+  const loadDesign = (project: Project) => {
+    if (!project.scene3d) return;
+    try {
+      const room = JSON.parse(project.scene3d);
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'LOAD_3D_DESIGN', room },
+        window.location.origin
+      );
+      setDesignsOpen(false);
+      toast.success(`Loaded "${project.name}"`);
+    } catch {
+      toast.error('That saved design could not be read.');
+    }
+  };
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -25,9 +58,12 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
             await createProject({
               name,
               estimateValue: typeof price === 'number' ? Math.round(price) : null,
-              notes: `Created from the 3D Configurator.\n\n${JSON.stringify(scene?.room ?? {}, null, 2)}`,
+              notes: 'Created from the 3D Configurator.',
+              // The full room spec, restorable via the My Designs picker.
+              scene3d: JSON.stringify(room),
             });
             toast.success('Design saved to your projects');
+            refreshDesigns();
           } catch (err: any) {
             console.error('Failed to save 3D design', err);
             toast.error(err?.message || 'Could not save the design to your projects.');
@@ -38,23 +74,27 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
 
       if (event.data && event.data.type === 'RENDER_3D_SCENE') {
         const dataUrl = event.data.image;
-        
+        // Hard-constraint spec for the render prompt — the server turns this
+        // into "exactly N doors, style X, cladding Y" so the render matches
+        // the configured building instead of guessing from the screenshot.
+        setConfigSpec(event.data.roomSpec || null);
+
         // Convert dataUrl to a File object so the engine can process it properly
         fetch(dataUrl)
           .then(res => res.blob())
           .then(async blob => {
             const file = new File([blob], '3d-design.png', { type: 'image/png' });
-            
+
             try {
                 // Compress the image to strip the prefix and reduce size before sending to API
                 const base64Data = await compressImageFile(file, 1920);
-                
+
                 // Set it as if they uploaded a SketchUp image
                 engine.setIsSketchUpMode(true);
-                
+
                 // Manually set the original image directly
                 engine.setOriginalImageForStage(AppStage.RENDER_ENGINE, base64Data);
-                
+
                 // Switch to the Render Engine stage
                 engine.setActiveStage(AppStage.RENDER_ENGINE);
 
@@ -68,11 +108,11 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
     };
 
     window.addEventListener('message', handleMessage);
-    
+
     // Lock scroll on the main page when configurator is active
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
-    
+
     return () => {
       window.removeEventListener('message', handleMessage);
       document.body.style.overflow = 'auto';
@@ -91,9 +131,41 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
   }
 
   return (
-    <div className="w-full h-[calc(100dvh-6rem)] flex flex-col bg-[#0F1110]">
-      <iframe 
-        src="/3d-config/index.html" 
+    <div className="w-full h-[calc(100dvh-6rem)] flex flex-col bg-[#0F1110] relative">
+      {/* My Designs — floats over the configurator's top bar so saved scenes
+          are one click away without stealing vertical space from the canvas. */}
+      {savedDesigns.length > 0 && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20">
+          <button
+            onClick={() => setDesignsOpen(o => !o)}
+            className="flex items-center gap-2 bg-white/95 backdrop-blur-md border border-black/10 shadow-lg rounded-full px-4 py-2 text-xs font-bold text-[#3b4d4a] hover:bg-white transition-colors"
+          >
+            <FolderOpen size={14} />
+            My Designs ({savedDesigns.length})
+            <ChevronDown size={14} className={`transition-transform ${designsOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {designsOpen && (
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-72 bg-white rounded-2xl shadow-2xl border border-black/5 p-1.5 max-h-72 overflow-y-auto">
+              {savedDesigns.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => loadDesign(p)}
+                  className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors"
+                >
+                  <span className="block text-xs font-bold text-[#3b4d4a] truncate">{p.name}</span>
+                  <span className="block text-[10px] text-slate-400">
+                    {p.estimateValue ? `£${p.estimateValue.toLocaleString()} · ` : ''}
+                    {new Date(p.updatedAt).toLocaleDateString()}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <iframe
+        ref={iframeRef}
+        src="/3d-config/index.html"
         className="w-full flex-1 border-none"
         title="3D Configurator"
       />

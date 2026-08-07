@@ -7,7 +7,11 @@ export const GalleryView: React.FC = () => {
     // 12 is deliberately excluded: it already appears below as a before/after
     // pair, so listing it here as well showed the same render twice.
     const renderItems = [
-        ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((id) => ({
+        // Newest work leads the grid. This is the same render that now opens the
+        // homepage, so a visitor arriving from there sees it again first.
+        { id: 'sauna-hero', image: '/sauna-hero.jpg' },
+        // 3 removed at Charlie's request (7 Aug 2026) — image retired site-wide.
+        ...[1, 2, 4, 5, 6, 7, 8, 9, 10, 11].map((id) => ({
             id: `gallery-${id}`,
             image: `/gallery-${id}.jpg`,
         })),
@@ -24,6 +28,9 @@ export const GalleryView: React.FC = () => {
      * and a square tile rather than being forced into the landscape render grid.
      */
     const materialItems = [
+        // Pairs with the sauna render leading the section above - the same
+        // building, shown at macro.
+        '/sauna-materials.jpg',
         '/MaterialStudio-1782396007318.jpg',
         '/MaterialStudio-1780410234937.jpg',
         '/MaterialStudio-1778843455110.jpg',
@@ -69,13 +76,6 @@ export const GalleryView: React.FC = () => {
                             A curated selection of photorealistic 4K renders, technical line drawings, and before/after transformations-all created using Modulr Studio.
                         </p>
                         
-                        <div className="mt-12 flex justify-center">
-                            <div className="px-8 py-6 rounded-[2.5rem] bg-accent/5 border border-accent/10 backdrop-blur-md max-w-3xl shadow-sm hover:shadow-md transition-all duration-500">
-                                <p className="text-lg md:text-xl font-bold text-accent tracking-tight leading-relaxed">
-                                    Want to see your own projects featured here? Send us your Modulr Studio designs and be showcased with your business name in our official gallery.
-                                </p>
-                            </div>
-                        </div>
                     </div>
 
                     {/* Section 1: Sliders */}

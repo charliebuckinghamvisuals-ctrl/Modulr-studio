@@ -18,7 +18,7 @@ import {
     deleteObject,
 } from 'firebase/storage';
 import { db, storage, auth } from './firebase';
-import { Project, ProjectDraft, ProjectAsset, ProjectAssetKind } from '../types';
+import { Project, ProjectDraft, ProjectAsset, ProjectAssetKind, ProjectStatus } from '../types';
 
 const PROJECTS = 'projects';
 
@@ -59,25 +59,48 @@ const emptyDraft = (): ProjectDraft => ({
     address: '',
     estimateValue: null,
     status: 'lead',
+    quotedAt: null,
+    wonAt: null,
     notes: '',
+    scene3d: null,
 });
+
+const toMillis = (v: any): number | null =>
+    v?.toMillis?.() ?? (typeof v === 'number' ? v : null);
 
 /** Normalise a Firestore document into a Project, tolerating older records
  *  written before a field existed. */
-const toProject = (id: string, data: any): Project => ({
-    id,
-    ownerUid: data.ownerUid,
-    name: data.name || 'Untitled project',
-    clientName: data.clientName || '',
-    clientEmail: data.clientEmail || '',
-    address: data.address || '',
-    estimateValue: typeof data.estimateValue === 'number' ? data.estimateValue : null,
-    status: data.status || 'lead',
-    notes: data.notes || '',
-    assets: Array.isArray(data.assets) ? data.assets : [],
-    createdAt: data.createdAt?.toMillis?.() ?? data.createdAt ?? Date.now(),
-    updatedAt: data.updatedAt?.toMillis?.() ?? data.updatedAt ?? Date.now(),
-});
+const toProject = (id: string, data: any): Project => {
+    const createdAt = toMillis(data.createdAt) ?? Date.now();
+    const status: ProjectStatus = data.status || 'lead';
+
+    /* Projects saved before quote dates existed carry none. Rather than drop
+     * them out of every total, they fall back to their creation date - which is
+     * the closest thing to a quote date the record has. The fallback lives here
+     * so the dashboard never has to know about the old shape. */
+    const quotedAt = toMillis(data.quotedAt) ?? (status === 'lead' ? null : createdAt);
+    const wonAt =
+        toMillis(data.wonAt) ??
+        (status === 'won' || status === 'complete' ? quotedAt ?? createdAt : null);
+
+    return {
+        id,
+        ownerUid: data.ownerUid,
+        name: data.name || 'Untitled project',
+        clientName: data.clientName || '',
+        clientEmail: data.clientEmail || '',
+        address: data.address || '',
+        estimateValue: typeof data.estimateValue === 'number' ? data.estimateValue : null,
+        status,
+        quotedAt,
+        wonAt,
+        notes: data.notes || '',
+        scene3d: typeof data.scene3d === 'string' ? data.scene3d : null,
+        assets: Array.isArray(data.assets) ? data.assets : [],
+        createdAt,
+        updatedAt: toMillis(data.updatedAt) ?? Date.now(),
+    };
+};
 
 export const listProjects = async (): Promise<Project[]> => {
     const uid = requireUid();

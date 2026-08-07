@@ -178,6 +178,18 @@ export const analyzeBatchMaterials = async (base64Images: string[]): Promise<Arr
 /**
  * Renders the building with specific materials.
  */
+/**
+ * The 3D configurator's scene spec, when the current source image came from
+ * "Send to Render Engine". Rides along with every render request so the
+ * server can write hard constraints (exact door/window counts, styles,
+ * cladding, roof) into the prompt instead of letting the model guess from
+ * the screenshot. Cleared whenever the user uploads their own image.
+ */
+let currentConfigSpec: Record<string, unknown> | null = null;
+export const setConfigSpec = (spec: Record<string, unknown> | null) => {
+    currentConfigSpec = spec;
+};
+
 export const renderBuilding = async (
   base64Image: string,
   materials: MaterialConfig,
@@ -196,7 +208,7 @@ export const renderBuilding = async (
     const response = await fetch(`${API_BASE_URL}/renderBuilding`, {
       method: 'POST',
       headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground, isBatchSequence, seed })
+      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground, isBatchSequence, seed, configSpec: currentConfigSpec || undefined })
     });
 
     if (!response.ok) {

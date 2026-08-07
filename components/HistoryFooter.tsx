@@ -117,7 +117,9 @@ export const HistoryFooter: React.FC<HistoryFooterProps> = ({ currentStage, onLo
     return (
         <div className="w-full mt-6 bg-surface/40 border-t border-border rounded-b-3xl p-4 animate-in slide-in-from-bottom-5 duration-500">
             <div className="flex items-center justify-between mb-3 px-2">
-                <h3 className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
+                {/* text-white was a dark-theme leftover — invisible on the light
+                    surface this strip now sits on. */}
+                <h3 className="text-sm font-bold tracking-tight text-accent flex items-center gap-2">
                     <Clock size={16} className="text-accent" /> Recent Iterations ({history.length})
                 </h3>
                 <button onClick={handleClear} className="text-xs text-secondary hover:text-red-400 transition-colors flex items-center gap-1">
@@ -129,7 +131,7 @@ export const HistoryFooter: React.FC<HistoryFooterProps> = ({ currentStage, onLo
                 {history.map((item) => (
                     <div
                         key={item.id}
-                        className="flex-shrink-0 w-48 group relative bg-surface-highlight rounded-xl border border-white/5 overflow-hidden shadow-lg hover:border-accent/40 transition-all duration-300 cursor-pointer"
+                        className="flex-shrink-0 w-48 group relative bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:border-accent/40 transition-all duration-300 cursor-pointer"
                         onClick={() => onLoadHistoryItem(item)}
                     >
                         <div className="aspect-video relative overflow-hidden bg-black">

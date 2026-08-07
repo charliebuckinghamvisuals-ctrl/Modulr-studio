@@ -20,9 +20,30 @@ service firebase.storage {
         return request.auth != null && request.auth.uid == uid;
       }
 
+      /**
+       * Projects is a Business feature. Firestore rules gate the project
+       * documents; without the same gate here an unentitled account could still
+       * upload files to its own prefix and run up the storage bill, simply by
+       * never creating the document that would have been refused.
+       *
+       * `projectsEnabled` is server-written only — see the users/{uid} rules in
+       * firestore.rules for why the client cannot set it.
+       */
+      // A single get(), not exists() + get(): Storage rules may touch at most two
+      // Firestore documents per evaluation, and there is no reason to spend both
+      // on the same one. An account with no document yet makes this error, which
+      // denies the write - the outcome we want for a brand new account anyway.
+      function hasProjectAccess() {
+        return firestore.get(/databases/(default)/documents/users/$(request.auth.uid))
+                 .data.projectsEnabled == true;
+      }
+
       // Only the owner reads directly. Clients viewing a shared project never
       // hit Storage with these rules — the server issues time-limited signed
       // URLs for that, so revoking a share actually revokes file access too.
+      //
+      // Read is not plan-gated: a lapsed subscriber can still retrieve the files
+      // they already uploaded.
       allow read: if isOwner();
 
       // Size and type are enforced here as well as in the client, because the
@@ -30,6 +51,7 @@ service firebase.storage {
       // anyone with the public Firebase config could upload arbitrary files of
       // arbitrary size to their own prefix and run up the storage bill.
       allow write: if isOwner()
+                   && hasProjectAccess()
                    && request.resource.size < 25 * 1024 * 1024
                    && (
                         request.resource.contentType.matches('image/(png|jpeg|webp)')

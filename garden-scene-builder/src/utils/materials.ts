@@ -31,6 +31,8 @@ export const MATERIAL_DEF = {
   // timber base produces mud rather than grey.
   composite_cedar: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.75, color: '#b0764b' },
   composite_oak: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.75, color: '#c9a173' },
+  composite_light_oak: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.75, color: '#dcc09a' },
+  composite_white: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.72, color: '#e8e6e1', neutral: true },
   composite_brown: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.8, color: '#8b6b55' },
   composite_black: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.8, color: '#1f2123', neutral: true },
   composite_dark_grey: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.78, color: '#4a5057', neutral: true },
@@ -54,16 +56,23 @@ export const MATERIAL_DEF = {
   // brown wood base produces mud rather than the intended colour.
   cedar_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.65, color: '#b0764b' },
   oak_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.65, color: '#c9a173' },
+  light_oak_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.62, color: '#dcc09a' },
   black_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.7, color: '#1f2123', neutral: true },
   dark_grey_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.68, color: '#4a5057', neutral: true },
   light_grey_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.62, color: '#a9aeb2', neutral: true },
+  // Off-white rather than pure #fff: the colour multiplies the neutral board
+  // map, and pure white leaves no headroom so the groove shading washes out.
+  white_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.6, color: '#e8e6e1', neutral: true },
   // Kept so existing saved scenes referencing grey_composite still resolve.
   grey_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.65, color: '#767c84', neutral: true },
   slate_blue_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.62, color: '#7c93a6', neutral: true },
   sage_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.64, color: '#7e8c74', neutral: true },
   clay_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.66, color: '#9a6b58', neutral: true },
-  cedar_cladding: { prefix: 'Cedar Timber Cladding', tileSize: 2.0, roughness: 1.0, color: '#ffffff', ext: 'png', singleMap: true },
-  oak_cladding: { prefix: 'Oak timber cladding', tileSize: 2.0, roughness: 1.0, color: '#ffffff', ext: 'png', singleMap: true },
+  // Legacy keys from old saved scenes. Their original PNG textures no longer
+  // exist in public/textures — pointing at the missing files faulted useTexture
+  // and blanked the whole scene, so they resolve to the composite equivalents.
+  cedar_cladding: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.65, color: '#b0764b' },
+  oak_cladding: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.65, color: '#c9a173' },
   default: { prefix: 'larch', tileSize: 2.0, roughness: 1.0, color: '#ffffff' }
 };
 
@@ -79,6 +88,8 @@ export const MATERIAL_DEF = {
 export const CLADDING_TO_DECKING: Record<string, string> = {
   cedar_composite: 'composite_cedar',
   oak_composite: 'composite_oak',
+  light_oak_composite: 'composite_light_oak',
+  white_composite: 'composite_white',
   black_composite: 'composite_black',
   dark_grey_composite: 'composite_dark_grey',
   light_grey_composite: 'composite_grey',

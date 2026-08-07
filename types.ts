@@ -15,8 +15,18 @@ export enum AppStage {
   ACCOUNT = 'account',
   DESIGNER = 'designer',
   PROJECTS = 'projects',
+  ANIMATION_STUDIO = 'animation_studio',
+  /** Public showcase of finished animation clips — the moving Gallery. */
+  ANIMATIONS = 'animations',
   WHY = 'why'
 }
+
+/** Camera move for an animation. The wording each of these maps to lives on the
+ *  server so it cannot be edited from the browser. */
+export type AnimationPreset = 'push_in' | 'pan' | 'orbit' | 'still';
+
+/** Optional atmosphere layered on top of the camera move. */
+export type AnimationModifier = 'motion_blur' | 'breeze' | 'golden_hour' | 'people';
 
 export interface MaterialConfig {
   walls: string;
@@ -102,7 +112,21 @@ export interface Project {
   /** Estimate or agreed value, in pounds. */
   estimateValue: number | null;
   status: ProjectStatus;
+  /** When the quote went out to the client, in ms. Stamped automatically the
+   *  first time the project leaves Lead, and editable afterwards.
+   *
+   *  Deliberately not derived from createdAt: a job is usually logged as a lead
+   *  well before it is priced, so dating quotes by creation would push the money
+   *  into the wrong month on every report. */
+  quotedAt: number | null;
+  /** When the client accepted, in ms. Stamped when the status becomes Won or
+   *  Complete. A January quote won in March counts as March revenue. */
+  wonAt: number | null;
   notes: string;
+  /** JSON-serialised 3D configurator scene (the room spec), when this project
+   *  was saved from the configurator. Stored as a string so Firestore never
+   *  has to validate its nested shape, and parsed only on load. */
+  scene3d?: string | null;
   assets: ProjectAsset[];
   createdAt: number;
   updatedAt: number;
@@ -111,7 +135,8 @@ export interface Project {
 /** Fields a user may edit. Deliberately excludes ownerUid, id and timestamps. */
 export type ProjectDraft = Pick<
   Project,
-  'name' | 'clientName' | 'clientEmail' | 'address' | 'estimateValue' | 'status' | 'notes'
+  'name' | 'clientName' | 'clientEmail' | 'address' | 'estimateValue' | 'status'
+  | 'quotedAt' | 'wonAt' | 'notes' | 'scene3d'
 >;
 
 export interface HistoryItem {

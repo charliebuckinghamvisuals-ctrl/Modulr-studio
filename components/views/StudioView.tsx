@@ -117,6 +117,7 @@ export const StudioView: React.FC<StudioViewProps> = ({ engine, selectedBatchInd
             onFormatChange={engine.setDownloadFormat}
             downloadFormat={engine.downloadFormat}
             onInputClick={() => {}} // Inputs handled by slots
+            onReset={engine.clearWorkspace}
             isLoading={engine.activeStage === AppStage.STUDIO && engine.processing.isLoading}
             loadingMessage={engine.processing.message}
             userPlan={engine.userPlan}

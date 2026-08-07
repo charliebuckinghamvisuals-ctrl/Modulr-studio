@@ -119,8 +119,11 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       // Fetch Planning Advice from API
       let planningAdvice = '';
       try {
-        const totalFrontHeight = scene.room.heightMm + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
-        const totalBackHeight = (scene.room.backHeightMm ?? scene.room.heightMm) + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
+        // For Gable, heightMm is already the total height — adding base+roof
+        // again overstated the building by ~450mm in the planning advice.
+        const heightExtra = scene.room.shape === 'Gable' ? 0 : (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
+        const totalFrontHeight = scene.room.heightMm + heightExtra;
+        const totalBackHeight = (scene.room.backHeightMm ?? scene.room.heightMm) + heightExtra;
         
         const augmentedRoomDetails = {
            ...scene.room,
@@ -260,8 +263,10 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
         pdf.addImage(shot.dataUrl, 'PNG', cx, cy, w, h);
       };
 
-      const totalHeightFront = scene.room.heightMm + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
-      const totalHeightBack = (scene.room.backHeightMm ?? scene.room.heightMm) + (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
+      // Same Gable rule as the planning-advice block above: heightMm is total.
+      const pdfHeightExtra = scene.room.shape === 'Gable' ? 0 : (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
+      const totalHeightFront = scene.room.heightMm + pdfHeightExtra;
+      const totalHeightBack = (scene.room.backHeightMm ?? scene.room.heightMm) + pdfHeightExtra;
       const totalPrice = useStore.getState().calculatePrice();
       const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
@@ -360,15 +365,33 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       finY = specRow('Floor', titleCase(String(scene.room.interiorFloorType || 'Oak')), M, finY, colW);
 
       let openY = sectionTitle('Openings & Fixtures', p2y);
+      // The schedule lists the building's actual openings — doors, windows,
+      // skylights. It previously grouped scene.objects, which put the garden
+      // furniture (trees, sofas) under "Openings" and omitted every real door
+      // and window from the client's document.
+      const openings: { key: string; size: string }[] = [
+        ...(scene.room.doors || []).map(dr => ({
+          key: `${titleCase(String(dr.style || 'standard'))} Door (${dr.leaves} leaf)`,
+          size: `${dr.widthMm} x ${dr.heightMm} mm`,
+        })),
+        ...(scene.room.windows || []).map(wn => ({
+          key: `${titleCase(String(wn.style || 'standard'))} Window`,
+          size: `${wn.widthMm} x ${wn.heightMm} mm`,
+        })),
+        ...(scene.room.skylights || []).map(sk => ({
+          key: `${titleCase(String(sk.type))} Skylight`,
+          size: `${sk.widthMm} x ${sk.lengthMm} mm`,
+        })),
+      ];
       // Group identical items so a schedule reads "3 x Window" rather than
       // three near-identical lines.
-      const grouped = scene.objects.reduce((acc: Record<string, { count: number; width: number }>, o: any) => {
-        const key = titleCase(String(o.type));
-        if (!acc[key]) acc[key] = { count: 0, width: o.widthMm || 0 };
+      const grouped = openings.reduce((acc: Record<string, { count: number; size: string }>, o) => {
+        const key = `${o.key}|${o.size}`;
+        if (!acc[key]) acc[key] = { count: 0, size: o.size };
         acc[key].count += 1;
         return acc;
       }, {});
-      const entries = Object.entries(grouped);
+      const entries = Object.entries(grouped).map(([k, info]) => [k.split('|')[0], info] as [string, { count: number; size: string }]);
       if (entries.length === 0) {
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(8.5);
@@ -378,7 +401,7 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
         entries.slice(0, 14).forEach(([name, info]) => {
           openY = specRow(
             info.count > 1 ? `${name} (x${info.count})` : name,
-            info.width ? `${info.width} mm` : '-',
+            info.size || '-',
             rightX, openY, colW
           );
         });

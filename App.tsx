@@ -3,7 +3,9 @@ import { Zap, Grid, Layers, Sparkles, PenTool, Image as ImageIcon, Settings, His
 import { ToggleSwitch } from './components/ToggleSwitch';
 import { Toaster, toast } from 'react-hot-toast';
 import { AppShell } from './components/AppShell';
-import { StartupLoader } from './components/StartupLoader';
+// StartupLoader (the fake 2.5s percentage bar) is retired: the instant green
+// brand splash in index.html now covers loading, and it disappears the moment
+// the app is genuinely ready instead of after an artificial countdown.
 import { Button } from './components/Button';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { HistoryFooter } from './components/HistoryFooter';
@@ -20,7 +22,9 @@ import { PricingView } from './components/views/PricingView';
 import { AboutView } from './components/views/AboutView';
 import { GuideView } from './components/views/GuideView';
 import { GalleryView } from './components/views/GalleryView';
+import { AnimationsView } from './components/views/AnimationsView';
 import { ProjectsView } from './components/views/ProjectsView';
+import { AnimationStudioView } from './components/views/AnimationStudioView';
 import { WhyModulrView } from './components/views/WhyModulrView';
 import { AuthView } from './components/views/AuthView';
 import { AccountView } from './components/views/AccountView';
@@ -32,10 +36,9 @@ import { useCredits } from './hooks/useCredits';
 
 const App: React.FC = () => {
     const engine = useAppEngine();
-    const { isMaster } = useAuth();
+    const { isMaster, user } = useAuth();
     const { hasApiAccess } = useCredits();
     const [maskImage, setMaskImage] = React.useState<string | null>(null);
-    const [isAppLoaded, setIsAppLoaded] = React.useState(false);
     const [selectedBatchIndex, setSelectedBatchIndex] = React.useState(0);
     const [openCategoryDropdown, setOpenCategoryDropdown] = React.useState<string | null>(null);
     const [savingPresetKey, setSavingPresetKey] = React.useState<string | null>(null);
@@ -45,6 +48,13 @@ const App: React.FC = () => {
     React.useEffect(() => {
         setMaskImage(null);
     }, [engine.activeStage, engine.originalImage, engine.editorImage]);
+
+    // Views share one window scroll position, so without this a page opened
+    // after scrolling (e.g. the 3D Config, which then locks body overflow)
+    // appears anchored at the old scroll offset and renders cut off.
+    React.useEffect(() => {
+        window.scrollTo(0, 0);
+    }, [engine.activeStage]);
 
     const handleLoadHistory = (item: HistoryItem) => {
         engine.setActiveStage(item.stage);
@@ -82,6 +92,12 @@ const App: React.FC = () => {
                 if (item.settings?.detectedDetails) {
                     engine.setDetectedDetails(item.settings.detectedDetails);
                 }
+                break;
+            case AppStage.WEATHER_LAB:
+                // Weather Lab renders a HistoryFooter but had no restore case,
+                // so clicking a thumbnail wiped the canvas instead of loading it.
+                engine.setFinalImage(item.image);
+                if (item.settings?.condition) engine.setWeather(item.settings);
                 break;
         }
     };
@@ -123,7 +139,10 @@ const App: React.FC = () => {
                 />
             </div>
 
-            <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar mt-4">
+            {/* No flex-1/overflow here: inside the fixed-height sidebar a
+                flex-1 basis-0 child collapses to nothing, which silently hid
+                the whole material analyser. The sidebar itself scrolls. */}
+            <div className="space-y-4 pr-2 mt-4">
                 {engine.isBatchMode && (
                     <BatchSlotUploader 
                         batchImages={engine.batchImages}
@@ -137,13 +156,9 @@ const App: React.FC = () => {
                         <Layers size={14} className="text-secondary" />
                         Material Library
                     </label>
-                    <button 
-                        onClick={() => engine.setActiveStage(AppStage.ACCOUNT)}
-                        className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-secondary hover:text-accent px-2 py-1 rounded-md transition-all hover:bg-slate-50 border border-transparent hover:border-slate-100"
-                    >
-                        <Settings size={12} />
-                        Manage
-                    </button>
+                    {/* "Manage" navigated to the Account page, which no longer
+                        has any material-library UI — a button to nowhere.
+                        Removed until a library manager exists. */}
                 </div>
 
                 {Object.keys(engine.materials).filter(k => k !== 'orientation').map((key) => (
@@ -576,7 +591,7 @@ const App: React.FC = () => {
                             className="w-full"
                             onClick={() => engine.handleGenerateLineDrawing('image')}
                             icon={<PenTool size={16} />}
-                            disabled={!engine.lineSourceImage}
+                            disabled={!engine.lineSourceImage || engine.processing.isLoading}
                         >
                             Convert to Line Drawing
                         </Button>
@@ -619,7 +634,7 @@ const App: React.FC = () => {
                             className="w-full"
                             onClick={() => engine.handleGenerateLineDrawing('text')}
                             icon={<PenTool size={16} />}
-                            disabled={!engine.lineDrawingPrompt.trim()}
+                            disabled={!engine.lineDrawingPrompt.trim() || engine.processing.isLoading}
                         >
                             Generate from Description
                         </Button>
@@ -809,12 +824,20 @@ const App: React.FC = () => {
                 <DesignerView engine={engine} />
             )}
 
+            {engine.activeStage === AppStage.ANIMATIONS && (
+                <AnimationsView />
+            )}
+
             {engine.activeStage === AppStage.GALLERY && (
                 <GalleryView />
             )}
 
             {engine.activeStage === AppStage.PROJECTS && (
-                <ProjectsView />
+                <ProjectsView onNavigate={engine.setActiveStage} />
+            )}
+
+            {engine.activeStage === AppStage.ANIMATION_STUDIO && (
+                <AnimationStudioView onNavigate={engine.setActiveStage} />
             )}
 
             {engine.activeStage === AppStage.WHY && (
@@ -883,6 +906,7 @@ const App: React.FC = () => {
                     onFormatChange={engine.setDownloadFormat}
                     downloadFormat={engine.downloadFormat}
                     onInputClick={engine.isBatchMode ? undefined : () => engine.fileInputRef.current?.click()}
+                    onReset={engine.clearWorkspace}
                     isLoading={engine.activeStage === AppStage.RENDER_ENGINE && engine.processing.isLoading}
                     loadingMessage={engine.processing.message}
                     customEmptyState={engine.activeStage === AppStage.RENDER_ENGINE && !engine.originalImage && !engine.isBatchMode ? renderEngineEmptyState : undefined}
@@ -911,6 +935,7 @@ const App: React.FC = () => {
                     onFormatChange={engine.setDownloadFormat}
                     downloadFormat={engine.downloadFormat}
                     onInputClick={() => engine.fileInputRef.current?.click()}
+                    onReset={engine.clearWorkspace}
                     isLoading={engine.activeStage === AppStage.WEATHER_LAB && engine.processing.isLoading}
                     loadingMessage={engine.processing.message}
                     historyFooter={<HistoryFooter currentStage={AppStage.WEATHER_LAB} onLoadHistoryItem={handleLoadHistory} />}
@@ -929,6 +954,7 @@ const App: React.FC = () => {
                     onFormatChange={engine.setDownloadFormat}
                     downloadFormat={engine.downloadFormat}
                     onInputClick={() => engine.fileInputRef.current?.click()}
+                    onReset={engine.clearWorkspace}
                     isLoading={engine.activeStage === AppStage.LINE_CONVERT && engine.processing.isLoading}
                     loadingMessage={engine.processing.message}
                     historyFooter={<HistoryFooter currentStage={AppStage.LINE_CONVERT} onLoadHistoryItem={handleLoadHistory} />}
@@ -954,16 +980,23 @@ const App: React.FC = () => {
         </AppShell>
     );
 
-    if (!isAppLoaded) {
-        return <StartupLoader onFinish={() => setIsAppLoaded(true)} />;
-    }
 
     // Access is decided by the SERVER, not by the email claim. isMaster is a
     // fast local shortcut so the three master addresses do not wait on a round
     // trip; anyone else (testers, and later beta users) is admitted only once
     // /api/user/credits confirms the pre-launch lock lets them through.
-    // hasApiAccess is null while that check is still in flight.
     const hasAccess = isMaster || hasApiAccess === true;
+
+    // null means the access check is still in flight for a signed-in user —
+    // show a spinner, not the lock screen. Flashing ComingSoonView at a
+    // legitimate tester on a slow connection read as "you've been locked out".
+    if (!hasAccess && user && hasApiAccess === null) {
+        return (
+            <div className="w-full h-[100dvh] flex items-center justify-center bg-background">
+                <div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
 
     if (!hasAccess) {
         return <ComingSoonView onUnlockSuccess={() => engine.setActiveStage(AppStage.HOME)} />;

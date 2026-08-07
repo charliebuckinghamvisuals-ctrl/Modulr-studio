@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Settings, Plus, Box, Tent, Trees, Map, Settings2, Trash2, DoorOpen, DoorClosed, ArrowLeft, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
+import { Settings, Plus, Box, Tent, Trees, Map, Settings2, Trash2, DoorOpen, DoorClosed, ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Link } from 'react-router-dom';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
@@ -107,20 +107,6 @@ export function Sidebar() {
           <button onClick={() => setTab('building')} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${tab === 'building' ? 'bg-white shadow-sm text-[#1d1d1f]' : 'text-gray-400 hover:text-gray-600'}`}>Building</button>
           <button onClick={() => setTab('objects')} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${tab === 'objects' ? 'bg-white shadow-sm text-[#1d1d1f]' : 'text-gray-400 hover:text-gray-600'}`}>Objects</button>
         </div>
-
-        <button 
-          onClick={() => {
-            const canvas = document.querySelector('canvas');
-            if (canvas) {
-              const dataUrl = canvas.toDataURL('image/png');
-              window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl }, '*');
-            }
-          }}
-          className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer border border-emerald-400/30"
-        >
-          <Sparkles size={16} className="text-emerald-200" />
-          Render in Modulr
-        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -184,71 +170,7 @@ export function Sidebar() {
 
         {tab === 'building' && (
           <>
-            <CollapsibleSection title="Base Model & Features" defaultOpen={true}>
-              <div className="grid grid-cols-2 gap-2">
-                {['Box', 'Gable'].map((shape) => (
-                  <div key={shape} onClick={() => updateRoom({ shape: shape as any })} className={`p-3 rounded-xl text-center cursor-pointer transition-all ${room.shape === shape ? 'bg-[#3b4d4a] text-white shadow-md' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
-                    <span className="text-[11px] font-semibold tracking-wide">{shape}</span>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="space-y-3">
-                {[
-                  { label: 'Has Canopy', key: 'hasCanopy' as const },
-                  { label: 'Picture Frame Front', key: 'hasPictureFrame' as const },
-                  { label: 'Has Decking', key: 'hasDecking' as const },
-                  { label: 'Show Dimensions', key: 'showDimensions' as const },
-                ].map(({label, key}) => (
-                  <div key={key} className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-gray-700">{label}</span>
-                    <button 
-                      onClick={() => {
-                        const newValue = !room[key];
-                        if (key === 'hasDecking') {
-                          if (newValue) {
-                            const matName = room.deckingMaterial || room.cladding || 'timber';
-                            const baseMat = matName === 'timber' ? 'timber_decking' : 'composite_decking';
-                            updateRoom({
-                              hasDecking: true,
-                              baseMaterial: baseMat,
-                              deckingMaterial: matName as any
-                            });
-                          } else {
-                            updateRoom({
-                              hasDecking: false,
-                              baseMaterial: room.hasPictureFrame ? room.baseMaterial : 'concrete'
-                            });
-                          }
-                        } else if (key === 'hasPictureFrame') {
-                          if (newValue) {
-                            const matName = room.deckingMaterial || room.cladding || 'timber';
-                            const baseMat = matName === 'timber' ? 'timber_decking' : 'composite_decking';
-                            updateRoom({
-                              hasPictureFrame: true,
-                              baseMaterial: baseMat,
-                              deckingMaterial: matName as any
-                            });
-                          } else {
-                            updateRoom({
-                              hasPictureFrame: false,
-                              baseMaterial: room.hasDecking ? room.baseMaterial : 'concrete'
-                            });
-                          }
-                        } else {
-                          updateRoom({ [key]: newValue });
-                        }
-                      }}
-                      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${room[key] ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300/60'}`}
-                    >
-                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${room[key] ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Dimensions">
+            <CollapsibleSection title="Dimensions" defaultOpen={true}>
               <div className="space-y-3">
                 {[
                   { label: 'Total Width', key: 'widthMm', hidden: viewMode !== 'plan' },
@@ -261,23 +183,31 @@ export function Sidebar() {
                 ].filter(d => !d.hidden).map(dim => {
                   const baseH = room.baseHeightMm ?? 100;
                   const roofH = room.roofHeightMm ?? 200;
+                  // For Gable, heightMm is ALREADY the total height (the 3D
+                  // maths subtracts base+roof from it) — adding base+roof here
+                  // showed a total 450mm taller than the 3D label for the same
+                  // building. Box stores wall height, so it still converts.
+                  const heightIsTotal = room.shape === 'Gable';
                   let val = room[dim.key as keyof typeof room] as number;
-                  if (dim.key === 'heightMm') val = (room.heightMm ?? 2350) + baseH + roofH;
-                  if (dim.key === 'backHeightMm') val = (room.backHeightMm ?? room.heightMm ?? 2350) + baseH + roofH;
+                  if (dim.key === 'heightMm') val = (room.heightMm ?? 2350) + (heightIsTotal ? 0 : baseH + roofH);
+                  if (dim.key === 'backHeightMm') val = (room.backHeightMm ?? room.heightMm ?? 2350) + (heightIsTotal ? 0 : baseH + roofH);
                   if (dim.key === 'wallThicknessMm') val = room.wallThicknessMm || 150;
 
                   return (
                     <div key={dim.key} className="flex items-center gap-2">
                       <span className="text-xs font-medium text-gray-600 w-28">{dim.label}</span>
-                      <DeferredInput type="number" 
+                      <DeferredInput type="number"
                         value={val}
                         onChange={(e) => {
                           let newVal = parseInt(e.target.value) || 0;
+                          if ((dim.key === 'heightMm' || dim.key === 'backHeightMm') && !heightIsTotal) {
+                            newVal = newVal - baseH - roofH;
+                          }
                           if (dim.key === 'heightMm' || dim.key === 'backHeightMm') {
-                            newVal = Math.max(10, newVal - baseH - roofH);
+                            newVal = Math.max(10, newVal);
                           }
                           updateRoom({ [dim.key]: newVal });
-                        }} 
+                        }}
                         className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] focus:border-[#3b4d4a] outline-none transition-shadow" />
                     </div>
                   );
@@ -285,211 +215,7 @@ export function Sidebar() {
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection title="Doors">
-              <button onClick={wrap(store.addDoor)} className="w-full mb-4 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-4 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all flex items-center justify-center shadow-sm">+ Add Door</button>
-              <div className="space-y-4">
-                {(room.doors || []).map((door, idx) => (
-                  <div key={door.id} className="p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-4 relative group">
-                    <button onClick={() => wrap(store.removeDoor)(door.id)} className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                    </button>
-                    <div className="text-xs font-bold text-gray-800 mb-2">Door {idx + 1}</div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-medium text-gray-700">Wall</span>
-                      <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={door.wall} onChange={e => wrap(store.updateDoor)(door.id, { wall: e.target.value as any })}>
-                        <option value="front">Front</option>
-                        <option value="back">Back</option>
-                        <option value="left">Left</option>
-                        <option value="right">Right</option>
-                      </select>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-medium text-gray-700">Leaves</span>
-                      <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={door.leaves} onChange={e => wrap(store.updateDoor)(door.id, { leaves: parseInt(e.target.value) })}>
-                        {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n} Leaf</option>)}
-                      </select>
-                    </div>
-<DimensionSlider label="Width" min={800} max={6000} step={100} value={door.widthMm} onChange={(v) => wrap(store.updateDoor)(door.id, { widthMm: v })} />
-<DimensionSlider label="Offset (Pos)" min={-3000} max={3000} step={100} value={door.offsetMm} onChange={(v) => wrap(store.updateDoor)(door.id, { offsetMm: v })} />
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 flex items-center justify-between p-4 bg-white border border-black/5 rounded-xl shadow-sm">
-                <span className="text-xs font-medium text-gray-700">Door Handles</span>
-                <button onClick={() => updateRoom({ hasDoorHandles: !room.hasDoorHandles })} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${room.hasDoorHandles ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300/60'}`}>
-                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${room.hasDoorHandles ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
-                </button>
-              </div>
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Windows">
-              <div className="flex justify-end mb-4">
-                <button onClick={addWindow} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors">+ Add New</button>
-              </div>
-              <div className="space-y-3">
-                {room.windows.map((win, i) => (
-                  <div key={win.id} className="p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-4 relative group">
-                    <div className="flex justify-between items-center text-xs mb-2">
-                      <span className="font-semibold text-gray-800">Window {i + 1}</span>
-                      <button onClick={() => removeWindow(win.id)} className="text-gray-400 hover:text-red-500 transition-colors">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-medium text-gray-700">Wall</span>
-                      <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={win.wall} onChange={e => updateWindow(win.id, { wall: e.target.value as any })}>
-                        <option value="front">Front</option>
-                        <option value="back">Back</option>
-                        <option value="left">Left</option>
-                        <option value="right">Right</option>
-                      </select>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-medium text-gray-700">Leaves (Panes)</span>
-                      <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={win.leaves || 1} onChange={e => updateWindow(win.id, { leaves: parseInt(e.target.value) })}>
-                        {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n} Pane(s)</option>)}
-                      </select>
-                    </div>
-<DimensionSlider label="Width" min={400} max={6000} step={100} value={win.widthMm} onChange={(v) => updateWindow(win.id, { widthMm: v })} />
-                    <div>
-                      <div className="flex justify-between items-center text-xs mb-2">
-                        <span className="font-medium text-gray-700">Full Height</span>
-                        <button onClick={() => updateWindow(win.id, { fullHeight: !win.fullHeight, sillMm: 0, heightMm: 2100 })} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${win.fullHeight ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300/60'}`}>
-                          <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${win.fullHeight ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
-                        </button>
-                      </div>
-                    </div>
-                    {!win.fullHeight && (
-                      <>
-<DimensionSlider label="Height" min={400} max={2500} step={100} value={win.heightMm} onChange={(v) => updateWindow(win.id, { heightMm: v })} />
-<DimensionSlider label="Sill Height" min={0} max={2000} step={100} value={win.sillMm} onChange={(v) => updateWindow(win.id, { sillMm: v })} />
-                      </>
-                    )}
-<DimensionSlider label="Offset Position" min={-3000} max={3000} step={100} value={win.offsetMm} onChange={(v) => updateWindow(win.id, { offsetMm: v })} />
-                  </div>
-                ))}
-                {room.windows.length === 0 && <p className="text-xs text-gray-400 text-center py-4">No windows</p>}
-              </div>
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Internal Walls">
-              <div className="flex gap-2 mb-4">
-                <button onClick={wrap(store.addPartition)} className="flex-1 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm">+ Wall</button>
-                <button onClick={wrap(store.addInteriorDoor)} className="flex-1 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm">+ Door</button>
-              </div>
-              <div className="space-y-3">
-                {room.partitions?.map((part, i) => (
-                  <div key={part.id} className="p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-4 relative group">
-                    <button onClick={() => wrap(store.removePartition)(part.id)} className="absolute top-3 right-3 text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Trash2 size={14} />
-                    </button>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-gray-800">Wall #{i + 1}</span>
-                      <button onClick={(e) => wrap(store.updatePartition)(part.id, { rotation: part.rotation === 0 ? 90 : 0 })} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors bg-blue-50 px-2 py-1 rounded">
-                        Rotate 90°
-                      </button>
-                    </div>
-<DimensionSlider label="Length" min={400} max={6000} step={100} value={part.lengthMm} onChange={(v) => wrap(store.updatePartition)(part.id, { lengthMm: v })} />
-                  </div>
-                ))}
-                {!room.partitions?.length && <p className="text-xs text-gray-400 text-center py-4">No internal walls</p>}
-              </div>
-
-              {room.interiorDoors && room.interiorDoors.length > 0 && (
-                <div className="mt-6 border-t border-black/5 pt-4">
-                  <h4 className="text-[10px] font-bold uppercase text-gray-500 mb-3">Interior Doors</h4>
-                  {room.interiorDoors.map((door, i) => (
-                    <div key={door.id} className="p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-4 relative group mb-3">
-                      <button onClick={() => wrap(store.removeInteriorDoor)(door.id)} className="absolute top-3 right-3 text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Trash2 size={14} />
-                      </button>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-gray-800">Interior Door #{i + 1}</span>
-                        <button onClick={(e) => wrap(store.updateInteriorDoor)(door.id, { rotation: door.rotation === 0 ? 90 : 0 })} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors bg-blue-50 px-2 py-1 rounded">
-                          Rotate 90°
-                        </button>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-3 mt-3">
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-500 mb-1">Width (mm)</label>
-                          <input type="number" value={door.widthMm} onChange={(e) => wrap(store.updateInteriorDoor)(door.id, { widthMm: Number(e.target.value) })} className="w-full bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-500 mb-1">Height (mm)</label>
-                          <input type="number" value={door.heightMm} onChange={(e) => wrap(store.updateInteriorDoor)(door.id, { heightMm: Number(e.target.value) })} className="w-full bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 mt-2">
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-500 mb-1">X Position (mm)</label>
-                          <input type="number" value={Math.round(door.xMm)} onChange={(e) => wrap(store.updateInteriorDoor)(door.id, { xMm: Number(e.target.value) })} className="w-full bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-500 mb-1">Z Position (mm)</label>
-                          <input type="number" value={Math.round(door.zMm)} onChange={(e) => wrap(store.updateInteriorDoor)(door.id, { zMm: Number(e.target.value) })} className="w-full bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                        </div>
-                      </div>
-                      
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CollapsibleSection>
-            <CollapsibleSection title="Skylights & Lanterns">
-              <div className="flex justify-end mb-4">
-                <button onClick={wrap(store.addSkylight)} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors">+ Add New</button>
-              </div>
-              <div className="space-y-3">
-                {(room.skylights || []).map((sky, i) => (
-                  <div key={sky.id} className="p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-4 relative group">
-                    <button onClick={() => wrap(store.removeSkylight)(sky.id)} className="absolute top-3 right-3 text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Trash2 size={14} />
-                    </button>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-gray-800">#{i + 1}</span>
-                      <select value={sky.type} onChange={(e) => wrap(store.updateSkylight)(sky.id, { type: e.target.value as any })} className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a] text-xs">
-                        <option value="lantern">Roof Lantern</option>
-                        <option value="flat">Flat Skylight</option>
-                      </select>
-                    </div>
-<DimensionSlider label="Width" min={400} max={3000} step={100} value={sky.widthMm} onChange={(v) => wrap(store.updateSkylight)(sky.id, { widthMm: v })} />
-<DimensionSlider label="Length" min={400} max={3000} step={100} value={sky.lengthMm} onChange={(v) => wrap(store.updateSkylight)(sky.id, { lengthMm: v })} />
-                  </div>
-                ))}
-                {(room.skylights || []).length === 0 && <p className="text-xs text-gray-400 text-center py-4">No roof features</p>}
-              </div>
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Interior Finishes">
-              <div className="space-y-6">
-                <div>
-                  <label className="text-[10px] font-medium text-gray-500 mb-2 block">Interior Wall Color</label>
-                  <input type="color" value={room.interiorColor || '#ffffff'} onChange={(e) => updateRoom({ interiorColor: e.target.value })} className="w-8 h-8 rounded-full cursor-pointer border-0 shadow-sm overflow-hidden" title="Choose Interior Color"/>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-medium text-gray-500 mb-2 block">Interior Floor Type</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: 'oak', name: 'Oak' },
-                      { id: 'pine', name: 'Pine' },
-                      { id: 'walnut', name: 'Walnut' },
-                      { id: 'cherry', name: 'Cherry' },
-                      { id: 'tiles', name: 'Tiles' },
-                      { id: 'carpet', name: 'Carpet' },
-                      { id: 'concrete', name: 'Concrete' }
-                    ].map(floor => (
-                      <button key={floor.id} onClick={() => updateRoom({ interiorFloorType: floor.id as any })} className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg uppercase transition-colors ${room.interiorFloorType === floor.id ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
-                        {floor.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Exterior Finishes">
+            <CollapsibleSection title="Cladding" defaultOpen={true}>
               <div className="space-y-6">
                 <div>
                   <label className="text-[10px] font-medium text-gray-500 mb-2 block">Wall Cladding Orientation</label>
@@ -528,9 +254,11 @@ export function Sidebar() {
                             // about what it is about to apply.
                             { id: 'cedar_composite', color: 'bg-[#b0764b]', name: 'Cedar Composite' },
                             { id: 'oak_composite', color: 'bg-[#c9a173]', name: 'Oak Composite' },
+                            { id: 'light_oak_composite', color: 'bg-[#dcc09a]', name: 'Light Oak' },
                             { id: 'black_composite', color: 'bg-[#1f2123]', name: 'Black' },
                             { id: 'dark_grey_composite', color: 'bg-[#4a5057]', name: 'Dark Grey' },
                             { id: 'light_grey_composite', color: 'bg-[#a9aeb2]', name: 'Light Grey' },
+                            { id: 'white_composite', color: 'bg-[#e8e6e1]', name: 'White' },
                             { id: 'slate_blue_composite', color: 'bg-[#7c93a6]', name: 'Slate Blue' },
                             { id: 'sage_composite', color: 'bg-[#7e8c74]', name: 'Sage Green' },
                             { id: 'clay_composite', color: 'bg-[#9a6b58]', name: 'Clay' },
@@ -557,7 +285,109 @@ export function Sidebar() {
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection title="Exterior Finishes (Misc)">
+            <CollapsibleSection title="Doors" defaultOpen={true}>
+              <button onClick={wrap(store.addDoor)} className="w-full mb-4 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-4 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all flex items-center justify-center shadow-sm">+ Add Door</button>
+              <div className="space-y-4">
+                {(room.doors || []).map((door, idx) => (
+                  <div key={door.id} className="p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-4 relative group">
+                    <button onClick={() => wrap(store.removeDoor)(door.id)} className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                    <div className="text-xs font-bold text-gray-800 mb-2">Door {idx + 1}</div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-medium text-gray-700">Wall</span>
+                      <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={door.wall} onChange={e => wrap(store.updateDoor)(door.id, { wall: e.target.value as any })}>
+                        <option value="front">Front</option>
+                        <option value="back">Back</option>
+                        <option value="left">Left</option>
+                        <option value="right">Right</option>
+                      </select>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-medium text-gray-700">Leaves</span>
+                      <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={door.leaves} onChange={e => wrap(store.updateDoor)(door.id, { leaves: parseInt(e.target.value) })}>
+                        {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n} Leaf</option>)}
+                      </select>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-medium text-gray-700">Style</span>
+                      <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={door.style || 'standard'} onChange={e => wrap(store.updateDoor)(door.id, { style: e.target.value as any })}>
+                        <option value="standard">Standard</option>
+                        <option value="crittall">Crittall</option>
+                      </select>
+                    </div>
+<DimensionSlider label="Width" min={800} max={6000} step={100} value={door.widthMm} onChange={(v) => wrap(store.updateDoor)(door.id, { widthMm: v })} />
+<DimensionSlider label="Height" min={1800} max={2500} step={50} value={door.heightMm} onChange={(v) => wrap(store.updateDoor)(door.id, { heightMm: v })} />
+<DimensionSlider label="Offset (Pos)" min={-3000} max={3000} step={100} value={door.offsetMm} onChange={(v) => wrap(store.updateDoor)(door.id, { offsetMm: v })} />
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex items-center justify-between p-4 bg-white border border-black/5 rounded-xl shadow-sm">
+                <span className="text-xs font-medium text-gray-700">Door Handles</span>
+                <button onClick={() => updateRoom({ hasDoorHandles: !room.hasDoorHandles })} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${room.hasDoorHandles ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300/60'}`}>
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${room.hasDoorHandles ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
+                </button>
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Windows" defaultOpen={true}>
+              <div className="flex justify-end mb-4">
+                <button onClick={addWindow} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors">+ Add New</button>
+              </div>
+              <div className="space-y-3">
+                {room.windows.map((win, i) => (
+                  <div key={win.id} className="p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-4 relative group">
+                    <div className="flex justify-between items-center text-xs mb-2">
+                      <span className="font-semibold text-gray-800">Window {i + 1}</span>
+                      <button onClick={() => removeWindow(win.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-medium text-gray-700">Wall</span>
+                      <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={win.wall} onChange={e => updateWindow(win.id, { wall: e.target.value as any })}>
+                        <option value="front">Front</option>
+                        <option value="back">Back</option>
+                        <option value="left">Left</option>
+                        <option value="right">Right</option>
+                      </select>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-medium text-gray-700">Leaves (Panes)</span>
+                      <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={win.leaves || 1} onChange={e => updateWindow(win.id, { leaves: parseInt(e.target.value) })}>
+                        {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n} Pane(s)</option>)}
+                      </select>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-medium text-gray-700">Style</span>
+                      <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={win.style || 'standard'} onChange={e => updateWindow(win.id, { style: e.target.value as any })}>
+                        <option value="standard">Standard</option>
+                        <option value="crittall">Crittall</option>
+                      </select>
+                    </div>
+<DimensionSlider label="Width" min={400} max={6000} step={100} value={win.widthMm} onChange={(v) => updateWindow(win.id, { widthMm: v })} />
+                    <div>
+                      <div className="flex justify-between items-center text-xs mb-2">
+                        <span className="font-medium text-gray-700">Full Height</span>
+                        <button onClick={() => updateWindow(win.id, { fullHeight: !win.fullHeight, sillMm: 0, heightMm: 2100 })} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${win.fullHeight ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300/60'}`}>
+                          <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${win.fullHeight ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
+                        </button>
+                      </div>
+                    </div>
+                    {!win.fullHeight && (
+                      <>
+<DimensionSlider label="Height" min={400} max={2500} step={100} value={win.heightMm} onChange={(v) => updateWindow(win.id, { heightMm: v })} />
+<DimensionSlider label="Sill Height" min={0} max={2000} step={100} value={win.sillMm} onChange={(v) => updateWindow(win.id, { sillMm: v })} />
+                      </>
+                    )}
+<DimensionSlider label="Offset Position" min={-3000} max={3000} step={100} value={win.offsetMm} onChange={(v) => updateWindow(win.id, { offsetMm: v })} />
+                  </div>
+                ))}
+                {room.windows.length === 0 && <p className="text-xs text-gray-400 text-center py-4">No windows</p>}
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Colours & Materials" defaultOpen={true}>
               <div>
                 <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Door/Window Frames</label>
                 <div className="flex gap-2">
@@ -649,6 +479,98 @@ export function Sidebar() {
               </div>
 
 
+
+              <div className="space-y-4 mt-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Base / Decking</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {['concrete', 'timber', 'composite_cedar', 'composite_oak', 'composite_black', 'composite_dark_grey', 'composite_grey', 'composite_brown'].map(col => {
+                      const isActive = col === 'concrete' ? room.baseMaterial === 'concrete' : (room.deckingMaterial || room.cladding || 'timber') === col && room.baseMaterial !== 'concrete';
+                      return (
+                        <button 
+                          key={col} 
+                          onClick={() => {
+                            if (col === 'concrete') {
+                              updateRoom({ baseMaterial: 'concrete' });
+                            } else {
+                              updateRoom({ 
+                                baseMaterial: col === 'timber' ? 'timber_decking' : 'composite_decking',
+                                deckingMaterial: col as any
+                              });
+                            }
+                          }} 
+                          className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg uppercase transition-colors ${isActive ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
+                          {col.replace('composite_', 'comp ').replace('_', ' ')}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Base Model & Features" defaultOpen={true}>
+              <div className="grid grid-cols-2 gap-2">
+                {['Box', 'Gable'].map((shape) => (
+                  <div key={shape} onClick={() => updateRoom({ shape: shape as any })} className={`p-3 rounded-xl text-center cursor-pointer transition-all ${room.shape === shape ? 'bg-[#3b4d4a] text-white shadow-md' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
+                    <span className="text-[11px] font-semibold tracking-wide">{shape}</span>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="space-y-3">
+                {[
+                  { label: 'Has Canopy', key: 'hasCanopy' as const },
+                  { label: 'Picture Frame Front', key: 'hasPictureFrame' as const },
+                  { label: 'Has Decking', key: 'hasDecking' as const },
+                  { label: 'Show Dimensions', key: 'showDimensions' as const },
+                ].map(({label, key}) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-700">{label}</span>
+                    <button 
+                      onClick={() => {
+                        const newValue = !room[key];
+                        if (key === 'hasDecking') {
+                          if (newValue) {
+                            const matName = room.deckingMaterial || room.cladding || 'timber';
+                            const baseMat = matName === 'timber' ? 'timber_decking' : 'composite_decking';
+                            updateRoom({
+                              hasDecking: true,
+                              baseMaterial: baseMat,
+                              deckingMaterial: matName as any
+                            });
+                          } else {
+                            updateRoom({
+                              hasDecking: false,
+                              baseMaterial: room.hasPictureFrame ? room.baseMaterial : 'concrete'
+                            });
+                          }
+                        } else if (key === 'hasPictureFrame') {
+                          if (newValue) {
+                            const matName = room.deckingMaterial || room.cladding || 'timber';
+                            const baseMat = matName === 'timber' ? 'timber_decking' : 'composite_decking';
+                            updateRoom({
+                              hasPictureFrame: true,
+                              baseMaterial: baseMat,
+                              deckingMaterial: matName as any
+                            });
+                          } else {
+                            updateRoom({
+                              hasPictureFrame: false,
+                              baseMaterial: room.hasDecking ? room.baseMaterial : 'concrete'
+                            });
+                          }
+                        } else {
+                          updateRoom({ [key]: newValue });
+                        }
+                      }}
+                      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${room[key] ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300/60'}`}
+                    >
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${room[key] ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </CollapsibleSection>
 
             <CollapsibleSection title="Overhangs & Canopy">
@@ -692,41 +614,140 @@ export function Sidebar() {
                 </div>
               )}
               
-              <div className="space-y-4 mt-4">
-                <div>
-                  <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Base / Decking</label>
-                  <div className="flex gap-2 flex-wrap">
-                    {['concrete', 'timber', 'composite_cedar', 'composite_oak', 'composite_black', 'composite_dark_grey', 'composite_grey', 'composite_brown'].map(col => {
-                      const isActive = col === 'concrete' ? room.baseMaterial === 'concrete' : (room.deckingMaterial || room.cladding || 'timber') === col && room.baseMaterial !== 'concrete';
-                      return (
-                        <button 
-                          key={col} 
-                          onClick={() => {
-                            if (col === 'concrete') {
-                              updateRoom({ baseMaterial: 'concrete' });
-                            } else {
-                              updateRoom({ 
-                                baseMaterial: col === 'timber' ? 'timber_decking' : 'composite_decking',
-                                deckingMaterial: col as any
-                              });
-                            }
-                          }} 
-                          className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg uppercase transition-colors ${isActive ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
-                          {col.replace('composite_', 'comp ').replace('_', ' ')}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+
               {room.shape === 'Gable' && (
                 <div className="space-y-3 mt-4">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-gray-600 w-28">Roof Height</span>
-                    <DeferredInput type="number" value={room.roofHeightMm ?? 200} onChange={(e) => updateRoom({ roofHeightMm: parseInt(e.target.value) || 0 })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
+                    <DeferredInput type="number" value={room.roofHeightMm ?? 200} onChange={(e) => {
+                      // Clamp below the total height: a roof taller than the
+                      // building makes the wall height negative and the walls
+                      // invert into a broken mess (three.js tolerates it, so
+                      // there's no error — just a mangled model).
+                      const maxRoof = (room.heightMm ?? 2350) - (room.baseHeightMm ?? 100) - 100;
+                      updateRoom({ roofHeightMm: Math.min(Math.max(0, parseInt(e.target.value) || 0), Math.max(100, maxRoof)) });
+                    }} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
                   </div>
                 </div>
               )}
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Skylights & Lanterns">
+              <div className="flex justify-end mb-4">
+                <button onClick={wrap(store.addSkylight)} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors">+ Add New</button>
+              </div>
+              <div className="space-y-3">
+                {(room.skylights || []).map((sky, i) => (
+                  <div key={sky.id} className="p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-4 relative group">
+                    <button onClick={() => wrap(store.removeSkylight)(sky.id)} className="absolute top-3 right-3 text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Trash2 size={14} />
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-800">#{i + 1}</span>
+                      <select value={sky.type} onChange={(e) => wrap(store.updateSkylight)(sky.id, { type: e.target.value as any })} className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a] text-xs">
+                        <option value="lantern">Roof Lantern</option>
+                        <option value="flat">Flat Skylight</option>
+                      </select>
+                    </div>
+<DimensionSlider label="Width" min={400} max={3000} step={100} value={sky.widthMm} onChange={(v) => wrap(store.updateSkylight)(sky.id, { widthMm: v })} />
+<DimensionSlider label="Length" min={400} max={3000} step={100} value={sky.lengthMm} onChange={(v) => wrap(store.updateSkylight)(sky.id, { lengthMm: v })} />
+                  </div>
+                ))}
+                {(room.skylights || []).length === 0 && <p className="text-xs text-gray-400 text-center py-4">No roof features</p>}
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Internal Walls">
+              <div className="flex gap-2 mb-4">
+                <button onClick={wrap(store.addPartition)} className="flex-1 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm">+ Wall</button>
+                <button onClick={wrap(store.addInteriorDoor)} className="flex-1 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm">+ Door</button>
+              </div>
+              <div className="space-y-3">
+                {room.partitions?.map((part, i) => (
+                  <div key={part.id} className="p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-4 relative group">
+                    <button onClick={() => wrap(store.removePartition)(part.id)} className="absolute top-3 right-3 text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Trash2 size={14} />
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-800">Wall #{i + 1}</span>
+                      <button onClick={(e) => wrap(store.updatePartition)(part.id, { rotation: part.rotation === 0 ? 90 : 0 })} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors bg-blue-50 px-2 py-1 rounded">
+                        Rotate 90°
+                      </button>
+                    </div>
+<DimensionSlider label="Length" min={400} max={6000} step={100} value={part.lengthMm} onChange={(v) => wrap(store.updatePartition)(part.id, { lengthMm: v })} />
+                  </div>
+                ))}
+                {!room.partitions?.length && <p className="text-xs text-gray-400 text-center py-4">No internal walls</p>}
+              </div>
+
+              {room.interiorDoors && room.interiorDoors.length > 0 && (
+                <div className="mt-6 border-t border-black/5 pt-4">
+                  <h4 className="text-[10px] font-bold uppercase text-gray-500 mb-3">Interior Doors</h4>
+                  {room.interiorDoors.map((door, i) => (
+                    <div key={door.id} className="p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-4 relative group mb-3">
+                      <button onClick={() => wrap(store.removeInteriorDoor)(door.id)} className="absolute top-3 right-3 text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Trash2 size={14} />
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-gray-800">Interior Door #{i + 1}</span>
+                        <button onClick={(e) => wrap(store.updateInteriorDoor)(door.id, { rotation: door.rotation === 0 ? 90 : 0 })} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors bg-blue-50 px-2 py-1 rounded">
+                          Rotate 90°
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3 mt-3">
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-500 mb-1">Width (mm)</label>
+                          <input type="number" value={door.widthMm} onChange={(e) => wrap(store.updateInteriorDoor)(door.id, { widthMm: Number(e.target.value) })} className="w-full bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-500 mb-1">Height (mm)</label>
+                          <input type="number" value={door.heightMm} onChange={(e) => wrap(store.updateInteriorDoor)(door.id, { heightMm: Number(e.target.value) })} className="w-full bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 mt-2">
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-500 mb-1">X Position (mm)</label>
+                          <input type="number" value={Math.round(door.xMm)} onChange={(e) => wrap(store.updateInteriorDoor)(door.id, { xMm: Number(e.target.value) })} className="w-full bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-500 mb-1">Z Position (mm)</label>
+                          <input type="number" value={Math.round(door.zMm)} onChange={(e) => wrap(store.updateInteriorDoor)(door.id, { zMm: Number(e.target.value) })} className="w-full bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        </div>
+                      </div>
+                      
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Interior Finishes">
+              <div className="space-y-6">
+                <div>
+                  <label className="text-[10px] font-medium text-gray-500 mb-2 block">Interior Wall Color</label>
+                  <input type="color" value={room.interiorColor || '#ffffff'} onChange={(e) => updateRoom({ interiorColor: e.target.value })} className="w-8 h-8 rounded-full cursor-pointer border-0 shadow-sm overflow-hidden" title="Choose Interior Color"/>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-medium text-gray-500 mb-2 block">Interior Floor Type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'oak', name: 'Oak' },
+                      { id: 'pine', name: 'Pine' },
+                      { id: 'walnut', name: 'Walnut' },
+                      { id: 'cherry', name: 'Cherry' },
+                      { id: 'tiles', name: 'Tiles' },
+                      { id: 'carpet', name: 'Carpet' },
+                      { id: 'concrete', name: 'Concrete' }
+                    ].map(floor => (
+                      <button key={floor.id} onClick={() => updateRoom({ interiorFloorType: floor.id as any })} className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg uppercase transition-colors ${room.interiorFloorType === floor.id ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
+                        {floor.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </CollapsibleSection>
 
           </>
@@ -778,13 +799,15 @@ export function Sidebar() {
             const canvas = document.querySelector('canvas');
             if (canvas) {
               const dataUrl = canvas.toDataURL('image/png');
-              window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl }, '*');
+              // Same payload as the canvas button: screenshot for composition,
+              // room spec so the AI obeys the configured building exactly.
+              const { room: roomSpec } = useStore.getState().scene;
+              window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl, roomSpec }, window.location.origin);
             }
           }}
-          className="w-full bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white py-3.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer border border-emerald-400/30"
+          className="w-full bg-[#3b4d4a] hover:bg-[#2d3a38] text-white py-3.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
         >
-          <Sparkles size={18} className="text-emerald-200" />
-          Render in Modulr
+          Send to Render Engine
         </button>
       </div>
     </div>

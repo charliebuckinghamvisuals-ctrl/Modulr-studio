@@ -2,8 +2,8 @@ export type ShapeType = 'Box' | 'LShape' | 'Gable';
 export type CladdingType =
   // Composite range offered in the sidebar picker. These must match the keys in
   // MATERIAL_DEF, or the swatch applies a value that falls back to 'default'.
-  | 'cedar_composite' | 'oak_composite' | 'black_composite'
-  | 'dark_grey_composite' | 'light_grey_composite'
+  | 'cedar_composite' | 'oak_composite' | 'light_oak_composite' | 'black_composite'
+  | 'dark_grey_composite' | 'light_grey_composite' | 'white_composite'
   | 'slate_blue_composite' | 'sage_composite' | 'clay_composite'
   | 'grey_composite'
   // Legacy values retained so previously saved scenes still resolve.
@@ -16,6 +16,8 @@ export type RoofMaterialType = 'epdm' | 'sedum' | 'upvc' | 'metal';
 export type FrameColorType = 'anthracite' | 'black' | 'white' | 'silver';
 export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 'planter' | 'bench' | 'slab' | 'patio' | 'toilet' | 'sink' | 'shower' | 'interior_wall' | 'interior_door' | 'desk' | 'sofa' | 'armchair' | 'dining_table' | 'rug' | 'tv' | 'bed' | 'bookshelf' | 'dressing_table' | 'wardrobe' | 'exterior_wall_light' | 'drop_light' | 'coffee_table' | 'indoor_plant' | 'kitchen_island';
 
+export type GlazingStyle = 'standard' | 'crittall';
+
 export interface Door {
   id: string;
   wall: 'front' | 'back' | 'left' | 'right';
@@ -23,6 +25,7 @@ export interface Door {
   heightMm: number;
   offsetMm: number;
   leaves: number;
+  style?: GlazingStyle;
 }
 
 export type InteriorFloorType = 'oak' | 'pine' | 'walnut' | 'cherry' | 'tiles' | 'concrete' | 'carpet';
@@ -36,6 +39,7 @@ export interface WindowData {
   sillMm: number;
   leaves?: number;
   fullHeight?: boolean;
+  style?: GlazingStyle;
 }
 
 export type FrameStyleType = 'default' | 'slim' | 'ultra-slim';

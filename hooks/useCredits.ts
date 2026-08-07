@@ -14,6 +14,15 @@ type CreditBalance = number | 'Unlimited';
 interface CreditsData {
     credits: CreditBalance;
     plan: string;
+    /** Whether this account may create projects. Sent by the server rather than
+     *  worked out from `plan` here - the entitled plan list belongs in one
+     *  place, and the same value is what Firestore rules enforce. */
+    canUseProjects?: boolean;
+    /** Whether this account may generate animations, and how many of the
+     *  monthly allowance are left. Both decided by the server. */
+    canUseAnimation?: boolean;
+    animationsLeft?: number;
+    animationsLimit?: number;
     // Free trial fields
     rendersLeft?: number;
     rendersPerDay?: number;
@@ -41,6 +50,12 @@ export function useCredits() {
      * the two disagree.
      */
     const [hasApiAccess, setHasApiAccess] = useState<boolean | null>(null);
+    /** null while unknown, so the UI can wait rather than flashing an upsell at
+     *  a subscriber whose plan has not loaded yet. */
+    const [canUseProjects, setCanUseProjects] = useState<boolean | null>(null);
+    const [canUseAnimation, setCanUseAnimation] = useState<boolean | null>(null);
+    const [animationsLeft, setAnimationsLeft] = useState<number | null>(null);
+    const [animationsLimit, setAnimationsLimit] = useState<number | null>(null);
 
     const fetchCredits = async () => {
         if (!user) return;
@@ -50,17 +65,36 @@ export function useCredits() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
-            // 403 is the pre-launch lock refusing this account.
-            if (response.status === 403) {
+            // Only 401/403 mean "this account is locked out" — that is the
+            // pre-launch lock (or a dead token) refusing this account.
+            //
+            // Every failure path must resolve canUseProjects to false rather
+            // than leaving it null: null means "not known yet", and a screen
+            // waiting on it would spin forever on a request that already failed.
+            if (response.status === 401 || response.status === 403) {
                 setHasApiAccess(false);
+                setCanUseProjects(false);
+                setCanUseAnimation(false);
                 return;
             }
-            setHasApiAccess(response.ok);
-            if (!response.ok) return;
+            if (!response.ok) {
+                // 429 / 5xx are transient. Setting hasApiAccess false here used
+                // to unmount the whole app back to the pre-launch lock screen
+                // mid-session whenever one credits refresh hit the rate limiter.
+                // Keep whatever access state we already knew and try again later.
+                setCanUseProjects(prev => prev ?? false);
+                setCanUseAnimation(prev => prev ?? false);
+                return;
+            }
+            setHasApiAccess(true);
 
             const data: CreditsData = await response.json();
             setCredits(data.credits);
             setPlan(data.plan);
+            setCanUseProjects(data.canUseProjects === true);
+            setCanUseAnimation(data.canUseAnimation === true);
+            setAnimationsLeft(data.animationsLeft ?? null);
+            setAnimationsLimit(data.animationsLimit ?? null);
             if (data.plan) trackUserPlan(data.plan);
             setRendersLeft(data.rendersLeft ?? null);
 
@@ -70,6 +104,8 @@ export function useCredits() {
             setTrialExpiresAt(data.trialExpiresAt ?? null);
         } catch (error) {
             console.error("Error fetching credits:", error);
+            setCanUseProjects(false);
+            setCanUseAnimation(false);
         } finally {
             setLoading(false);
         }
@@ -87,6 +123,10 @@ export function useCredits() {
             setTrialBlocked(false);
             setTrialExpiresAt(null);
             setHasApiAccess(null);
+            setCanUseProjects(null);
+            setCanUseAnimation(null);
+            setAnimationsLeft(null);
+            setAnimationsLimit(null);
             setLoading(false);
         }
     }, [user]);
@@ -94,6 +134,7 @@ export function useCredits() {
     return {
         credits, plan, loading, refreshCredits: fetchCredits,
         rendersLeft, rendersPerDay, trialDaysLeft, trialBlocked, trialExpiresAt,
-        hasApiAccess
+        hasApiAccess, canUseProjects,
+        canUseAnimation, animationsLeft, animationsLimit
     };
 }

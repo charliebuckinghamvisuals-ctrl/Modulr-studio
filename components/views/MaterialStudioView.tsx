@@ -1,6 +1,7 @@
 import React from 'react';
 import { Grid, Download, CheckCircle, Circle, Loader2, Upload, Layers, Palette, X } from 'lucide-react';
 import { Button } from '../Button';
+import { RENDER_CANVAS, WORKSPACE_HEIGHT } from '../canvasStyles';
 import { MaterialVisualPicker } from '../MaterialVisualPicker';
 import { PRESET_MATERIALS } from '../../constants';
 import { MaterialConfig, MaterialLibrary } from '../../types';
@@ -91,7 +92,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
     };
 
     return (
-        <div className="h-full flex flex-col md:flex-row bg-background relative overflow-hidden">
+        <div className={`${WORKSPACE_HEIGHT} flex flex-col md:flex-row bg-background relative overflow-hidden`}>
             {/* Ambient Lighting */}
             <div className="absolute top-1/2 right-1/4 w-[600px] h-[600px] bg-white/5 rounded-full blur-[150px] pointer-events-none"></div>
 
@@ -144,9 +145,12 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                     </div>
                 ) : detectedDetails.length > 0 ? (
                     <div className="flex-1 flex flex-col gap-5">
-                        <div className="flex justify-between items-center text-[10px] uppercase tracking-[0.2em] font-bold text-white/50">
+                        {/* Dark-theme leftovers: white text on the white sidebar made
+                            this instruction invisible, so the 16 chips looked
+                            unexplained and the hidden Generate button confusing. */}
+                        <div className="flex justify-between items-center text-[10px] uppercase tracking-[0.2em] font-bold text-slate-400">
                             <span>Select 4 Focus Details</span>
-                            <span className={`${selectedDetails.length === 4 ? 'text-white' : 'text-white/30'}`}>{selectedDetails.length} / 4 Selected</span>
+                            <span className={`${selectedDetails.length === 4 ? 'text-accent' : 'text-slate-300'}`}>{selectedDetails.length} / 4 Selected</span>
                         </div>
 
                         <div className="grid grid-cols-1 gap-3">
@@ -170,7 +174,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                                             <span className={`text-sm font-semibold tracking-wide ${isSelected ? 'text-white' : 'text-accent'}`}>{detail}</span>
                                             <span className={`text-[10px] uppercase tracking-widest mt-1 font-medium ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>Texture / Macro</span>
                                         </div>
-                                        {isSelected ? <CheckCircle size={20} className="text-white relative z-10 drop-shadow-[0_0_8px_rgba(139,92,246,0.8)]" /> : <Circle size={20} className="text-slate-200 group-hover:text-slate-400 transition-colors relative z-10" />}
+                                        {isSelected ? <CheckCircle size={20} className="text-white relative z-10 drop-shadow-[0_0_6px_rgba(0,0,0,0.35)]" /> : <Circle size={20} className="text-slate-200 group-hover:text-slate-400 transition-colors relative z-10" />}
                                     </div>
                                 )
                             })}
@@ -180,7 +184,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                     <div className="p-8 border border-slate-100 rounded-3xl bg-slate-50/50 flex flex-col items-center gap-4 text-center shadow-inner">
                         {originalImage ? (
                             <div className="flex flex-col items-center gap-4 py-4">
-                                <Loader2 className="w-8 h-8 animate-spin text-accent shadow-[0_0_10px_rgba(139,92,246,0.5)] rounded-full" />
+                                <Loader2 className="w-8 h-8 animate-spin text-accent shadow-[0_0_8px_rgba(64,90,86,0.35)] rounded-full" />
                                 <span className="tracking-wide text-accent font-medium animate-pulse">Analyzing geometry...</span>
                             </div>
                         ) : (
@@ -228,7 +232,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
 
             <div className="flex-1 p-6 md:p-12 flex items-center justify-center relative z-10 w-full overflow-hidden">
                 {isLoading ? (
-                    <div className="w-full max-w-5xl mx-auto flex-1 min-h-[500px] max-h-[85vh] glass-panel rounded-3xl overflow-hidden border-2 border-dashed border-border relative flex flex-col items-center justify-center bg-white z-50">
+                    <div className={`${RENDER_CANVAS} flex-col bg-white z-50`}>
                         <Loader2 className="w-10 h-10 animate-spin text-accent mb-4 mx-auto" />
                         <p className="text-accent font-medium text-lg tracking-wide text-center mx-auto">{loadingMessage}</p>
                     </div>
@@ -268,7 +272,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                 ) : (
                     <div className="flex flex-col items-center justify-center text-secondary w-full">
                         {originalImage ? (
-                            <div className="w-full max-w-5xl mx-auto flex-1 min-h-[500px] max-h-[85vh] glass-panel canvas-grid rounded-3xl overflow-hidden border-2 border-dashed border-border relative flex items-center justify-center bg-surface/50 group">
+                            <div className={`${RENDER_CANVAS} group`}>
                                 <img src={getImageUrl(originalImage)} className="w-full h-full object-contain opacity-30 grayscale transition-all duration-700 group-hover:opacity-50 absolute inset-0" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent"></div>
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -281,11 +285,11 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                         ) : (
                             <div
                                 onClick={onOpenSceneUpload}
-                                className="w-full max-w-5xl mx-auto flex-1 min-h-[500px] max-h-[85vh] glass-panel canvas-grid rounded-3xl overflow-hidden border-2 border-dashed border-border hover:border-accent/40 relative flex flex-col items-center justify-center bg-surface/50 cursor-pointer group hover:bg-accent/5 transition-colors duration-300"
+                                className={`${RENDER_CANVAS} flex-col cursor-pointer group hover:bg-slate-50/60 transition-colors duration-200`}
                             >
                                 <div className="absolute inset-0 bg-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
 
-                                <div className="w-20 h-20 bg-background rounded-full flex items-center justify-center mb-6 shadow-2xl group-hover:scale-110 group-hover:shadow-[0_0_30px_rgba(139,92,246,0.3)] transition-all duration-300 border border-border group-hover:border-accent/30 relative">
+                                <div className="w-20 h-20 bg-background rounded-full flex items-center justify-center mb-6 shadow-2xl group-hover:scale-110 group-hover:shadow-sm transition-all duration-300 border border-border group-hover:border-accent/30 relative">
                                     <div className="absolute inset-0 rounded-full bg-accent/20 blur-xl group-hover:opacity-100 opacity-0 transition-opacity"></div>
                                     <Upload className="text-secondary group-hover:text-accent relative z-10 transition-colors" size={28} />
                                 </div>

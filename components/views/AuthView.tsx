@@ -4,7 +4,7 @@ import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
 import { auth } from '../../services/firebase';
 import { trackSignUp, trackLogin } from '../../services/analytics';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from 'firebase/auth';
 
 import { toast } from 'react-hot-toast';
 import { AppStage } from '../../types';
@@ -171,8 +171,28 @@ export const AuthView: React.FC<AuthViewProps> = ({ onNavigate }) => {
                             <div className="space-y-2 group">
                                 <div className="flex justify-between items-center px-1">
                                     <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/50 group-focus-within:text-accent transition-colors">Password</label>
+                                    {/* type="button" is load-bearing: inside the form the
+                                        default type is submit, so this used to fire a failed
+                                        login attempt instead of a password reset. */}
                                     {mode === 'signin' && (
-                                        <button className="text-[10px] font-bold text-accent hover:opacity-70 transition-opacity">Forgot Password?</button>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                if (!email.trim()) {
+                                                    toast.error('Enter your email above first, then click Forgot Password.');
+                                                    return;
+                                                }
+                                                try {
+                                                    await sendPasswordResetEmail(auth, email.trim());
+                                                    toast.success('Password reset email sent — check your inbox.');
+                                                } catch {
+                                                    // Deliberately the same message: confirming which
+                                                    // addresses exist would leak account presence.
+                                                    toast.success('Password reset email sent — check your inbox.');
+                                                }
+                                            }}
+                                            className="text-[10px] font-bold text-accent hover:opacity-70 transition-opacity"
+                                        >Forgot Password?</button>
                                     )}
                                 </div>
                                 <div className="relative">
@@ -203,14 +223,13 @@ export const AuthView: React.FC<AuthViewProps> = ({ onNavigate }) => {
                             <span className="relative z-10 px-4 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Or Continue With</span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        {/* Apple sign-in was a styled button with no onClick and no
+                            provider configured — a dead control that swallowed clicks.
+                            Removed until Apple auth actually exists. */}
+                        <div className="grid grid-cols-1 gap-4">
                             <button type="button" onClick={handleGoogleSignIn} className="flex items-center justify-center gap-2 py-3 rounded-2xl border border-border hover:bg-slate-50 transition-all group active:scale-95 shadow-sm">
                                 <Chrome size={18} className="text-secondary group-hover:text-accent transition-colors" />
                                 <span className="text-[11px] font-bold text-accent uppercase tracking-wider">Google</span>
-                            </button>
-                            <button className="flex items-center justify-center gap-2 py-3 rounded-2xl border border-border hover:bg-slate-50 transition-all group active:scale-95 shadow-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none" className="text-secondary group-hover:text-accent transition-colors"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.223-4.857-.026-3.039 2.48-4.5 2.597-4.571-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701z"/></svg>
-                                <span className="text-[11px] font-bold text-accent uppercase tracking-wider">Apple ID</span>
                             </button>
                         </div>
                     </div>

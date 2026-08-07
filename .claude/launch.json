@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "3d-config-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "garden-scene-builder", "run", "dev"],
+      "port": 3000
     }
   ]
 }

@@ -1,8 +1,11 @@
 import React from 'react';
-import { Download, Upload, Loader2 } from 'lucide-react';
+import { Download, Upload, Loader2, RotateCcw } from 'lucide-react';
 import { Button } from '../Button';
 import { CompareSlider } from '../CompareSlider';
 import { SkeletonLoader } from '../SkeletonLoader';
+import { ImageViewport } from '../ImageViewport';
+import { RENDER_CANVAS, RENDER_CANVAS_FITTED, RENDER_CANVAS_IMG_MAX_H, WORKSPACE_HEIGHT } from '../canvasStyles';
+import { GenerationProgress, RENDER_STAGES } from '../GenerationProgress';
 
 interface WorkspaceViewProps {
     title: string;
@@ -15,6 +18,8 @@ interface WorkspaceViewProps {
     loadingMessage?: string;
     onDownload: (base64Data: string, filename: string) => void;
     onInputClick: () => void;
+    /** Empty the workspace without leaving the tool. */
+    onReset?: () => void;
     downloadFormat?: 'png' | 'jpg';
     onFormatChange?: (format: 'png' | 'jpg') => void;
     customViewer?: React.ReactNode;
@@ -39,6 +44,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     loadingMessage,
     onDownload,
     onInputClick,
+    onReset,
     downloadFormat,
     onFormatChange,
     customViewer,
@@ -67,9 +73,15 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
             
             if (!currentIsRendered) {
                 return (
-                    <div className="w-full h-full min-h-[500px] max-h-[85vh] absolute inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm z-50">
-                        <Loader2 className="w-10 h-10 animate-spin text-accent mb-4 mx-auto" />
-                        <p className="text-accent font-medium text-lg tracking-wide text-center mx-auto">{loadingMessage}</p>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm z-50">
+                        {/* Same waiting state as Animation Studio. loadingMessage
+                            wins when the caller has something specific to say;
+                            otherwise it walks the generic render stages. */}
+                        <GenerationProgress
+                            stages={RENDER_STAGES}
+                            expectedSeconds={30}
+                            message={loadingMessage}
+                        />
                     </div>
                 );
             }
@@ -87,14 +99,16 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
         if (primaryImg && secondaryImg) {
             content = <CompareSlider beforeImage={secondaryImg} afterImage={primaryImg} />;
         } else if (primaryImg) {
-            content = <img src={getImageUrl(primaryImg)} className="w-full h-full object-contain" alt="Result" />;
+            // The finished render gets the real viewer - scroll to zoom, drag to
+            // pan. At 4K the detail that sells the job is invisible fitted to
+            // the window.
+            content = <ImageViewport src={getImageUrl(primaryImg)} alt="Render" />;
         } else if (secondaryImg) {
             content = (
                 <>
                     <img src={getImageUrl(secondaryImg)} className="w-full h-full object-contain opacity-40 grayscale" alt="Source" />
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="bg-background/80 backdrop-blur-md px-6 py-3 rounded-full text-primary font-medium shadow-[0_0_20px_rgba(139,92,246,0.3)] border border-accent/20 flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-accent animate-pulse"></div>
+                        <span className="bg-white/90 backdrop-blur-md px-5 py-2.5 rounded-xl text-slate-600 text-sm font-medium border border-slate-200 shadow-sm">
                             {placeholder}
                         </span>
                     </div>
@@ -125,24 +139,25 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
 
         return (
             <div
-                className="w-full h-full absolute inset-0 flex flex-col items-center justify-center cursor-pointer group hover:bg-accent/5 transition-colors duration-300 canvas-grid"
+                className="w-full h-full absolute inset-0 flex flex-col items-center justify-center cursor-pointer group transition-colors duration-200 hover:bg-slate-50/60"
                 onClick={onInputClick}
             >
-                <div className="w-20 h-20 bg-background rounded-full flex items-center justify-center mb-6 shadow-2xl group-hover:scale-110 group-hover:shadow-[0_0_30px_rgba(139,92,246,0.3)] transition-all duration-300 border border-border group-hover:border-accent/30 relative">
-                    <div className="absolute inset-0 rounded-full bg-accent/20 blur-xl group-hover:opacity-100 opacity-0 transition-opacity"></div>
-                    <Upload className="text-secondary group-hover:text-accent relative z-10 transition-colors" size={28} />
+                <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-5 shadow-sm group-hover:border-accent/40 transition-colors">
+                    <Upload className="text-slate-400 group-hover:text-accent transition-colors" size={22} />
                 </div>
-                <p className="text-accent font-semibold text-lg mb-1 tracking-tight text-center">Drop your drawing here</p>
-                <p className="text-secondary text-sm text-center">Or click to browse files</p>
+                <p className="text-slate-700 font-semibold text-base mb-1 text-center">Drop your drawing here</p>
+                <p className="text-slate-400 text-sm text-center">or click to browse files</p>
             </div>
         );
     };
 
     return (
-        <div className="h-full flex flex-col md:flex-row bg-background relative overflow-hidden">
+        <div className={`${WORKSPACE_HEIGHT} flex flex-col md:flex-row bg-background relative overflow-hidden`}>
 
-            {/* Ambient Lighting for Workspace */}
-            <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-accent/10 rounded-full blur-[100px] pointer-events-none"></div>
+            {/* A whisper of warmth behind the panels. It used to be a 400px
+                accent blob at 10% - the blurred coloured glow that makes an app
+                look like a demo rather than a tool. */}
+            <div className="absolute top-1/3 left-1/3 w-[500px] h-[500px] bg-accent/[0.03] rounded-full blur-[140px] pointer-events-none"></div>
 
             <div className="w-full md:w-80 flex flex-col gap-6 relative z-10 p-6 m-4 md:m-4 bg-white/95 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-y-auto border border-white">
                 <div className="space-y-4">
@@ -152,18 +167,63 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                 {controls}
             </div>
 
-            <div className="flex-1 p-6 lg:p-10 flex flex-col gap-6 relative z-10 min-w-0">
-                <div className="w-full max-w-5xl mx-auto flex-1 min-h-[500px] max-h-[85vh] glass-panel rounded-3xl overflow-hidden border-2 border-dashed border-border hover:border-accent/40 transition-colors duration-300 relative flex items-center justify-center bg-surface/50">
+            {/* overflow-y-auto: the column stacks canvas + export row + filmstrip
+                + history inside a fixed-height workspace — without its own
+                scrollbar, a tall (portrait) image pushed the history strip off
+                the bottom with no way to reach it. */}
+            <div className="flex-1 p-4 lg:p-6 flex flex-col gap-4 relative z-10 min-w-0 overflow-y-auto custom-scrollbar">
+                {/* Shared with Material Studio and Animation Studio - see
+                    canvasStyles. Once an image is loaded the frame shrink-wraps
+                    it (RENDER_CANVAS_FITTED): the invisible in-flow img below
+                    gives the box the image's exact aspect ratio, and every
+                    viewer branch renders absolute inset-0 over it, so the
+                    viewport IS the image - no letterbox bands. */}
+                {(() => {
+                    const sizingSrc = primaryImg ? getImageUrl(primaryImg) : (secondaryImg ? getImageUrl(secondaryImg) : null);
+                    return (
+                <div className={sizingSrc ? RENDER_CANVAS_FITTED : RENDER_CANVAS}>
+                    {sizingSrc && (
+                        <img
+                            src={sizingSrc}
+                            alt=""
+                            aria-hidden
+                            className={`block w-auto h-auto max-w-full ${RENDER_CANVAS_IMG_MAX_H} opacity-0 pointer-events-none select-none`}
+                        />
+                    )}
                     {renderViewer()}
-                    {(userPlan === 'free' || userPlan === 'trial') && primaryImg && (
+                    {/* Trial watermark overlay - off for now at Charlie's
+                        request (7 Aug 2026). The matching burn-in on download
+                        is gated in useAppEngine.handleDownload; re-enable both
+                        together. */}
+                    {false && (userPlan === 'free' || userPlan === 'trial') && primaryImg && (
                         <div className="absolute inset-0 pointer-events-none flex flex-col items-end justify-end p-8 z-50">
-                            <h1 className="text-4xl md:text-5xl font-black text-white/80 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] tracking-tighter">MODULR STUDIO</h1>
+                            <h1 className="text-4xl md:text-5xl font-bold text-white/80 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] tracking-tighter">MODULR STUDIO</h1>
                             <p className="text-lg text-white/60 font-medium italic drop-shadow-[0_2px_5px_rgba(0,0,0,0.8)]">Trial Render</p>
                         </div>
                     )}
                 </div>
+                    );
+                })()}
                 <div className="flex justify-between items-center text-xs text-secondary px-2 font-medium tracking-wide uppercase">
-                    <div></div> {/* Placeholder for flex parity */}
+                    {/* Reset lives here, opposite the export controls, rather
+                        than only in the header - after a render you did not want,
+                        the fix should be next to the thing you are looking at.
+                        Only offered when there is something to clear. */}
+                    {onReset && (primaryImg || secondaryImg) ? (
+                        <button
+                            onClick={() => {
+                                if (window.confirm('Clear this workspace and start again? Your uploaded image and render will be removed.')) {
+                                    onReset();
+                                }
+                            }}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors normal-case tracking-normal font-semibold"
+                        >
+                            <RotateCcw size={14} />
+                            Reset
+                        </button>
+                    ) : (
+                        <div />
+                    )}
                     {primaryImg && (
                         <div className="flex items-center gap-3">
                             <div className="flex items-center bg-surface/50 rounded-lg p-1 border border-border">
@@ -189,7 +249,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
 
                 {/* Batch Filmstrip Gallery */}
                 {batchImages && batchImages.length > 1 && (
-                    <div className="w-full max-w-5xl mx-auto flex gap-3 overflow-x-auto pb-2 custom-scrollbar mt-2">
+                    <div className="w-full flex gap-3 overflow-x-auto pb-2 custom-scrollbar mt-2">
                         {batchImages.map((bImage, idx) => {
                             const isSelected = selectedBatchIndex === idx;
                             const hasRender = batchRenders && batchRenders[idx];
@@ -200,7 +260,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                                 <div 
                                     key={idx} 
                                     onClick={() => onBatchSelect?.(idx)}
-                                    className={`relative flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-300 ${isSelected ? 'border-accent shadow-[0_0_15px_rgba(139,92,246,0.3)]' : 'border-border opacity-60 hover:opacity-100 hover:border-accent/50'}`}
+                                    className={`relative flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-300 ${isSelected ? 'border-accent shadow-sm ring-2 ring-accent/20' : 'border-border opacity-60 hover:opacity-100 hover:border-accent/50'}`}
                                 >
                                     {hasImage || hasRender ? (
                                         <img src={thumbUrl} className="w-full h-full object-cover" alt={`Angle ${idx + 1}`} />
@@ -222,12 +282,12 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                 )}
 
                 {extraFooter && (
-                    <div className="w-full max-w-5xl mx-auto">
+                    <div className="w-full">
                         {extraFooter}
                     </div>
                 )}
                 {historyFooter && (
-                    <div className="w-full max-w-5xl mx-auto">
+                    <div className="w-full">
                         {historyFooter}
                     </div>
                 )}

@@ -136,6 +136,168 @@ const MODULR_HOUSE_STYLE = `
  */
 const UNLIMITED_PLANS = new Set(['business', 'master']);
 
+/**
+ * Plans that include the Projects directory.
+ *
+ * Projects is a Business feature. It is not merely a screen: it stores client
+ * names, addresses, quote values and uploaded files, all of which sit on our
+ * Firestore and Storage bill for as long as the account exists — so it is not
+ * something a free or trial account gets.
+ *
+ * `master` is here because the owner must never be locked out of their own
+ * application, and `tester` because the point of tester access is to evaluate
+ * the product; a tester who cannot open Projects cannot report on it.
+ */
+const PROJECT_PLANS = new Set(['business', 'master', 'tester']);
+
+/**
+ * Plans that may generate animations.
+ *
+ * Deliberately excludes 'tester' where PROJECT_PLANS includes it. Projects cost
+ * pennies of storage; a single animation costs roughly a pound of real money,
+ * and tester access is handed out by email address to people we have not billed.
+ */
+const ANIMATION_PLANS = new Set(['business', 'master']);
+
+/**
+ * Animations per calendar month, per account.
+ *
+ * This number is a BUDGET, not a product decision. Measured: the model returns
+ * 10 seconds of 720p, billed at 5,792 tokens per second at $17.50/1M output
+ * tokens - about $1.01 a clip. Fifteen of those is roughly £12 a month, which
+ * is the ceiling agreed against a £189.99 subscription.
+ *
+ * Business is otherwise an unlimited plan, so if you raise this you are raising
+ * the worst-case bill for every subscriber simultaneously. Multiply before
+ * changing it.
+ */
+const ANIMATION_MONTHLY_LIMIT = 15;
+
+/** Calendar-month key, e.g. "2026-08". Comparing this to the stored key is what
+ *  resets the allowance - cheaper and more reliable than a scheduled job. */
+const currentPeriod = () => {
+    const d = new Date();
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+};
+
+/**
+ * Claim one animation from this month's allowance.
+ *
+ * Transactional for the same reason deductCredits is: read-then-write leaves a
+ * window where N concurrent requests all see 14 used, all pass, and all
+ * generate - which at a pound a clip is a real bill, not a rounding error.
+ */
+const claimAnimation = async (uid) => {
+    if (!db) return { allowed: true, remaining: ANIMATION_MONTHLY_LIMIT };
+
+    const userRef = db.collection('users').doc(uid);
+    try {
+        return await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(userRef);
+            const data = snap.exists ? snap.data() : {};
+            const period = currentPeriod();
+
+            // A stored period from a previous month means the allowance has
+            // rolled over, so the count starts again rather than carrying.
+            const used = data.animationPeriod === period ? (data.animationsUsed || 0) : 0;
+
+            if (used >= ANIMATION_MONTHLY_LIMIT) {
+                return {
+                    allowed: false,
+                    status: 402,
+                    error: `You have used all ${ANIMATION_MONTHLY_LIMIT} animations for this month. Your allowance resets on the 1st.`,
+                };
+            }
+
+            transaction.set(userRef, {
+                animationPeriod: period,
+                animationsUsed: used + 1,
+            }, { merge: true });
+
+            return { allowed: true, remaining: ANIMATION_MONTHLY_LIMIT - (used + 1) };
+        });
+    } catch (e) {
+        console.error('[ANIMATION] Quota check failed for uid:', uid, '|', e.message || e);
+        // Fail closed. A database blip must not become free unmetered video.
+        return { allowed: false, status: 503, error: 'Animation service temporarily unavailable. Please try again shortly.' };
+    }
+};
+
+/** Hand back an animation that was claimed but never generated, so a failure at
+ *  Google's end does not cost the user one of their fifteen. */
+const releaseAnimation = async (uid) => {
+    if (!db) return;
+    try {
+        const userRef = db.collection('users').doc(uid);
+        await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(userRef);
+            const data = snap.exists ? snap.data() : {};
+            if (data.animationPeriod !== currentPeriod()) return;
+            const used = data.animationsUsed || 0;
+            if (used > 0) transaction.set(userRef, { animationsUsed: used - 1 }, { merge: true });
+        });
+    } catch (e) {
+        console.error('[ANIMATION] Refund failed for uid:', uid, '|', e.message || e);
+    }
+};
+
+/**
+ * Camera and atmosphere presets.
+ *
+ * Held server-side so the wording cannot be edited from the browser, and phrased
+ * ENTIRELY as positive instructions: this model does not support negative
+ * prompts, so "not a full zoom" has to become "ending only slightly nearer than
+ * it began" or it simply will not be honoured.
+ */
+const ANIMATION_PRESETS = {
+    push_in: 'The camera drifts almost imperceptibly closer over the full duration, ending only slightly nearer than it began. The movement is one continuous, slow, steady glide, as if on a motorised slider.',
+    pan: 'The camera glides slowly and evenly sideways across the scene in one continuous motion, as if on a motorised slider. The pace is identical from the first frame to the last.',
+    orbit: 'The camera arcs very slowly around the building in one smooth continuous move, travelling only a short distance so the same face of the building stays in view throughout.',
+    still: 'The camera is locked off on a tripod and does not move. Only the scene itself has life in it.',
+};
+
+const ANIMATION_MODIFIERS = {
+    motion_blur: 'Subtle natural motion blur consistent with a real cinema camera at a 180 degree shutter angle.',
+    breeze: 'The existing leaves, grass and planting sway gently in a light breeze, every plant staying rooted in its own place.',
+    golden_hour: 'Warm low golden-hour sunlight with long soft shadows.',
+    people: 'A person walks slowly through the scene in the distance, small in frame and out of focus.',
+};
+
+/** Scene lock, stated twice on purpose.
+ *
+ *  The clip generator was observed redesigning the scene mid-clip (new
+ *  planting, altered building) even with a single fidelity sentence present.
+ *  Two measures against that: the lock is much more explicit about WHAT is
+ *  fixed (building, garden, every object's position, sky, lighting), and it is
+ *  repeated AFTER the user's free-text — the model weights the end of a prompt
+ *  heavily, so user wording can otherwise drown out an opening-only lock.
+ *  Phrased entirely positively: this model does not honour "do not" wording. */
+const ANIMATION_SCENE_LOCK_OPENING =
+    'This is documentary footage of an existing, finished scene, captured exactly as it stands. ' +
+    'Every frame of the clip shows the same building with the same geometry, proportions, cladding, doors, windows and colours as the source image, ' +
+    'and the same garden with every plant, tree, path, fence and object in exactly the same place, under the same sky and the same lighting.';
+const ANIMATION_SCENE_LOCK_CLOSING =
+    'From the first frame to the last, the scene itself stays identical to the source image; ' +
+    'the camera move and the gentle natural motion described above are the only things that change. ' +
+    'Pausing on any single frame shows the source image scene, unchanged, viewed from wherever the camera is at that moment.';
+
+/** Assemble the final prompt. Order matters: subject, then scene lock, then
+ *  camera, then atmosphere, then the user's text, then the scene lock again so
+ *  it is the last instruction the model reads. */
+const buildAnimationPrompt = (preset, modifiers, extra) => {
+    const parts = [
+        'Cinematic architectural film of this garden room, filmed on a full-frame cinema camera.',
+        ANIMATION_SCENE_LOCK_OPENING,
+        ANIMATION_PRESETS[preset] || ANIMATION_PRESETS.push_in,
+    ];
+    for (const m of modifiers) {
+        if (ANIMATION_MODIFIERS[m]) parts.push(ANIMATION_MODIFIERS[m]);
+    }
+    if (extra) parts.push(extra);
+    parts.push(ANIMATION_SCENE_LOCK_CLOSING);
+    return parts.join(' ');
+};
+
 // Try Before You Buy Trial Constants
 const RENDERS_PER_DAY = 5;    // Max renders during trial
 const TRIAL_HOURS = 24;       // Trial window in hours (1 day)
@@ -368,7 +530,13 @@ const enforceRenderAccess = async (req, creditCost) => {
     }
 
     // Testers are metered by render count and an expiry date, not by credits.
+    // Cheap ANALYSIS calls ride free for testers: every upload triggers an
+    // automatic analysis, so metering them burned the 40-render allowance
+    // roughly twice as fast as the tester was told it would last.
     if (isTesterUser(req.user)) {
+        if (creditCost === CREDIT_COSTS.ANALYSIS) {
+            return { allowed: true };
+        }
         const testerCheck = await checkTesterRender(req.user);
         if (!testerCheck.allowed) {
             return { allowed: false, status: testerCheck.status || 402, body: { error: testerCheck.error } };
@@ -448,7 +616,12 @@ console.log("----------------------------");
 // Rate Limiters
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    // 600, not 100: this is an SPA that polls (animation status is a GET every
+    // 3s — up to ~100 requests for one slow clip) and several people can share
+    // one office IP. At 100 a single demo session tripped the limiter, and the
+    // client used to interpret the resulting 429 as "locked out". Abuse control
+    // for the expensive endpoints is the per-UID userAiLimiter, not this.
+    max: 600,
     message: { error: "Too many requests from this IP, please try again after 15 minutes" },
     standardHeaders: true,
     legacyHeaders: false,
@@ -465,7 +638,11 @@ const aiLimiter = rateLimit({
 // Per-User AI Limiter — rate-limited per Firebase UID, not just IP
 const userAiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000,
-    max: 5, // max 5 renders per minute per individual user
+    // 12, not 5: a 5-image batch render is 5 sequential calls 3s apart, usually
+    // preceded by an analysis call on this same limiter — the old cap of 5
+    // aborted the batch midway with "individual render limit". Credits are the
+    // real spend control; this only has to stop runaway loops.
+    max: 12,
     // Authenticated requests key on the Firebase UID. The IP fallback must go
     // through ipKeyGenerator, which normalises IPv6 to its /64 prefix — a raw
     // req.ip lets an IPv6 client hop addresses within its own allocation and
@@ -623,6 +800,10 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
                     }
                     if (plan) {
                         update.plan = plan;
+                        // Grant Projects here rather than waiting for the next
+                        // credits fetch, so the directory is usable the moment
+                        // checkout returns.
+                        update.projectsEnabled = PROJECT_PLANS.has(plan);
                     }
                     transaction.set(userRef, update, { merge: true });
                 });
@@ -673,6 +854,10 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
             try {
                 await db.collection('users').doc(uid).set({
                     plan: 'free',
+                    // No new projects once the subscription lapses. Existing ones
+                    // stay readable and deletable - the data is theirs, and
+                    // holding it hostage is not what revocation is for.
+                    projectsEnabled: false,
                     subscriptionStatus: event.type === 'customer.subscription.deleted' ? 'cancelled' : 'past_due',
                     accessRevokedAt: admin.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
@@ -752,8 +937,60 @@ const enforceMasterLock = (req, res, next) => {
     if (isMasterUser(req.user) || isTesterUser(req.user)) {
         return next();
     }
+    // Log WHO was refused. When a legitimate tester is turned away (typo'd
+    // allowlist entry, Google alias, TESTER_EMAILS unset on the host) this line
+    // is the only way to see it from the server side.
+    console.warn(
+        `Pre-launch lock refused uid=${req.user?.uid || 'none'} email=${req.user?.email || 'none'} ` +
+        `(allowlisted testers: ${TESTER_EMAILS.length}, masters: ${MASTER_UIDS.length})`
+    );
     return res.status(403).json({ error: 'Access restricted: App is currently in pre-launch mode for Master Account access only.' });
 };
+
+/**
+ * Planning advice for the 3D configurator's PDF export.
+ *
+ * Registered BEFORE the auth middleware on purpose: the configurator runs in
+ * an iframe with no Firebase client, so it cannot attach a bearer token — and
+ * this route previously existed only in the configurator's standalone dev
+ * server, meaning the embedded product's PDF silently lost its Planning
+ * Guidance page (the fetch 404ed and the catch swallowed it). It is a cheap
+ * text-only call, hard-capped by the strict per-IP aiLimiter.
+ */
+app.post('/api/planning-advice', aiLimiter, async (req, res) => {
+    try {
+        const { roomDetails } = req.body;
+        if (!roomDetails || typeof roomDetails !== 'object') {
+            return res.status(400).json({ error: "Room details required" });
+        }
+
+        const prompt = `You are a professional but very approachable planning consultant in the UK.
+Provide a simplified, easy-to-understand planning guide for a proposed garden room with the following specifications:
+${JSON.stringify(roomDetails, null, 2).slice(0, 4000)}
+
+CRITICAL NOTE FOR HEIGHTS:
+The overall total front height from ground to the very top is ${roomDetails.overallTotalFrontHeightMm || roomDetails.heightMm}mm.
+The overall total back height from ground to the very top is ${roomDetails.overallTotalBackHeightMm || roomDetails.backHeightMm}mm.
+Always use these numbers when assessing height for Permitted Development limits.
+
+Provide a simplified assessment covering:
+1. Do I need planning permission? (A simple summary of Permitted Development Rights based on dimensions and roof style, avoiding confusing jargon).
+2. Building Regulations (a simple summary based on size, boundary, and use).
+3. Recommendation: You must strongly recommend the National Association of Planning Consultants (NAPC) and provide their website link: www.napc.uk. Explain why they are highly recommended (e.g., they are experts in securing planning permission and certificates of lawfulness for garden rooms, ensuring a stress-free and smooth process).
+
+Write this as a helpful guide for a homeowner. Use plain text formatting. Do NOT use markdown symbols like asterisks (*) or hash (#). Use capitalized words for emphasis and numbering for lists. Keep it conversational but professional.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-pro-latest',
+            contents: prompt
+        });
+
+        res.json({ advice: response.text });
+    } catch (error) {
+        console.error("Planning advice error:", error);
+        res.status(500).json({ error: "Failed to generate planning advice" });
+    }
+});
 
 // Protect all API routes and enforce master lock
 app.use('/api', verifyFirebaseToken, enforceMasterLock);
@@ -995,6 +1232,52 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
         const deckingValue = materials.decking && materials.decking.trim().toLowerCase() !== 'none' ? materials.decking : null;
 
         /**
+         * Hard constraints from the 3D configurator's scene spec.
+         *
+         * When the source image came from "Send to Render Engine" the client
+         * attaches the room's actual data — so instead of the model counting
+         * doors in a screenshot, the prompt states the truth outright. Missing
+         * or malformed spec degrades silently to the screenshot-only prompt.
+         */
+        const buildConfigSpecBlock = (spec) => {
+            if (!spec || typeof spec !== 'object') return '';
+            try {
+                const mm = (v) => (typeof v === 'number' && isFinite(v) ? `${Math.round(v)}mm` : null);
+                const lines = [];
+                const wStr = mm(spec.widthMm), dStr = mm(spec.depthMm);
+                if (wStr && dStr) lines.push(`- Building footprint: ${wStr} wide x ${dStr} deep.`);
+                if (spec.shape) lines.push(`- Roof form: ${spec.shape === 'Gable' ? 'gable (dual pitched)' : 'flat roof'}.`);
+                const doors = Array.isArray(spec.doors) ? spec.doors.slice(0, 12) : [];
+                lines.push(`- Door sets: EXACTLY ${doors.length}.${doors.length ? '' : ' Render no exterior door sets beyond what the source shows.'}`);
+                doors.forEach((dr, i) => {
+                    const style = dr.style === 'crittall' ? 'black steel Crittall-style with a grid of slim glazing bars' : 'standard glazed';
+                    lines.push(`  - Door ${i + 1}: ${Math.max(1, parseInt(dr.leaves) || 1)} leaf, ${mm(dr.widthMm) || 'unspecified width'} x ${mm(dr.heightMm) || 'unspecified height'}, ${style}, on the ${sanitizeString(String(dr.wall || ''), 10) || 'front'} elevation.`);
+                });
+                const windows = Array.isArray(spec.windows) ? spec.windows.slice(0, 12) : [];
+                lines.push(`- Windows: EXACTLY ${windows.length}.`);
+                windows.forEach((wn, i) => {
+                    const style = wn.style === 'crittall' ? 'Crittall-style glazing bar grid' : 'standard';
+                    lines.push(`  - Window ${i + 1}: ${mm(wn.widthMm) || '?'} x ${mm(wn.heightMm) || '?'}, ${style}, ${sanitizeString(String(wn.wall || ''), 10) || 'front'} elevation.`);
+                });
+                if (spec.cladding) lines.push(`- Wall cladding: ${sanitizeString(String(spec.cladding), 60).replace(/_/g, ' ')} boards, laid ${spec.claddingOrientation === 'vertical' ? 'vertically' : 'horizontally'}.`);
+                if (spec.frameColor) lines.push(`- All door and window frames: ${sanitizeString(String(spec.frameColor), 30)}.`);
+                if (spec.roofMaterial) lines.push(`- Roof covering: ${sanitizeString(String(spec.roofMaterial), 30)}.`);
+                const sky = Array.isArray(spec.skylights) ? spec.skylights.length : 0;
+                if (sky > 0) lines.push(`- Skylights: EXACTLY ${sky}.`);
+                if (!lines.length) return '';
+                return `
+      CONFIGURED SPECIFICATION - ABSOLUTE TRUTH, OVERRIDES ANYTHING COUNTED FROM THE IMAGE:
+      The client configured this exact building. The render MUST show precisely:
+${lines.map(l => '      ' + l).join('\n')}
+      Do not add, remove or restyle any of the elements listed above.`;
+            } catch (e) {
+                console.warn('configSpec block skipped:', e.message || e);
+                return '';
+            }
+        };
+        const configSpecBlock = buildConfigSpecBlock(req.body.configSpec);
+
+        /**
          * Material instruction for CGI-model sources (3D Configurator, SketchUp).
          *
          * Deliberately different from buildMaterialInstruction. For a photograph,
@@ -1046,6 +1329,8 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
       - IGNORE 3D GRID LINES: the source may show a floor grid on the ground. Never render
         these. Replace with natural, seamless ground or grass.
 
+      ${configSpecBlock}
+
       MATERIAL ASSIGNMENTS:
       ${buildCgiMaterialInstruction('Walls', materials.walls)}
       ${buildCgiMaterialInstruction('Roof', materials.roof)}
@@ -1082,6 +1367,8 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
 
       GEOMETRY & CONTEXT RULES — CRITICAL:
       - STRICT GEOMETRY LOCK: Reproduce the EXACT structure shown. Do NOT add, remove, or modify any architectural elements. DO NOT change the roof pitch or shape.\n      - NO HALLUCINATIONS: Do NOT invent structures, decking, patios, porches, or raised platforms unless clearly visible in the source. Your assignment is surface-level materials only.\n      - PRESERVE THE ENVIRONMENT: Render surrounding landscape, fences, trees, and sky exactly as shown.
+
+      ${configSpecBlock}
 
       MATERIAL ASSIGNMENTS:
       ${buildMaterialInstruction('Walls/Main Facade', materials.walls)}
@@ -1293,6 +1580,85 @@ app.post('/api/analyzeMaterials', userAiLimiter, async (req, res) => {
     } catch (error) {
         console.error("Material analysis error:", error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * Batch counterpart of /api/analyzeMaterials — one call over every angle of
+ * the same building. This route existed in server.js.original but never made
+ * it across in the rebuild, so every multi-image batch upload 404ed and the
+ * client fell back to "Could not auto-detect batch materials".
+ */
+app.post('/api/analyzeBatchMaterials', userAiLimiter, async (req, res) => {
+    try {
+        const { base64Images } = req.body;
+        if (!Array.isArray(base64Images) || base64Images.length === 0) {
+            return res.status(400).json({ error: "Expected an array of images" });
+        }
+        if (base64Images.length > 5) {
+            return res.status(400).json({ error: "A batch is at most 5 images" });
+        }
+        const images = base64Images.map(img => sanitizeString(img, 10_000_000)).filter(Boolean);
+        if (images.length !== base64Images.length) {
+            return res.status(400).json({ error: "Every batch entry must be an image" });
+        }
+
+        const access = await enforceRenderAccess(req, CREDIT_COSTS.ANALYSIS);
+        if (!access.allowed) {
+            return res.status(access.status).json(access.body);
+        }
+
+        const parts = images.map(img => fileToGenerativePart(img, "image/jpeg"));
+        const prompt = `
+        ROLE: Expert Architectural Analyst.
+        TASK: You are looking at ${images.length} images of the same building (e.g. a garden room/studio) from different angles.
+
+        CRITICAL INSTRUCTIONS:
+        1. Identify the spatial orientation of EACH image (e.g., "Front Elevation", "Left Side", "Right Side", "Back", "Angle").
+        2. Analyze the main exterior materials visible in EACH image individually. Building sides often have different cladding (e.g. Cedar on the front, cheap metal on the sides).
+        3. DECKING/GROUND: ONLY return a value if a clearly visible raised deck, paved patio, or path is directly in front of the building. If the ground is simply grass, return 'none'.
+        4. DOORS - CRITICAL: Describe the EXACT glazing zone on every visible door:
+           - If glass is ONLY on the top half and bottom is solid: write "top-half glazed, bottom solid panel".
+           - If the door is fully glazed top to bottom: write "full-height glazed".
+           - Always include: material, colour, door style and the glazing zone.
+           - Example: "Anthracite grey aluminium composite door, top-half glazed, bottom solid panel".
+        5. If a component is not visible in that specific angle, return "none".
+
+        Return a JSON array where each object corresponds to an image in the exact order they were provided.
+        `;
+        parts.push({ text: prompt });
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-pro-latest',
+            contents: { parts },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            orientation: { type: Type.STRING },
+                            walls: { type: Type.STRING },
+                            roof: { type: Type.STRING },
+                            windows: { type: Type.STRING },
+                            doors: { type: Type.STRING },
+                            decking: { type: Type.STRING }
+                        }
+                    }
+                },
+                temperature: 0.2
+            }
+        });
+
+        const text = response.text;
+        if (!text) throw new Error("No analysis returned");
+        const cleanText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        res.json({ result: JSON.parse(cleanText) });
+
+    } catch (error) {
+        console.error("Batch analysis error:", error);
+        res.status(500).json({ error: "Batch material analysis failed. Please try again." });
     }
 });
 
@@ -1581,12 +1947,214 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
 });
 
 
+// --- ANIMATION STUDIO ---
+//
+// Three routes rather than one, because video does not fit the shape every other
+// AI route here uses.
+//
+// Measured against the real model: interactions.create() takes ~45s and hands
+// back a file that is still PROCESSING, which then needs ~6s of polling before
+// it can be downloaded. So the work is split - /start does the expensive call
+// and returns a file handle, /status reports whether it is ready, and /video
+// streams the bytes. The client shows progress across the whole minute instead
+// of staring at one silent request.
+//
+// The file also lives behind Google's API key, so it can never be handed to the
+// browser directly; /video is the proxy that keeps the key server-side.
+
+const resolveEffectivePlan = async (req) => {
+    if (isMasterUser(req.user)) return 'master';
+    if (isTesterUser(req.user)) return 'tester';
+    if (!db) return 'free';
+    try {
+        const snap = await db.collection('users').doc(req.user.uid).get();
+        return snap.exists ? (snap.data().plan || 'free') : 'free';
+    } catch (e) {
+        console.error('[ANIMATION] Plan lookup failed:', e.message || e);
+        return null; // caller treats null as "refuse", never as "free"
+    }
+};
+
+app.post('/api/animation/start', userAiLimiter, async (req, res) => {
+    let claimed = false;
+    try {
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
+        const preset      = sanitizeString(req.body.preset, 40);
+        const extra       = sanitizeString(req.body.extraPrompt, 800);
+        const aspectRatio = req.body.aspectRatio === '9:16' ? '9:16' : '16:9';
+        const modifiers   = Array.isArray(req.body.modifiers)
+            ? req.body.modifiers.slice(0, 8).map(m => sanitizeString(m, 40))
+            : [];
+
+        if (!base64Image) {
+            return res.status(400).json({ error: 'A source image is required.' });
+        }
+
+        const plan = await resolveEffectivePlan(req);
+        if (plan === null) {
+            return res.status(503).json({ error: 'Could not verify your plan. Please try again shortly.' });
+        }
+        if (!ANIMATION_PLANS.has(plan)) {
+            return res.status(403).json({ error: 'Animation Studio is part of the Business plan.' });
+        }
+
+        // Claimed BEFORE the model is called, not after. Google bills for the
+        // generation whether or not we manage to deliver it, so the allowance
+        // has to be spent at the moment the spend is committed.
+        const quota = await claimAnimation(req.user.uid);
+        if (!quota.allowed) {
+            return res.status(quota.status).json({ error: quota.error });
+        }
+        claimed = true;
+
+        const prompt = buildAnimationPrompt(preset, modifiers, extra);
+
+        const interaction = await ai.interactions.create({
+            model: 'gemini-omni-flash-preview',
+            input: [
+                { type: 'image', data: base64Image, mime_type: 'image/jpeg' },
+                { type: 'text', text: prompt },
+            ],
+            // snake_case throughout. The published JS example shows
+            // generationConfig/videoConfig and the API rejects both.
+            generation_config: { video_config: { task: 'image_to_video' } },
+            // 'uri' not 'base64': output measured at 2.5 MB, and inline delivery
+            // is capped around 4 MB. A longer or busier clip would silently
+            // exceed it.
+            response_format: { type: 'video', aspect_ratio: aspectRatio, delivery: 'uri' },
+        });
+
+        const uri = interaction?.output_video?.uri;
+        const match = uri && uri.match(/files\/([a-zA-Z0-9_-]+)/);
+        if (!match) {
+            throw new Error('The model did not return a video.');
+        }
+
+        res.json({
+            fileName: `files/${match[1]}`,
+            remaining: quota.remaining,
+            limit: ANIMATION_MONTHLY_LIMIT,
+        });
+
+    } catch (error) {
+        console.error('Animation start error:', error);
+        if (claimed) await releaseAnimation(req.user.uid);
+        res.status(500).json({ error: error.message || 'Animation failed to start.' });
+    }
+});
+
+app.get('/api/animation/status', async (req, res) => {
+    try {
+        const name = sanitizeString(req.query.file, 120);
+        if (!/^files\/[a-zA-Z0-9_-]+$/.test(name)) {
+            return res.status(400).json({ error: 'Invalid file reference.' });
+        }
+        const info = await ai.files.get({ name });
+        const state = info?.state?.name || info?.state || 'PROCESSING';
+        res.json({ state, ready: state === 'ACTIVE' });
+    } catch (error) {
+        console.error('Animation status error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/animation/video', async (req, res) => {
+    try {
+        const name = sanitizeString(req.query.file, 120);
+        if (!/^files\/[a-zA-Z0-9_-]+$/.test(name)) {
+            return res.status(400).json({ error: 'Invalid file reference.' });
+        }
+
+        // Streamed through the server rather than redirected to: the download
+        // URL only works with our API key attached, and that key must never
+        // reach the browser.
+        // Use the shared apiKey (with its VITE_ fallback) — reading the env var
+        // directly meant a deployment still on the deprecated name could
+        // generate clips (paying for them) but never download them.
+        const upstream = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/${name}:download?alt=media`,
+            { headers: { 'x-goog-api-key': apiKey } }
+        );
+        if (!upstream.ok) {
+            return res.status(upstream.status).json({ error: 'Could not fetch the finished video.' });
+        }
+
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Content-Disposition', 'attachment; filename="modulr-animation.mp4"');
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+        res.send(buffer);
+
+    } catch (error) {
+        console.error('Animation download error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
 // --- BILLING / ACCOUNT ENDPOINTS ---
+
+/**
+ * Mirror the account's Projects entitlement onto its user document.
+ *
+ * Projects are written by the browser straight to Firestore, so the control that
+ * actually stops an unentitled account creating them is a Firestore rule — and a
+ * rule can only read documents. It cannot see MASTER_UIDS, TESTER_EMAILS or
+ * anything else that lives in the environment.
+ *
+ * Writing the resolved answer here is what lets one rule cover every kind of
+ * entitled account. It is deliberately a separate boolean rather than an
+ * overloaded `plan` value: stamping plan:'master' on a document would also hand
+ * out unmetered rendering via UNLIMITED_PLANS, and would keep doing so after the
+ * UID was removed from the allowlist.
+ *
+ * The read first keeps this to one write per entitlement change rather than one
+ * per page load.
+ */
+const syncProjectAccess = async (uid, enabled) => {
+    if (!db) return;
+    try {
+        const ref = db.collection('users').doc(uid);
+        const snap = await ref.get();
+        if (snap.exists && snap.data().projectsEnabled === enabled) return;
+        await ref.set({ projectsEnabled: enabled }, { merge: true });
+    } catch (e) {
+        console.error('[PROJECT ACCESS] Sync failed for uid:', uid, '|', e.message || e);
+    }
+};
+
+/** Animations still available this month, from a user document. A stored period
+ *  from an earlier month means the allowance has already rolled over. */
+const animationsLeftFor = (data) => {
+    const used = data?.animationPeriod === currentPeriod() ? (data.animationsUsed || 0) : 0;
+    return Math.max(0, ANIMATION_MONTHLY_LIMIT - used);
+};
+
+/** Attach the feature flags the client gates its UI on. The client must never
+ *  derive these from the plan string itself — that would mean maintaining the
+ *  entitlement list in two places, free to drift apart. */
+const withEntitlements = (payload, data) => {
+    const canUseAnimation = ANIMATION_PLANS.has(payload.plan);
+    return {
+        ...payload,
+        canUseProjects: PROJECT_PLANS.has(payload.plan),
+        canUseAnimation,
+        animationsLimit: ANIMATION_MONTHLY_LIMIT,
+        animationsLeft: canUseAnimation ? animationsLeftFor(data) : 0,
+    };
+};
 
 app.get('/api/user/credits', async (req, res) => {
     try {
         if (isMasterUser(req.user)) {
-            return res.json({ credits: 'Unlimited', plan: 'master' });
+            await syncProjectAccess(req.user.uid, true);
+            // Read for the animation counter only - master bypasses every other
+            // limit, but the monthly video allowance is a cost ceiling rather
+            // than an entitlement, so it applies to the owner too.
+            const snap = db ? await db.collection('users').doc(req.user.uid).get() : null;
+            return res.json(withEntitlements(
+                { credits: 'Unlimited', plan: 'master' },
+                snap?.exists ? snap.data() : {}
+            ));
         }
 
         // Tester: report the remaining renders and days so the account page can
@@ -1598,7 +2166,8 @@ app.get('/api/user/credits', async (req, res) => {
             const startedAt = data.testerStartedAt || Date.now();
             const expiresAt = startedAt + TESTER_DAYS * 86400000;
             const msLeft = Math.max(0, expiresAt - Date.now());
-            return res.json({
+            if (data.projectsEnabled !== true) await syncProjectAccess(req.user.uid, true);
+            return res.json(withEntitlements({
                 credits: Math.max(0, TESTER_RENDERS - used),
                 plan: 'tester',
                 rendersLeft: Math.max(0, TESTER_RENDERS - used),
@@ -1606,7 +2175,7 @@ app.get('/api/user/credits', async (req, res) => {
                 trialDaysLeft: Math.ceil(msLeft / 86400000),
                 trialExpiresAt: new Date(expiresAt).toISOString(),
                 trialBlocked: used >= TESTER_RENDERS || msLeft <= 0,
-            });
+            }));
         }
 
         const userRef = db.collection('users').doc(req.user.uid);
@@ -1623,10 +2192,10 @@ app.get('/api/user/credits', async (req, res) => {
             if (existingTrial.exists) {
                 console.warn(`[TRIAL ABUSE] Blocked repeat trial from IP hash: ${ipHash.slice(0, 8)}...`);
                 await userRef.set({
-                    credits: 0, plan: 'free', trialBlocked: true,
+                    credits: 0, plan: 'free', trialBlocked: true, projectsEnabled: false,
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
-                return res.json({ credits: 0, plan: 'free', rendersLeft: 0, rendersPerDay: RENDERS_PER_DAY, trialDaysLeft: 0, trialBlocked: true });
+                return res.json(withEntitlements({ credits: 0, plan: 'free', rendersLeft: 0, rendersPerDay: RENDERS_PER_DAY, trialDaysLeft: 0, trialBlocked: true }));
             }
 
             const starterCredits = 0; // Removed starter credits so they can't spam other credit endpoints, but can still use trial renders.
@@ -1634,7 +2203,7 @@ app.get('/api/user/credits', async (req, res) => {
             const trialExpiresAt = new Date(now + TRIAL_HOURS * 3600000).toISOString();
             await Promise.all([
                 userRef.set({
-                    credits: starterCredits, plan: 'free',
+                    credits: starterCredits, plan: 'free', projectsEnabled: false,
                     trialStartTimestamp: now,
                     trialExpiresAt: trialExpiresAt,
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
@@ -1644,11 +2213,17 @@ app.get('/api/user/credits', async (req, res) => {
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 })
             ]);
-            return res.json({ credits: starterCredits, plan: 'free', rendersLeft: RENDERS_PER_DAY, rendersPerDay: RENDERS_PER_DAY, trialDaysLeft: 1, trialExpiresAt, trialBlocked: false });
+            return res.json(withEntitlements({ credits: starterCredits, plan: 'free', rendersLeft: RENDERS_PER_DAY, rendersPerDay: RENDERS_PER_DAY, trialDaysLeft: 1, trialExpiresAt, trialBlocked: false }));
         }
-        
+
         const data = userDoc.data();
         const plan = data.plan || 'free';
+
+        // Keep the flag the Firestore rules read in step with the plan Stripe
+        // last set - this is where a new subscriber gains Projects and where a
+        // cancelled one loses the ability to add more.
+        const entitled = PROJECT_PLANS.has(plan);
+        if (data.projectsEnabled !== entitled) await syncProjectAccess(req.user.uid, entitled);
 
         // For free/trial plan: enrich response with daily render info
         if (plan === 'free') {
@@ -1660,7 +2235,7 @@ app.get('/api/user/credits', async (req, res) => {
             const rendersUsed = data.trialRendersUsed || 0;
             const rendersLeft = Math.max(0, RENDERS_PER_DAY - rendersUsed);
             
-            return res.json({
+            return res.json(withEntitlements({
                 credits: data.credits || 0,
                 plan,
                 rendersLeft,
@@ -1668,16 +2243,16 @@ app.get('/api/user/credits', async (req, res) => {
                 trialDaysLeft: trialExpired ? 0 : 1,
                 trialExpiresAt: trialExpiresAt,
                 trialBlocked: rendersLeft <= 0 || trialExpired
-            });
+            }));
         }
 
         // Unlimited plans report a sentinel rather than a balance — the UI
         // renders an infinity symbol for any non-numeric value.
         if (UNLIMITED_PLANS.has(plan)) {
-            return res.json({ credits: 'Unlimited', plan });
+            return res.json(withEntitlements({ credits: 'Unlimited', plan }, data));
         }
 
-        res.json({ credits: data.credits || 0, plan });
+        res.json(withEntitlements({ credits: data.credits || 0, plan }, data));
     } catch (error) {
         console.error("Error fetching user credits:", error);
         res.status(500).json({ error: "Could not fetch credits balance" });

@@ -41,6 +41,9 @@ interface AppState {
   redo: () => void;
   
   // Scene Actions
+  /** Replace the room with a saved design, merged over defaults so scenes
+   *  saved before a field existed still load cleanly. */
+  loadRoom: (room: Partial<SceneState['room']>) => void;
   updateRoom: (updates: Partial<SceneState['room']>) => void;
   updatePricing: (updates: Partial<SceneState['pricing']>) => void;
   addDoor: () => void;
@@ -77,6 +80,9 @@ interface AppState {
   // Pricing
   calculatePrice: () => number;
 }
+
+/** Timestamp of the last undo snapshot — see saveState for why. */
+let lastSaveStateAt = 0;
 
 const initialState: SceneState = {
   room: {
@@ -146,6 +152,13 @@ const initialState: SceneState = {
       oak_cladding: 185,
       cedar_composite: 190,
       oak_composite: 185,
+      light_oak_composite: 185,
+      dark_grey_composite: 180,
+      light_grey_composite: 180,
+      white_composite: 180,
+      slate_blue_composite: 180,
+      sage_composite: 180,
+      clay_composite: 180,
     },
     roofPrices: {
       epdm: 80,
@@ -212,10 +225,20 @@ export const useStore = create<AppState>((set, get) => ({
   setHarmonizedImage: (image) => set({ harmonizedImage: image }),
   setRenderTransform: (updates) => set((state) => ({ renderTransform: { ...state.renderTransform, ...updates } })),
 
-  saveState: () => set((state) => ({
-    pastScenes: [...state.pastScenes, JSON.parse(JSON.stringify(state.scene))],
-    futureScenes: []
-  })),
+  saveState: () => set((state) => {
+    // One undo step per gesture, not per slider tick. The sidebar wraps every
+    // debounced slider commit in saveState, so a single drag pushed dozens of
+    // near-identical snapshots — Undo then appeared to do nothing, stepping
+    // back 100mm at a time. Collapse snapshots taken within a second.
+    const now = Date.now();
+    const tooSoon = now - lastSaveStateAt < 1000;
+    lastSaveStateAt = now;
+    if (tooSoon && state.pastScenes.length > 0) return state;
+    return {
+      pastScenes: [...state.pastScenes, JSON.parse(JSON.stringify(state.scene))],
+      futureScenes: []
+    };
+  }),
 
   undo: () => set((state) => {
     if (state.pastScenes.length === 0) return state;
@@ -238,6 +261,18 @@ export const useStore = create<AppState>((set, get) => ({
       futureScenes: newFuture,
     };
   }),
+
+  loadRoom: (room) => set((state) => ({
+    // The current scene goes onto the undo stack, so loading a design is
+    // reversible like any other edit.
+    pastScenes: [...state.pastScenes, JSON.parse(JSON.stringify(state.scene))],
+    futureScenes: [],
+    scene: {
+      ...state.scene,
+      room: { ...initialState.room, ...room },
+    },
+    selectedElementId: null,
+  })),
 
   updateRoom: (updates) => set((state) => {
     let finalUpdates = { ...updates };
@@ -550,6 +585,11 @@ export const useStore = create<AppState>((set, get) => ({
       wallArea -= area;
       windowArea += area;
     });
+
+    // Openings are subtracted independently with no overlap handling, so
+    // enough large doors/windows could drive wallArea negative — which showed
+    // up as a negative cladding line silently deflating the quote.
+    wallArea = Math.max(0, wallArea);
 
     const claddingPrice = wallArea * (pricing.claddingPrices[room.cladding as string] || 150);
     const floorPrice = floorArea * (pricing.basePrices[room.baseMaterial as string] || 60);

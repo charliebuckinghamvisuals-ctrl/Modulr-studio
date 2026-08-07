@@ -2,7 +2,7 @@ import React from 'react';
 import {
     Share2, Clock, PoundSterling, FileCheck, Users, Repeat,
     ArrowRight, Instagram, Camera, TrendingUp, Box, Sofa, Rotate3d,
-    Layers, Palette, FileText, FolderOpen,
+    Layers, Palette, FileText, FolderOpen, Film,
 } from 'lucide-react';
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
@@ -10,10 +10,10 @@ import { AppStage } from '../../types';
 
 /** Same scale as About and Guide so the site reads as one thing. */
 const TYPE = {
-    eyebrow: 'text-[11px] font-black uppercase tracking-[0.25em] text-accent',
+    eyebrow: 'text-[11px] font-bold uppercase tracking-[0.25em] text-accent',
     h1: 'text-5xl md:text-6xl lg:text-7xl font-bold text-accent tracking-tight leading-[1.05]',
     h2: 'text-3xl md:text-4xl font-bold text-accent tracking-tight leading-[1.1]',
-    h3: 'text-xl md:text-2xl font-extrabold text-accent tracking-tight',
+    h3: 'text-xl md:text-2xl font-bold text-accent tracking-tight',
     lead: 'text-lg md:text-xl text-secondary leading-relaxed',
     body: 'text-base md:text-lg text-secondary leading-relaxed',
     small: 'text-sm md:text-base text-secondary leading-relaxed',
@@ -42,6 +42,19 @@ const USE_CASES: UseCase[] = [
             'Seasonal variations of a design you have already posted',
         ],
         image: '/gallery-14-after.jpg',
+    },
+    {
+        icon: <Film size={22} />,
+        title: 'Video, without a film crew',
+        body:
+            'Every platform pushes video ahead of photographs, and a moving scheme holds attention in a way a still never does. Animation Studio turns any finished render into a short cinematic clip - a slow push in, a gentle pan, planting moving in the breeze - in about a minute, from the render you already made.',
+        points: [
+            'A moving hero for your website instead of a static image',
+            'Reels and shorts from schemes you have never built',
+            'Open a client presentation with the building alive rather than sitting still',
+            'No camera, no drone, no waiting for the weather',
+        ],
+        image: '/hero-clip-4.jpg',
     },
     {
         icon: <PoundSterling size={22} />,
@@ -263,11 +276,11 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                                         <div className="w-10 h-10 rounded-xl bg-accent/8 border border-accent/15 flex items-center justify-center text-accent shrink-0">
                                             {step.icon}
                                         </div>
-                                        <span className="text-[11px] font-black uppercase tracking-[0.2em] text-secondary/40">
+                                        <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-secondary/40">
                                             {String(i + 1).padStart(2, '0')}
                                         </span>
                                     </div>
-                                    <h3 className="text-base font-extrabold text-accent tracking-tight leading-snug">
+                                    <h3 className="text-base font-bold text-accent tracking-tight leading-snug">
                                         {step.title}
                                     </h3>
                                     <p className="text-sm text-secondary leading-relaxed">{step.body}</p>
@@ -319,7 +332,7 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
                             {NUMBERS.map(n => (
                                 <div key={n.label} className={`${CARD} p-7 space-y-3`}>
-                                    <div className="text-2xl md:text-3xl font-black text-accent tracking-tight leading-none">
+                                    <div className="text-2xl md:text-3xl font-bold text-accent tracking-tight leading-none">
                                         {n.figure}
                                     </div>
                                     <div className="text-xs md:text-sm text-secondary leading-snug">{n.label}</div>
@@ -351,7 +364,7 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                                             <div className="w-12 h-12 rounded-2xl bg-accent/8 border border-accent/15 flex items-center justify-center text-accent shrink-0">
                                                 {uc.icon}
                                             </div>
-                                            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-secondary/50">
+                                            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-secondary/50">
                                                 {String(i + 1).padStart(2, '0')}
                                             </span>
                                         </div>
@@ -447,7 +460,7 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                                             {item.status}
                                         </span>
                                     </div>
-                                    <h3 className="text-lg font-extrabold text-accent tracking-tight leading-snug">
+                                    <h3 className="text-lg font-bold text-accent tracking-tight leading-snug">
                                         {item.title}
                                     </h3>
                                     <p className={TYPE.small}>{item.body}</p>

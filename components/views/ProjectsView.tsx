@@ -2,15 +2,19 @@ import React, { useEffect, useState, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 import {
     FolderOpen, Plus, Trash2, MapPin, User, FileText, Image as ImageIcon,
-    Upload, Loader2, ArrowLeft, PoundSterling, Paperclip,
+    Upload, Loader2, ArrowLeft, PoundSterling, Paperclip, Trophy, Lock,
 } from 'lucide-react';
 import { DraftingBackground } from '../DraftingBackground';
 import { Button } from '../Button';
-import { Project, ProjectAssetKind, ProjectStatus } from '../../types';
+import { ProjectsDashboard } from '../ProjectsDashboard';
+import { useAuth } from '../../hooks/useAuth';
+import { useCredits } from '../../hooks/useCredits';
+import { AppStage, Project, ProjectAssetKind, ProjectStatus } from '../../types';
 import {
     listProjects, createProject, updateProject, deleteProject,
     uploadAsset, removeAsset, MAX_ASSET_BYTES,
 } from '../../services/projectService';
+import { isWon } from '../../services/projectMetrics';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
     lead: 'Lead',
@@ -49,7 +53,49 @@ const formatCurrency = (value: number | null) =>
 const formatDate = (ms: number) =>
     new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-export const ProjectsView: React.FC = () => {
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** ms -> the yyyy-mm-dd an <input type="date"> expects, in local time. */
+const toDateInput = (ms: number | null) => {
+    if (ms === null) return '';
+    const d = new Date(ms);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/** Parsed at midday local rather than midnight UTC: a quote dated the 1st would
+ *  otherwise land on the 31st of the previous month west of Greenwich, and drop
+ *  into the wrong month's total. */
+const fromDateInput = (value: string) =>
+    value === '' ? null : new Date(`${value}T12:00:00`).getTime();
+
+/** Shared chrome for the locked states, so a signed-out visitor lands on a page
+ *  that looks like the rest of the site rather than a bare message. */
+const Gate: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar">
+        <DraftingBackground pageName="PROJECTS" />
+        <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[150px] pointer-events-none" />
+        <div className="flex-1 flex items-center justify-center p-6 md:p-12 relative z-10">
+            <div className="max-w-lg w-full text-center p-8 md:p-10 rounded-3xl bg-white border border-slate-200 shadow-sm">
+                {children}
+            </div>
+        </div>
+    </div>
+);
+
+interface ProjectsViewProps {
+    onNavigate?: (stage: AppStage) => void;
+}
+
+export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
+    const { user } = useAuth();
+    /**
+     * The server decides. Deriving entitlement from the plan string here would
+     * put the list of entitled plans in a second place, free to drift from the
+     * server's - and the flag the Firestore rules enforce comes from the same
+     * source, so the button and the write can never disagree.
+     */
+    const { canUseProjects, loading: planLoading } = useCredits();
+
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -71,7 +117,13 @@ export const ProjectsView: React.FC = () => {
         }
     };
 
-    useEffect(() => { refresh(); }, []);
+    // Only fetch once the account is known to be entitled. Asking earlier just
+    // earns a permission-denied from Firestore and an error toast on a screen
+    // that is about to show an upgrade panel anyway.
+    useEffect(() => {
+        if (user && canUseProjects) refresh();
+        else if (!planLoading) setLoading(false);
+    }, [user, canUseProjects, planLoading]);
 
     const handleCreate = async () => {
         try {
@@ -126,12 +178,42 @@ export const ProjectsView: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleField = (field: keyof Project, value: any) => {
+    const handleFields = (changes: Partial<Project>) => {
         if (!active) return;
-        setProjects(prev => prev.map(p => (p.id === active.id ? { ...p, [field]: value } : p)));
-        pendingWrites.current[field as string] = value;
+        setProjects(prev => prev.map(p => (p.id === active.id ? { ...p, ...changes } : p)));
+        Object.assign(pendingWrites.current, changes);
         if (flushTimer.current) clearTimeout(flushTimer.current);
         flushTimer.current = setTimeout(flush, 700);
+    };
+
+    const handleField = (field: keyof Project, value: any) =>
+        handleFields({ [field]: value } as Partial<Project>);
+
+    /**
+     * Change status and keep the two dates the dashboard counts by honest.
+     *
+     * The dates are stamped here rather than inferred at read time because the
+     * user can correct them afterwards - once a date is on the record it is
+     * theirs, so nothing re-stamps a field that already has a value.
+     */
+    const handleStatus = (status: ProjectStatus) => {
+        if (!active) return;
+        const now = Date.now();
+        const changes: Partial<Project> = { status };
+
+        // Leaving Lead implies a price went out - Quoted, Won and Lost all
+        // presuppose a quote.
+        if (status !== 'lead' && active.quotedAt === null) changes.quotedAt = now;
+
+        if (status === 'won' || status === 'complete') {
+            if (active.wonAt === null) changes.wonAt = now;
+        } else if (active.wonAt !== null) {
+            // Moved back out of Won. Leaving the acceptance date behind would
+            // keep the job in won totals for a month it is no longer won in.
+            changes.wonAt = null;
+        }
+
+        handleFields(changes);
     };
 
     const handleDelete = async (project: Project) => {
@@ -182,7 +264,69 @@ export const ProjectsView: React.FC = () => {
 
     const inputClass =
         'w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition';
-    const labelClass = 'text-[10px] font-black uppercase tracking-[0.2em] text-slate-500';
+    const labelClass = 'text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500';
+
+    if (!user) {
+        return (
+            <Gate>
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center mb-6">
+                    <FolderOpen size={24} className="text-accent" />
+                </div>
+                <h1 className="text-2xl font-bold text-accent tracking-tight mb-3">Projects</h1>
+                <p className="text-sm text-slate-600 leading-relaxed mb-8">
+                    Keep every client, address, quote value and file with the job it belongs to,
+                    and see what you have quoted and won at a glance. Sign in to your Business
+                    account to open your directory.
+                </p>
+                <Button onClick={() => onNavigate?.(AppStage.AUTH)}>Sign in</Button>
+            </Gate>
+        );
+    }
+
+    // Wait for the answer rather than guessing at it - flashing an upgrade
+    // screen at a paying subscriber for half a second is worse than a spinner.
+    if (planLoading || canUseProjects === null) {
+        return (
+            <Gate>
+                <div className="flex items-center justify-center gap-3 text-slate-500 py-6">
+                    <Loader2 className="animate-spin" size={20} />
+                    <span className="text-sm">Checking your plan…</span>
+                </div>
+            </Gate>
+        );
+    }
+
+    if (!canUseProjects) {
+        return (
+            <Gate>
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mb-6">
+                    <Lock size={22} className="text-amber-600" />
+                </div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-600 mb-3">
+                    Business plan feature
+                </p>
+                <h1 className="text-2xl font-bold text-accent tracking-tight mb-3">
+                    Projects is part of Business
+                </h1>
+                <p className="text-sm text-slate-600 leading-relaxed mb-8">
+                    Store clients, addresses, quote values, renders and documents against every
+                    job, and track what you have quoted and won across the year. It is included
+                    with the Business plan and is not available on the standard plan.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                    <Button onClick={() => onNavigate?.(AppStage.PRICING)}>
+                        See Business plan
+                    </Button>
+                    <button
+                        onClick={() => onNavigate?.(AppStage.HOME)}
+                        className="text-sm text-slate-500 hover:text-accent transition-colors px-3 py-2"
+                    >
+                        Back to home
+                    </button>
+                </div>
+            </Gate>
+        );
+    }
 
     return (
         <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar">
@@ -227,6 +371,9 @@ export const ProjectsView: React.FC = () => {
                                     </p>
                                 </div>
                             ) : (
+                                <>
+                                <ProjectsDashboard projects={projects} />
+
                                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                     {projects.map(project => (
                                         <div
@@ -238,7 +385,7 @@ export const ProjectsView: React.FC = () => {
                                                 <h3 className="font-bold text-slate-800 leading-snug group-hover:text-accent transition-colors">
                                                     {project.name}
                                                 </h3>
-                                                <span className={`shrink-0 text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full ${STATUS_STYLES[project.status]}`}>
+                                                <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${STATUS_STYLES[project.status]}`}>
                                                     {STATUS_LABELS[project.status]}
                                                 </span>
                                             </div>
@@ -260,7 +407,7 @@ export const ProjectsView: React.FC = () => {
                                             </div>
 
                                             <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                                                <span className="text-lg font-black text-accent">
+                                                <span className="text-lg font-bold text-accent">
                                                     {formatCurrency(project.estimateValue)}
                                                 </span>
                                                 <span className="text-[10px] text-slate-400">
@@ -270,6 +417,7 @@ export const ProjectsView: React.FC = () => {
                                         </div>
                                     ))}
                                 </div>
+                                </>
                             )}
                         </>
                     )}
@@ -342,7 +490,7 @@ export const ProjectsView: React.FC = () => {
 
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="space-y-1.5">
-                                            <label className={labelClass}>Value (£)</label>
+                                            <label className={labelClass}>Quote value (£)</label>
                                             <input
                                                 type="number"
                                                 min={0}
@@ -361,7 +509,7 @@ export const ProjectsView: React.FC = () => {
                                             <select
                                                 className={inputClass}
                                                 value={active.status}
-                                                onChange={e => handleField('status', e.target.value)}
+                                                onChange={e => handleStatus(e.target.value as ProjectStatus)}
                                             >
                                                 {(Object.keys(STATUS_LABELS) as ProjectStatus[]).map(s => (
                                                     <option key={s} value={s}>{STATUS_LABELS[s]}</option>
@@ -369,6 +517,56 @@ export const ProjectsView: React.FC = () => {
                                             </select>
                                         </div>
                                     </div>
+
+                                    {/* Dates the totals are counted by. Only shown once they
+                                        mean something - a lead has no quote date to correct. */}
+                                    {active.status !== 'lead' && (
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1.5">
+                                                <label className={labelClass}>Quote sent</label>
+                                                <input
+                                                    type="date"
+                                                    className={inputClass}
+                                                    value={toDateInput(active.quotedAt)}
+                                                    onChange={e =>
+                                                        handleField('quotedAt', fromDateInput(e.target.value))
+                                                    }
+                                                />
+                                            </div>
+                                            {isWon(active) && (
+                                                <div className="space-y-1.5">
+                                                    <label className={labelClass}>Accepted</label>
+                                                    <input
+                                                        type="date"
+                                                        className={inputClass}
+                                                        value={toDateInput(active.wonAt)}
+                                                        onChange={e =>
+                                                            handleField('wonAt', fromDateInput(e.target.value))
+                                                        }
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {isWon(active) ? (
+                                        <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+                                            <Trophy size={16} className="shrink-0" />
+                                            <p className="text-xs font-semibold">
+                                                Client accepted{active.wonAt ? ` on ${formatDate(active.wonAt)}` : ''}
+                                                {(active.estimateValue ?? 0) > 0 &&
+                                                    ` · ${formatCurrency(active.estimateValue)}`}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => handleStatus('won')}
+                                            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-bold uppercase tracking-[0.14em] hover:bg-emerald-100 transition-colors"
+                                        >
+                                            <Trophy size={15} />
+                                            Client accepted - mark as won
+                                        </button>
+                                    )}
 
                                     <div className="space-y-1.5">
                                         <label className={labelClass}>Notes</label>

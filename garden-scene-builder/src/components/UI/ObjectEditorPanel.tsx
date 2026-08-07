@@ -1,5 +1,6 @@
 import { useStore } from '../../store';
 import { Trash2, RotateCw } from 'lucide-react';
+import { DimensionSlider } from '../DimensionSlider';
 
 export function ObjectEditorPanel() {
   const { selectedObjectId, scene, updateObject, removeObject, viewMode } = useStore();

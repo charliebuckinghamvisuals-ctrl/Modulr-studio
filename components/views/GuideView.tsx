@@ -1,16 +1,16 @@
 import React from 'react';
 import {
-    BookOpen, Box, Layers, PenTool, CloudSun, Palette, FolderOpen,
+    BookOpen, Box, Layers, PenTool, CloudSun, Palette, FolderOpen, Film,
     Lightbulb, AlertTriangle, CheckCircle2, ArrowRight,
 } from 'lucide-react';
 import { DraftingBackground } from '../DraftingBackground';
 
 /** Shared type scale, matching the About page so the two read as one site. */
 const TYPE = {
-    eyebrow: 'text-[11px] font-black uppercase tracking-[0.25em] text-accent',
+    eyebrow: 'text-[11px] font-bold uppercase tracking-[0.25em] text-accent',
     h1: 'text-5xl md:text-6xl lg:text-7xl font-bold text-accent tracking-tight leading-[1.05]',
     h2: 'text-3xl md:text-4xl font-bold text-accent tracking-tight leading-[1.1]',
-    h3: 'text-xl md:text-2xl font-extrabold text-accent tracking-tight',
+    h3: 'text-xl md:text-2xl font-bold text-accent tracking-tight',
     lead: 'text-lg md:text-xl text-secondary leading-relaxed',
     body: 'text-base md:text-lg text-secondary leading-relaxed',
     small: 'text-sm md:text-base text-secondary leading-relaxed',
@@ -156,6 +156,32 @@ const TOOLS: ToolGuide[] = [
         ],
     },
     {
+        icon: <Film size={22} />,
+        name: 'Animation Studio',
+        purpose:
+            'Turn a finished render into a short cinematic clip - a slow push in, a gentle pan, a breeze through the planting.',
+        inputs: ['A finished render, or any exterior photograph'],
+        steps: [
+            'Upload the render you want to bring to life.',
+            'Choose a camera move: slow push in, slow pan, gentle arc, or locked off.',
+            'Add motion if you want it: motion blur, gentle breeze, golden hour, a distant figure.',
+            'Add anything else in your own words, then generate.',
+            'It takes about a minute. Play it back, then download the MP4.',
+        ],
+        uses: [
+            'A moving hero for your website instead of a still',
+            'Social posts, which the algorithms favour over photographs',
+            'Open a client presentation with the scheme moving rather than sitting there',
+            'Show a scheme in its setting, with the planting and light alive',
+        ],
+        tips: [
+            'Describe what you want to see, not what you do not. This model reads "no cars" as a request for cars.',
+            'Clips are 10 seconds at 720p and every one carries an invisible SynthID watermark.',
+            'Included with the Business plan, with a monthly allowance shown at the top of the page.',
+        ],
+        status: 'New',
+    },
+    {
         icon: <FolderOpen size={22} />,
         name: 'Projects',
         purpose:
@@ -202,6 +228,16 @@ const WORKFLOWS = [
             'Material Studio close-up sheet for the specification page',
             'Weather Lab for a seasonal alternate',
             'Everything attached to one Project',
+        ],
+    },
+    {
+        title: 'A moving hero for your website',
+        time: 'About 3 minutes',
+        steps: [
+            'Open a finished render, or make one in the Render Engine',
+            'Animation Studio, slow push in, with a gentle breeze',
+            'Download the MP4 and drop it straight onto your homepage',
+            'Repeat for two or three schemes and run them as a slideshow',
         ],
     },
     {
@@ -273,7 +309,7 @@ export const GuideView: React.FC = () => {
                             </p>
                         </div>
                         <div className={`lg:col-span-4 ${CARD} p-6 space-y-3`}>
-                            <div className="text-[11px] font-black uppercase tracking-[0.15em] text-secondary">
+                            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-secondary">
                                 Covered in this guide
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -343,7 +379,7 @@ export const GuideView: React.FC = () => {
                                                 <div className="w-12 h-12 rounded-2xl bg-accent/8 border border-accent/15 flex items-center justify-center text-accent shrink-0">
                                                     {tool.icon}
                                                 </div>
-                                                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-secondary/50">
+                                                <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-secondary/50">
                                                     {String(i + 1).padStart(2, '0')}
                                                 </span>
                                                 {tool.status && (
@@ -356,7 +392,7 @@ export const GuideView: React.FC = () => {
                                             <p className={TYPE.small}>{tool.purpose}</p>
 
                                             <div className="pt-2 space-y-2">
-                                                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary/60">
+                                                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-secondary/60">
                                                     What to feed it
                                                 </div>
                                                 <ul className="space-y-1.5">
@@ -372,13 +408,13 @@ export const GuideView: React.FC = () => {
 
                                         <div className="lg:col-span-7 space-y-6">
                                             <div className="space-y-3">
-                                                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary/60">
+                                                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-secondary/60">
                                                     How to use it
                                                 </div>
                                                 <ol className="space-y-2.5">
                                                     {tool.steps.map((step, si) => (
                                                         <li key={step} className="flex gap-3 text-sm md:text-base text-secondary leading-relaxed">
-                                                            <span className="shrink-0 w-5 h-5 rounded-full bg-accent/10 text-accent text-[10px] font-black flex items-center justify-center mt-0.5">
+                                                            <span className="shrink-0 w-5 h-5 rounded-full bg-accent/10 text-accent text-[10px] font-bold flex items-center justify-center mt-0.5">
                                                                 {si + 1}
                                                             </span>
                                                             {step}
@@ -388,7 +424,7 @@ export const GuideView: React.FC = () => {
                                             </div>
 
                                             <div className="space-y-3">
-                                                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary/60">
+                                                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-secondary/60">
                                                     Ways people use it
                                                 </div>
                                                 <ul className="grid sm:grid-cols-2 gap-x-8 gap-y-2.5">
@@ -433,7 +469,7 @@ export const GuideView: React.FC = () => {
                             {WORKFLOWS.map(flow => (
                                 <div key={flow.title} className={`${CARD} p-8 space-y-5`}>
                                     <div className="flex items-baseline justify-between gap-4">
-                                        <h3 className="text-lg font-extrabold text-accent tracking-tight">{flow.title}</h3>
+                                        <h3 className="text-lg font-bold text-accent tracking-tight">{flow.title}</h3>
                                         <span className="text-[10px] font-bold uppercase tracking-wider text-secondary/60 shrink-0">
                                             {flow.time}
                                         </span>
@@ -441,7 +477,7 @@ export const GuideView: React.FC = () => {
                                     <ol className="space-y-2.5">
                                         {flow.steps.map((step, i) => (
                                             <li key={step} className="flex gap-3 text-sm text-secondary leading-relaxed">
-                                                <span className="shrink-0 w-5 h-5 rounded-full bg-accent/10 text-accent text-[10px] font-black flex items-center justify-center mt-0.5">
+                                                <span className="shrink-0 w-5 h-5 rounded-full bg-accent/10 text-accent text-[10px] font-bold flex items-center justify-center mt-0.5">
                                                     {i + 1}
                                                 </span>
                                                 {step}

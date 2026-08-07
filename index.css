@@ -1,4 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+/* Build-time Tailwind (v4). The app previously shipped NO compiled CSS and
+ * relied on the cdn.tailwindcss.com runtime compiler — which is why first
+ * paint took 10-20s (blank white until the CDN script downloaded, ran, and
+ * generated every style in the browser). These tokens recreate the old
+ * runtime tailwind.config: utility colours resolve through the CSS variables
+ * below so the theming system is unchanged. */
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-highlight: var(--surface-highlight);
+  --color-border: var(--border);
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --font-sans: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-heading: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
 
 * {
   font-family: 'Montserrat', sans-serif !important;
@@ -246,9 +266,34 @@ input[type=range]::-webkit-slider-runnable-track {
 
 .canvas-grid {
   background-size: 30px 30px;
-  background-image: 
+  background-image:
     linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+}
+
+/* ── Render canvas artboard ──────────────────────────────
+ *
+ * The surface every render sits on, across Render Engine, Line Converter,
+ * Weather Lab, Material Studio and Animation Studio.
+ *
+ * Two grids rather than one: a fine 16px rule with a heavier 96px rule over it,
+ * the way drafting paper and every professional canvas app does it. A single
+ * even grid reads as a placeholder texture; the major/minor pair reads as a
+ * measured surface and gives the eye something to judge scale against when an
+ * image is zoomed.
+ *
+ * Tinted with the brand sage rather than neutral black, so it sits under the
+ * work without turning the panel grey.
+ */
+.render-grid {
+  background-color: #fbfbfa;
+  background-image:
+    linear-gradient(to right, rgba(64, 90, 86, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(64, 90, 86, 0.05) 1px, transparent 1px),
+    linear-gradient(to right, rgba(64, 90, 86, 0.085) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(64, 90, 86, 0.085) 1px, transparent 1px);
+  background-size: 16px 16px, 16px 16px, 96px 96px, 96px 96px;
+  background-position: -1px -1px;
 }
 
 /* ── Pro Drafting Grid (Technical Graph Paper) ──────────── */

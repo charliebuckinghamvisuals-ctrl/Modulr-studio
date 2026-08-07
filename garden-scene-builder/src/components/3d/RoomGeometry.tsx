@@ -1,5 +1,5 @@
 import React from 'react';
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState, useRef, useEffect, useDeferredValue } from 'react';
 import { Room } from '../../types';
 import { useFrame } from '@react-three/fiber';
 import { Geometry, Base, Subtraction, Addition } from '@react-three/csg';
@@ -103,6 +103,30 @@ function DimText({ value, onValueChange, position, rotation, children, isDraggab
   );
 }
 
+// Crittall-style glazing bars: grid of slim steel bars over a glass panel.
+// Pane sizes adapt to the glass dimensions (targeting ~400mm wide x ~450mm tall panes).
+function CrittallBars({ glassW, glassH, depth, color }: { glassW: number, glassH: number, depth: number, color: string }) {
+  const barT = 0.022;
+  const cols = Math.max(1, Math.round(glassW / 0.40));
+  const rows = Math.max(2, Math.round(glassH / 0.45));
+  return (
+    <group>
+      {Array.from({ length: cols - 1 }).map((_, i) => (
+        <mesh key={`v-${i}`} position={[-glassW/2 + (glassW/cols)*(i+1), 0, 0]}>
+          <boxGeometry args={[barT, glassH, depth]} />
+          <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} />
+        </mesh>
+      ))}
+      {Array.from({ length: rows - 1 }).map((_, i) => (
+        <mesh key={`h-${i}`} position={[0, -glassH/2 + (glassH/rows)*(i+1), 0]}>
+          <boxGeometry args={[glassW, barT, depth]} />
+          <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 function AnimatedDoorLeaves({ door, frameColorHex, frameThickness, sashThickness, depth, room }: { door: any, frameColorHex: string, frameThickness: number, sashThickness: number, depth: number, room: Room }) {
   const { areDoorsOpen, toggleDoors, viewMode } = useStore();
   const leavesRef = useRef<THREE.Group[]>([]);
@@ -187,6 +211,14 @@ function AnimatedDoorLeaves({ door, frameColorHex, frameThickness, sashThickness
               <boxGeometry args={[leafW - sashThickness*2, door.heightMm/1000 - frameThickness*2 - sashThickness*2, 0.02]} />
               <meshPhysicalMaterial color="#aabed1" transmission={0.9} ior={1.5} thickness={0.05} roughness={0.1} clearcoat={1} envMapIntensity={3} />
             </mesh>
+            {door.style === 'crittall' && (
+              <CrittallBars
+                glassW={leafW - sashThickness*2}
+                glassH={door.heightMm/1000 - frameThickness*2 - sashThickness*2}
+                depth={0.03}
+                color={frameColorHex}
+              />
+            )}
           </group>
         )
       })}
@@ -363,9 +395,13 @@ export function RoomGeometry() {
   const claddingBoxGeom = useMemo(() => createWorldScaleBoxGeometry(w, h + 0.05, d, true, 0, 0, 0, isVertical), [w, h, d, isVertical]);
   const gableTriangleGeom = useMemo(() => createWorldScaleGableGeometry(w, roofH, wallThickness, 0, h + 0.05, 0, isVertical), [w, roofH, wallThickness, h, isVertical]);
   const lShapeCutOuterGeom = useMemo(() => createWorldScaleBoxGeometry(cutW + 0.2, h + 1, cutD + 0.2, false, 0, 0, 0, isVertical), [cutW, cutD, h, roofH, isGable, isVertical]);
-  const roofFlatGeom = useMemo(() => createWorldScaleBoxGeometry(roofW + 0.2, roofH, roofD + 0.2, false, 0, 0, 0), [roofW, roofH, roofD]);
-  const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohLeft) / Math.cos(gablePitch), 0.1, roofD + 0.2, false, 0, 0, 0), [w, ohLeft, gablePitch, roofD]);
-  const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohRight) / Math.cos(gablePitch), 0.1, roofD + 0.2, false, 0, 0, 0), [w, ohRight, gablePitch, roofD]);
+  // Roof plan size is exactly roofW x roofD (wall footprint + user overhangs).
+  // A 100mm lip was previously baked in here (+0.2), so even with every
+  // overhang at 0 the roof was never flush — overhang is now entirely the
+  // user's Overhangs & Canopy setting.
+  const roofFlatGeom = useMemo(() => createWorldScaleBoxGeometry(roofW, roofH, roofD, false, 0, 0, 0), [roofW, roofH, roofD]);
+  const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohLeft) / Math.cos(gablePitch), 0.1, roofD, false, 0, 0, 0), [w, ohLeft, gablePitch, roofD]);
+  const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohRight) / Math.cos(gablePitch), 0.1, roofD, false, 0, 0, 0), [w, ohRight, gablePitch, roofD]);
 
 
   const renderBaseMeshes = () => {
@@ -455,6 +491,13 @@ export function RoomGeometry() {
     );
   };
 
+  // Deferred copies drive only the CSG wall cutouts. While a door/window is
+  // being dragged the frames track the pointer at full rate, but the expensive
+  // boolean rebuild of the wall mesh runs at deferred priority, so it coalesces
+  // instead of blocking every pointer step — that lag was the whole drag feel.
+  const deferredDoors = useDeferredValue(room.doors);
+  const deferredWindows = useDeferredValue(room.windows);
+
   return (
     <group position={[room.x / 1000, 0, room.z / 1000]} rotation={[0, room.rot, 0]}>
       {/* Interior light to prevent partitions from being too dark */}
@@ -465,9 +508,13 @@ export function RoomGeometry() {
 
       {/* Main Elevated Structure */}
       <group position={[0, baseH, 0]}>
-        {/* Main Structure via CSG */}
-        <mesh 
-          castShadow 
+        {/* Main Structure via CSG. The element is memoized so renders caused by
+            per-step drag updates reuse the same element and React skips the
+            subtree — the boolean ops only re-run when one of the deps below
+            actually changes (deferredDoors/deferredWindows settle after drag). */}
+        {useMemo(() => (
+        <mesh
+          castShadow
           receiveShadow
           onPointerOver={(e) => { e.stopPropagation(); useStore.getState().setHoveredElementId('room'); }}
           onPointerOut={() => useStore.getState().setHoveredElementId(null)}
@@ -505,13 +552,11 @@ export function RoomGeometry() {
             {isLShape && (
               <Subtraction position={[w/2 - cutW/2 + 0.1, h/2, d/2 - cutD/2 + 0.1]}>
                 <primitive object={lShapeCutOuterGeom} attach="geometry" />
-                <meshStandardMaterial 
+                <meshStandardMaterial
                   color="#ffffff"
                   {...texFront}
-                   
-                  metalness={claddingProps.metalness} 
-                   
-                  bumpScale={0.1} 
+                  metalness={0.1}
+                  bumpScale={0.1}
                 />
               </Subtraction>
             )}
@@ -597,7 +642,7 @@ export function RoomGeometry() {
             )}
 
             {/* Doors Cutouts */}
-            {(room.doors || []).map(door => {
+            {(deferredDoors || []).map(door => {
               const doorW = door.widthMm / 1000;
               const doorH = door.heightMm / 1000;
               const offset = door.offsetMm / 1000;
@@ -641,7 +686,7 @@ export function RoomGeometry() {
             )}
 
             {/* Window Cutouts */}
-            {room.windows.map(win => {
+            {(deferredWindows || []).map(win => {
               const winW = win.widthMm / 1000;
               const winH = win.heightMm / 1000;
               const sill = (win.sillMm ?? 0) / 1000;
@@ -674,6 +719,16 @@ export function RoomGeometry() {
             })}
           </Geometry>
         </mesh>
+        ), [
+          claddingBoxGeom, pfLeftGeom, pfRightGeom, pfTopGeom, lShapeCutOuterGeom, gableTriangleGeom,
+          texFront.map, texBack.map, texLeft.map, texRight.map,
+          texFront.color, texBack.color, texLeft.color, texRight.color, texFront.roughness,
+          room.hasPictureFrame, room.interiorColor,
+          w, d, h, wallThickness, roofH, pfHeight, ohFront,
+          isLShape, isTShape, isCornerCut, isGable, isPitched,
+          cutW, cutD, frontH, backH, roofPitch,
+          deferredDoors, deferredWindows,
+        ])}
 
         {/* Internal Floor */}
         <mesh position={[0, 0.005, 0]} receiveShadow>
@@ -768,11 +823,11 @@ export function RoomGeometry() {
             {room.roofMaterial === 'sedum' && (
               <>
                 <mesh position={[-w/4 - ohLeft/2 - 0.06 * Math.sin(gablePitch), roofH/2 - ohLeft * Math.tan(gablePitch)/2 + 0.06 * Math.cos(gablePitch), 0]} rotation={[0, 0, gablePitch]} castShadow receiveShadow>
-                   <boxGeometry args={[(w/2 + ohLeft) / Math.cos(gablePitch), 0.02, roofD + 0.18]} />
+                   <boxGeometry args={[(w/2 + ohLeft) / Math.cos(gablePitch), 0.02, roofD - 0.02]} />
                    <meshStandardMaterial color="#ffffff" {...texRoof}  bumpScale={0.1} roughness={0.9} />
                 </mesh>
                 <mesh position={[w/4 + ohRight/2 + 0.06 * Math.sin(gablePitch), roofH/2 - ohRight * Math.tan(gablePitch)/2 + 0.06 * Math.cos(gablePitch), 0]} rotation={[0, 0, -gablePitch]} castShadow receiveShadow>
-                   <boxGeometry args={[(w/2 + ohRight) / Math.cos(gablePitch), 0.02, roofD + 0.18]} />
+                   <boxGeometry args={[(w/2 + ohRight) / Math.cos(gablePitch), 0.02, roofD - 0.02]} />
                    <meshStandardMaterial color="#ffffff" {...texRoof}  bumpScale={0.1} roughness={0.9} />
                 </mesh>
               </>
@@ -834,7 +889,7 @@ export function RoomGeometry() {
               })()}
               <Geometry>
                 <Base>
-                  {room.fasciaMaterial === 'match_cladding' ? <primitive object={roofFlatGeom} attach="geometry" /> : <boxGeometry args={[roofW + 0.2, roofH, roofD + 0.2]} />}
+                  {room.fasciaMaterial === 'match_cladding' ? <primitive object={roofFlatGeom} attach="geometry" /> : <boxGeometry args={[roofW, roofH, roofD]} />}
                 </Base>
                 {isLShape && (
                   <Subtraction position={[cutBoxPosX, 0, cutBoxPosZ]}>
@@ -863,7 +918,7 @@ export function RoomGeometry() {
             <meshStandardMaterial color="#444" metalness={0.8} roughness={0.2} />
             <Geometry>
               <Base>
-                <boxGeometry args={[roofW + 0.22, 0.02, roofD + 0.22]} />
+                <boxGeometry args={[roofW + 0.02, 0.02, roofD + 0.02]} />
               </Base>
               {isLShape && (
                 <Subtraction position={[cutBoxPosX, 0, cutBoxPosZ]}>
@@ -892,7 +947,7 @@ export function RoomGeometry() {
               <meshStandardMaterial color="#ffffff" {...texRoof}  bumpScale={0.1} roughness={0.9} />
               <Geometry>
                 <Base>
-                  <boxGeometry args={[roofW + 0.18, 0.02, roofD + 0.18]} />
+                  <boxGeometry args={[roofW - 0.02, 0.02, roofD - 0.02]} />
                 </Base>
                 {isLShape && (
                   <Subtraction position={[cutBoxPosX, 0, cutBoxPosZ]}>
@@ -1138,6 +1193,14 @@ export function RoomGeometry() {
                      <boxGeometry args={[paneW - sashThickness*2, winH - frameThickness*2 - sashThickness*2, 0.02]} />
                      <meshPhysicalMaterial color="#aabed1" transmission={0.9} ior={1.5} thickness={0.05} roughness={0.1} clearcoat={1} envMapIntensity={3} />
                    </mesh>
+                   {win.style === 'crittall' && (
+                     <CrittallBars
+                       glassW={paneW - sashThickness*2}
+                       glassH={winH - frameThickness*2 - sashThickness*2}
+                       depth={0.03}
+                       color={frameColorHex}
+                     />
+                   )}
 
                    {/* Window Handle */}
                    {room.hasDoorHandles && (
@@ -1546,9 +1609,14 @@ export function RoomGeometry() {
               value={Math.round((frontH + baseH + roofH) * 1000)}
               onValueChange={(val: number) => {
                 const store = useStore.getState();
-                const newTotal = val;
-                const newFrontH = newTotal - (store.scene.room.baseHeightMm || 100) - (store.scene.room.roofHeightMm || 200);
-                store.updateRoom({ heightMm: Math.max(10, newFrontH) });
+                // For Gable, heightMm IS the total height (frontH already has
+                // base+roof subtracted), so the typed total stores directly.
+                // Subtracting again shrank a Gable building by base+roof every
+                // time the displayed number was retyped unchanged.
+                const newHeight = isGable
+                  ? val
+                  : val - (store.scene.room.baseHeightMm || 100) - (store.scene.room.roofHeightMm || 200);
+                store.updateRoom({ heightMm: Math.max(10, newHeight) });
               }}
             />
             {room.showDimensions && (
@@ -1911,14 +1979,16 @@ export function RoomGeometry() {
             // Collect elements on this wall
             type Opening = { id: string, type: 'door'|'window', offset: number, width: number, onUpdateWidth?: (val: number) => void };
             const elements: Opening[] = [];
-            if (wall === 'front' && room.doors) {
-               room.doors.forEach(door => {
-                 elements.push({
-                   id: door.id, type: 'door', offset: door.offsetMm / 1000, width: door.widthMm / 1000,
-                   onUpdateWidth: (val) => useStore.getState().updateDoor(door.id, { widthMm: Math.max(10, val) })
-                 });
+            // Doors filter by their own wall, same as windows below — the old
+            // code pushed EVERY door into the front chain, so a back-wall door
+            // produced garbage segment dimensions on the front elevation and
+            // was missing from its own wall's chain.
+            (room.doors || []).filter(dr => dr.wall === wall).forEach(door => {
+               elements.push({
+                 id: door.id, type: 'door', offset: door.offsetMm / 1000, width: door.widthMm / 1000,
+                 onUpdateWidth: (val) => useStore.getState().updateDoor(door.id, { widthMm: Math.max(10, val) })
                });
-            }
+            });
             room.windows.filter(w => w.wall === wall).forEach(win => {
                elements.push({
                  id: win.id, type: 'window', offset: (win.offsetMm ?? 0) / 1000, width: win.widthMm / 1000,

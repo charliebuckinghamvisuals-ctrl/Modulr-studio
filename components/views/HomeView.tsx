@@ -4,6 +4,7 @@ import { AppStage } from '../../types';
 import { CompareSlider } from '../CompareSlider';
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
+import { HeroVideoCarousel } from '../HeroVideoCarousel';
 
 interface HomeViewProps {
     onOpenEngine: () => void;
@@ -18,17 +19,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
             {/* Pro Drafting Grid (Disabled for Homepage for clean look) */}
             <DraftingBackground pageName="HOMEPAGE" hideGrid={true} />
 
-
-
             <div className="max-w-6xl w-full flex flex-col items-center relative z-10 gap-24 px-8">
 
-                {/* 1. Hero Section */}
+                {/* 1. Hero Section. The eyebrow badge that used to open this
+                    block now sits on the hero video below, so it is not said
+                    twice within one screen. */}
                 <div className="flex flex-col items-center text-center max-w-4xl">
-                    <div className="mb-8 px-4 py-1.5 rounded-full glass-panel border border-border text-[9px] font-bold uppercase tracking-[0.2em] text-accent flex items-center gap-2 shadow-xl animate-glow">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                        Architectural Intelligence
-                    </div>
-
                     <div className="flex flex-col items-center mb-8 w-full px-4">
                         <img src="/Logo.png" alt="Modulr Studio Logo" className="h-[24rem] md:h-[32rem] w-auto object-contain drop-shadow-2xl -mt-28 -mb-28 md:-mt-36 md:-mb-36" />
                         <h1 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-accent font-bold block max-w-4xl mx-auto leading-tight mt-6 text-center w-fit inline-block">
@@ -51,10 +47,25 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                     </div>
                 </div>
 
+                {/*
+                  Hero, sitting under the logo and headline rather than above
+                  them - the name and the promise land first, and the work is
+                  then the proof of it.
+
+                  Contained rather than full-bleed, and that is a sharpness
+                  decision rather than a stylistic one. Full-bleed drew the frame
+                  at the whole viewport width - 2880 device px on a retina laptop
+                  - which is more than a 1080p source has to give, so it read as
+                  soft. Capped by this container it draws at roughly 850 CSS px,
+                  comfortably inside what the files can cover even at 2x.
+                */}
+                <HeroVideoCarousel />
+
+
                 {/* 2. Before/After Demo Slider Section */}
                 <div className="w-full space-y-8">
                     <div className="text-center space-y-4 max-w-[100vw] overflow-x-hidden md:max-w-4xl mx-auto px-4">
-                        <h2 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-accent font-bold whitespace-nowrap w-fit inline-block">From Plan to Perfection</h2>
+                        <h2 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-accent font-bold w-fit inline-block">From Plan to Perfection</h2>
                         <p className="text-secondary text-lg">
                             Swipe to see how our engine transforms technical geometry into stunning 4K visualizations-all created within Modulr Studio.
                         </p>
@@ -77,7 +88,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                     output, so the work appears before the feature list. */}
                 <section className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
                     <div className="flex items-baseline justify-between gap-4 flex-wrap">
-                        <h2 className="text-2xl font-extrabold text-accent tracking-tight">Made with Modulr Studio</h2>
+                        <h2 className="text-2xl font-bold text-accent tracking-tight">Made with Modulr Studio</h2>
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-secondary/60">
                             Every image generated in-app
                         </span>
@@ -87,7 +98,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                         misaligned rather than dynamic, so every tile is now the
                         same size on a single baseline. */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        {['/gallery-3.jpg', '/gallery-5.jpg', '/gallery-9.jpg', '/gallery-12.jpg'].map(src => (
+                        {['/gallery-6.jpg', '/gallery-5.jpg', '/gallery-9.jpg', '/gallery-12.jpg'].map(src => (
                             <div
                                 key={src}
                                 className="aspect-[4/5] rounded-3xl overflow-hidden border border-border bg-slate-100 shadow-lg group"
@@ -203,7 +214,7 @@ const ScatteredBackground: React.FC = () => {
         
         // Section 2: Before/After & Comparison
         { src: "/gallery-2.jpg", top: "45%", right: "-5%", size: "w-[50rem]", rotate: "-4deg", speed: 0.12 },
-        { src: "/gallery-3.jpg", top: "60%", left: "-8%", size: "w-[42rem]", rotate: "15deg", speed: 0.04 },
+        { src: "/gallery-6.jpg", top: "60%", left: "-8%", size: "w-[42rem]", rotate: "15deg", speed: 0.04 },
         { src: "/gallery-5.jpg", top: "75%", right: "2%", size: "w-[48rem]", rotate: "-9deg", speed: 0.14 },
         { src: "/gallery-7.jpg", top: "90%", left: "20%", size: "w-[38rem]", rotate: "5deg", speed: 0.06 },
 

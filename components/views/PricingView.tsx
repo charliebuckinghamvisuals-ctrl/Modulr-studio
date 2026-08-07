@@ -120,7 +120,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             >
                                 Yearly
                                 {billingCycle !== 'yearly' && (
-                                    <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1 bg-green-500 text-[10px] text-white rounded-full font-black animate-bounce shadow-lg whitespace-nowrap">
+                                    <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1 bg-green-500 text-[10px] text-white rounded-full font-bold animate-bounce shadow-lg whitespace-nowrap">
                                         Save ~20% 🔥
                                     </span>
                                 )}
@@ -141,10 +141,10 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                     {/* Free Trial Entry */}
                     <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-surface/40 hover:bg-surface/60 transition-all duration-300 relative group shadow-[0_20px_50px_rgba(0,0,0,0.1)]">
                         <div className="mb-6 text-white">
-                            <h3 className="text-xl font-extrabold text-accent mb-2 flex items-center gap-2">Try Before You Buy</h3>
+                            <h3 className="text-xl font-bold text-accent mb-2 flex items-center gap-2">Try Before You Buy</h3>
                             <p className="text-sm text-secondary min-h-[40px]">Experience the full power of our engine. No card required.</p>
                         </div>
-                        <div className="mb-8 font-black text-4xl text-primary dark:text-white">
+                        <div className="mb-8 font-bold text-4xl text-primary dark:text-white">
                             24 Hours
                         </div>
 
@@ -181,12 +181,12 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         </div>
 
                         <div className="mb-6 mt-2">
-                            <h3 className="text-2xl font-black text-accent dark:text-accent mb-2 flex items-center gap-2">Business</h3>
+                            <h3 className="text-2xl font-bold text-accent dark:text-accent mb-2 flex items-center gap-2">Business</h3>
                             <p className="text-sm text-secondary">The absolute peak of visualization performance.</p>
                         </div>
                         <div className="mb-8 text-white">
                             <div className="flex items-baseline gap-1">
-                                <span className="text-5xl font-black text-primary dark:text-white drop-shadow-md">
+                                <span className="text-5xl font-bold text-primary dark:text-white drop-shadow-md">
                                     £{billingCycle === 'monthly' ? '189.99' : '1,710'}
                                 </span>
                                 <span className="text-xs font-bold text-secondary uppercase tracking-tighter self-end mb-2">inc VAT</span>
@@ -240,7 +240,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
                             <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-3">
-                                    <h4 className="text-xl font-black text-accent">Modulr Managed Service</h4>
+                                    <h4 className="text-xl font-bold text-accent">Modulr Managed Service</h4>
                                 </div>
                                 <p className="text-sm text-secondary leading-relaxed max-w-2xl">
                                     Short on time? Even though our engine is incredibly fast, we at Modulr Studio can handle the entire creative process for you. We'll generate your high-end visuals and material specs to your exact requirements.
@@ -248,7 +248,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             </div>
                             <div className="flex flex-col items-center md:items-end gap-3 shrink-0">
                                 <div className="flex flex-col items-end">
-                                    <span className="text-4xl font-black text-primary">£100 <span className="text-xs font-black text-secondary uppercase">inc VAT</span></span>
+                                    <span className="text-4xl font-bold text-primary">£100 <span className="text-xs font-bold text-secondary uppercase">inc VAT</span></span>
                                     <span className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em]">Extra / Month</span>
                                 </div>
                                 <Button 

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { AppStage, MaterialConfig, WeatherConfig, ProcessingState, LibraryMaterialItem, MaterialLibrary } from '../types';
 import { PRESET_MATERIALS, WEATHER_CONDITIONS, SEASONS } from '../constants';
-import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor } from '../services/geminiService';
+import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor, setConfigSpec } from '../services/geminiService';
 import { saveToHistory } from '../services/historyService';
 import { trackFeatureUsage } from '../services/analytics';
 import { db, auth } from '../services/firebase';
@@ -231,7 +231,20 @@ export const useAppEngine = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const materialInputRef = useRef<HTMLInputElement>(null);
 
-    const handleReset = () => {
+    /**
+     * Empty the workspace but stay where you are.
+     *
+     * This is what the Reset button on each tool calls. Kept separate from
+     * handleReset because "clear this and let me try again" and "take me back to
+     * the start" are different intentions - resetting to the homepage means
+     * navigating back into the tool and re-picking it, which is not what someone
+     * wants after one bad render.
+     *
+     * The file inputs are cleared by value as well as by state: without that,
+     * choosing the SAME file again fires no change event and the upload appears
+     * to do nothing.
+     */
+    const clearWorkspace = () => {
         setStageImages({});
         setLineImage(null);
         setLineSourceImage(null);
@@ -250,10 +263,15 @@ export const useAppEngine = () => {
         setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
         setIsSketchUpMode(false);
         setIsBatchMode(false);
-        setActiveStage(AppStage.HOME);
 
         if (fileInputRef.current) fileInputRef.current.value = '';
         if (materialInputRef.current) materialInputRef.current.value = '';
+    };
+
+    /** Clear everything AND leave the tool - what the header's Start Over does. */
+    const handleReset = () => {
+        clearWorkspace();
+        setActiveStage(AppStage.HOME);
     };
 
     const handleAnalyzeForMaterialStudio = async (image: string) => {
@@ -307,6 +325,9 @@ export const useAppEngine = () => {
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetStage: AppStage) => {
         const file = e.target.files?.[0];
         if (file) {
+            // A hand-picked image is not the configured 3D building — stale
+            // configurator constraints must not leak into its render prompt.
+            setConfigSpec(null);
             setProcessing({ isLoading: true, message: 'Optimizing high-res upload...' });
             try {
                 const base64Data = await compressImageFile(file, 1920);
@@ -424,16 +445,11 @@ export const useAppEngine = () => {
         setActiveStage(AppStage.RENDER_ENGINE);
         setOriginalImage(null); // Clear single image mode
 
-        Promise.all(selectedFiles.map(file => {
-            return new Promise<string>((resolve) => {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const result = event.target?.result as string;
-                    resolve(result.split(',')[1]);
-                };
-                reader.readAsDataURL(file);
-            });
-        })).then(base64Array => {
+        // Same canvas pass as single uploads: resize to 1920 and re-encode as
+        // JPEG. Reading files raw meant a batch of phone photos could exceed
+        // the server's base64 cap (which truncates, corrupting the image) or
+        // the 20 MB JSON body limit outright.
+        Promise.all(selectedFiles.map(file => compressImageFile(file, 1920))).then(base64Array => {
             setBatchImages(base64Array);
             setBatchRenders([]);
             handleAnalyzeBatchMaterials(base64Array);
@@ -503,8 +519,11 @@ export const useAppEngine = () => {
             }
             ctx.drawImage(img, 0, 0);
 
-            // Watermark for Free users
-            if (userPlan === 'free' || userPlan === 'trial') {
+            // Watermark for Free users.
+            // Charlie asked for the trial watermark to be off "for now"
+            // (7 Aug 2026) - flip this to re-enable rather than rewriting it.
+            const TRIAL_WATERMARK_ENABLED = false;
+            if (TRIAL_WATERMARK_ENABLED && (userPlan === 'free' || userPlan === 'trial')) {
                 ctx.save();
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
                 ctx.font = 'bold 36px "Inter", sans-serif';
@@ -879,7 +898,7 @@ export const useAppEngine = () => {
         isAnalyzingMaterials,
         weather, setWeather,
         fileInputRef, materialInputRef,
-        handleReset, handleImageUpload, handleBatchImageUpload, handleDownload,
+        handleReset, clearWorkspace, handleImageUpload, handleBatchImageUpload, handleDownload,
         refinementPrompt, setRefinementPrompt,
         downloadFormat, setDownloadFormat,
         isSketchUpMode, setIsSketchUpMode,

@@ -88,7 +88,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({ originalImage, rende
                             )}
                             <div>
                                 {!branding.logo && (
-                                    <h1 className="text-4xl font-black tracking-tight text-slate-900 leading-tight uppercase font-heading" style={{ color: branding.primaryColor }}>
+                                    <h1 className="text-4xl font-bold tracking-tight text-slate-900 leading-tight uppercase font-heading" style={{ color: branding.primaryColor }}>
                                         MODULR <span className="font-sans font-light">STUDIO</span>
                                     </h1>
                                 )}
@@ -144,7 +144,7 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({ originalImage, rende
                     {/* Footer / Watermark */}
                     <div className="mt-auto pt-8 border-t border-slate-200 flex justify-between items-center text-[10px] text-slate-400 font-medium uppercase tracking-widest">
                         <span>Private & Confidential</span>
-                        <span className="flex items-center gap-1 uppercase"><span className="font-heading font-black">MODULR</span> <span className="font-sans font-light">STUDIO</span> v3.2 Pro</span>
+                        <span className="flex items-center gap-1 uppercase"><span className="font-heading font-bold">MODULR</span> <span className="font-sans font-light">STUDIO</span> v3.2 Pro</span>
                     </div>
 
                 </div>
