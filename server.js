@@ -533,7 +533,10 @@ const enforceRenderAccess = async (req, creditCost) => {
     // Cheap ANALYSIS calls ride free for testers: every upload triggers an
     // automatic analysis, so metering them burned the 40-render allowance
     // roughly twice as fast as the tester was told it would last.
-    if (isTesterUser(req.user)) {
+    // Beta members are metered exactly like testers - a fixed render count over
+    // a fixed window - so they share checkTesterRender rather than duplicating
+    // the transactional counter logic.
+    if (isTesterUser(req.user) || req.user?.beta === true) {
         if (creditCost === CREDIT_COSTS.ANALYSIS) {
             return { allowed: true };
         }
@@ -932,9 +935,13 @@ const verifyFirebaseToken = async (req, res, next) => {
  * auth providers. The UID is assigned by Firebase and cannot be chosen.
  */
 const enforceMasterLock = (req, res, next) => {
-    // Testers are let through the pre-launch lock. Their usage is still bounded
-    // by enforceRenderAccess, which caps renders and expires the account.
-    if (isMasterUser(req.user) || isTesterUser(req.user)) {
+    // Testers and beta members are let through the pre-launch lock. Their usage
+    // is still bounded by enforceRenderAccess, which caps renders and expires.
+    //
+    // The beta flag is a Firebase CUSTOM CLAIM, so it travels inside the signed
+    // ID token. Reading it costs nothing; a Firestore lookup here would add a
+    // read to every single API call.
+    if (isMasterUser(req.user) || isTesterUser(req.user) || req.user?.beta === true) {
         return next();
     }
     // Log WHO was refused. When a legitimate tester is turned away (typo'd
@@ -989,6 +996,58 @@ Write this as a helpful guide for a homeowner. Use plain text formatting. Do NOT
     } catch (error) {
         console.error("Planning advice error:", error);
         res.status(500).json({ error: "Failed to generate planning advice" });
+    }
+});
+
+/**
+ * Beta code redemption.
+ *
+ * Registered BEFORE the master lock, because by definition the caller has not
+ * been let in yet. Authentication is still required - you must be a signed-in
+ * Firebase user to redeem - so this is not an anonymous endpoint.
+ *
+ * Success grants a `beta` custom claim rather than writing a Firestore field.
+ * The claim rides inside the signed ID token, so enforceMasterLock can check it
+ * without a database read on every request.
+ */
+const betaLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 8, // brute force protection - the code is 74 bits, this makes guessing hopeless
+    keyGenerator: (req) => req.user?.uid || ipKeyGenerator(req.ip) || 'unknown',
+    message: { error: 'Too many attempts. Please wait 15 minutes and try again.' },
+    validate: { ip: false, xForwardedForHeader: false }
+});
+
+app.post('/api/beta/redeem', verifyFirebaseToken, betaLimiter, async (req, res) => {
+    const expected = (process.env.BETA_CODE || '').trim();
+    if (!expected) {
+        console.warn('[BETA] Redemption attempted but BETA_CODE is not set on this host.');
+        return res.status(503).json({ error: 'The beta is not currently open.' });
+    }
+
+    const supplied = sanitizeString(req.body.code, 64).toUpperCase().replace(/\s+/g, '');
+    if (supplied !== expected.toUpperCase().replace(/\s+/g, '')) {
+        console.warn(`[BETA] Bad code from uid=${req.user.uid} email=${req.user.email || 'none'}`);
+        return res.status(403).json({ error: 'That access code is not valid.' });
+    }
+
+    try {
+        // Preserve any claims already on the account rather than replacing them.
+        const existing = (await admin.auth().getUser(req.user.uid)).customClaims || {};
+        await admin.auth().setCustomUserClaims(req.user.uid, { ...existing, beta: true });
+
+        if (db) {
+            await db.collection('users').doc(req.user.uid).set({
+                plan: 'beta',
+                betaJoinedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+        }
+
+        console.log(`[BETA] Access granted to uid=${req.user.uid} email=${req.user.email || 'none'}`);
+        res.json({ ok: true });
+    } catch (e) {
+        console.error('[BETA] Failed to grant access:', e);
+        res.status(500).json({ error: 'Could not activate your account. Please try again.' });
     }
 });
 
@@ -2159,7 +2218,7 @@ app.get('/api/user/credits', async (req, res) => {
 
         // Tester: report the remaining renders and days so the account page can
         // show a countdown.
-        if (isTesterUser(req.user)) {
+        if (isTesterUser(req.user) || req.user?.beta === true) {
             const snap = await db.collection('users').doc(req.user.uid).get();
             const data = snap.exists ? snap.data() : {};
             const used = data.testerRendersUsed || 0;
@@ -2169,7 +2228,7 @@ app.get('/api/user/credits', async (req, res) => {
             if (data.projectsEnabled !== true) await syncProjectAccess(req.user.uid, true);
             return res.json(withEntitlements({
                 credits: Math.max(0, TESTER_RENDERS - used),
-                plan: 'tester',
+                plan: req.user?.beta === true && !isTesterUser(req.user) ? 'beta' : 'tester',
                 rendersLeft: Math.max(0, TESTER_RENDERS - used),
                 rendersPerDay: TESTER_RENDERS,
                 trialDaysLeft: Math.ceil(msLeft / 86400000),
@@ -2261,6 +2320,23 @@ app.get('/api/user/credits', async (req, res) => {
 
 app.post('/api/create-checkout-session', async (req, res) => {
     try {
+        /**
+         * Billing kill switch.
+         *
+         * Enforced HERE and not only in the UI. A disabled button is a
+         * suggestion; this is the control. Without it, anyone could POST to
+         * this endpoint directly and start a real subscription before the
+         * billing flow is finished.
+         *
+         * Set BILLING_ENABLED=true to open payments.
+         */
+        if (process.env.BILLING_ENABLED !== 'true') {
+            return res.status(503).json({
+                error: 'Subscriptions are not open yet. Modulr Studio is currently in private beta.',
+                billingClosed: true,
+            });
+        }
+
         if (!stripe) throw new Error("Stripe is not configured on the server");
 
         // The price ID is the ONLY thing we accept from the client, and it must

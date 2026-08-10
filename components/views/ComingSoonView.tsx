@@ -16,6 +16,22 @@ interface ComingSoonViewProps {
  * and a 403 means "not enabled". Using the server as the source of truth is
  * what lets testers in without duplicating TESTER_EMAILS into the bundle.
  */
+/** Exchange a beta access code for a `beta` custom claim on this account. */
+const redeemBetaCode = async (user: User, code: string): Promise<boolean> => {
+    try {
+        const token = await user.getIdToken();
+        const res = await fetch('/api/beta/redeem', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code.trim() }),
+        });
+        return res.ok;
+    } catch (e) {
+        console.error('Beta redemption failed', e);
+        return false;
+    }
+};
+
 const serverGrantsAccess = async (user: User): Promise<boolean> => {
     try {
         const token = await user.getIdToken();
@@ -34,6 +50,7 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+    const [betaCode, setBetaCode] = useState('');
 
     /**
      * Create a master account.
@@ -59,8 +76,23 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
 
         setIsLoading(true);
         try {
-            await createUserWithEmailAndPassword(auth, email.trim(), password);
-            toast.success('Master account created');
+            const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+
+            // Redeem the beta code if one was supplied. Team members on the
+            // MASTER_UIDS allowlist do not need one, so an empty box is fine.
+            if (betaCode.trim()) {
+                const redeemed = await redeemBetaCode(cred.user, betaCode);
+                if (!redeemed) {
+                    toast.error('That access code is not valid.');
+                    setIsLoading(false);
+                    return;
+                }
+                // The beta flag is a custom claim, so the ID token must be
+                // refreshed before the server will see it.
+                await cred.user.getIdToken(true);
+            }
+
+            toast.success('Account created');
             setShowLoginModal(false);
             if (onUnlockSuccess) onUnlockSuccess();
         } catch (error: any) {
@@ -148,7 +180,7 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                 <div className="flex items-center gap-3">
                     <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#405a56]/10 border border-[#405a56]/20 text-[#405a56] text-xs font-semibold tracking-wide">
                         <span className="w-2 h-2 rounded-full bg-[#405a56] animate-pulse"></span>
-                        Pre-Launch Private Access
+                        Private Beta - Now Open
                     </span>
 
                     {user && !isMasterAccount(user.email) && (
@@ -165,7 +197,7 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-slate-50 border border-[#405a56]/20 text-[#405a56] text-xs font-bold transition-all shadow-md hover:shadow-lg backdrop-blur-md group active:scale-95"
                     >
                         <Lock size={14} className="text-[#405a56] group-hover:scale-110 transition-transform" />
-                        <span>Master Access</span>
+                        <span>Beta Access</span>
                     </button>
                 </div>
             </header>
@@ -191,11 +223,11 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
 
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#405a56]/5 border border-[#405a56]/20 text-[#405a56] text-xs font-bold uppercase tracking-widest mb-6">
                         <Sparkles size={14} className="text-[#405a56]" />
-                        Next-Gen AI Architectural Engine
+                        Now in Private Beta
                     </div>
 
                     <p className="text-slate-600 text-base md:text-lg leading-relaxed max-w-xl mx-auto font-normal mb-8">
-                        We are putting the final touches on our revolutionary AI-powered exterior rendering & material styling platform. Public launch is coming soon.
+                        Welcome to the Modulr Studio beta. If you have an access code, create your account below and start rendering. Full public launch follows soon.
                     </p>
 
                     {/* Animated Progress Bar */}
@@ -249,7 +281,7 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                 <div className="flex items-center gap-4">
                     <button onClick={() => setShowLoginModal(true)} className="hover:text-[#405a56] transition-colors flex items-center gap-1">
                         <Lock size={12} />
-                        <span>Master Access Login</span>
+                        <span>Beta Access</span>
                     </button>
                     <span>|</span>
                     <a href="mailto:info@napc.uk" className="hover:text-[#405a56] transition-colors">Contact Support</a>
@@ -271,15 +303,15 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                         <div className="space-y-2">
                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#405a56]/10 text-[#405a56] text-xs font-bold uppercase tracking-wider">
                                 <ShieldCheck size={14} />
-                                Restricted Master Login
+                                Beta Access
                             </div>
                             <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
-                                {mode === 'signup' ? 'Create Master Account' : 'Master Account Access'}
+                                {mode === 'signup' ? 'Join the Beta' : 'Welcome Back'}
                             </h2>
                             <p className="text-xs text-slate-500">
                                 {mode === 'signup'
-                                    ? 'Create an account using your approved NAPC email address.'
-                                    : 'Enter your master credentials to unlock the application environment.'}
+                                    ? 'Enter your access code to join the Modulr Studio beta.'
+                                    : 'Sign in to your Modulr Studio account.'}
                             </p>
                         </div>
 
@@ -329,6 +361,29 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                                     />
                                 </div>
                             </div>
+
+                            {mode === 'signup' && (
+                                <div className="space-y-1 text-left">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5c7b77] pl-1">
+                                        Beta Access Code
+                                    </label>
+                                    <div className="relative">
+                                        <ShieldCheck size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5c7b77]" />
+                                        <input
+                                            type="text"
+                                            value={betaCode}
+                                            onChange={(e) => setBetaCode(e.target.value.toUpperCase())}
+                                            placeholder="MODULR-XXXXX-XXXXX-XXXXX"
+                                            autoComplete="off"
+                                            spellCheck={false}
+                                            className="w-full bg-[#f8fafc] border border-[#405a56]/20 focus:border-[#405a56] focus:ring-2 focus:ring-[#405a56]/20 rounded-xl pl-10 pr-4 py-3 text-sm text-[#405a56] outline-none transition-all placeholder:text-slate-400 font-mono tracking-wider"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 pl-1">
+                                        Leave blank if you are on the Modulr team.
+                                    </p>
+                                </div>
+                            )}
 
                             <button
                                 type="submit"

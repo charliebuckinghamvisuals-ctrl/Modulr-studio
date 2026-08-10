@@ -30,6 +30,7 @@ import { AuthView } from './components/views/AuthView';
 import { AccountView } from './components/views/AccountView';
 import { DesignerView } from './components/views/DesignerView';
 import { ComingSoonView } from './components/views/ComingSoonView';
+import { BetaGate } from './components/BetaGate';
 import { useAuth } from './hooks/useAuth';
 import { useCredits } from './hooks/useCredits';
 
@@ -998,13 +999,33 @@ const App: React.FC = () => {
         );
     }
 
-    if (!hasAccess) {
-        return <ComingSoonView onUnlockSuccess={() => engine.setActiveStage(AppStage.HOME)} />;
-    }
+    /**
+     * Only the TOOLS are gated.
+     *
+     * The whole site used to sit behind a single lock screen, so a prospect
+     * could not see what Modulr Studio was without an account. The marketing
+     * pages are now open to everyone and the beta gate covers only the pages
+     * that actually cost money to run.
+     */
+    const GATED_STAGES = new Set<AppStage>([
+        AppStage.RENDER_ENGINE,
+        AppStage.LINE_CONVERT,
+        AppStage.WEATHER_LAB,
+        AppStage.MATERIAL_STUDIO,
+        AppStage.STUDIO,
+        AppStage.DESIGNER,
+        AppStage.PROJECTS,
+        AppStage.UPLOAD,
+    ]);
+
+    const showBetaGate = !hasAccess && GATED_STAGES.has(engine.activeStage);
 
     return (
         <div className="animate-app-startup opacity-0">
-            {renderAppContent()}
+            <div className={showBetaGate ? 'relative' : undefined}>
+                {renderAppContent()}
+                {showBetaGate && <BetaGate onGranted={() => engine.setActiveStage(engine.activeStage)} />}
+            </div>
         </div>
     );
 };

@@ -18,6 +18,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
     const { plan } = useCredits();
     const [billingCycle, setBillingCycle] = React.useState<'monthly' | 'yearly'>('monthly');
     const [loadingPlan, setLoadingPlan] = React.useState<string | null>(null);
+    const [showBillingClosed, setShowBillingClosed] = React.useState(false);
 
     const handleStartTrial = () => {
         if (user) {
@@ -33,6 +34,17 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
     };
 
     const handleUpgrade = async (planName: string, priceId: string, creditsAmount: number, isOneTime = false) => {
+        /**
+         * Billing is closed during the private beta.
+         *
+         * This is the friendly explanation; the actual enforcement is the
+         * BILLING_ENABLED check on /api/create-checkout-session, because a
+         * client-side guard alone could be bypassed by calling the endpoint.
+         */
+        setShowBillingClosed(true);
+        return;
+
+        /* eslint-disable no-unreachable */
         if (!user) {
             toast.error('Please sign in to upgrade your plan');
             onNavigate?.(AppStage.AUTH);
@@ -76,6 +88,42 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
         <div className="min-h-full bg-background relative overflow-y-auto w-full py-20 px-6 sm:px-12 flex flex-col items-center">
             {/* Pro Drafting Grid Background */}
             <DraftingBackground pageName="PRICING" />
+
+            {/* Billing closed notice */}
+            {showBillingClosed && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-white border border-accent/20 rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-5 text-center">
+                        <div className="w-14 h-14 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent mx-auto">
+                            <Sparkles size={26} />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-2xl font-black text-slate-800 tracking-tight">Not quite yet</h3>
+                            <p className="text-sm text-slate-600 leading-relaxed">
+                                Modulr Studio is in private beta, so subscriptions are not open.
+                                Pricing is shown so you know what to expect at launch.
+                            </p>
+                            <p className="text-sm text-slate-600 leading-relaxed">
+                                Want early access? Request a beta code and use the studio free
+                                while we finish building.
+                            </p>
+                        </div>
+                        <div className="flex flex-col gap-3 pt-1">
+                            <a
+                                href="mailto:info@napc.uk?subject=Modulr%20Studio%20beta%20access"
+                                className="w-full py-3 rounded-xl bg-accent hover:bg-accent-hover text-white font-bold text-sm transition-colors"
+                            >
+                                Request Beta Access
+                            </a>
+                            <button
+                                onClick={() => setShowBillingClosed(false)}
+                                className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-accent font-bold text-sm transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Ambient Background Effects */}
             <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse-slow"></div>
