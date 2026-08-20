@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Check, Zap, Sparkles, Wand2, TrendingUp, Loader2 } from 'lucide-react';
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
@@ -18,7 +19,17 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
     const { plan } = useCredits();
     const [billingCycle, setBillingCycle] = React.useState<'monthly' | 'yearly'>('monthly');
     const [loadingPlan, setLoadingPlan] = React.useState<string | null>(null);
-    const [showBillingClosed, setShowBillingClosed] = React.useState(false);
+    /**
+     * Opens on arrival, not just when a plan is clicked.
+     *
+     * The numbers on this page are not settled, and a price someone has already
+     * read is very hard to move afterwards. Saying so up front is the honest
+     * version - letting them study the cards first and only admitting it at the
+     * checkout button wastes their time and reads as a bait and switch.
+     *
+     * Dismissible, because the page behind it is still worth browsing.
+     */
+    const [showBillingClosed, setShowBillingClosed] = React.useState(true);
 
     const handleStartTrial = () => {
         if (user) {
@@ -89,22 +100,38 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
             {/* Pro Drafting Grid Background */}
             <DraftingBackground pageName="PRICING" />
 
-            {/* Billing closed notice */}
-            {showBillingClosed && (
+            {/*
+              * Billing closed notice.
+              *
+              * Portalled to <body> rather than rendered in place. The whole app
+              * is wrapped in .animate-app-startup, which is transformed for its
+              * first second - and a transformed ancestor makes position:fixed
+              * resolve against that ancestor instead of the viewport, which
+              * centres this dialog in the SCROLL HEIGHT of the pricing page.
+              * That put it around a thousand pixels down, so on arrival you saw
+              * the pricing page and no notice at all.
+              *
+              * The transform is gone once the intro finishes, but the dialog
+              * opens on mount - inside that window. A portal sidesteps the
+              * timing question entirely, and is what a modal wants anyway.
+              */}
+            {showBillingClosed && createPortal((
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-white border border-accent/20 rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-5 text-center">
                         <div className="w-14 h-14 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent mx-auto">
                             <Sparkles size={26} />
                         </div>
                         <div className="space-y-2">
-                            <h3 className="text-2xl font-black text-slate-800 tracking-tight">Not quite yet</h3>
+                            <h3 className="text-2xl font-black text-slate-800 tracking-tight">We are still working on this page</h3>
                             <p className="text-sm text-slate-600 leading-relaxed">
-                                Modulr Studio is in private beta, so subscriptions are not open.
-                                Pricing is shown so you know what to expect at launch.
+                                Modulr Studio is in private beta, and our pricing is not final.
+                                The plans below are a work in progress - treat them as an
+                                indication rather than a quote, because the numbers may still
+                                change before launch.
                             </p>
                             <p className="text-sm text-slate-600 leading-relaxed">
-                                Want early access? Request a beta code and use the studio free
-                                while we finish building.
+                                Subscriptions are not open yet. Want early access? Request a beta
+                                code and use the studio free while we finish building.
                             </p>
                         </div>
                         <div className="flex flex-col gap-3 pt-1">
@@ -118,12 +145,12 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                 onClick={() => setShowBillingClosed(false)}
                                 className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-accent font-bold text-sm transition-colors"
                             >
-                                Close
+                                Browse the plans anyway
                             </button>
                         </div>
                     </div>
                 </div>
-            )}
+            ), document.body)}
 
             {/* Ambient Background Effects */}
             <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse-slow"></div>

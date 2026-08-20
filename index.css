@@ -252,16 +252,30 @@ input[type=range]::-webkit-slider-runnable-track {
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    /* `none`, not `scale(1) translateY(0)`. The animation is `forwards`, so the
+       final frame persists - and ANY transform other than none, identity
+       included, makes this element the containing block for every
+       position:fixed descendant. That is what put the pricing notice a
+       thousand pixels down the page instead of centred on screen. */
+    transform: none;
   }
 }
 
+/*
+ * The whole app is wrapped in this class, so anything here applies to every
+ * fixed overlay in the product - modals, menus, the beta gate.
+ *
+ * will-change, perspective and transform-style: preserve-3d were all set as GPU
+ * hints for a one-second intro. Each of them ALSO establishes a containing
+ * block, permanently, long after the animation has finished. The cost was that
+ * position:fixed silently meant "fixed to the app wrapper" everywhere, which
+ * centres a dialog in the scroll height of the page rather than the viewport.
+ *
+ * The animation is a one-shot opacity and transform tween; it does not need the
+ * hints, so they are gone rather than worked around at each call site.
+ */
 .animate-app-startup {
   animation: appFadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
-  will-change: transform, opacity;
-  backface-visibility: hidden;
-  transform-style: preserve-3d;
-  perspective: 1000px;
 }
 
 .canvas-grid {
