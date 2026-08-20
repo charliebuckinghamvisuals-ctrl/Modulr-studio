@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, Mail, KeyRound, Loader2, ArrowRight, Sparkles, MailCheck, RefreshCw } from 'lucide-react';
 import { auth } from '../services/firebase';
 import {
@@ -133,6 +133,28 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
         }
     };
 
+    /**
+     * Send the confirmation mail on ARRIVING at the unverified panel, not only
+     * on signup.
+     *
+     * Signing in to an account that already existed lands straight here, and
+     * nothing had sent an email - while the panel said "we have sent a
+     * confirmation link", which is how someone ends up waiting for a message
+     * that was never going to come. Anyone who made an account before email
+     * confirmation existed hits exactly this path.
+     *
+     * The ref guards against React re-runs and StrictMode's double effect;
+     * Firebase rate-limits the address anyway, but there is no reason to lean
+     * on that.
+     */
+    const autoSentTo = useRef<string | null>(null);
+    useEffect(() => {
+        if (!user || verified) return;
+        if (autoSentTo.current === user.uid) return;
+        autoSentTo.current = user.uid;
+        sendVerification(user, true);
+    }, [user, verified]);
+
     // ── State 1: signed out ──────────────────────────────────────────────────
     const handleSignedOutSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -164,6 +186,9 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
                 }
 
                 await cred.user.getIdToken(true); // pick up the new claim
+                // Claim it before sending, so the arrival effect does not fire a
+                // second identical email at someone who just signed up.
+                autoSentTo.current = cred.user.uid;
                 await sendVerification(cred.user, true);
                 setVerified(false);
                 toast.success('Account created - check your email to confirm it');
@@ -264,6 +289,10 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
                         <span className="font-semibold text-accent">{user.email}</span>. Open it, then
                         come back and press the button below. Beta seats are limited, so we confirm
                         every address is real before opening the studio.
+                    </p>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                        It arrives from a firebaseapp.com address, so it often lands in spam or
+                        promotions - worth checking there first.
                     </p>
                 </div>
 
