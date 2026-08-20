@@ -1044,117 +1044,36 @@ const betaLimiter = rateLimit({
     validate: { ip: false, xForwardedForHeader: false }
 });
 
-/** Codes are compared with case and whitespace removed, because this is typed
- *  by hand off an email. The hyphens are significant. */
-const normaliseBetaCode = (raw) => String(raw || '').toUpperCase().replace(/\s+/g, '');
-
-/**
- * Every code currently valid, mapped to the label it was issued under.
- *
- * Sourced from BETA_CODES (comma separated) plus the older single BETA_CODE,
- * which is merged in so an existing host keeps working. Each entry is either a
- * bare code or `CODE:label`, so one code can be told from another:
- *
- *   BETA_CODES=MODULR-AAAAA-BBBBB-CCCCC:Dave,MODULR-DDDDD-EEEEE-FFFFF:Sarah
- *
- * The label is never shown to the person redeeming - it is there so the server
- * log and the betaCodes document say WHO a code was meant for, which is what
- * turns "a code was used" into "Dave used his".
- *
- * Read per request rather than cached at boot, so adding a code on the host
- * does not invalidate anything already issued.
- */
-const betaCodeMap = () => {
-    const map = new Map();
-    [process.env.BETA_CODE, process.env.BETA_CODES]
-        .filter(Boolean)
-        .join(',')
-        .split(',')
-        .forEach((entry) => {
-            // Split on the FIRST colon only, so a label may itself contain one.
-            const idx = String(entry).indexOf(':');
-            const rawCode = idx === -1 ? entry : String(entry).slice(0, idx);
-            const label = idx === -1 ? '' : String(entry).slice(idx + 1).trim();
-            const code = normaliseBetaCode(rawCode);
-            if (code) map.set(code, label || null);
-        });
-    return map;
-};
-
 app.post('/api/beta/redeem', verifyFirebaseToken, betaLimiter, async (req, res) => {
-    const valid = betaCodeMap();
-    if (valid.size === 0) {
-        console.warn('[BETA] Redemption attempted but no BETA_CODE/BETA_CODES set on this host.');
+    const expected = (process.env.BETA_CODE || '').trim();
+    if (!expected) {
+        console.warn('[BETA] Redemption attempted but BETA_CODE is not set on this host.');
         return res.status(503).json({ error: 'The beta is not currently open.' });
     }
 
-    // One-time enforcement is a Firestore transaction, so without a database we
-    // cannot promise a code is single-use. Refuse rather than silently handing
-    // out an unlimited code - failing closed is the whole point of the feature.
-    if (!db) {
-        console.error('[BETA] Refusing redemption: no Firestore, cannot enforce single use.');
-        return res.status(503).json({ error: 'The beta is not currently open.' });
-    }
-
-    const supplied = normaliseBetaCode(sanitizeString(req.body.code, 64));
-    if (!valid.has(supplied)) {
+    // Compared with case and whitespace removed, because this gets typed by
+    // hand off an email. The hyphens are significant.
+    const supplied = sanitizeString(req.body.code, 64).toUpperCase().replace(/\s+/g, '');
+    if (supplied !== expected.toUpperCase().replace(/\s+/g, '')) {
         console.warn(`[BETA] Bad code from uid=${req.user.uid} email=${req.user.email || 'none'}`);
         return res.status(403).json({ error: 'That access code is not valid.' });
     }
-    const issuedTo = valid.get(supplied);
-
-    const codeRef = db.collection('betaCodes').doc(supplied);
-    let claimedNow = false;
 
     try {
-        /**
-         * Claim the code transactionally.
-         *
-         * Read-then-write would leave a window where two people who were handed
-         * the same code both see it unused and both get in - which is exactly
-         * the thing a one-time code is supposed to prevent.
-         */
-        const outcome = await db.runTransaction(async (tx) => {
-            const snap = await tx.get(codeRef);
-            if (snap.exists) {
-                // Idempotent for the person who already owns it: a refresh or a
-                // double-submit mid-signup must not burn their own code.
-                return snap.data().redeemedBy === req.user.uid ? 'mine' : 'taken';
-            }
-            tx.set(codeRef, {
-                issuedTo,
-                redeemedBy: req.user.uid,
-                redeemedEmail: req.user.email || null,
-                redeemedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-            return 'claimed';
-        });
-
-        if (outcome === 'taken') {
-            console.warn(`[BETA] Code issued to "${issuedTo || 'unlabelled'}" already used - refused uid=${req.user.uid} email=${req.user.email || 'none'}`);
-            return res.status(403).json({
-                error: 'That access code has already been used. Codes are single use - please request your own.',
-            });
-        }
-        claimedNow = outcome === 'claimed';
-
         // Preserve any claims already on the account rather than replacing them.
         const existing = (await admin.auth().getUser(req.user.uid)).customClaims || {};
         await admin.auth().setCustomUserClaims(req.user.uid, { ...existing, beta: true });
 
-        await db.collection('users').doc(req.user.uid).set({
-            plan: 'beta',
-            betaJoinedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
+        if (db) {
+            await db.collection('users').doc(req.user.uid).set({
+                plan: 'beta',
+                betaJoinedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+        }
 
-        console.log(`[BETA] Access granted to uid=${req.user.uid} email=${req.user.email || 'none'} (code issued to "${issuedTo || 'unlabelled'}")`);
+        console.log(`[BETA] Access granted to uid=${req.user.uid} email=${req.user.email || 'none'}`);
         res.json({ ok: true });
     } catch (e) {
-        // Hand the code back if we burned it but never granted access, or the
-        // tester is left holding a code the server considers spent.
-        if (claimedNow) {
-            try { await codeRef.delete(); } catch (_) { /* best effort */ }
-        }
         console.error('[BETA] Failed to grant access:', e);
         res.status(500).json({ error: 'Could not activate your account. Please try again.' });
     }

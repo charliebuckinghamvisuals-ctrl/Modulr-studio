@@ -123,13 +123,6 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Beta code ledger — server only. This is what makes a code single use, so
-    // a client that could write here would free a spent code for reuse, and one
-    // that could read here would learn every unredeemed code in the beta.
-    match /betaCodes/{code} {
-      allow read, write: if false;
-    }
-
     // Deny everything not explicitly matched above.
     match /{document=**} {
       allow read, write: if false;
