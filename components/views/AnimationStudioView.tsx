@@ -57,9 +57,14 @@ interface AnimationStudioViewProps {
 export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavigate }) => {
     const { user } = useAuth();
     const {
-        canUseAnimation, animationsLeft, animationsLimit,
+        canUseAnimation, animationsLeft, animationsLimit, plan,
         loading: planLoading, refreshCredits,
     } = useCredits();
+
+    /** Beta accounts are locked out of animation for cost reasons, not billing
+     *  ones. Sending them to a pricing page that refuses payment would be a
+     *  dead end, so they get a different explanation below. */
+    const isBeta = plan === 'beta' || plan === 'tester';
 
     const [sourceImage, setSourceImage] = useState<string | null>(null);
     const [sourceName, setSourceName] = useState('');
@@ -178,23 +183,39 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
                     <Lock size={22} className="text-amber-600" />
                 </div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-600 mb-3">
-                    Business plan feature
+                    {isBeta ? 'Not in the beta' : 'Business plan feature'}
                 </p>
                 <h1 className="text-2xl font-bold text-accent tracking-tight mb-3">
-                    Animation Studio is part of Business
+                    {isBeta ? 'Animation Studio is not part of the beta' : 'Animation Studio is part of Business'}
                 </h1>
                 <p className="text-sm text-slate-600 leading-relaxed mb-8">
-                    Turn any finished render into a 10-second cinematic clip for your website,
-                    social feeds or client presentations. Included with the Business plan.
+                    {isBeta ? (
+                        <>
+                            Every other studio tool is open to you - this is the one exception.
+                            Video generation is expensive to run, so it stays closed while we are
+                            in beta. It arrives with the Business plan at launch.
+                        </>
+                    ) : (
+                        <>
+                            Turn any finished render into a 10-second cinematic clip for your website,
+                            social feeds or client presentations. Included with the Business plan.
+                        </>
+                    )}
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
-                    <Button onClick={() => onNavigate?.(AppStage.PRICING)}>See Business plan</Button>
-                    <button
-                        onClick={() => onNavigate?.(AppStage.HOME)}
-                        className="text-sm text-slate-500 hover:text-accent transition-colors px-3 py-2"
-                    >
-                        Back to home
-                    </button>
+                    {isBeta ? (
+                        <Button onClick={() => onNavigate?.(AppStage.RENDER_ENGINE)}>Back to the Render Engine</Button>
+                    ) : (
+                        <>
+                            <Button onClick={() => onNavigate?.(AppStage.PRICING)}>See Business plan</Button>
+                            <button
+                                onClick={() => onNavigate?.(AppStage.HOME)}
+                                className="text-sm text-slate-500 hover:text-accent transition-colors px-3 py-2"
+                            >
+                                Back to home
+                            </button>
+                        </>
+                    )}
                 </div>
             </Gate>
         );

@@ -148,14 +148,18 @@ const UNLIMITED_PLANS = new Set(['business', 'master']);
  * application, and `tester` because the point of tester access is to evaluate
  * the product; a tester who cannot open Projects cannot report on it.
  */
-const PROJECT_PLANS = new Set(['business', 'master', 'tester']);
+const PROJECT_PLANS = new Set(['business', 'master', 'tester', 'beta']);
 
 /**
  * Plans that may generate animations.
  *
- * Deliberately excludes 'tester' where PROJECT_PLANS includes it. Projects cost
- * pennies of storage; a single animation costs roughly a pound of real money,
- * and tester access is handed out by email address to people we have not billed.
+ * Deliberately excludes 'tester' and 'beta' where PROJECT_PLANS includes both.
+ * Projects cost pennies of storage; a single animation costs roughly a pound of
+ * real money, and tester/beta access is handed out to people we have not billed.
+ *
+ * This is the ONLY difference between a beta account and a paid one. Beta users
+ * get every other tool, which is the point - we want them stress-testing the
+ * product, just not the one feature that bills us a pound per click.
  */
 const ANIMATION_PLANS = new Set(['business', 'master']);
 

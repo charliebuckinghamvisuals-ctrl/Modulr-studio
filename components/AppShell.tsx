@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool } from 'lucide-react';
+import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool, Lock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { AppStage } from '../types';
 import { useAuth } from '../hooks/useAuth';
@@ -74,7 +74,7 @@ const DesktopOnlyScreen: React.FC<{ onNavigate: (stage: AppStage) => void }> = (
 // ─── Main AppShell ─────────────────────────────────────────────────────────────
 export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNavigate, onReset, headerActions }) => {
   const { user } = useAuth();
-  const { credits, plan, loading: creditsLoading, rendersLeft, rendersPerDay, trialDaysLeft } = useCredits();
+  const { credits, plan, loading: creditsLoading, rendersLeft, rendersPerDay, trialDaysLeft, canUseAnimation } = useCredits();
   const [isToolsDropdownOpen, setIsToolsDropdownOpen] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
@@ -89,13 +89,20 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     setIsMobileMenuOpen(false);
   }, [activeStage]);
 
-  const toolItems: Array<{ id: AppStage; label: string; comingSoon?: boolean; icon?: React.ReactNode }> = [
+  const toolItems: Array<{ id: AppStage; label: string; comingSoon?: boolean; locked?: boolean; icon?: React.ReactNode }> = [
     { id: AppStage.DESIGNER, label: '3D Config', comingSoon: true },
     { id: AppStage.RENDER_ENGINE, label: 'Render Engine' },
     { id: AppStage.LINE_CONVERT, label: 'Line Converter' },
     { id: AppStage.WEATHER_LAB, label: 'Weather Lab' },
     { id: AppStage.MATERIAL_STUDIO, label: 'Material Studio' },
-    { id: AppStage.ANIMATION_STUDIO, label: 'Animation Studio' },
+    // Shown but badged for accounts without it (beta, tester, free) rather than
+    // hidden. It is a headline feature and hiding it entirely would mean beta
+    // users never learn the Business plan has it. Clicking through lands on the
+    // explanation screen in AnimationStudioView, which is the real gate; the
+    // actual enforcement is ANIMATION_PLANS on /api/animation/start.
+    // `canUseAnimation` is null until the plan loads - only badge on an explicit
+    // false, so a subscriber never sees a lock flash on their own feature.
+    { id: AppStage.ANIMATION_STUDIO, label: 'Animation Studio', locked: canUseAnimation === false },
   ];
 
   // Top-level header items, in display order. Tools is injected between Home
@@ -196,6 +203,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
                     >
                       <span>{item.label}</span>
                       {item.comingSoon && <span className="text-[8px] font-semibold uppercase tracking-wider text-slate-400">Soon</span>}
+                      {item.locked && <Lock size={11} className="text-slate-400 shrink-0" />}
                     </button>
                   );
                 })}
@@ -370,6 +378,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
               <span className="flex items-center">
                 {item.label}
                 {item.comingSoon && <span className="text-[8px] font-bold uppercase tracking-wider bg-[#405a56]/10 text-[#405a56] px-1.5 py-0.5 rounded-full ml-2">Soon</span>}
+                {item.locked && <Lock size={11} className="text-secondary/40 ml-2 shrink-0" />}
               </span>
               <span className="ml-auto text-[9px] font-bold uppercase bg-slate-100 text-secondary/50 px-2 py-0.5 rounded-full tracking-widest whitespace-nowrap">Desktop</span>
             </button>
