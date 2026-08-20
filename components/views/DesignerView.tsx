@@ -101,7 +101,10 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
                 // Switch to the Render Engine stage
                 engine.setActiveStage(AppStage.RENDER_ENGINE);
 
-                // Trigger the analysis automatically so the user sees the loading state
+                // Identical to a manual upload from here: analyse the image,
+                // then render what was analysed. The configurator screenshot is
+                // the source of truth for how the building LOOKS - the spec
+                // only guarantees the things a picture cannot be miscounted on.
                 engine.handleAnalyzeForRenderEngine(base64Data);
             } catch (err) {
                 console.error("Failed to process 3D scene image", err);

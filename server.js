@@ -1427,17 +1427,33 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                     const style = wn.style === 'crittall' ? 'Crittall-style glazing bar grid' : 'standard';
                     lines.push(`  - Window ${i + 1}: ${mm(wn.widthMm) || '?'} x ${mm(wn.heightMm) || '?'}, ${style}, ${sanitizeString(String(wn.wall || ''), 10) || 'front'} elevation.`);
                 });
-                if (spec.cladding) lines.push(`- Wall cladding: ${sanitizeString(String(spec.cladding), 60).replace(/_/g, ' ')} boards, laid ${spec.claddingOrientation === 'vertical' ? 'vertically' : 'horizontally'}.`);
-                if (spec.frameColor) lines.push(`- All door and window frames: ${sanitizeString(String(spec.frameColor), 30)}.`);
-                if (spec.roofMaterial) lines.push(`- Roof covering: ${sanitizeString(String(spec.roofMaterial), 30)}.`);
+                /**
+                 * GEOMETRY ONLY - no material or colour claims.
+                 *
+                 * This block used to assert `spec.cladding`, the single global
+                 * cladding value. A building can be clad differently on each
+                 * elevation, so on a design that was black on one face and
+                 * mahogany on another this said "clad in cedar composite" and,
+                 * being labelled absolute truth, overrode what the image plainly
+                 * showed. The render came back uniformly light.
+                 *
+                 * Appearance now comes from the image analysis, exactly as it
+                 * does for a manual upload. The spec is kept only for the things
+                 * a picture genuinely can be miscounted on - how many doors,
+                 * how wide, which elevation - where it cannot contradict what is
+                 * visible, only make it precise.
+                 */
+                if (spec.claddingOrientation) lines.push(`- Cladding board direction: ${spec.claddingOrientation === 'vertical' ? 'vertical' : 'horizontal'} (direction only - take the material and colour from the image).`);
                 const sky = Array.isArray(spec.skylights) ? spec.skylights.length : 0;
                 if (sky > 0) lines.push(`- Skylights: EXACTLY ${sky}.`);
                 if (!lines.length) return '';
                 return `
-      CONFIGURED SPECIFICATION - ABSOLUTE TRUTH, OVERRIDES ANYTHING COUNTED FROM THE IMAGE:
+      CONFIGURED DIMENSIONS AND COUNTS - use these to be exact about SIZE, COUNT
+      and POSITION. They say nothing about materials, colour or finish: take all
+      of those from the image and the MATERIAL ASSIGNMENTS section.
       The client configured this exact building. The render MUST show precisely:
 ${lines.map(l => '      ' + l).join('\n')}
-      Do not add, remove or restyle any of the elements listed above.`;
+      Do not add or remove any of the elements listed above.`;
             } catch (e) {
                 console.warn('configSpec block skipped:', e.message || e);
                 return '';
