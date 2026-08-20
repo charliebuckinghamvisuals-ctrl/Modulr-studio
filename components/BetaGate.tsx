@@ -118,13 +118,29 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
         setTimeout(() => window.location.reload(), 600);
     };
 
+    /**
+     * Outcome of the last send attempt, shown ON THE PANEL.
+     *
+     * A silent failure here is indistinguishable from a slow inbox, and that
+     * ambiguity costs far more than an ugly error message: you cannot tell
+     * "Firebase refused" from "check your spam folder", so you wait for a mail
+     * that is never coming. The Firebase error code is deliberately included -
+     * auth/unauthorized-continue-uri and auth/too-many-requests need completely
+     * different fixes, and the code is the fastest way to tell which you have.
+     */
+    const [sendState, setSendState] = useState<{ status: 'idle' | 'sending' | 'sent' | 'error'; detail?: string }>({ status: 'idle' });
+
     /** Send the confirmation mail, tolerating Firebase's rate limit. */
     const sendVerification = async (target: User, quiet = false) => {
+        setSendState({ status: 'sending' });
         try {
             await sendEmailVerification(target);
+            setSendState({ status: 'sent' });
             if (!quiet) toast.success('Confirmation email sent');
         } catch (e: any) {
-            if (e?.code === 'auth/too-many-requests') {
+            const code = e?.code || 'unknown';
+            setSendState({ status: 'error', detail: `${code}${e?.message ? ` - ${e.message}` : ''}` });
+            if (code === 'auth/too-many-requests') {
                 toast.error('Too many emails requested. Please wait a few minutes.');
             } else if (!quiet) {
                 toast.error('Could not send the confirmation email.');
@@ -291,9 +307,24 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
                         every address is real before opening the studio.
                     </p>
                     <p className="text-[11px] text-slate-400 leading-relaxed">
-                        It arrives from a firebaseapp.com address, so it often lands in spam or
-                        promotions - worth checking there first.
+                        It comes from <span className="font-mono text-slate-500">noreply@modulr-studio.firebaseapp.com</span>,
+                        which often lands in spam or promotions - search for that address.
                     </p>
+
+                    {sendState.status === 'sending' && (
+                        <p className="text-[11px] text-slate-400">Sending…</p>
+                    )}
+                    {sendState.status === 'sent' && (
+                        <p className="text-[11px] text-emerald-600 font-semibold">
+                            Firebase accepted the send. If nothing arrives it is a delivery problem, not a sending one.
+                        </p>
+                    )}
+                    {sendState.status === 'error' && (
+                        <div className="text-left bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
+                            <p className="text-[11px] text-red-700 font-bold">The email could not be sent.</p>
+                            <p className="text-[10px] text-red-600 font-mono break-all">{sendState.detail}</p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-3">
