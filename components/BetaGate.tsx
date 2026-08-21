@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldCheck, Mail, KeyRound, Loader2, ArrowRight, Sparkles, MailCheck, RefreshCw } from 'lucide-react';
+import { ShieldCheck, Mail, KeyRound, Loader2, ArrowRight, Sparkles, MailCheck, RefreshCw, UserRound } from 'lucide-react';
 import { auth } from '../services/firebase';
 import {
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
+    updateProfile,
     sendEmailVerification,
     signOut,
     User,
@@ -95,6 +96,7 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
     const { user, loading: authLoading } = useAuth();
 
     const [mode, setMode] = useState<'signup' | 'signin'>('signup');
+    const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [code, setCode] = useState('');
@@ -178,6 +180,10 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
             toast.error('Please enter both email and password');
             return;
         }
+        if (mode === 'signup' && !name.trim()) {
+            toast.error('Please enter your name');
+            return;
+        }
         if (mode === 'signup' && !code.trim()) {
             toast.error('Please enter your beta access code');
             return;
@@ -191,6 +197,28 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
         try {
             if (mode === 'signup') {
                 const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+
+                /**
+                 * Set the display name BEFORE the verification mail goes out.
+                 *
+                 * Firebase's template opens "Hello %DISPLAY_NAME%," and that
+                 * placeholder reads the account's displayName at SEND time.
+                 * Signup only ever collected an email and a password, so the
+                 * field was empty and every new tester was greeted "Hello ," -
+                 * in a message that already lands in spam, which reads as
+                 * broken rather than merely unpersonalised.
+                 *
+                 * The body of that template is locked by Firebase, so this is
+                 * the only end we can fix.
+                 */
+                if (name.trim()) {
+                    try {
+                        await updateProfile(cred.user, { displayName: name.trim() });
+                    } catch (e) {
+                        // Not worth failing a signup over a greeting.
+                        console.error('Could not set display name', e);
+                    }
+                }
 
                 // Validate the code BEFORE sending any mail, so a bad code
                 // neither leaves an orphan account nor emails a stranger.
@@ -436,6 +464,17 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
             </div>
 
             <form onSubmit={handleSignedOutSubmit} className="space-y-4">
+                {mode === 'signup' && (
+                    <div className="space-y-1 text-left">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-secondary pl-1">Your Name</label>
+                        <div className="relative">
+                            <UserRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary" />
+                            <input type="text" value={name} onChange={e => setName(e.target.value)}
+                                placeholder="Jane Smith" autoComplete="name" className={field} />
+                        </div>
+                    </div>
+                )}
+
                 <div className="space-y-1 text-left">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-secondary pl-1">Email</label>
                     <div className="relative">
