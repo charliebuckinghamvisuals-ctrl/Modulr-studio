@@ -41,7 +41,22 @@ type PlanKey = 'trial' | 'standard' | 'business';
  * every plan - ticked or struck through - so the difference IS the page.
  */
 const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: string | boolean; business: string | boolean }> = [
-    { label: 'Renders',            trial: '5 (24 hours)', standard: '200 per month', business: 'Unlimited' },
+    /**
+     * 100 renders on Standard.
+     *
+     * Sized against two numbers. A small garden room firm runs about four
+     * projects a month, and a project takes somewhere around 15-25 renders once
+     * you count angles, material options and weather - so 100 covers the
+     * typical customer comfortably while still being a real ceiling for a busy
+     * one, which is what makes the upgrade to Business mean something. 200 was
+     * above what anyone would ever reach, so it was not a tier boundary at all.
+     *
+     * It is also the safer half of the cost question. At 49.99 inc VAT roughly
+     * 40 pounds survives VAT and Stripe, so 100 renders keeps generation costs
+     * near a quarter of revenue at full usage on a 10p render, and still viable
+     * at 20p. At 200 the same plan loses money on anyone who uses it properly.
+     */
+    { label: 'Renders',            trial: '5 (24 hours)', standard: '100 per month', business: 'Unlimited' },
     { label: 'Output quality',     trial: '1080p Full HD', standard: '1080p Full HD', business: '4K Ultra HD' },
     { label: 'Render Engine',      trial: true,  standard: true,  business: true },
     { label: 'Line Converter',     trial: true,  standard: true,  business: true },
