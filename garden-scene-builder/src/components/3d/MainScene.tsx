@@ -290,7 +290,11 @@ export function MainScene() {
               mieCoefficient={0.005}
               mieDirectionalG={0.8}
             />
-            <Clouds material={THREE.MeshLambertMaterial} limit={200}>
+            {/* limit is the instanced buffer drei allocates and walks every
+                frame. The three clouds below use 62 segments between them, so
+                200 was reserving and iterating more than three times what is
+                drawn. 64 covers them with room to spare. */}
+            <Clouds material={THREE.MeshLambertMaterial} limit={64}>
               <Cloud seed={1} segments={26} bounds={[26, 3, 12]} volume={9} color="#ffffff" opacity={0.5} position={[-14, 22, -22]} />
               <Cloud seed={2} segments={20} bounds={[20, 3, 10]} volume={7} color="#f3f6fa" opacity={0.42} position={[20, 26, -30]} />
               <Cloud seed={3} segments={16} bounds={[16, 2, 8]} volume={5} color="#ffffff" opacity={0.32} position={[4, 30, -40]} />

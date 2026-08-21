@@ -131,12 +131,24 @@ function AnimatedDoorLeaves({ door, frameColorHex, frameThickness, sashThickness
   const { areDoorsOpen, toggleDoors, viewMode } = useStore();
   const leavesRef = useRef<THREE.Group[]>([]);
 
+  /**
+   * True once every leaf has reached its target, so the loop can stop working.
+   *
+   * lerp approaches its target asymptotically and never quite arrives, so
+   * without this the door maths ran for every leaf of every door on every
+   * frame, for the entire session, long after the doors had visibly stopped
+   * moving. Reset whenever the target changes.
+   */
+  const settledRef = useRef(false);
+  useEffect(() => { settledRef.current = false; }, [areDoorsOpen, door?.leaves, door?.widthMm]);
+
   useFrame((_, delta) => {
-    if (!door) return;
-    
+    if (!door || settledRef.current) return;
+
     // Sliders mostly open by pushing all but one leaf to one side
     const leafW = (door.widthMm/1000 - frameThickness*1.5) / door.leaves;
     const isSingle = door.leaves === 1;
+    let moving = false;
 
     leavesRef.current.forEach((leaf, i) => {
       if (!leaf) return;
@@ -149,17 +161,39 @@ function AnimatedDoorLeaves({ door, frameColorHex, frameThickness, sashThickness
         ? Math.PI / 2 // Swing 90 deg
         : 0;
 
+      // Sub-millimetre at this scale, and well under a pixel on screen.
+      if (Math.abs(leaf.position.x - targetX) > 0.0005 || Math.abs(leaf.rotation.y - targetRotY) > 0.0005) {
+          moving = true;
+      }
+
       // Animate position
       leaf.position.x = THREE.MathUtils.lerp(leaf.position.x, targetX, 5 * delta);
       // Animate rotation (important for swing)
       leaf.rotation.y = THREE.MathUtils.lerp(leaf.rotation.y, targetRotY, 5 * delta);
-      
+
       // Pivot offset for swinging doors
       if (isSingle) {
          leaf.position.x = targetX + Math.sin(leaf.rotation.y) * leafW/2;
          leaf.position.z = Math.cos(leaf.rotation.y) * leafW/2 - leafW/2;
       }
     });
+
+    // Snap to the exact target on the last frame, so parking the animation can
+    // never leave a leaf a fraction out of place.
+    if (!moving) {
+      leavesRef.current.forEach((leaf, i) => {
+        if (!leaf) return;
+        leaf.position.x = areDoorsOpen && !isSingle
+          ? - (door.widthMm/1000 - frameThickness*1.5)/2 + (leafW/2) + Math.min(i, 0.5) * leafW * 0.2
+          : - (door.widthMm/1000 - frameThickness*1.5)/2 + (leafW/2) + i * leafW;
+        leaf.rotation.y = areDoorsOpen && isSingle ? Math.PI / 2 : 0;
+        if (isSingle) {
+          leaf.position.x += Math.sin(leaf.rotation.y) * leafW/2;
+          leaf.position.z = Math.cos(leaf.rotation.y) * leafW/2 - leafW/2;
+        }
+      });
+      settledRef.current = true;
+    }
   });
 
   if (!door) return null;
@@ -975,8 +1009,20 @@ export function RoomGeometry() {
         </group>
         )}
 
-      {/* Interior warm lights */}
-      <pointLight position={[0, h - 0.5, 0]} intensity={3} color="#ffe5b4" distance={10} shadow-mapSize={[1024, 1024]} castShadow />
+      {/*
+        Interior warm light - deliberately NOT shadow casting.
+
+        A point light with castShadow renders the whole scene SIX times a frame,
+        once per face of a cube shadow map. This one sits inside the room, so
+        from the default exterior camera almost none of that work is visible:
+        it was costing six extra passes to shadow surfaces you cannot see. The
+        matching light further up the file already had castShadow={false}, so
+        this was an inconsistency rather than a decision.
+
+        The warm glow through the glazing is unchanged - that comes from the
+        light's colour and intensity, not from its shadows.
+      */}
+      <pointLight position={[0, h - 0.5, 0]} intensity={3} color="#ffe5b4" distance={10} castShadow={false} />
 
       {/* Render Door frames and glass */}
       {(room.doors || []).map((door) => {
