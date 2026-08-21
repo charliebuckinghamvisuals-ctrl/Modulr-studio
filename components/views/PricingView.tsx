@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Zap, Sparkles, Wand2, TrendingUp, Loader2 } from 'lucide-react';
+import { Check, X, Zap, Sparkles, Wand2, TrendingUp, Loader2 } from 'lucide-react';
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
 import { useAuth } from '../../hooks/useAuth';
@@ -13,6 +13,86 @@ import { AppStage } from '../../types';
 interface PricingViewProps {
     onNavigate?: (stage: AppStage) => void;
 }
+
+/**
+ * Stripe price IDs for the Standard tier.
+ *
+ * PLACEHOLDERS. No Standard product exists in Stripe yet, so these will not
+ * resolve at checkout - which is harmless while BILLING_ENABLED is off, because
+ * the button opens the "not open yet" notice and never reaches Stripe. Before
+ * billing is switched on, create the products, paste the real IDs here, and add
+ * them to PRICE_CATALOGUE in server.js. The server rejects any price ID it does
+ * not recognise, so a forgotten one fails closed rather than charging wrongly.
+ */
+const STANDARD_PRICE_ID: Record<'monthly' | 'yearly', string> = {
+    monthly: 'price_standard_monthly_TODO',
+    yearly: 'price_standard_yearly_TODO',
+};
+
+type PlanKey = 'trial' | 'standard' | 'business';
+
+/**
+ * One feature list, three columns.
+ *
+ * Written as a single matrix rather than three hand-maintained bullet lists,
+ * because the previous version had exactly that problem: the trial card and the
+ * business card described overlapping features in different words, so it was
+ * impossible to see what you actually gained by upgrading. Every row appears on
+ * every plan - ticked or struck through - so the difference IS the page.
+ */
+const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: string | boolean; business: string | boolean }> = [
+    /**
+     * 100 renders on Standard.
+     *
+     * Sized against two numbers. A small garden room firm runs about four
+     * projects a month, and a project takes somewhere around 15-25 renders once
+     * you count angles, material options and weather - so 100 covers the
+     * typical customer comfortably while still being a real ceiling for a busy
+     * one, which is what makes the upgrade to Business mean something. 200 was
+     * above what anyone would ever reach, so it was not a tier boundary at all.
+     *
+     * It is also the safer half of the cost question. At 49.99 inc VAT roughly
+     * 40 pounds survives VAT and Stripe, so 100 renders keeps generation costs
+     * near a quarter of revenue at full usage on a 10p render, and still viable
+     * at 20p. At 200 the same plan loses money on anyone who uses it properly.
+     */
+    { label: 'Renders',            trial: '5 (24 hours)', standard: '100 per month', business: 'Unlimited' },
+    { label: 'Output quality',     trial: '1080p Full HD', standard: '1080p Full HD', business: '4K Ultra HD' },
+    { label: 'Render Engine',      trial: true,  standard: true,  business: true },
+    { label: 'Line Converter',     trial: true,  standard: true,  business: true },
+    { label: 'Weather Lab',        trial: true,  standard: true,  business: true },
+    { label: 'Material Studio',    trial: true,  standard: true,  business: true },
+    { label: 'Content Studio',     trial: false, standard: false, business: true },
+    { label: '3D Configurator',    trial: false, standard: false, business: true },
+    { label: 'Animation Studio',   trial: false, standard: false, business: true },
+    { label: 'Projects & clients', trial: false, standard: false, business: true },
+    { label: 'Commercial rights',  trial: false, standard: true,  business: true },
+    { label: 'Priority queue',     trial: false, standard: false, business: true },
+];
+
+const FeatureList: React.FC<{ plan: PlanKey }> = ({ plan }) => (
+    <>
+        {PLAN_FEATURES.map((row) => {
+            const value = row[plan];
+            const included = value !== false;
+            return (
+                <div key={row.label} className="flex items-start gap-2.5">
+                    {included ? (
+                        <Check size={16} className="text-accent shrink-0 mt-0.5" strokeWidth={3} />
+                    ) : (
+                        <X size={16} className="text-slate-300 shrink-0 mt-0.5" strokeWidth={3} />
+                    )}
+                    <span className={`text-sm leading-tight ${included ? 'text-primary/85' : 'text-slate-400 line-through decoration-slate-300'}`}>
+                        {row.label}
+                        {typeof value === 'string' && (
+                            <span className="block text-[11px] font-bold text-accent/70 mt-0.5">{value}</span>
+                        )}
+                    </span>
+                </div>
+            );
+        })}
+    </>
+);
 
 export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
     const { user } = useAuth();
@@ -211,7 +291,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                 </div>
 
                 {/* Pricing Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl items-stretch pb-20 mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl items-stretch pb-20 mx-auto">
 
                     {/* Free Trial Entry */}
                     <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-surface/40 hover:bg-surface/60 transition-all duration-300 relative group shadow-[0_20px_50px_rgba(0,0,0,0.1)]">
@@ -230,20 +310,42 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             {user ? 'Go to Studio →' : 'Sign In to Start Trial'}
                         </Button>
 
-                        <div className="space-y-4 flex-1">
+                        <div className="space-y-3 flex-1">
                             <div className="text-xs font-bold uppercase tracking-widest text-secondary mb-2">The Taster Package</div>
-                            {[
-                                '5 Renders (24-Hour Window)',
-                                '1080p High Definition Output',
-                                'Standard & Pro Modes Included',
-                                'Access All Core Tools',
-                                'Weather Lab Access'
-                            ].map((feature, i) => (
-                                <div key={i} className="flex items-start gap-3">
-                                    <Sparkles size={18} className="text-accent shrink-0 mt-0.5" />
-                                    <span className="text-sm text-primary/80 leading-tight">{feature}</span>
-                                </div>
-                            ))}
+                            <FeatureList plan="trial" />
+                        </div>
+                    </div>
+
+                    {/* Standard Plan */}
+                    <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-surface/40 hover:bg-surface/60 transition-all duration-300 relative group shadow-[0_20px_50px_rgba(0,0,0,0.1)]">
+                        <div className="mb-6">
+                            <h3 className="text-2xl font-bold text-accent mb-2">Standard</h3>
+                            <p className="text-sm text-secondary min-h-[40px]">Everything a smaller studio needs to sell a job.</p>
+                        </div>
+                        <div className="mb-8">
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-5xl font-bold text-primary drop-shadow-md">
+                                    £{billingCycle === 'monthly' ? '49.99' : '449'}
+                                </span>
+                                <span className="text-xs font-bold text-secondary uppercase tracking-tighter self-end mb-2">inc VAT</span>
+                            </div>
+                            <span className="text-secondary font-medium"> / {billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
+                            {billingCycle === 'yearly' && (
+                                <div className="text-xs font-bold text-green-500 uppercase mt-2">£37.42 effective monthly</div>
+                            )}
+                        </div>
+
+                        <Button
+                            className="w-full mb-8 shadow-xl"
+                            onClick={() => handleUpgrade('standard', STANDARD_PRICE_ID[billingCycle], 0)}
+                            disabled={loadingPlan !== null}
+                        >
+                            {loadingPlan === STANDARD_PRICE_ID[billingCycle] ? <Loader2 className="animate-spin" /> : 'Choose Standard'}
+                        </Button>
+
+                        <div className="space-y-3 flex-1">
+                            <div className="text-xs font-bold uppercase tracking-widest text-secondary mb-2">What's Included</div>
+                            <FeatureList plan="standard" />
                         </div>
                     </div>
 
@@ -262,14 +364,14 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         <div className="mb-8 text-white">
                             <div className="flex items-baseline gap-1">
                                 <span className="text-5xl font-bold text-primary dark:text-white drop-shadow-md">
-                                    £{billingCycle === 'monthly' ? '189.99' : '1,710'}
+                                    £{billingCycle === 'monthly' ? '140.99' : '1,269'}
                                 </span>
                                 <span className="text-xs font-bold text-secondary uppercase tracking-tighter self-end mb-2">inc VAT</span>
                             </div>
                             <span className="text-secondary font-medium"> / {billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
                             {billingCycle === 'yearly' && (
                                 <div className="text-xs font-bold text-green-400 uppercase mt-2">
-                                    £142.50 effective monthly
+                                    £105.75 effective monthly
                                 </div>
                             )}
                         </div>
@@ -288,21 +390,9 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             {loadingPlan === (billingCycle === 'monthly' ? 'price_1TM28kHtB5liiqHxBZvK7pjm' : 'price_1TM2OGHtB5liiqHx2RQXMxO3') ? <Loader2 className="animate-spin" /> : 'Upgrade Now'}
                         </Button>
 
-                        <div className="space-y-4 flex-1">
+                        <div className="space-y-3 flex-1">
                             <div className="text-xs font-bold uppercase tracking-widest text-primary dark:text-white mb-2">The Complete Architectural Toolkit:</div>
-                            {[
-                                'Unlimited Renders',
-                                '4K Ultra HD - Every Render',
-                                'All Tools (Material Studio + Refinement)',
-                                'Primary Brand Material Presets',
-                                'Full Commercial Rights',
-                                'Priority Rendering Queue'
-                            ].map((feature, i) => (
-                                <div key={i} className="flex items-start gap-3">
-                                    <Check size={18} className="text-accent shrink-0 mt-0.5" strokeWidth={3} />
-                                    <span className="text-sm font-medium text-accent dark:text-white leading-tight">{feature}</span>
-                                </div>
-                            ))}
+                            <FeatureList plan="business" />
                         </div>
                     </div>
 
