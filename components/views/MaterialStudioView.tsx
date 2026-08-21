@@ -245,13 +245,25 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                     </div>
                 ) : materialStudioImage ? (
                     <div className="flex-1 flex items-center justify-center p-8 relative z-10 transition-all duration-700 opacity-100 scale-100">
-                        <div className="relative group rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 max-w-5xl w-full">
+                        {/*
+                          * Bounded by HEIGHT as well as width.
+                          *
+                          * The detail sheet is a 2x2 grid, so it is roughly square.
+                          * At `w-full` inside max-w-5xl that made it about 1024px
+                          * tall - taller than the panel, which clips - so the top of
+                          * the sheet was cut off along with the download button, and
+                          * the rest ran over the Recent Iterations list below.
+                          */}
+                        <div className="relative group rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 max-w-5xl max-h-full">
                             <img
                                 src={getImageUrl(materialStudioImage)}
-                                className="w-full h-auto object-contain bg-black"
+                                className="max-h-[68vh] w-auto max-w-full object-contain bg-black block"
                                 alt="Material Studio Generation"
                             />
-                            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 items-center">
+                            {/* Always visible, not hover-only: on a tall sheet the
+                                hover target sat off-screen, so the only way to
+                                download was to guess where it was. */}
+                            <div className="absolute top-4 right-4 flex gap-2 opacity-100 transition-opacity duration-300 items-center">
                                 <div className="flex items-center bg-black/40 backdrop-blur-xl rounded-xl p-1 border border-white/20 mr-1">
                                     <button
                                         onClick={() => onFormatChange?.('png')}
