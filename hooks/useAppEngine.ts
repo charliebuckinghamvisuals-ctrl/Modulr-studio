@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { AppStage, MaterialConfig, WeatherConfig, ProcessingState, LibraryMaterialItem, MaterialLibrary } from '../types';
 import { PRESET_MATERIALS, WEATHER_CONDITIONS, SEASONS } from '../constants';
-import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor, setConfigSpec } from '../services/geminiService';
+import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor, setConfigSpec, describeGarden, getSceneContext, setSceneContext } from '../services/geminiService';
 import { saveToHistory } from '../services/historyService';
 import { trackFeatureUsage } from '../services/analytics';
 import { db, auth } from '../services/firebase';
@@ -668,6 +668,8 @@ export const useAppEngine = () => {
 
     const handleBatchRender = async () => {
         if (batchImages.length === 0) return;
+        // Captured before anything can change it, restored in the finally below.
+        const userSceneContextRestore = getSceneContext();
 
         setProcessing({ isLoading: true, message: 'Rendering batch sequence...' });
         try {
@@ -680,7 +682,26 @@ export const useAppEngine = () => {
             while(newRenders.length < 5) newRenders.push(''); // Ensure matching array length
             
             const batchSeed = Math.floor(Math.random() * 2147483647);
-            
+
+            /**
+             * Keep the garden identical across every angle.
+             *
+             * Each angle is an independent API call with no memory of the
+             * others, so telling the model to "match the other angles" asks it
+             * to recall something it has never seen. A shared seed steadies the
+             * look but does not fix the setting: left alone, angle two invents
+             * its own fence and planting, and a multi-angle set where the
+             * garden changes between shots is worth nothing.
+             *
+             * So the setting is made EXPLICIT and identical in every call. If
+             * the user has described the client's garden we use that. If they
+             * have not, we render the first angle, read the garden it produced,
+             * and hand that description to every angle after it - so the rest
+             * are told exactly what the first one made up.
+             */
+            const userSceneContext = getSceneContext();
+            let sequenceContext = userSceneContext;
+
             for (let i = 0; i < validIndices.length; i++) {
                 const slotIndex = validIndices[i];
                 const sourceImg = batchImages[slotIndex];
@@ -712,7 +733,22 @@ export const useAppEngine = () => {
                 
                 newRenders[slotIndex] = result;
                 setBatchRenders([...newRenders]);
-                
+
+                // Lock the setting from the first angle onwards. Free (a text
+                // response, not a generation) and it only has to happen once
+                // per batch, so the cost is a couple of seconds before angle two.
+                if (i === 0 && !sequenceContext && validIndices.length > 1) {
+                    try {
+                        setProcessing({ isLoading: true, message: 'Locking the scene for the remaining angles...' });
+                        sequenceContext = await describeGarden(result);
+                        setSceneContext(sequenceContext);
+                    } catch (e) {
+                        // Not worth failing a batch over: the angles simply stay
+                        // as consistent as the shared seed can make them.
+                        console.warn('Could not lock the batch scene', e);
+                    }
+                }
+
                 // Show last rendered
                 if (i === validIndices.length - 1) {
                     setRenderedImage(result);
@@ -732,6 +768,11 @@ export const useAppEngine = () => {
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Batch render failed midway');
         } finally {
+            // Put back whatever the user had. A scene derived from the first
+            // angle exists to hold THIS batch together; leaving it set would
+            // silently apply one batch's invented garden to every later single
+            // render, with nothing in the panel to show why.
+            setSceneContext(userSceneContextRestore);
             setProcessing({ isLoading: false, message: '' });
         }
     };

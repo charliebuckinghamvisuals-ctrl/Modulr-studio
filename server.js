@@ -1503,7 +1503,7 @@ ${lines.join('\n')}
 
       SCENE MODIFICATIONS: ${additionalPrompt || 'None'}
       ${studioBackground ? `\n      STUDIO OVERRIDE - THIS SUPERSEDES THE HOUSE STYLE COMPOSITION AND CONTEXT RULES ABOVE: Render this building completely isolated on a ${studioBackground}. Do NOT render grass, trees, fences, skies, or any natural environment. Pure studio lighting only. Keep the house style's camera, focus and finish guidance - the building must still be tack sharp with true-to-life material colour.` : ''}
-      ${isBatchSequence ? `\n      BATCH SEQUENCE CONTINUITY: This image is part of a multi-angle batch sequence. You MUST maintain exactly the same surrounding landscape, garden design, driveway, sky, trees, and general environment style as the other angles of this property.` : ''}
+      ${isBatchSequence ? `\n      BATCH SEQUENCE CONTINUITY: This image is one angle of a multi-angle set of the SAME property, rendered independently. You cannot see the other angles, so do not try to recall them - reproduce the SITE CONTEXT above exactly as written, because every angle in this set is given the identical description. Same boundary treatment, same planting, same paving, same sun position and time of day, same weather and sky. Nothing about the setting may differ between angles except the viewpoint.` : ''}
 
       FINAL OUTPUT: The result must be indistinguishable from a real architectural photograph
       (DSLR quality). It must NOT look like a 3D model, a game engine screenshot, or a
@@ -1546,7 +1546,7 @@ ${lines.join('\n')}
 
       SCENE MODIFICATIONS: ${additionalPrompt || 'None'}
       ${studioBackground ? `\n      STUDIO OVERRIDE - THIS SUPERSEDES THE HOUSE STYLE COMPOSITION AND CONTEXT RULES ABOVE: Render this building completely isolated on a ${studioBackground}. Do NOT render grass, trees, fences, skies, or any natural environment. Pure studio lighting only. Keep the house style's camera, focus and finish guidance - the building must still be tack sharp with true-to-life material colour.` : ''}
-      ${isBatchSequence ? `\n      BATCH SEQUENCE CONTINUITY: This image is part of a multi-angle batch sequence. You MUST maintain exactly the same surrounding landscape, garden design, driveway, sky, trees, and general environment style as the other angles of this property.` : ''}
+      ${isBatchSequence ? `\n      BATCH SEQUENCE CONTINUITY: This image is one angle of a multi-angle set of the SAME property, rendered independently. You cannot see the other angles, so do not try to recall them - reproduce the SITE CONTEXT above exactly as written, because every angle in this set is given the identical description. Same boundary treatment, same planting, same paving, same sun position and time of day, same weather and sky. Nothing about the setting may differ between angles except the viewpoint.` : ''}
 
       FINAL OUTPUT: The result must be indistinguishable from a real architectural photograph (DSLR quality).
       CRITICAL: Output resolution 3840 x 2160 pixels (4K UHD).
