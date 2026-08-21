@@ -10,6 +10,7 @@ import { Button } from './components/Button';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { HistoryFooter } from './components/HistoryFooter';
 import { CanvasMask } from './components/CanvasMask';
+import { GardenContextPanel } from './components/GardenContextPanel';
 import { AppStage, HistoryItem } from './types';
 import { WEATHER_CONDITIONS, SEASONS } from './constants';
 import { useAppEngine } from './hooks/useAppEngine';
@@ -297,6 +298,8 @@ const App: React.FC = () => {
                     value={engine.additionalPrompt}
                     onChange={(e) => engine.setAdditionalPrompt(e.target.value)}
                 />
+
+                <GardenContextPanel />
             </div>
             <div className="mt-auto pt-6">
                 {engine.isBatchMode ? (
