@@ -856,7 +856,21 @@ export const useAppEngine = () => {
     };
 
     const handleMaterialStudio = async (sourceImg?: string | null) => {
-        const targetImage = sourceImg || originalImage;
+        /**
+         * Only a string counts as a source image.
+         *
+         * This is called both with an explicit image and, from the Generate Grid
+         * button, with nothing. Passed straight to onClick it received a React
+         * click event instead, which is truthy - so the event travelled all the
+         * way to the request body and JSON.stringify hit the circular reference
+         * inside the element's fiber.
+         *
+         * The call site is fixed, but the guard stays: an optional first
+         * parameter on a function used as an event handler is a trap worth
+         * closing at both ends.
+         */
+        const explicit = typeof sourceImg === 'string' ? sourceImg : null;
+        const targetImage = explicit || originalImage;
         if (!targetImage) return;
         if (selectedDetails.length !== 4) return;
 

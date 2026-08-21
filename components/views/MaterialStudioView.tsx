@@ -219,7 +219,14 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                         <div className="pt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <Button
                                 className="w-full"
-                                onClick={handleMaterialStudio}
+                                // Wrapped, NOT passed directly. handleMaterialStudio
+                                // takes an optional source image as its first
+                                // argument, so handing it straight to onClick made
+                                // React pass the click event as that image - and the
+                                // event is truthy, so it was sent to the API and
+                                // JSON.stringify choked on the React fiber inside
+                                // the button element.
+                                onClick={() => handleMaterialStudio()}
                                 disabled={isLoading}
                                 icon={<Grid size={16} />}
                             >
