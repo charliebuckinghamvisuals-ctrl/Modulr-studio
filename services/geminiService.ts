@@ -190,6 +190,54 @@ export const setConfigSpec = (spec: Record<string, unknown> | null) => {
     currentConfigSpec = spec;
 };
 
+/**
+ * The client's garden, as a written brief rather than a photograph.
+ *
+ * Set from the Garden panel and sent with every render, so a whole job's worth
+ * of angles, seasons and weather variants share one setting. Module state for
+ * the same reason as configSpec: it has to reach renderBuilding from a panel
+ * that does not own the render call.
+ */
+export interface SceneContext {
+    boundary?: string;
+    levels?: string;
+    hardLandscaping?: string;
+    planting?: string;
+    context?: string;
+    aspect?: string;
+    character?: string;
+    summary?: string;
+}
+
+let currentSceneContext: SceneContext | null = null;
+export const setSceneContext = (ctx: SceneContext | null) => {
+    currentSceneContext = ctx;
+};
+export const getSceneContext = (): SceneContext | null => currentSceneContext;
+
+/**
+ * Turn a client's garden into a buildable description.
+ *
+ * Takes a photo, a written note, or both - and where both are given the note
+ * wins, because it is the correction someone made after seeing what the photo
+ * produced. The photo is read once here and never travels with a render.
+ */
+export const describeGarden = async (base64Image?: string, notes?: string): Promise<SceneContext> => {
+    const res = await fetch(`${API_BASE_URL}/scene/describe`, {
+        method: 'POST',
+        headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+            base64Image: base64Image ? (base64Image.includes(',') ? base64Image.split(',')[1] : base64Image) : undefined,
+            notes,
+        }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || 'Could not read that photo.');
+    }
+    return res.json();
+};
+
 export const renderBuilding = async (
   base64Image: string,
   materials: MaterialConfig,
@@ -208,7 +256,7 @@ export const renderBuilding = async (
     const response = await fetch(`${API_BASE_URL}/renderBuilding`, {
       method: 'POST',
       headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground, isBatchSequence, seed, configSpec: currentConfigSpec || undefined })
+      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground, isBatchSequence, seed, configSpec: currentConfigSpec || undefined, sceneContext: currentSceneContext || undefined })
     });
 
     if (!response.ok) {

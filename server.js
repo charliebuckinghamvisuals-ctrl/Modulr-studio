@@ -1381,6 +1381,56 @@ ${lines.map(l => '      ' + l).join('\n')}
         const configSpecBlock = buildConfigSpecBlock(req.body.configSpec);
 
         /**
+         * SITE CONTEXT - rebuild the client's garden around the building.
+         *
+         * The photo never reaches the model. This is a written brief produced
+         * by /api/scene/describe, exactly as a visualiser works from site
+         * photos: the garden is rebuilt as CGI, so it is recognisably the
+         * client's without a single pixel being composited. That sidesteps
+         * perspective, scale and sun-direction matching entirely.
+         *
+         * The block MUST re-scope the NO HALLUCINATIONS rule above it. That
+         * rule forbids inventing decking, patios and structures absent from the
+         * source - which is precisely what a described garden asks for. Left
+         * unqualified the two instructions contradict each other, and there is
+         * no telling which one the model follows. The configured-specification
+         * block learned that lesson the hard way.
+         */
+        const buildSiteContextBlock = (ctx) => {
+            if (!ctx || typeof ctx !== 'object') return '';
+            const line = (label, v) => (typeof v === 'string' && v.trim() ? `      - ${label}: ${sanitizeString(v, 400)}` : null);
+            const lines = [
+                line('Boundary', ctx.boundary),
+                line('Ground and levels', ctx.levels),
+                line('Paving and hard landscaping', ctx.hardLandscaping),
+                line('Planting', ctx.planting),
+                line('Beyond the boundary', ctx.context),
+                line('Aspect and light', ctx.aspect),
+                line('Overall character', ctx.character),
+            ].filter(Boolean);
+            if (!lines.length) return '';
+
+            return `
+      SITE CONTEXT - BUILD THIS GARDEN AROUND THE BUILDING:
+      The client's own garden, described from their photograph. Recreate it as
+      part of this render.
+
+      THIS SECTION OVERRIDES THE "NO HALLUCINATIONS" RULE ABOVE, WHICH APPLIES
+      TO THE BUILDING ONLY. The building's geometry stays exactly as shown in
+      the source image. The SURROUNDINGS below are to be built even though they
+      do not appear in it - replace whatever background the source has.
+
+${lines.join('\n')}
+
+      Render this as a real garden photographed on the day: correct contact
+      shadows where the building meets the ground, planting with real depth and
+      variation rather than repeated copies, and boundary treatments that
+      continue naturally out of frame. It should look like the building was
+      photographed in this garden, not placed on top of it.`;
+        };
+        const siteContextBlock = buildSiteContextBlock(req.body.sceneContext);
+
+        /**
          * Material instruction for CGI-model sources (3D Configurator, SketchUp).
          *
          * Deliberately different from buildMaterialInstruction. For a photograph,
@@ -1447,6 +1497,8 @@ ${lines.map(l => '      ' + l).join('\n')}
       - Keep contrast controlled and natural. Depth comes from soft directional falloff
         and ambient occlusion, not from hard shadows or crushed blacks.
 
+      ${siteContextBlock}
+
       ${MODULR_HOUSE_STYLE}
 
       SCENE MODIFICATIONS: ${additionalPrompt || 'None'}
@@ -1487,6 +1539,8 @@ ${lines.map(l => '      ' + l).join('\n')}
       - If a colour like "Black", "Charred", "Anthracite", or "Dark" is specified, render it as deep, rich, non-reflective tone. DO NOT wash out to grey.
       - Keep contrast controlled and natural. Depth comes from soft directional falloff
         and ambient occlusion, not from hard shadows or crushed blacks.
+
+      ${siteContextBlock}
 
       ${MODULR_HOUSE_STYLE}
 
@@ -2523,6 +2577,97 @@ Return STRICT JSON only, no code fence:
     } catch (error) {
         console.error('[CONTENT] Suggest failed:', error);
         res.status(500).json({ error: 'Could not read that image. Please try again.' });
+    }
+});
+
+/**
+ * Read a photo of a client's garden and describe it as a buildable brief.
+ *
+ * The goal is NOT to composite the building into the photograph. Asking an
+ * image model to place a render into a real scene means asking it to solve
+ * perspective, scale and sun direction at once, which it cannot do - it skews
+ * the building, guesses the size, and quietly redesigns it on the way through.
+ *
+ * So the photo is treated the way a visualiser treats site photos: as a brief.
+ * The garden gets rebuilt as CGI from this description, which is why the output
+ * has to be a list of renderable ELEMENTS - fence type and height, planting,
+ * paving material, levels - rather than atmosphere. The client recognises their
+ * garden because the parts match, not because any pixels survived.
+ *
+ * Free: a small text response, no image generation.
+ */
+app.post('/api/scene/describe', userAiLimiter, async (req, res) => {
+    try {
+        /**
+         * A photo, a written note, or both.
+         *
+         * Plenty of customers can simply say "north facing, close-board fence,
+         * lawn and a patio" without hunting for a photograph, and someone who
+         * has a photo often knows something it does not show - the shed that is
+         * out of shot, the fence they are about to replace. Where both arrive
+         * the note WINS, because it is the correction the person made after
+         * seeing what the photo produced.
+         */
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
+        const notes = sanitizeString(req.body.notes, 1500);
+        if (!base64Image && !notes) {
+            return res.status(400).json({ error: 'Add a photo or describe the garden.' });
+        }
+
+        const prompt = `You are a senior architectural visualiser writing a site brief for a client's garden. Another artist will rebuild this garden in 3D from your description alone - they will never see the source material.
+
+${base64Image ? 'Work from the photograph provided.' : 'Work from the written description below alone.'}
+${notes ? `\nThe client says:\n"""${notes}"""\n${base64Image ? 'Where this disagrees with the photo, BELIEVE THE CLIENT - they know their garden, and the photo may be old or out of shot.' : ''}` : ''}
+${!base64Image ? 'Fill in anything they have not mentioned with the most typical UK garden option, and keep it plain and unremarkable rather than inventing features.' : ''}
+
+Describe ONLY the setting. Ignore any existing building, shed or outbuilding: a new garden room will be placed here, and describing the old one would confuse the render.
+
+Be concrete and physical. "Close-board timber fence, about 1.8m, weathered grey-brown" is useful. "A charming, peaceful space" is not - it cannot be built.
+
+Where something is unclear in the photo, choose the most typical UK garden option rather than guessing wildly, and keep it plain.
+
+Return STRICT JSON only, no code fence, no markdown:
+{
+  "boundary": "fence or wall type, height, material, condition",
+  "levels": "flat, sloping, terraced, steps and their rough height",
+  "hardLandscaping": "patio, path and decking materials, colours, sizes",
+  "planting": "lawn condition, trees, shrubs, borders - species where obvious, character where not",
+  "context": "what is visible beyond the boundary - neighbouring rooflines, trees, open fields",
+  "aspect": "which way the garden appears to face and where the light comes from",
+  "character": "one short phrase - suburban, rural, courtyard, coastal",
+  "summary": "two sentences a visualiser could build from"
+}`;
+
+        const parts = [];
+        if (base64Image) parts.push({ inlineData: { mimeType: 'image/jpeg', data: base64Image } });
+        parts.push({ text: prompt });
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-pro-latest',
+            contents: { parts },
+        });
+
+        const raw = String(response.text || '').replace(/```json|```/g, '').trim();
+        try {
+            const p = JSON.parse(raw);
+            const pick = (v) => (typeof v === 'string' ? v.slice(0, 400) : '');
+            return res.json({
+                boundary: pick(p.boundary),
+                levels: pick(p.levels),
+                hardLandscaping: pick(p.hardLandscaping),
+                planting: pick(p.planting),
+                context: pick(p.context),
+                aspect: pick(p.aspect),
+                character: pick(p.character),
+                summary: pick(p.summary),
+            });
+        } catch {
+            console.warn('[SCENE] Describe returned unparseable JSON');
+            return res.status(502).json({ error: 'Could not read that photo. Please try another.' });
+        }
+    } catch (error) {
+        console.error('[SCENE] Describe failed:', error);
+        res.status(500).json({ error: 'Could not read that photo. Please try again.' });
     }
 });
 
