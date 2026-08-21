@@ -103,6 +103,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     // `canUseAnimation` is null until the plan loads - only badge on an explicit
     // false, so a subscriber never sees a lock flash on their own feature.
     { id: AppStage.ANIMATION_STUDIO, label: 'Animation Studio', locked: canUseAnimation === false },
+    { id: AppStage.CONTENT_STUDIO, label: 'Content Studio' },
   ];
 
   // Top-level header items, in display order. Tools is injected between Home

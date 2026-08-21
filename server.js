@@ -2362,6 +2362,223 @@ app.get('/api/user/credits', async (req, res) => {
     }
 });
 
+/**
+ * CONTENT STUDIO
+ *
+ * Two endpoints, both behind the same auth and lock as everything else in /api.
+ */
+
+/** Aspect ratios the image model accepts, keyed by the studio's format ids. */
+const CONTENT_RATIOS = {
+    square: '1:1',
+    portrait: '4:5',
+    story: '9:16',
+    linkedin: '16:9',
+};
+
+/**
+ * AI Reframe - extend a render into a different aspect ratio.
+ *
+ * The difference between this and the browser-side compositor is the whole
+ * point of the feature. A canvas can letterbox a landscape render into a 9:16
+ * story, or blur the sides to fill it; only the model can invent the extra sky
+ * above and lawn below so the result looks like it was photographed that way.
+ *
+ * Costs a render, because it IS one - the model generates a new image. Priced
+ * at LOW_RES: the output is for a phone screen, so paying 4K rates for it would
+ * be daft.
+ */
+app.post('/api/content/reframe', userAiLimiter, async (req, res) => {
+    try {
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
+        const format = sanitizeString(req.body.format, 20);
+        const ratio = CONTENT_RATIOS[format];
+
+        if (!base64Image) return res.status(400).json({ error: 'A source image is required.' });
+        if (!ratio) return res.status(400).json({ error: 'Unknown format.' });
+
+        const access = await enforceRenderAccess(req, CREDIT_COSTS.LOW_RES);
+        if (!access.allowed) {
+            return res.status(access.status).json(access.body);
+        }
+
+        const prompt = `
+      TASK: Re-frame this architectural photograph to a ${ratio} aspect ratio by EXTENDING the scene.
+
+      THIS IS AN EXTENSION, NOT A CROP AND NOT A ZOOM:
+      - The building must stay COMPLETE and UNCHANGED. Do not cut any part of it
+        off, do not resize it relative to its surroundings, and do not alter its
+        materials, colours, proportions, windows or doors in any way.
+      - Generate NEW scenery to fill the space the new shape adds: more sky above,
+        more garden, lawn or paving below, more planting and fencing to the sides.
+      - Everything you add must be a plausible continuation of what is already
+        there - same time of day, same sun direction and shadow length, same
+        weather, same lens, same colour grade, same depth of field.
+      - Match grain and sharpness across the join. There must be no visible seam,
+        vignette or tonal step where the original image ends.
+
+      COMPOSITION:
+      - Place the building slightly below centre, leaving the upper third calmer,
+        so a caption or logo can sit over the image without covering the subject.
+      - Keep the horizon level and the verticals of the building perfectly upright.
+
+      OUTPUT: a single photorealistic image at ${ratio}, indistinguishable from a
+      real photograph taken in that format.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-image',
+            contents: {
+                parts: [
+                    { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+                    { text: prompt },
+                ],
+            },
+            config: {
+                outputMimeType: 'image/jpeg',
+                imageConfig: { aspectRatio: ratio, imageSize: '1K' },
+                // Low, because this is a faithfulness task rather than a creative
+                // one - the extension should be boring and seamless.
+                temperature: 0.15,
+            },
+        });
+
+        for (const part of response.candidates?.[0]?.content?.parts || []) {
+            if (part.inlineData) {
+                const d = part.inlineData.data;
+                const b64 = Buffer.isBuffer(d) ? d.toString('base64')
+                    : ((d instanceof Uint8Array || d instanceof ArrayBuffer) ? Buffer.from(d).toString('base64') : d);
+                return res.json({ result: b64 });
+            }
+        }
+        throw new Error('No reframed image was returned.');
+    } catch (error) {
+        console.error('[CONTENT] Reframe failed:', error);
+        res.status(500).json({ error: 'Could not reframe that image. Please try again.' });
+    }
+});
+
+/**
+ * Post copy written from the SPEC, not from the picture.
+ *
+ * A generic caption tool is looking at pixels and guessing. This one is handed
+ * the real dimensions and materials, which is why it can say "4.2m x 3m in
+ * Siberian larch" instead of "a beautiful modern garden building".
+ */
+/**
+ * Look at the render and suggest overlay copy.
+ *
+ * Different job from the caption endpoint. A caption is prose under the post;
+ * this is the handful of words that sit ON the image, where the constraint is
+ * severity - four words that fit a headline, not a paragraph. It reads the
+ * picture as well as the spec, so it can say "evening light" or "bifolds" when
+ * that is what is actually in shot.
+ *
+ * Free: it is a small text response, not an image generation.
+ */
+app.post('/api/content/suggest', userAiLimiter, async (req, res) => {
+    try {
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
+        if (!base64Image) return res.status(400).json({ error: 'An image is required.' });
+        const businessName = sanitizeString(req.body.businessName, 80);
+        const details = req.body.details && typeof req.body.details === 'object' ? req.body.details : {};
+
+        const prompt = `You are an art director writing the words that go ON a social post for a UK garden room company${businessName ? ` called ${businessName}` : ''}.
+
+Look at the image. Note the building's character, materials, glazing, planting, light and time of day.
+Known specification (use it, never contradict it, never invent beyond it):
+${JSON.stringify(details, null, 2).slice(0, 1200)}
+
+Give FOUR different options. Each has:
+- "headline": 2 to 5 words. This is set large over the photo, so it must be short, concrete and specific to THIS building. No slogans, no "transform your space", no exclamation marks.
+- "subline": 3 to 8 words of supporting detail - dimensions, material, or use. Sentence case.
+
+Vary the angle across the four: one factual, one about the feeling of the space, one about the material or craft, one about what it is used for.
+British English. No emoji, no hashtags, no markdown.
+
+Return STRICT JSON only, no code fence:
+{"options":[{"headline":"...","subline":"..."}],"altText":"one sentence describing the image for accessibility"}`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-pro-latest',
+            contents: {
+                parts: [
+                    { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+                    { text: prompt },
+                ],
+            },
+        });
+
+        const raw = String(response.text || '').replace(/```json|```/g, '').trim();
+        try {
+            const parsed = JSON.parse(raw);
+            const options = Array.isArray(parsed.options) ? parsed.options.slice(0, 6).map(o => ({
+                headline: String(o.headline || '').slice(0, 60),
+                subline: String(o.subline || '').slice(0, 90),
+            })).filter(o => o.headline) : [];
+            return res.json({ options, altText: String(parsed.altText || '') });
+        } catch {
+            console.warn('[CONTENT] Suggest returned unparseable JSON');
+            return res.json({ options: [], altText: '' });
+        }
+    } catch (error) {
+        console.error('[CONTENT] Suggest failed:', error);
+        res.status(500).json({ error: 'Could not read that image. Please try again.' });
+    }
+});
+
+app.post('/api/content/captions', userAiLimiter, async (req, res) => {
+    try {
+        const platform = sanitizeString(req.body.platform, 20) || 'instagram';
+        const tone = sanitizeString(req.body.tone, 30) || 'friendly';
+        const businessName = sanitizeString(req.body.businessName, 80);
+        const details = req.body.details && typeof req.body.details === 'object' ? req.body.details : {};
+
+        const house = platform === 'linkedin'
+            ? 'LinkedIn: professional and specific, first person plural, a short case-study note. No emoji. 3-4 short paragraphs at most.'
+            : 'Instagram: warm and direct, short lines, a hook in the first sentence because the rest is hidden behind "more". A few tasteful emoji are fine.';
+
+        const prompt = `You write social posts for a UK garden room and outbuilding company${businessName ? ` called ${businessName}` : ''}.
+
+Write a post about this finished project. These are the REAL specifications - use the actual numbers and materials, never invent any:
+${JSON.stringify(details, null, 2).slice(0, 2000)}
+
+Platform - ${house}
+Tone: ${tone}.
+
+RULES:
+- British English. Metres and millimetres, never feet.
+- Never invent a price, a lead time, a location or a client name that is not above.
+- No hard sell and no "DM us now" energy. One gentle closing line is enough.
+- Do not use markdown, asterisks or headings.
+
+Return STRICT JSON only, no code fence, in exactly this shape:
+{"caption":"the post text","hashtags":["#tag","#tag"],"altText":"one sentence describing the image for accessibility"}
+Between 8 and 12 hashtags, lowercase, a mix of broad and niche, relevant to UK garden rooms.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-pro-latest',
+            contents: prompt,
+        });
+
+        // The model is asked for bare JSON but will occasionally fence it anyway.
+        const raw = String(response.text || '').replace(/```json|```/g, '').trim();
+        try {
+            const parsed = JSON.parse(raw);
+            return res.json({
+                caption: String(parsed.caption || ''),
+                hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags.slice(0, 14).map(String) : [],
+                altText: String(parsed.altText || ''),
+            });
+        } catch {
+            // Better a caption with no hashtags than an error screen.
+            return res.json({ caption: raw, hashtags: [], altText: '' });
+        }
+    } catch (error) {
+        console.error('[CONTENT] Caption generation failed:', error);
+        res.status(500).json({ error: 'Could not write a caption. Please try again.' });
+    }
+});
+
 app.post('/api/create-checkout-session', async (req, res) => {
     try {
         /**

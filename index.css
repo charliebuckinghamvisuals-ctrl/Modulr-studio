@@ -1,4 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900&display=swap');
+/* Content Studio typography. A design tool with one typeface is a form with a
+   preview, so these are the display faces offered alongside Montserrat:
+   an editorial serif, a neutral grotesque, and a condensed poster face. */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@300..900&family=Archivo+Black&family=DM+Serif+Display&display=swap');
 @import "tailwindcss";
 
 /* Build-time Tailwind (v4). The app previously shipped NO compiled CSS and
