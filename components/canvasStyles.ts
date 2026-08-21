@@ -31,9 +31,22 @@ export const RENDER_CANVAS_FITTED =
     'border border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ' +
     'relative render-grid';
 
-/** Height cap for the invisible sizing image inside RENDER_CANVAS_FITTED:
- *  one viewport minus the header (6rem), workspace padding and the export row. */
-export const RENDER_CANVAS_IMG_MAX_H = 'max-h-[calc(100vh-13rem)]';
+/**
+ * Height cap for the invisible sizing image inside RENDER_CANVAS_FITTED.
+ *
+ * One viewport minus the header (6rem) and the chrome stacked under the canvas.
+ * That reservation was 13rem, which was measured to be about 36px more than the
+ * column actually uses - and since a landscape render is height-bound, every
+ * pixel reserved here is lost from the WIDTH too. On a 1280x720 screen the
+ * canvas came out 732px wide inside a 979px column, leaving a quarter of the
+ * workspace empty.
+ *
+ * 9.5rem is what is genuinely below the canvas: the export row, one gap, and
+ * the column's padding. Trimmed alongside that padding (p-4 lg:p-6 -> p-3
+ * lg:p-4 in WorkspaceView), so the cap still lands inside the column rather
+ * than pushing the export row into a scroll.
+ */
+export const RENDER_CANVAS_IMG_MAX_H = 'max-h-[calc(100vh-9.5rem)]';
 
 /**
  * Height of a tool workspace.

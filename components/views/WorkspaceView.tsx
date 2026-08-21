@@ -171,7 +171,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                 + history inside a fixed-height workspace — without its own
                 scrollbar, a tall (portrait) image pushed the history strip off
                 the bottom with no way to reach it. */}
-            <div className="flex-1 p-4 lg:p-6 flex flex-col gap-4 relative z-10 min-w-0 overflow-y-auto custom-scrollbar">
+            <div className="flex-1 p-3 lg:p-4 flex flex-col gap-3 relative z-10 min-w-0 overflow-y-auto custom-scrollbar">
                 {/* Shared with Material Studio and Animation Studio - see
                     canvasStyles. Once an image is loaded the frame shrink-wraps
                     it (RENDER_CANVAS_FITTED): the invisible in-flow img below

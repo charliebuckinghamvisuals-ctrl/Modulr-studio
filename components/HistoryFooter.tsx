@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getHistory, clearHistory } from '../services/historyService';
 import { HistoryItem, AppStage } from '../types';
-import { Clock, Trash2, AlertTriangle } from 'lucide-react';
+import { Clock, Trash2, AlertTriangle, ChevronDown } from 'lucide-react';
 
 /** Returns a formatted HH:MM:SS string for time remaining until next midnight */
 function getTimeUntilMidnight(): string {
@@ -31,6 +31,9 @@ interface HistoryFooterProps {
 export const HistoryFooter: React.FC<HistoryFooterProps> = ({ currentStage, onLoadHistoryItem }) => {
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [blobUrls, setBlobUrls] = useState<Record<string, string>>({});
+    /** Closed by default: this strip shares a fixed-height column with the
+     *  canvas, so an open filmstrip costs the render about 180px of height. */
+    const [open, setOpen] = useState(false);
     const countdown = useMidnightCountdown();
 
     const loadHistory = async () => {
@@ -115,18 +118,36 @@ export const HistoryFooter: React.FC<HistoryFooterProps> = ({ currentStage, onLo
     }
 
     return (
-        <div className="w-full mt-6 bg-surface/40 border-t border-border rounded-b-3xl p-4 animate-in slide-in-from-bottom-5 duration-500">
-            <div className="flex items-center justify-between mb-3 px-2">
+        /**
+         * Collapsed by default, and `shrink-0` so it can never be squeezed.
+         *
+         * This strip lives in the same fixed-height column as the canvas, so
+         * every pixel it occupies is taken off the render - roughly 180px once
+         * thumbnails and the reset notice are showing, which is what made the
+         * canvas look small the moment you had any history. The canvas is the
+         * job; the history is a drawer you open when you want it.
+         */
+        <div className="w-full mt-3 shrink-0 bg-surface/40 border-t border-border rounded-b-3xl px-4 py-2 animate-in slide-in-from-bottom-5 duration-500">
+            <div className={`flex items-center justify-between px-2 ${open ? 'mb-3' : ''}`}>
                 {/* text-white was a dark-theme leftover — invisible on the light
                     surface this strip now sits on. */}
-                <h3 className="text-sm font-bold tracking-tight text-accent flex items-center gap-2">
+                <button
+                    onClick={() => setOpen(o => !o)}
+                    className="text-sm font-bold tracking-tight text-accent flex items-center gap-2 hover:opacity-70 transition-opacity"
+                    title={open ? 'Hide history' : 'Show history'}
+                >
                     <Clock size={16} className="text-accent" /> Recent Iterations ({history.length})
-                </h3>
-                <button onClick={handleClear} className="text-xs text-secondary hover:text-red-400 transition-colors flex items-center gap-1">
-                    <Trash2 size={12} /> Clear
+                    <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
                 </button>
+                {open && (
+                    <button onClick={handleClear} className="text-xs text-secondary hover:text-red-400 transition-colors flex items-center gap-1">
+                        <Trash2 size={12} /> Clear
+                    </button>
+                )}
             </div>
-            
+
+            {open && (<>
+
             <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar no-scroll-arrows">
                 {history.map((item) => (
                     <div
@@ -159,6 +180,7 @@ export const HistoryFooter: React.FC<HistoryFooterProps> = ({ currentStage, onLo
                 </div>
                 <span className="text-[11px] font-mono font-bold text-amber-400 shrink-0 tabular-nums">{countdown}</span>
             </div>
+            </>)}
         </div>
     );
 };
