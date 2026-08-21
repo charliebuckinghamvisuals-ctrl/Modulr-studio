@@ -41,12 +41,13 @@ type PlanKey = 'trial' | 'standard' | 'business';
  * every plan - ticked or struck through - so the difference IS the page.
  */
 const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: string | boolean; business: string | boolean }> = [
-    { label: 'Renders',            trial: '5 (24 hours)', standard: '40 per month', business: 'Unlimited' },
+    { label: 'Renders',            trial: '5 (24 hours)', standard: '200 per month', business: 'Unlimited' },
     { label: 'Output quality',     trial: '1080p Full HD', standard: '1080p Full HD', business: '4K Ultra HD' },
     { label: 'Render Engine',      trial: true,  standard: true,  business: true },
     { label: 'Line Converter',     trial: true,  standard: true,  business: true },
     { label: 'Weather Lab',        trial: true,  standard: true,  business: true },
-    { label: 'Material Studio',    trial: true,  standard: false, business: true },
+    { label: 'Material Studio',    trial: true,  standard: true,  business: true },
+    { label: 'Content Studio',     trial: false, standard: false, business: true },
     { label: '3D Configurator',    trial: false, standard: false, business: true },
     { label: 'Animation Studio',   trial: false, standard: false, business: true },
     { label: 'Projects & clients', trial: false, standard: false, business: true },
