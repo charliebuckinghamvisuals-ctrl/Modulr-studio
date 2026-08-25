@@ -668,7 +668,8 @@ export const useStore = create<AppState>((set, get) => ({
 
     let partitionsPrice = 0;
     (room.partitions || []).forEach(part => {
-       const lengthM = part.lengthMm / 1000;
+       // An L-shaped wall is priced by its total run: main length plus leg.
+       const lengthM = (part.lengthMm + (part.legLengthMm || 0)) / 1000;
        partitionsPrice += lengthM * pricing.partitionLmPrice;
     });
 

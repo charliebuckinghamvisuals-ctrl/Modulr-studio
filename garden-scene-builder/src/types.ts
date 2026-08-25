@@ -80,6 +80,13 @@ export interface PartitionData {
   thicknessMm: number;
   rotation: 0 | 90;
   doors?: PartitionDoor[];
+  /** L-shape: a perpendicular leg welded to one end of the main run.
+   *  0/undefined = straight wall. */
+  legLengthMm?: number;
+  /** Which end of the main run the leg sits on (+1 = the local +X end). */
+  legEnd?: 1 | -1;
+  /** Which side the leg turns towards (+1 = local +Z). */
+  legDir?: 1 | -1;
 }
 
 export interface Room {

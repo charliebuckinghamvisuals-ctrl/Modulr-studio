@@ -433,6 +433,31 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
         />
       </mesh>
 
+      {/* L-shape leg: a perpendicular run welded to one end of the main
+          wall, so a corner is ONE unit instead of two walls nudged together.
+          It shares the group, so body-drag, rotate and selection all treat
+          the L as a single wall. */}
+      {(part.legLengthMm || 0) > 100 && (() => {
+        const legL = part.legLengthMm / 1000;
+        const le = part.legEnd === -1 ? -1 : 1;
+        const ld = part.legDir === -1 ? -1 : 1;
+        return (
+          <mesh
+            position={[le * (pL / 2 - pT / 2), 0, ld * (legL / 2 + pT / 2)]}
+            castShadow receiveShadow
+            onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+          >
+            <boxGeometry args={[pT, hP, legL]} />
+            <meshStandardMaterial
+              color={room.interiorColor || '#ffffff'}
+              roughness={0.9}
+              emissive={isSelected ? '#10b981' : '#000000'}
+              emissiveIntensity={isSelected ? 0.18 : 0}
+            />
+          </mesh>
+        );
+      })()}
+
       {/* Door frames for this wall's own doors. */}
       {(part.doors || []).map((dr: any) => {
         const dW = dr.widthMm / 1000;
@@ -457,6 +482,22 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
             onChange={(d) => resizeEnd(true)(part.rotation === 0 ? d : -d)} />
           <DragHandle elementId={`part-${part.id}`} position={[-pL / 2, 0, 0]} axis={part.rotation === 0 ? 'x' : 'z'} color="#ff0000" visualAxis="x" snapInterval={0.05}
             onChange={(d) => resizeEnd(false)(part.rotation === 0 ? d : -d)} />
+          {/* Leg tip handle: blue, resizes the L-shape leg. Local +Z maps to
+              world +Z (rot 0) or world +X (rot 90). */}
+          {(part.legLengthMm || 0) > 100 && (
+            <DragHandle elementId={`part-${part.id}`}
+              position={[(part.legEnd === -1 ? -1 : 1) * (pL / 2 - pT / 2), 0, (part.legDir === -1 ? -1 : 1) * (part.legLengthMm / 1000 + pT / 2)]}
+              axis={part.rotation === 0 ? 'z' : 'x'} color="#2563eb" visualAxis="z" snapInterval={0.05}
+              onChange={(d) => {
+                const st = useStore.getState();
+                const cur = (st.scene.room.partitions || []).find((p: any) => p.id === part.id);
+                if (!cur) return;
+                const localDz = cur.rotation === 0 ? d : d; // world z (rot 0) / world x (rot 90) both map to local +z
+                const dirSign = cur.legDir === -1 ? -1 : 1;
+                const next = Math.max(300, Math.round((cur.legLengthMm + dirSign * localDz * 1000) / 100) * 100);
+                st.updatePartition(part.id, { legLengthMm: next });
+              }} />
+          )}
           {/* Door slide handles: green, above each opening. */}
           {(part.doors || []).map((dr: any) => (
             <DragHandle key={`slide-${dr.id}`} elementId={`part-${part.id}`} position={[dr.offsetMm / 1000, hP / 2 + 0.18, 0]} axis={part.rotation === 0 ? 'x' : 'z'} color="#10b981" visualAxis="x" snapInterval={0.05}

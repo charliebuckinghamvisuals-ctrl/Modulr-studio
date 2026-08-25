@@ -772,6 +772,30 @@ export function Sidebar() {
                     </div>
                     <DimensionSlider label="Length" min={400} max={6000} step={100} value={part.lengthMm} onChange={(v) => wrap(store.updatePartition)(part.id, { lengthMm: v })} />
 
+                    {/* L-shape: a corner as ONE wall - lining up two separate
+                        walls at a corner was needlessly fiddly. */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); wrap(store.updatePartition)(part.id, { legLengthMm: (part.legLengthMm || 0) > 100 ? 0 : 1500, legEnd: part.legEnd || 1, legDir: part.legDir || 1 }); }}
+                        className={`text-[10px] font-semibold px-2 py-1 rounded transition-colors ${(part.legLengthMm || 0) > 100 ? 'bg-[#3b4d4a] text-white' : 'bg-blue-50 text-[#3b4d4a] hover:text-blue-600'}`}
+                      >
+                        {(part.legLengthMm || 0) > 100 ? 'L-Shape ✓' : 'Make L-Shape'}
+                      </button>
+                      {(part.legLengthMm || 0) > 100 && (
+                        <>
+                          <button onClick={(e) => { e.stopPropagation(); wrap(store.updatePartition)(part.id, { legEnd: (part.legEnd === -1 ? 1 : -1) }); }} className="text-[10px] font-semibold text-[#3b4d4a] bg-blue-50 hover:text-blue-600 px-2 py-1 rounded" title="Move the corner to the other end of the wall">
+                            Swap end
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); wrap(store.updatePartition)(part.id, { legDir: (part.legDir === -1 ? 1 : -1) }); }} className="text-[10px] font-semibold text-[#3b4d4a] bg-blue-50 hover:text-blue-600 px-2 py-1 rounded" title="Turn the leg to the other side">
+                            Flip side
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    {(part.legLengthMm || 0) > 100 && (
+                      <DimensionSlider label="Leg Length" min={300} max={6000} step={100} value={part.legLengthMm || 1500} onChange={(v) => wrap(store.updatePartition)(part.id, { legLengthMm: v })} />
+                    )}
+
                     <div className="border-t border-black/5 pt-3 space-y-2">
                       {(part.doors || []).map((dr, di) => (
                         <div key={dr.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-2.5 py-2">
