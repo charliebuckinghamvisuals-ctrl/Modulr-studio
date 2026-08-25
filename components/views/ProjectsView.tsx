@@ -3,6 +3,7 @@ import { toast } from 'react-hot-toast';
 import {
     FolderOpen, Plus, Trash2, MapPin, User, FileText, Image as ImageIcon,
     Upload, Loader2, ArrowLeft, PoundSterling, Paperclip, Trophy, Lock, Box,
+    Share2, Link2Off,
 } from 'lucide-react';
 import { DraftingBackground } from '../DraftingBackground';
 import { Button } from '../Button';
@@ -16,6 +17,7 @@ import {
 } from '../../services/projectService';
 import { isWon } from '../../services/projectMetrics';
 import { setPendingDesign } from '../../services/designHandoff';
+import { setCurrentProject } from '../../services/currentProject';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
     lead: 'Lead',
@@ -106,6 +108,44 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
     const [pendingKind, setPendingKind] = useState<ProjectAssetKind>('exterior_render');
 
     const active = projects.find(p => p.id === activeId) || null;
+
+    // Remember the job being worked on, so Save-to-Project across the tools
+    // can offer it first. Only set, never cleared on going back to the list -
+    // "the last project I had open" stays the best default.
+    useEffect(() => {
+        if (active) setCurrentProject({ id: active.id, name: active.name });
+    }, [active?.id, active?.name]);
+
+    /**
+     * Client sharing. The token is the whole credential (unlisted-link model),
+     * so it is generated with real randomness and revoked by clearing it.
+     */
+    const handleShare = async () => {
+        if (!active) return;
+        try {
+            let token = active.shareToken;
+            if (!token) {
+                token = crypto.randomUUID().replace(/-/g, '');
+                await updateProject(active.id, { shareToken: token });
+                setProjects(prev => prev.map(p => (p.id === active.id ? { ...p, shareToken: token } : p)));
+            }
+            await navigator.clipboard.writeText(`${window.location.origin}/share/${token}`);
+            toast.success('Client link copied - text or email it to your customer');
+        } catch (e: any) {
+            toast.error(e?.message || 'Could not create the share link.');
+        }
+    };
+
+    const handleUnshare = async () => {
+        if (!active) return;
+        try {
+            await updateProject(active.id, { shareToken: null });
+            setProjects(prev => prev.map(p => (p.id === active.id ? { ...p, shareToken: null } : p)));
+            toast.success('Sharing disabled - the old link no longer works');
+        } catch (e: any) {
+            toast.error(e?.message || 'Could not disable sharing.');
+        }
+    };
 
     const refresh = async () => {
         try {
@@ -383,8 +423,11 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                                             className="group cursor-pointer p-5 rounded-2xl bg-white border border-slate-200 hover:border-accent/40 hover:shadow-lg transition-all flex flex-col gap-3"
                                         >
                                             <div className="flex items-start justify-between gap-3">
-                                                <h3 className="font-bold text-slate-800 leading-snug group-hover:text-accent transition-colors">
+                                                <h3 className="font-bold text-slate-800 leading-snug group-hover:text-accent transition-colors flex items-center gap-2">
                                                     {project.name}
+                                                    {project.scene3d && (
+                                                        <Box size={13} className="shrink-0 text-accent/60" aria-label="Has a saved 3D design" />
+                                                    )}
                                                 </h3>
                                                 <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${STATUS_STYLES[project.status]}`}>
                                                     {STATUS_LABELS[project.status]}
@@ -437,6 +480,22 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                                         <span className="text-xs text-slate-400 flex items-center gap-1.5">
                                             <Loader2 size={12} className="animate-spin" /> Saving
                                         </span>
+                                    )}
+                                    <button
+                                        onClick={handleShare}
+                                        className="flex items-center gap-2 text-sm font-semibold text-accent hover:opacity-80 transition-opacity"
+                                        title="Copy a read-only link your customer can open - renders and estimate only, no contact details"
+                                    >
+                                        <Share2 size={16} /> {active.shareToken ? 'Copy client link' : 'Share with client'}
+                                    </button>
+                                    {active.shareToken && (
+                                        <button
+                                            onClick={handleUnshare}
+                                            className="flex items-center gap-2 text-sm text-slate-400 hover:text-rose-600 transition-colors"
+                                            title="Disable the share link"
+                                        >
+                                            <Link2Off size={16} />
+                                        </button>
                                     )}
                                     {active.scene3d && (
                                         <button

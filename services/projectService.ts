@@ -63,6 +63,7 @@ const emptyDraft = (): ProjectDraft => ({
     wonAt: null,
     notes: '',
     scene3d: null,
+    shareToken: null,
 });
 
 const toMillis = (v: any): number | null =>
@@ -96,6 +97,7 @@ const toProject = (id: string, data: any): Project => {
         wonAt,
         notes: data.notes || '',
         scene3d: typeof data.scene3d === 'string' ? data.scene3d : null,
+        shareToken: typeof data.shareToken === 'string' ? data.shareToken : null,
         assets: Array.isArray(data.assets) ? data.assets : [],
         createdAt,
         updatedAt: toMillis(data.updatedAt) ?? Date.now(),

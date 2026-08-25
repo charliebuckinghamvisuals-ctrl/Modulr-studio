@@ -36,6 +36,15 @@ export const UpdateNotice: React.FC = () => {
         if (!user) return;
         const key = `modulr_update_seen_${UPDATE_ID}_${user.uid}`;
         try {
+            // A brand-new account has no "before" to compare against -
+            // "what's new" is meaningless and would stack on top of the
+            // welcome tour. Same age test as the tour, so exactly one of the
+            // two popups shows for any given account.
+            const created = user.metadata?.creationTime ? new Date(user.metadata.creationTime).getTime() : 0;
+            if (created > 0 && Date.now() - created < 60 * 60 * 1000) {
+                localStorage.setItem(key, '1');
+                return;
+            }
             if (!localStorage.getItem(key)) setOpen(true);
         } catch { /* storage unavailable - just skip the notice */ }
     }, [user]);

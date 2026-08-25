@@ -14,7 +14,7 @@ import { GardenContextPanel } from './components/GardenContextPanel';
 import { AppStage, HistoryItem, ProjectAssetKind } from './types';
 import { SaveToProjectDialog } from './components/SaveToProjectDialog';
 import { WEATHER_CONDITIONS, SEASONS } from './constants';
-import { useAppEngine } from './hooks/useAppEngine';
+import { useAppEngine, compressImageFile } from './hooks/useAppEngine';
 import { HomeView } from './components/views/HomeView';
 import { MaterialStudioView } from './components/views/MaterialStudioView';
 import { StudioView } from './components/views/StudioView';
@@ -33,6 +33,8 @@ import { AccountView } from './components/views/AccountView';
 import { DesignerView } from './components/views/DesignerView';
 import { ComingSoonView } from './components/views/ComingSoonView';
 import { UpdateNotice } from './components/UpdateNotice';
+import { FirstRunTour } from './components/FirstRunTour';
+import { ClientShareView } from './components/views/ClientShareView';
 import { BetaGate } from './components/BetaGate';
 import { useAuth } from './hooks/useAuth';
 import { useCredits } from './hooks/useCredits';
@@ -61,6 +63,16 @@ const App: React.FC = () => {
     React.useEffect(() => {
         window.scrollTo(0, 0);
     }, [engine.activeStage]);
+
+    /**
+     * Public client-share pages bypass the entire app - no shell, no auth, no
+     * beta gate. The viewer is a homeowner who was texted a link; asking them
+     * to sign in would kill the feature. Must come after every hook above.
+     */
+    const shareMatch = window.location.pathname.match(/^\/share\/([a-f0-9]{32})$/);
+    if (shareMatch) {
+        return <ClientShareView token={shareMatch[1]} />;
+    }
 
     const handleLoadHistory = (item: HistoryItem) => {
         engine.setActiveStage(item.stage);
@@ -334,7 +346,7 @@ const App: React.FC = () => {
                     )
                 ) : (
                     engine.originalImage ? (
-                        <Button borderless className="w-full" onClick={engine.handleRender} icon={<Sparkles size={16} />} disabled={engine.processing.isLoading}>
+                        <Button borderless className="w-full" onClick={() => engine.handleRender()} icon={<Sparkles size={16} />} disabled={engine.processing.isLoading}>
                             Render Image
                         </Button>
                     ) : (
@@ -669,8 +681,25 @@ const App: React.FC = () => {
     );
 
 
+    /**
+     * Zero-friction first render: loads the bundled demo drawing as if the
+     * user uploaded it. The wow moment should not require having a file ready.
+     */
+    const loadSampleDrawing = async () => {
+        try {
+            const blob = await (await fetch('/demo-line-drawing.jpg')).blob();
+            const file = new File([blob], 'sample-line-drawing.jpg', { type: 'image/jpeg' });
+            const base64Data = await compressImageFile(file, 1920);
+            engine.setIsSketchUpMode(false);
+            engine.setOriginalImageForStage(AppStage.RENDER_ENGINE, base64Data);
+            engine.handleAnalyzeForRenderEngine(base64Data);
+        } catch {
+            toast.error('Could not load the sample image.');
+        }
+    };
+
     const renderEngineEmptyState = (
-        <div className="flex flex-col md:flex-row gap-6 items-center justify-center w-full h-full p-8 relative canvas-grid">
+        <div className="flex flex-col md:flex-row gap-6 items-center justify-center w-full h-full p-8 pb-20 relative canvas-grid">
             <div className="absolute inset-0 bg-accent/10 backdrop-blur-3xl pointer-events-none"></div>
 
             <div
@@ -704,110 +733,13 @@ const App: React.FC = () => {
                     <p className="text-secondary text-sm leading-relaxed">Upload a basic 3D model. AI auto-detects your materials for a 4K render.</p>
                 </div>
             </div>
-        </div>
-    );
 
-    const refinementBox = (
-        <div className="mt-4 p-4 glass-panel rounded-2xl border border-accent/20 bg-accent/5 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-500 shadow-sm">
-            <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-accent flex items-center gap-2">
-                        <Sparkles size={12} className="text-amber-500 animate-pulse" />
-                        Refinement Mode
-                    </label>
-                </div>
-                <div className="flex items-center gap-3 bg-white pl-4 pr-1 py-1 rounded-full border border-accent/20 focus-within:border-accent/50 focus-within:ring-2 focus-within:ring-accent/10 transition-all shadow-inner">
-                    <input
-                        value={engine.refinementPrompt}
-                        onChange={(e) => engine.setRefinementPrompt(e.target.value)}
-                        placeholder="e.g. Add modern patio furniture"
-                        className="flex-1 bg-transparent border-none outline-none text-xs text-accent placeholder:text-accent/30"
-                        onKeyDown={(e) => { 
-                            if (e.key === 'Enter' && !engine.processing.isLoading && engine.refinementPrompt.trim()) {
-                                engine.handleRefineRender(); 
-                            }
-                        }}
-                    />
-                    <Button
-                        onClick={engine.handleRefineRender}
-                        disabled={engine.processing.isLoading || !engine.refinementPrompt.trim()}
-                        className="h-8 px-4 text-[10px] rounded-full whitespace-nowrap"
-                        icon={<Sparkles size={12} />}
-                    >
-                        Apply
-                    </Button>
-                </div>
-            </div>
-        </div>
-    );
-
-    const materialStudioBox = (
-        <div className="mt-4 p-5 glass-panel rounded-2xl border border-accent/20 bg-accent/5 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-5 duration-700">
-            <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-widest text-accent flex items-center gap-2">
-                        <Grid size={14} className="text-accent" />
-                        Material Studio (2x2 Sheet)
-                    </label>
-                    <span className="text-[10px] text-secondary font-medium italic">Callout Details</span>
-                </div>
-
-                {engine.detectedDetails.length === 0 ? (
-                    <div className="flex items-center justify-between gap-3">
-                        <p className="text-[11px] text-secondary/80 leading-relaxed flex-1">
-                            Extract specific architectural materials and textures into a high-resolution 2x2 presentation grid.
-                        </p>
-                        <Button
-                            onClick={() => engine.handleAnalyzeForMaterialStudio(engine.renderedImage!)}
-                            disabled={engine.processing.isLoading}
-                            className="h-auto px-6 whitespace-nowrap bg-blue-600/80 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
-                            icon={<Sparkles size={16} />}
-                        >
-                            Detect Elements
-                        </Button>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center text-xs uppercase tracking-widest font-bold text-secondary">
-                            <span>Select 4 Focus Details</span>
-                            <span className={`${engine.selectedDetails.length === 4 ? 'text-accent' : 'text-secondary'}`}>
-                                {engine.selectedDetails.length} / 4 Selected
-                            </span>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            {engine.detectedDetails.slice(0, 8).map((detail, idx) => {
-                                const isSelected = engine.selectedDetails.includes(detail);
-                                return (
-                                    <button
-                                        key={idx}
-                                        onClick={() => engine.toggleDetailSelection(detail)}
-                                        className={`p-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 border text-center ${isSelected
-                                            ? 'bg-accent text-white border-accent'
-                                            : 'bg-white border-slate-200 text-secondary hover:text-accent hover:border-accent/40'
-                                            }`}
-                                    >
-                                        {detail}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        {engine.selectedDetails.length === 4 && (
-                            <Button
-                                className="w-full mt-2 bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-lg shadow-blue-500/30"
-                                onClick={() => {
-                                    engine.setActiveStage(AppStage.MATERIAL_STUDIO);
-                                    engine.setOriginalImageForStage(AppStage.MATERIAL_STUDIO, engine.renderedImage); // Carry over render
-                                    engine.handleMaterialStudio(engine.renderedImage);
-                                }}
-                                disabled={engine.processing.isLoading}
-                                icon={<Grid size={16} />}
-                            >
-                                Generate Material Grid
-                            </Button>
-                        )}
-                    </div>
-                )}
-            </div>
+            <button
+                onClick={loadSampleDrawing}
+                className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-accent/30 text-accent text-sm font-bold shadow-lg hover:bg-accent hover:text-white transition-colors"
+            >
+                <Sparkles size={14} /> No drawing handy? Try a sample
+            </button>
         </div>
     );
 
@@ -929,13 +861,29 @@ const App: React.FC = () => {
                     placeholder="Ready to Render"
                     onDownload={engine.handleDownload}
                     onSaveToProject={(img) => setProjectSave({ image: img, kind: 'exterior_render', name: 'render-engine' })}
+                    verification={engine.renderVerification}
+                    onRerender={(sameLook) => engine.handleRender({ reuseSeed: sameLook })}
                     onFormatChange={engine.setDownloadFormat}
                     downloadFormat={engine.downloadFormat}
                     onInputClick={engine.isBatchMode ? undefined : () => engine.fileInputRef.current?.click()}
                     onReset={engine.clearWorkspace}
                     isLoading={engine.activeStage === AppStage.RENDER_ENGINE && engine.processing.isLoading}
                     loadingMessage={engine.processing.message}
-                    customEmptyState={engine.activeStage === AppStage.RENDER_ENGINE && !engine.originalImage && !engine.isBatchMode ? renderEngineEmptyState : undefined}
+                    customEmptyState={
+                        engine.activeStage === AppStage.RENDER_ENGINE && !engine.originalImage && !engine.isBatchMode
+                            ? renderEngineEmptyState
+                            : engine.activeStage === AppStage.RENDER_ENGINE && engine.isBatchMode && !engine.batchImages.some((i: string) => i && i.trim() !== '')
+                                ? (
+                                    // The batch canvas used to be a dead click target - it looked
+                                    // like an upload zone but did nothing. Say where the uploads go.
+                                    <div className="flex flex-col items-center justify-center w-full h-full p-8 text-center canvas-grid">
+                                        <Layers size={36} className="text-accent/40 mb-4" />
+                                        <h3 className="text-accent font-bold text-lg mb-2">Batch mode is on</h3>
+                                        <p className="text-secondary text-sm max-w-xs">Add up to 5 angles of the same building using the numbered slots in the left panel. Each slot renders with a shared garden and lighting.</p>
+                                    </div>
+                                )
+                                : undefined
+                    }
                     userPlan={engine.userPlan}
                     historyFooter={<HistoryFooter currentStage={AppStage.RENDER_ENGINE} onLoadHistoryItem={handleLoadHistory} />}
                 />
@@ -1068,6 +1016,8 @@ const App: React.FC = () => {
             />
             {/* One-time release announcement for signed-in users */}
             {hasAccess && <UpdateNotice />}
+            {/* Three-step welcome for brand-new accounts */}
+            {hasAccess && <FirstRunTour onStart={engine.setActiveStage} />}
         </>
     );
 };

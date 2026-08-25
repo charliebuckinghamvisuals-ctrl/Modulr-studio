@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, Upload, Loader2, RotateCcw, FolderOpen } from 'lucide-react';
+import { Download, Upload, Loader2, RotateCcw, FolderOpen, ShieldCheck, ShieldAlert, RefreshCw, Lock } from 'lucide-react';
 import { Button } from '../Button';
 import { CompareSlider } from '../CompareSlider';
 import { SkeletonLoader } from '../SkeletonLoader';
@@ -19,6 +19,10 @@ interface WorkspaceViewProps {
     onDownload: (base64Data: string, filename: string) => void;
     /** Offer "Save to Project" on the finished image. */
     onSaveToProject?: (image: string) => void;
+    /** The server's automatic quality check on the last render. */
+    verification?: { checked: boolean; passed?: boolean; retried?: boolean } | null;
+    /** Re-render: sameLook=true reuses the last seed, false rolls a new one. */
+    onRerender?: (sameLook: boolean) => void;
     onInputClick: () => void;
     /** Empty the workspace without leaving the tool. */
     onReset?: () => void;
@@ -46,6 +50,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     loadingMessage,
     onDownload,
     onSaveToProject,
+    verification,
+    onRerender,
     onInputClick,
     onReset,
     downloadFormat,
@@ -228,7 +234,39 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                         <div />
                     )}
                     {primaryImg && (
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            {/* The verification badge: invisible engineering made visible.
+                                Green = the render passed the automatic count check against
+                                the design; amber = checked, differences may remain. */}
+                            {verification?.checked && (
+                                verification.passed ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold" title={verification.retried ? 'An automatic correction was applied before this render was accepted.' : 'Doors, windows and roof verified against your design.'}>
+                                        <ShieldCheck size={13} /> Checked against your design
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold" title="The automatic check found differences it could not fully correct - review the render before sending it to a client.">
+                                        <ShieldAlert size={13} /> Auto-checked - review recommended
+                                    </span>
+                                )
+                            )}
+                            {onRerender && (
+                                <div className="flex items-center bg-surface/50 rounded-lg p-1 border border-border">
+                                    <button
+                                        onClick={() => onRerender(false)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-secondary hover:text-primary transition-all"
+                                        title="Re-render with a fresh composition"
+                                    >
+                                        <RefreshCw size={13} /> New look
+                                    </button>
+                                    <button
+                                        onClick={() => onRerender(true)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-secondary hover:text-primary transition-all"
+                                        title="Re-render keeping the same composition (same seed) - useful after changing materials"
+                                    >
+                                        <Lock size={13} /> Same look
+                                    </button>
+                                </div>
+                            )}
                             <div className="flex items-center bg-surface/50 rounded-lg p-1 border border-border">
                                 <button
                                     onClick={() => onFormatChange?.('png')}

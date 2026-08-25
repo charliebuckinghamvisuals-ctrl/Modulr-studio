@@ -3,6 +3,7 @@ import { toast } from 'react-hot-toast';
 import { FolderOpen, Plus, Loader2, X, Lock } from 'lucide-react';
 import { Project, ProjectAssetKind } from '../types';
 import { listProjects, createProject, uploadAsset } from '../services/projectService';
+import { getCurrentProject } from '../services/currentProject';
 import { useCredits } from '../hooks/useCredits';
 
 /**
@@ -34,7 +35,13 @@ export const SaveToProjectDialog: React.FC<SaveToProjectDialogProps> = ({ image,
         setLoading(true);
         setNewName('');
         listProjects()
-            .then(setProjects)
+            .then(list => {
+                // The project the user last had open goes first - it is almost
+                // always the job this render belongs to.
+                const cur = getCurrentProject();
+                if (cur) list = [...list.filter(p => p.id === cur.id), ...list.filter(p => p.id !== cur.id)];
+                setProjects(list);
+            })
             .catch(() => setProjects([]))
             .finally(() => setLoading(false));
     }, [image, canUseProjects]);
@@ -142,7 +149,12 @@ export const SaveToProjectDialog: React.FC<SaveToProjectDialogProps> = ({ image,
                                             ? <Loader2 size={15} className="shrink-0 animate-spin text-accent" />
                                             : <FolderOpen size={15} className="shrink-0 text-accent" />}
                                         <span className="min-w-0">
-                                            <span className="block text-xs font-bold text-[#3b4d4a] truncate">{p.name}</span>
+                                            <span className="block text-xs font-bold text-[#3b4d4a] truncate">
+                                                {p.name}
+                                                {getCurrentProject()?.id === p.id && (
+                                                    <span className="ml-2 text-[9px] font-bold uppercase tracking-wider text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">Current</span>
+                                                )}
+                                            </span>
                                             <span className="block text-[10px] text-slate-400">
                                                 {p.clientName ? `${p.clientName} · ` : ''}
                                                 {new Date(p.updatedAt).toLocaleDateString()}

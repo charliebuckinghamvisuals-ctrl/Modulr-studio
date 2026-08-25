@@ -2,7 +2,6 @@ import React from 'react';
 import { User, Shield, CreditCard, Clock, Calendar, ChevronRight, Zap, Sparkles, LogOut, Settings, History, Info, CheckCircle2, Trash2, Grid, Layers, Crown, Lock } from 'lucide-react';
 import { DraftingBackground } from '../DraftingBackground';
 import { Button } from '../Button';
-import { useAppEngine } from '../../hooks/useAppEngine';
 import { LibraryMaterialItem } from '../../types';
 import { toast } from 'react-hot-toast';
 import { PRESET_MATERIALS } from '../../constants';
@@ -19,7 +18,6 @@ interface AccountViewProps {
 }
 
 export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
-    const engine = useAppEngine();
     const { user } = useAuth();
     const { credits, plan, rendersLeft, rendersPerDay, trialDaysLeft, refreshCredits } = useCredits();
     const { branding, setBranding } = useBranding();

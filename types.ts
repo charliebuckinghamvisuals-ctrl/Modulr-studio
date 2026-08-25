@@ -127,6 +127,10 @@ export interface Project {
    *  was saved from the configurator. Stored as a string so Firestore never
    *  has to validate its nested shape, and parsed only on load. */
   scene3d?: string | null;
+  /** Random token that makes the client share page live. Null/absent = not
+   *  shared. Possession of the token is the authorisation, so it is generated
+   *  client-side with crypto randomness and revoked by clearing the field. */
+  shareToken?: string | null;
   assets: ProjectAsset[];
   createdAt: number;
   updatedAt: number;
@@ -136,7 +140,7 @@ export interface Project {
 export type ProjectDraft = Pick<
   Project,
   'name' | 'clientName' | 'clientEmail' | 'address' | 'estimateValue' | 'status'
-  | 'quotedAt' | 'wonAt' | 'notes' | 'scene3d'
+  | 'quotedAt' | 'wonAt' | 'notes' | 'scene3d' | 'shareToken'
 >;
 
 export interface HistoryItem {
