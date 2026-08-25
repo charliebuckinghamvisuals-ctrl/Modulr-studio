@@ -893,10 +893,11 @@ export function RoomGeometry() {
                 buried the cladding. */}
             {([['front', d/2 - wallThickness/2], ['back', -(d/2 - wallThickness/2)]] as const).map(([side, zAbs]) => (
               <mesh key={`gable-end-${side}`} position={[-roofX, roofH/2, zAbs - roofZ]} castShadow receiveShadow>
-                {(() => {
-                  const tex = side === 'front' ? texFront : texBack;
-                  return <meshStandardMaterial color={tex.color} map={tex.map} normalMap={tex.normalMap} roughnessMap={tex.roughnessMap} roughness={tex.roughness} metalness={0.05} bumpScale={0.1} />;
-                })()}
+                {/* EXACTLY the wall material recipe (same spread, same
+                    metalness, same bumpScale, AO map included) - a hand-picked
+                    subset of the texture props read as a subtly different
+                    material on the same elevation. */}
+                <meshStandardMaterial color="#ffffff" {...(side === 'front' ? texFront : texBack)} metalness={0.1} bumpScale={0.1} />
                 <Geometry>
                   <Base>
                     <primitive object={side === 'front' ? gableEndFrontGeom : gableEndBackGeom} attach="geometry" />
