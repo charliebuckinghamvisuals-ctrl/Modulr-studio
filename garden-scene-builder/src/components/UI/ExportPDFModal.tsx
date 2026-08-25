@@ -696,8 +696,14 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
         pdf.setFillColor(248, 249, 250);
         pdf.setDrawColor(...HAIRLINE);
         pdf.setLineWidth(0.2);
+        // Confident but honest: the old wording ("should not be relied upon")
+        // read as "ignore this page". This assessment IS built on the real
+        // Class E rules and the design's exact measurements - what it cannot
+        // see is the site, so NAPC is framed as the confirmation step, not a
+        // health warning. No invented accuracy percentages: on planning
+        // guidance a number we cannot prove is a liability, not reassurance.
         const discl = pdf.splitTextToSize(
-          'Indicative guidance generated from your design. It is not planning advice and should not be relied upon. Confirm your proposal with NAPC (www.napc.uk) before proceeding.',
+          'This assessment is based on the current national Permitted Development rules (Class E) and the exact measurements of this design. Final confirmation depends on your specific site and local authority - please contact NAPC (www.napc.uk) before proceeding and they will confirm it formally.',
           CONTENT_W - 8
         );
         const disclH = discl.length * 4 + 7;
