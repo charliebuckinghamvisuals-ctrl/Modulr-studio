@@ -214,6 +214,7 @@ export function Sidebar() {
                   { label: 'Total Depth', key: 'depthMm', hidden: viewMode !== 'plan' },
                   { label: 'Eaves Height', key: '__eavesMm' },
                   { label: 'Ridge Height', key: '__ridgeMm' },
+                  { label: 'Fascia Depth', key: 'gableFasciaMm' },
                   { label: 'Base Height', key: 'baseHeightMm' },
                   { label: 'Wall Thickness', key: 'wallThicknessMm' },
                 ] : [
@@ -239,6 +240,7 @@ export function Sidebar() {
                   if (dim.key === 'wallThicknessMm') val = room.wallThicknessMm || 150;
                   if (dim.key === '__ridgeMm') val = ridgeTotal;
                   if (dim.key === '__eavesMm') val = ridgeTotal - roofH;
+                  if (dim.key === 'gableFasciaMm') val = room.gableFasciaMm ?? 100;
 
                   return (
                     <div key={dim.key} className="flex items-center gap-2">

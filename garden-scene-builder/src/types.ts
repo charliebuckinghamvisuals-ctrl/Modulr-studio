@@ -80,6 +80,9 @@ export interface Room {
   backHeightMm?: number;
   baseHeightMm: number;
   roofHeightMm: number;
+  /** Gable bargeboard/fascia depth in mm (the visible edge of the sloped roof
+   *  slabs). 100mm default; clamped 50-400 in the geometry. */
+  gableFasciaMm?: number;
   cladding: CladdingType;
   claddingFront?: CladdingType;
   claddingBack?: CladdingType;

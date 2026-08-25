@@ -434,8 +434,11 @@ export function RoomGeometry() {
   // overhang at 0 the roof was never flush — overhang is now entirely the
   // user's Overhangs & Canopy setting.
   const roofFlatGeom = useMemo(() => createWorldScaleBoxGeometry(roofW, roofH, roofD, false, 0, 0, 0), [roofW, roofH, roofD]);
-  const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohLeft) / Math.cos(gablePitch), 0.1, roofD, false, 0, 0, 0), [w, ohLeft, gablePitch, roofD]);
-  const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohRight) / Math.cos(gablePitch), 0.1, roofD, false, 0, 0, 0), [w, ohRight, gablePitch, roofD]);
+  // The slab thickness IS the visible fascia (bargeboard) depth on a gable -
+  // user-adjustable, 100mm by default.
+  const gableFascia = Math.min(0.4, Math.max(0.05, (room.gableFasciaMm ?? 100) / 1000));
+  const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohLeft) / Math.cos(gablePitch), gableFascia, roofD, false, 0, 0, 0), [w, ohLeft, gablePitch, roofD, gableFascia]);
+  const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohRight) / Math.cos(gablePitch), gableFascia, roofD, false, 0, 0, 0), [w, ohRight, gablePitch, roofD, gableFascia]);
 
 
   const renderBaseMeshes = () => {
@@ -912,13 +915,25 @@ export function RoomGeometry() {
                     return <meshStandardMaterial key={matKey} color="#2d3032" roughness={0.6} metalness={0.2} />; // anthracite default
                   }
                 };
+                /**
+                 * On a GABLE this prism's front/back faces are the gable-end
+                 * TRIANGLES - which are wall, not roof. Painting them fascia
+                 * colour buried the cladding under a black triangle the full
+                 * height of the rise. They now wear the wall cladding, and the
+                 * only visible fascia is the real one: the 100mm bargeboard
+                 * edge of the sloped roof slabs.
+                 */
+                const claddingMat = (side) => {
+                  const tex = side === 'front' ? texFront : texBack;
+                  return <meshStandardMaterial key={'gable-end-' + side + '-' + room.cladding + '-' + room.claddingOrientation} color={tex.color} map={tex.map} normalMap={tex.normalMap} roughnessMap={tex.roughnessMap} roughness={tex.roughness} metalness={0.05} bumpScale={0.1} />;
+                };
                 return [
                   React.cloneElement(getFasciaMat('right'), { key: 'mat-0', attach: 'material-0' }),
                   React.cloneElement(getFasciaMat('left'), { key: 'mat-1', attach: 'material-1' }),
                   <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
                   <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
-                  React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }),
-                  React.cloneElement(getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }),
+                  React.cloneElement(isGable ? claddingMat('front') : getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }),
+                  React.cloneElement(isGable ? claddingMat('back') : getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }),
                 ];
               })()}
               <Geometry>
