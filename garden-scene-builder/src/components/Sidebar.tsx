@@ -177,7 +177,24 @@ export function Sidebar() {
             <CollapsibleSection title="Roof Shape" defaultOpen={true}>
               <div className="grid grid-cols-2 gap-2">
                 {(['Box', 'Gable'] as const).map((shape) => (
-                  <div key={shape} onClick={() => updateRoom({ shape: shape as any })} className={`p-3 rounded-xl text-center cursor-pointer transition-all ${room.shape === shape ? 'bg-[#3b4d4a] text-white shadow-md' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
+                  <div key={shape} onClick={() => {
+                    if (room.shape === shape) return;
+                    const baseH = room.baseHeightMm ?? 100;
+                    const roofH = room.roofHeightMm ?? 200;
+                    if (shape === 'Gable') {
+                      // Box stores WALL height; Gable stores total-to-ridge.
+                      // Convert so the eaves line stays exactly where the flat
+                      // roof's top was, and open with a real 1m pitch instead
+                      // of inheriting the 200-300mm fascia - which rendered as
+                      // a near-flat pancake that looked broken.
+                      const eavesTotal = (room.heightMm ?? 2350) + baseH + roofH;
+                      const rise = Math.max(roofH, 1000);
+                      updateRoom({ shape: 'Gable', heightMm: eavesTotal + rise, roofHeightMm: rise });
+                    } else {
+                      const eavesTotal = (room.heightMm ?? 2350) - roofH;
+                      updateRoom({ shape: 'Box', heightMm: Math.max(10, eavesTotal - baseH - 200), roofHeightMm: 200 });
+                    }
+                  }} className={`p-3 rounded-xl text-center cursor-pointer transition-all ${room.shape === shape ? 'bg-[#3b4d4a] text-white shadow-md' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
                     <span className="text-[11px] font-semibold tracking-wide">{shape === 'Box' ? 'Flat Roof' : 'Gable Roof'}</span>
                   </div>
                 ))}
@@ -186,7 +203,20 @@ export function Sidebar() {
 
             <CollapsibleSection title="Dimensions" defaultOpen={true}>
               <div className="space-y-3">
-                {[
+                {/* A gable is specced the way surveyors and planners spec it:
+                    EAVES height and RIDGE height, both as totals from the
+                    ground. Internally heightMm stays "total to ridge" and
+                    roofHeightMm the rise - these two fields are just the
+                    honest projection of that model. Flat roofs keep the
+                    original front/back/fascia fields. */}
+                {(room.shape === 'Gable' ? [
+                  { label: 'Total Width', key: 'widthMm', hidden: viewMode !== 'plan' },
+                  { label: 'Total Depth', key: 'depthMm', hidden: viewMode !== 'plan' },
+                  { label: 'Eaves Height', key: '__eavesMm' },
+                  { label: 'Ridge Height', key: '__ridgeMm' },
+                  { label: 'Base Height', key: 'baseHeightMm' },
+                  { label: 'Wall Thickness', key: 'wallThicknessMm' },
+                ] : [
                   { label: 'Total Width', key: 'widthMm', hidden: viewMode !== 'plan' },
                   { label: 'Total Depth', key: 'depthMm', hidden: viewMode !== 'plan' },
                   { label: 'Total Front Height', key: 'heightMm' },
@@ -194,7 +224,7 @@ export function Sidebar() {
                   { label: 'Base Height', key: 'baseHeightMm' },
                   { label: 'Fascia Height', key: 'roofHeightMm' },
                   { label: 'Wall Thickness', key: 'wallThicknessMm' },
-                ].filter(d => !d.hidden).map(dim => {
+                ]).filter(d => !d.hidden).map(dim => {
                   const baseH = room.baseHeightMm ?? 100;
                   const roofH = room.roofHeightMm ?? 200;
                   // For Gable, heightMm is ALREADY the total height (the 3D
@@ -202,10 +232,13 @@ export function Sidebar() {
                   // showed a total 450mm taller than the 3D label for the same
                   // building. Box stores wall height, so it still converts.
                   const heightIsTotal = room.shape === 'Gable';
+                  const ridgeTotal = room.heightMm ?? 2350;
                   let val = room[dim.key as keyof typeof room] as number;
                   if (dim.key === 'heightMm') val = (room.heightMm ?? 2350) + (heightIsTotal ? 0 : baseH + roofH);
                   if (dim.key === 'backHeightMm') val = (room.backHeightMm ?? room.heightMm ?? 2350) + (heightIsTotal ? 0 : baseH + roofH);
                   if (dim.key === 'wallThicknessMm') val = room.wallThicknessMm || 150;
+                  if (dim.key === '__ridgeMm') val = ridgeTotal;
+                  if (dim.key === '__eavesMm') val = ridgeTotal - roofH;
 
                   return (
                     <div key={dim.key} className="flex items-center gap-2">
@@ -214,6 +247,19 @@ export function Sidebar() {
                         value={val}
                         onChange={(e) => {
                           let newVal = parseInt(e.target.value) || 0;
+                          if (dim.key === '__ridgeMm') {
+                            // Ridge moves, eaves stay put: the rise absorbs it.
+                            const eaves = ridgeTotal - roofH;
+                            const ridge = Math.max(eaves + 100, newVal);
+                            updateRoom({ heightMm: ridge, roofHeightMm: ridge - eaves });
+                            return;
+                          }
+                          if (dim.key === '__eavesMm') {
+                            // Eaves move, ridge stays put: the rise absorbs it.
+                            const eaves = Math.min(ridgeTotal - 100, Math.max(1000, newVal));
+                            updateRoom({ roofHeightMm: ridgeTotal - eaves });
+                            return;
+                          }
                           if ((dim.key === 'heightMm' || dim.key === 'backHeightMm') && !heightIsTotal) {
                             newVal = newVal - baseH - roofH;
                           }
