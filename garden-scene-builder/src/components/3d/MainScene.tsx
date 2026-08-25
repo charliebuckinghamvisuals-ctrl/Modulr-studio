@@ -93,6 +93,12 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
 function ScreenshotHelper() {
   const { gl, scene, camera } = useThree();
 
+  // Debug handle alongside __modulrStore: lets DevTools raycast the live
+  // scene to identify meshes. Harmless in production.
+  useEffect(() => {
+    (window as any).__modulrScene = scene;
+  }, [scene]);
+
   useEffect(() => {
     const handleCapture = () => {
       const bg = scene.getObjectByName('environment-background');

@@ -665,7 +665,7 @@ export function RoomGeometry() {
             {/* Main Interior Cutout (split into non-overlapping boxes to avoid nested Geometry issues) */}
             {(!isLShape && !isTShape && !isCornerCut) && (
               <Subtraction position={[0, h/2, 0]}>
-                <boxGeometry args={[w - wallThickness*2, h + 0.1, d - wallThickness*2]} />
+                <boxGeometry args={[w - wallThickness*2, h + 1, d - wallThickness*2]} />
                 <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
               </Subtraction>
             )}
@@ -674,12 +674,12 @@ export function RoomGeometry() {
               <>
                 {/* Left part of the L */}
                 <Subtraction position={[-cutW/2, h/2, 0]}>
-                  <boxGeometry args={[w - cutW - wallThickness*2, h + 0.1, d - wallThickness*2]} />
+                  <boxGeometry args={[w - cutW - wallThickness*2, h + 1, d - wallThickness*2]} />
                   <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
                 </Subtraction>
                 {/* Back-right part of the L */}
                 <Subtraction position={[w/2 - cutW/2 - wallThickness, h/2, -cutD/2]}>
-                  <boxGeometry args={[cutW + wallThickness*2, h + 0.1, d - cutD - wallThickness*2]} />
+                  <boxGeometry args={[cutW + wallThickness*2, h + 1, d - cutD - wallThickness*2]} />
                   <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
                 </Subtraction>
               </>
@@ -1109,7 +1109,7 @@ export function RoomGeometry() {
                 axis="x"
                 color="#00ff00"
                 onChange={(dx) => {
-                  useStore.getState().updateDoor(door.id, { offsetMm: door.offsetMm + dx * 1000 });
+                  useStore.getState().updateDoor(door.id, { offsetMm: Math.round((door.offsetMm + dx * 1000) / 50) * 50 });
                 }}
               />
               <DragHandle
@@ -1122,7 +1122,7 @@ export function RoomGeometry() {
                   const store = useStore.getState();
                   const targetDoor = store.scene.room.doors?.find(d => d.id === door.id);
                   if (targetDoor) {
-                    store.updateDoor(door.id, { widthMm: Math.max(10, targetDoor.widthMm - dx * 2000) });
+                    store.updateDoor(door.id, { widthMm: Math.max(100, Math.round((targetDoor.widthMm - dx * 2000) / 100) * 100) });
                   }
                 }}
               />
@@ -1136,7 +1136,7 @@ export function RoomGeometry() {
                   const store = useStore.getState();
                   const targetDoor = store.scene.room.doors?.find(d => d.id === door.id);
                   if (targetDoor) {
-                    store.updateDoor(door.id, { widthMm: Math.max(10, targetDoor.widthMm + dx * 2000) });
+                    store.updateDoor(door.id, { widthMm: Math.max(100, Math.round((targetDoor.widthMm + dx * 2000) / 100) * 100) });
                   }
                 }}
               />
@@ -1425,7 +1425,7 @@ export function RoomGeometry() {
                      <DragHandle elementId={`part-${part.id}`} position={[pL/2, 0, 0]} axis="x" color="#ff0000" visualAxis="x" snapInterval={0.05} onChange={(dx) => {
                        const current = useStore.getState().scene.room.partitions.find(p => p.id === part.id);
                        if (!current) return;
-                       const newL = Math.max(100, current.lengthMm + dx * 1000);
+                       const newL = Math.max(100, Math.round((current.lengthMm + dx * 1000) / 100) * 100);
                        const diff = newL - current.lengthMm;
                        useStore.getState().updatePartition(part.id, { lengthMm: newL, xMm: current.xMm + diff / 2 });
                      }} />
@@ -1433,9 +1433,9 @@ export function RoomGeometry() {
                      <DragHandle elementId={`part-${part.id}`} position={[-pL/2, 0, 0]} axis="x" color="#ff0000" visualAxis="x" snapInterval={0.05} onChange={(dx) => {
                        const current = useStore.getState().scene.room.partitions.find(p => p.id === part.id);
                        if (!current) return;
-                       const newL = Math.max(100, current.lengthMm - dx * 1000);
+                       const newL = Math.max(100, Math.round((current.lengthMm - dx * 1000) / 100) * 100);
                        const diff = newL - current.lengthMm;
-                       useStore.getState().updatePartition(part.id, { lengthMm: newL, xMm: current.xMm + dx * 1000 + diff / 2 });
+                       useStore.getState().updatePartition(part.id, { lengthMm: newL, xMm: Math.round((current.xMm + dx * 1000 + diff / 2) / 50) * 50 });
                      }} />
                      {/* Center Move Handle Z */}
                      <DragHandle elementId={`part-${part.id}`} position={[0, 0, pT/2 + 0.2]} axis="z" visualAxis="z" color="#00ff00" snapInterval={0.05} onChange={(dz) => useStore.getState().updatePartition(part.id, { zMm: part.zMm + dz*1000 })} />
@@ -1448,15 +1448,15 @@ export function RoomGeometry() {
                      <DragHandle elementId={`part-${part.id}`} position={[pL/2, 0, 0]} axis="z" color="#ff0000" visualAxis="x" snapInterval={0.05} onChange={(dz) => {
                        const current = useStore.getState().scene.room.partitions.find(p => p.id === part.id);
                        if (!current) return;
-                       const newL = Math.max(100, current.lengthMm - dz * 1000);
+                       const newL = Math.max(100, Math.round((current.lengthMm - dz * 1000) / 100) * 100);
                        const diff = newL - current.lengthMm;
-                       useStore.getState().updatePartition(part.id, { lengthMm: newL, zMm: current.zMm + dz * 1000 + diff / 2 });
+                       useStore.getState().updatePartition(part.id, { lengthMm: newL, zMm: Math.round((current.zMm + dz * 1000 + diff / 2) / 50) * 50 });
                      }} />
                      {/* Bottom End Handle (Local -X, World +Z) */}
                      <DragHandle elementId={`part-${part.id}`} position={[-pL/2, 0, 0]} axis="z" color="#ff0000" visualAxis="x" snapInterval={0.05} onChange={(dz) => {
                        const current = useStore.getState().scene.room.partitions.find(p => p.id === part.id);
                        if (!current) return;
-                       const newL = Math.max(100, current.lengthMm + dz * 1000);
+                       const newL = Math.max(100, Math.round((current.lengthMm + dz * 1000) / 100) * 100);
                        const diff = newL - current.lengthMm;
                        useStore.getState().updatePartition(part.id, { lengthMm: newL, zMm: current.zMm + diff / 2 });
                      }} />
@@ -1678,7 +1678,7 @@ export function RoomGeometry() {
                   label="Room Width"
                   onChange={(dx) => {
                     const store = useStore.getState();
-                    store.updateRoom({ widthMm: Math.max(10, Math.round(store.scene.room.widthMm + dx * 2000)) });
+                    store.updateRoom({ widthMm: Math.max(10, Math.round((store.scene.room.widthMm + dx * 2000) / 100) * 100) });
                   }} 
                 />
                 <DragHandle 
@@ -1687,7 +1687,7 @@ export function RoomGeometry() {
                   label="Room Width"
                   onChange={(dx) => {
                     const store = useStore.getState();
-                    store.updateRoom({ widthMm: Math.max(10, Math.round(store.scene.room.widthMm - dx * 2000)) });
+                    store.updateRoom({ widthMm: Math.max(10, Math.round((store.scene.room.widthMm - dx * 2000) / 100) * 100) });
                   }} 
                 />
               </>
@@ -1722,7 +1722,7 @@ export function RoomGeometry() {
                   onChange={(dz) => {
                     const store = useStore.getState();
                     // Z axis goes backwards!
-                    store.updateRoom({ depthMm: Math.max(10, Math.round(store.scene.room.depthMm + dz * 2000)) });
+                    store.updateRoom({ depthMm: Math.max(10, Math.round((store.scene.room.depthMm + dz * 2000) / 100) * 100) });
                   }} 
                 />
                 <DragHandle 
@@ -1731,7 +1731,7 @@ export function RoomGeometry() {
                   label="Room Depth"
                   onChange={(dz) => {
                     const store = useStore.getState();
-                    store.updateRoom({ depthMm: Math.max(10, Math.round(store.scene.room.depthMm - dz * 2000)) });
+                    store.updateRoom({ depthMm: Math.max(10, Math.round((store.scene.room.depthMm - dz * 2000) / 100) * 100) });
                   }} 
                 />
               </>
@@ -1770,7 +1770,7 @@ export function RoomGeometry() {
                 label={isGable || isPitched ? "Eaves Height" : "Front Height"}
                 onChange={(dy) => {
                   const store = useStore.getState();
-                  store.updateRoom({ heightMm: Math.max(10, Math.round(store.scene.room.heightMm + dy * 1000)) });
+                  store.updateRoom({ heightMm: Math.max(10, Math.round((store.scene.room.heightMm + dy * 1000) / 100) * 100) });
                 }} 
               />
             )}
@@ -1795,7 +1795,7 @@ export function RoomGeometry() {
                 color="#8a2be2"
                 onChange={(dy) => {
                   const store = useStore.getState();
-                  store.updateRoom({ roofHeightMm: Math.max(10, Math.round((store.scene.room.roofHeightMm || 200) + dy * 1000)) });
+                  store.updateRoom({ roofHeightMm: Math.max(10, Math.round(((store.scene.room.roofHeightMm || 200) + dy * 1000) / 100) * 100) });
                 }} 
               />
             </group>
@@ -1820,7 +1820,7 @@ export function RoomGeometry() {
                 onChange={(dx) => {
                    const store = useStore.getState();
                    const curW = store.scene.room.lShapeCutoutWidthMm ?? 2000;
-                   store.updateRoom({ lShapeCutoutWidthMm: Math.max(10, Math.round(curW - dx * 1000)) });
+                   store.updateRoom({ lShapeCutoutWidthMm: Math.max(10, Math.round((curW - dx * 1000) / 100) * 100) });
                 }}
               />
               <DimText 
@@ -1838,7 +1838,7 @@ export function RoomGeometry() {
                 onChange={(dz) => {
                    const store = useStore.getState();
                    const curD = store.scene.room.lShapeCutoutDepthMm ?? 1500;
-                   store.updateRoom({ lShapeCutoutDepthMm: Math.max(10, Math.round(curD - dz * 1000)) });
+                   store.updateRoom({ lShapeCutoutDepthMm: Math.max(10, Math.round((curD - dz * 1000) / 100) * 100) });
                 }}
               />
             </group>
@@ -1872,7 +1872,7 @@ export function RoomGeometry() {
                 onChange={(dy) => {
                   const store = useStore.getState();
                   const curBackH = store.scene.room.backHeightMm ?? store.scene.room.heightMm;
-                  store.updateRoom({ backHeightMm: Math.max(10, Math.round(curBackH + dy * 1000)) });
+                  store.updateRoom({ backHeightMm: Math.max(10, Math.round((curBackH + dy * 1000) / 100) * 100) });
                 }} 
               />
             )}
@@ -1899,7 +1899,7 @@ export function RoomGeometry() {
                     color="#4a5568"
                     onChange={(dz) => {
                       const store = useStore.getState();
-                      const newSize = Math.max(0, Math.round((store.scene.room.canopySizeMm || 0) + dz * 1000));
+                      const newSize = Math.max(0, Math.round(((store.scene.room.canopySizeMm || 0) + dz * 1000) / 100) * 100);
                       store.updateRoom({ canopySizeMm: newSize });
                     }}
                   />
@@ -1920,7 +1920,7 @@ export function RoomGeometry() {
                 color="#4a5568"
                 onChange={(dz) => {
                   const store = useStore.getState();
-                  store.updateRoom({ overhangBackMm: Math.max(0, Math.round((store.scene.room.overhangBackMm || 0) - dz * 1000)) });
+                  store.updateRoom({ overhangBackMm: Math.max(0, Math.round(((store.scene.room.overhangBackMm || 0) - dz * 1000) / 100) * 100) });
                 }}
               />
 
@@ -1938,7 +1938,7 @@ export function RoomGeometry() {
                 color="#4a5568"
                 onChange={(dx) => {
                   const store = useStore.getState();
-                  store.updateRoom({ overhangLeftMm: Math.max(0, Math.round((store.scene.room.overhangLeftMm || 0) - dx * 1000)) });
+                  store.updateRoom({ overhangLeftMm: Math.max(0, Math.round(((store.scene.room.overhangLeftMm || 0) - dx * 1000) / 100) * 100) });
                 }}
               />
 
@@ -1956,7 +1956,7 @@ export function RoomGeometry() {
                 color="#4a5568"
                 onChange={(dx) => {
                   const store = useStore.getState();
-                  store.updateRoom({ overhangRightMm: Math.max(0, Math.round((store.scene.room.overhangRightMm || 0) + dx * 1000)) });
+                  store.updateRoom({ overhangRightMm: Math.max(0, Math.round(((store.scene.room.overhangRightMm || 0) + dx * 1000) / 100) * 100) });
                 }}
               />
             </group>
@@ -1982,7 +1982,7 @@ export function RoomGeometry() {
                     color="#8a6e4d"
                     onChange={(dz) => {
                       const store = useStore.getState();
-                      const newSize = Math.max(0, Math.round((store.scene.room.deckingSizeMm || 0) + dz * 1000));
+                      const newSize = Math.max(0, Math.round(((store.scene.room.deckingSizeMm || 0) + dz * 1000) / 100) * 100);
                       store.updateRoom({ deckingSizeMm: newSize });
                     }}
                   />
@@ -2011,8 +2011,8 @@ export function RoomGeometry() {
             )}
             {room.showDimensions && isPlanView && (
               <>
-                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(10, Math.round(useStore.getState().scene.room.widthMm + dx * 2000)) })} />}
-                <DragHandle elementId="room" position={[-w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(10, Math.round(useStore.getState().scene.room.widthMm - dx * 2000)) })} />
+                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(100, Math.round((useStore.getState().scene.room.widthMm + dx * 2000) / 100) * 100) })} />}
+                <DragHandle elementId="room" position={[-w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(100, Math.round((useStore.getState().scene.room.widthMm - dx * 2000) / 100) * 100) })} />
               </>
             )}
           </group>
@@ -2032,8 +2032,8 @@ export function RoomGeometry() {
             )}
             {room.showDimensions && isPlanView && (
               <>
-                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[0, 0, d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(10, Math.round(useStore.getState().scene.room.depthMm + dz * 2000)) })} />}
-                <DragHandle elementId="room" position={[0, 0, -d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(10, Math.round(useStore.getState().scene.room.depthMm - dz * 2000)) })} />
+                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[0, 0, d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(100, Math.round((useStore.getState().scene.room.depthMm + dz * 2000) / 100) * 100) })} />}
+                <DragHandle elementId="room" position={[0, 0, -d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(100, Math.round((useStore.getState().scene.room.depthMm - dz * 2000) / 100) * 100) })} />
               </>
             )}
           </group>
@@ -2053,8 +2053,8 @@ export function RoomGeometry() {
             )}
             {room.showDimensions && isPlanView && (
               <>
-                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(10, Math.round(useStore.getState().scene.room.widthMm + dx * 2000)) })} />}
-                <DragHandle elementId="room" position={[-w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(10, Math.round(useStore.getState().scene.room.widthMm - dx * 2000)) })} />
+                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(100, Math.round((useStore.getState().scene.room.widthMm + dx * 2000) / 100) * 100) })} />}
+                <DragHandle elementId="room" position={[-w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(100, Math.round((useStore.getState().scene.room.widthMm - dx * 2000) / 100) * 100) })} />
               </>
             )}
           </group>
@@ -2074,8 +2074,8 @@ export function RoomGeometry() {
             )}
             {room.showDimensions && isPlanView && (
               <>
-                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[0, 0, d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(10, Math.round(useStore.getState().scene.room.depthMm + dz * 2000)) })} />}
-                <DragHandle elementId="room" position={[0, 0, -d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(10, Math.round(useStore.getState().scene.room.depthMm - dz * 2000)) })} />
+                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[0, 0, d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(100, Math.round((useStore.getState().scene.room.depthMm + dz * 2000) / 100) * 100) })} />}
+                <DragHandle elementId="room" position={[0, 0, -d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(100, Math.round((useStore.getState().scene.room.depthMm - dz * 2000) / 100) * 100) })} />
               </>
             )}
           </group>
@@ -2096,7 +2096,7 @@ export function RoomGeometry() {
                 />
                 {room.showDimensions && (
                   <>
-                    <DragHandle position={[-cutW/2, 0, -0.3]} axis="x" label="Cutout" color="#ff8c00" onChange={(dx) => useStore.getState().updateRoom({ lShapeCutoutWidthMm: Math.max(10, Math.round((useStore.getState().scene.room.lShapeCutoutWidthMm ?? 2000) - dx * 1000)) })} />
+                    <DragHandle position={[-cutW/2, 0, -0.3]} axis="x" label="Cutout" color="#ff8c00" onChange={(dx) => useStore.getState().updateRoom({ lShapeCutoutWidthMm: Math.max(100, Math.round(((useStore.getState().scene.room.lShapeCutoutWidthMm ?? 2000) - dx * 1000) / 100) * 100) })} />
                   </>
                 )}
               </group>
@@ -2114,7 +2114,7 @@ export function RoomGeometry() {
                 />
                 {room.showDimensions && (
                   <>
-                    <DragHandle position={[-0.3, 0, -cutD/2]} axis="z" label="Cutout" color="#ff8c00" onChange={(dz) => useStore.getState().updateRoom({ lShapeCutoutDepthMm: Math.max(10, Math.round((useStore.getState().scene.room.lShapeCutoutDepthMm ?? 1500) - dz * 1000)) })} />
+                    <DragHandle position={[-0.3, 0, -cutD/2]} axis="z" label="Cutout" color="#ff8c00" onChange={(dz) => useStore.getState().updateRoom({ lShapeCutoutDepthMm: Math.max(100, Math.round(((useStore.getState().scene.room.lShapeCutoutDepthMm ?? 1500) - dz * 1000) / 100) * 100) })} />
                   </>
                 )}
               </group>
