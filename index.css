@@ -246,18 +246,18 @@ input[type=range]::-webkit-slider-runnable-track {
 
 /* App Entry Animation */
 @keyframes appFadeIn {
+  /* OPACITY ONLY - deliberately no transform at any keyframe. Ending on
+     `transform: none` was tried and does not work: when a transform is
+     interpolated, Chrome's fill-forwards retains an identity MATRIX rather
+     than none, the element stays a containing block, and every
+     position:fixed descendant (modals, toasts, the update notice) anchors to
+     the page instead of the viewport - the update popup rendered thousands
+     of pixels down the document. A transform must never appear here. */
   from {
     opacity: 0;
-    transform: scale(0.98) translateY(10px);
   }
   to {
     opacity: 1;
-    /* `none`, not `scale(1) translateY(0)`. The animation is `forwards`, so the
-       final frame persists - and ANY transform other than none, identity
-       included, makes this element the containing block for every
-       position:fixed descendant. That is what put the pricing notice a
-       thousand pixels down the page instead of centred on screen. */
-    transform: none;
   }
 }
 
