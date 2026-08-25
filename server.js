@@ -2571,29 +2571,50 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
 
         const prompt = buildAnimationPrompt(preset, modifiers, extra);
 
-        const interaction = await ai.interactions.create({
-            model: 'gemini-omni-flash-preview',
-            input: [
-                { type: 'image', data: base64Image, mime_type: 'image/jpeg' },
-                { type: 'text', text: prompt },
-            ],
-            // snake_case throughout. The published JS example shows
-            // generationConfig/videoConfig and the API rejects both.
-            generation_config: { video_config: { task: 'image_to_video' } },
-            // 'uri' not 'base64': output measured at 2.5 MB, and inline delivery
-            // is capped around 4 MB. A longer or busier clip would silently
-            // exceed it.
-            response_format: { type: 'video', aspect_ratio: aspectRatio, delivery: 'uri' },
-        });
+        /**
+         * One generation attempt. Normal completion is ~40-90s; the video
+         * backend occasionally hangs for many minutes before failing, which is
+         * exactly the "waited 300 seconds then it errored" experience. Each
+         * attempt is therefore capped, and a failed or timed-out first attempt
+         * gets ONE automatic retry - transient backend wobbles usually clear
+         * immediately.
+         */
+        const generateOnce = async () => {
+            const interaction = await ai.interactions.create({
+                model: 'gemini-omni-flash-preview',
+                input: [
+                    { type: 'image', data: base64Image, mime_type: 'image/jpeg' },
+                    { type: 'text', text: prompt },
+                ],
+                // snake_case throughout. The published JS example shows
+                // generationConfig/videoConfig and the API rejects both.
+                generation_config: { video_config: { task: 'image_to_video' } },
+                // 'uri' not 'base64': output measured at 2.5 MB, and inline delivery
+                // is capped around 4 MB. A longer or busier clip would silently
+                // exceed it.
+                response_format: { type: 'video', aspect_ratio: aspectRatio, delivery: 'uri' },
+            });
+            const uri = interaction?.output_video?.uri;
+            const match = uri && uri.match(/files\/([a-zA-Z0-9_-]+)/);
+            if (!match) throw new Error('The model did not return a video.');
+            return match[1];
+        };
+        const ATTEMPT_TIMEOUT_MS = 240_000;
+        const withTimeout = (p) => Promise.race([
+            p,
+            new Promise((_, rej) => setTimeout(() => rej(new Error('Generation timed out')), ATTEMPT_TIMEOUT_MS)),
+        ]);
 
-        const uri = interaction?.output_video?.uri;
-        const match = uri && uri.match(/files\/([a-zA-Z0-9_-]+)/);
-        if (!match) {
-            throw new Error('The model did not return a video.');
+        let fileId;
+        try {
+            fileId = await withTimeout(generateOnce());
+        } catch (firstErr) {
+            console.warn('[ANIM] first attempt failed, retrying once:', firstErr.message || firstErr);
+            fileId = await withTimeout(generateOnce());
         }
 
         res.json({
-            fileName: `files/${match[1]}`,
+            fileName: `files/${fileId}`,
             remaining: quota.remaining,
             limit: ANIMATION_MONTHLY_LIMIT,
         });
@@ -2601,7 +2622,9 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
     } catch (error) {
         console.error('Animation start error:', error);
         if (claimed) await releaseAnimation(req.user.uid);
-        res.status(500).json({ error: error.message || 'Animation failed to start.' });
+        // The allowance really was released above - saying so stops users
+        // abandoning the feature believing a failed attempt cost them a clip.
+        res.status(500).json({ error: 'The animation service is having a busy moment and the clip could not be generated. Your monthly allowance was NOT used - please try again in a few minutes.' });
     }
 });
 
