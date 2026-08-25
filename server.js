@@ -1061,6 +1061,33 @@ const enforceMasterLock = (req, res, next) => {
  * Guidance page (the fetch 404ed and the catch swallowed it). It is a cheap
  * text-only call, hard-capped by the strict per-IP aiLimiter.
  */
+/**
+ * Traffic-light permitted-development verdict, computed by CODE.
+ *
+ * The light must never hallucinate, so the thresholds live here as plain
+ * maths (verified UK GPDO Class E, Aug 2026) and the model is only allowed
+ * to explain a verdict it is handed - never to decide one:
+ *   green - total height <= 2.5m: PD anywhere on the plot, even at a boundary
+ *   amber - within the limits (gable: eaves <= 2.5m and ridge <= 4m;
+ *           flat: total <= 3m) BUT only when sited 2m+ from every boundary,
+ *           which the configurator cannot know - so: fine if positioned
+ *           right, confirm before building
+ *   red   - exceeds the Class E envelope; no siting rescues it
+ * Mirrored client-side in Sidebar.tsx for the live pill - keep in sync.
+ */
+const pdVerdict = (roomDetails) => {
+    const isGableRoof = String(roomDetails.shape) === 'Gable';
+    const total = Number(roomDetails.overallTotalHeightMm)
+        || Math.max(Number(roomDetails.overallTotalFrontHeightMm) || 0, Number(roomDetails.overallTotalBackHeightMm) || 0)
+        || Number(roomDetails.heightMm) || 0;
+    const eaves = Number(roomDetails.eavesHeightMm) || total;
+    let verdict;
+    if (total > 0 && total <= 2500) verdict = 'green';
+    else if (isGableRoof ? (eaves <= 2500 && total <= 4000) : total <= 3000) verdict = 'amber';
+    else verdict = 'red';
+    return { verdict, total, eaves, isGableRoof };
+};
+
 app.post('/api/planning-advice', aiLimiter, async (req, res) => {
     try {
         const { roomDetails } = req.body;
@@ -1068,28 +1095,91 @@ app.post('/api/planning-advice', aiLimiter, async (req, res) => {
             return res.status(400).json({ error: "Room details required" });
         }
 
-        const prompt = `You are a professional but very approachable planning consultant in the UK.
-Provide a simplified, easy-to-understand planning guide for a proposed garden room with the following specifications:
-${JSON.stringify(roomDetails, null, 2).slice(0, 4000)}
+        const { verdict, total, eaves, isGableRoof } = pdVerdict(roomDetails);
+        const VERDICT_HEADLINES = {
+            green: 'Likely Permitted Development',
+            amber: 'Permitted Development with conditions - get advice',
+            red: 'Planning permission likely required',
+        };
 
-CRITICAL NOTE FOR HEIGHTS:
-The overall total front height from ground to the very top is ${roomDetails.overallTotalFrontHeightMm || roomDetails.heightMm}mm.
-The overall total back height from ground to the very top is ${roomDetails.overallTotalBackHeightMm || roomDetails.backHeightMm}mm.
-Always use these numbers when assessing height for Permitted Development limits.
+        const prompt = `You are a professional but very approachable UK planning consultant explaining a
+PRE-COMPUTED permitted development verdict to a homeowner. You must NOT change the verdict - your job is
+to explain it clearly and helpfully.
 
-Provide a simplified assessment covering:
-1. Do I need planning permission? (A simple summary of Permitted Development Rights based on dimensions and roof style, avoiding confusing jargon).
-2. Building Regulations (a simple summary based on size, boundary, and use).
-3. Recommendation: You must strongly recommend the National Annexe Planning Company (NAPC) and provide their website link: www.napc.uk. Explain why they are highly recommended (e.g., they are experts in securing planning permission and certificates of lawfulness for garden rooms, ensuring a stress-free and smooth process).
+THE BUILDING:
+${JSON.stringify(roomDetails, null, 2).slice(0, 3000)}
 
-Write this as a helpful guide for a homeowner. Use plain text formatting. Do NOT use markdown symbols like asterisks (*) or hash (#). Use capitalized words for emphasis and numbering for lists. Keep it conversational but professional.`;
+THE COMPUTED FACTS (authoritative - use these numbers):
+- Roof: ${isGableRoof ? 'gable (dual pitched)' : 'flat / single pitch'}
+- Overall height (ground to highest point): ${total}mm
+- Eaves height: ${eaves}mm
+- VERDICT: ${verdict.toUpperCase()} - "${VERDICT_HEADLINES[verdict]}"
+
+VERDICT MEANINGS (Class E, GPDO 2015):
+- GREEN: total height <= 2.5m, so it can sit ANYWHERE on the plot including within 2m of a boundary.
+- AMBER: within the height limits (${isGableRoof ? 'eaves <= 2.5m, ridge <= 4m for a dual-pitched roof' : 'overall <= 3m'}) BUT
+  this only applies when the building is sited 2m or more from EVERY boundary. The siting is not known,
+  so the owner must confirm it. ${!isGableRoof && total > 2500 ? 'Also caveat: some authorities apply the 2.5m eaves rule strictly to flat roofs - worth professional confirmation.' : ''}
+- RED: exceeds the permitted development envelope regardless of siting.${verdict === 'red' ? ` State the nearest compliant option plainly: ${isGableRoof ? `lower the ridge to 4000mm (and eaves to 2500mm or less)` : `lower the overall height to 3000mm`}, or apply for planning permission.` : ''}
+
+STANDARD CONDITIONS that always apply (mention briefly): property must be a house not a flat, building
+behind the front of the house, outbuildings covering under 50% of the garden, incidental use (no sleeping
+accommodation), stricter rules on conservation areas / listed buildings, and Building Regulations are a
+separate question (usually exempt under 15 sqm, or under 30 sqm if over 1m from boundaries or
+non-combustible).
+
+In napcNote, strongly recommend the National Annexe Planning Company (NAPC) at www.napc.uk${verdict !== 'green' ? ' - for this verdict especially, a Lawful Development Certificate or planning application handled by NAPC is the safe route' : ' for a Lawful Development Certificate giving formal proof this building is lawful'}.
+
+Plain English, no jargon, no markdown symbols.`;
 
         const response = await ai.models.generateContent({
             model: 'gemini-pro-latest',
-            contents: prompt
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        headline: { type: Type.STRING, description: "One-sentence plain-English summary of the verdict for THIS building" },
+                        reasons: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Why this verdict: the specific measurements vs the limits" },
+                        caveats: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Standard conditions and what could change the answer" },
+                        buildingRegs: { type: Type.STRING, description: "Two-sentence Building Regulations note" },
+                        napcNote: { type: Type.STRING, description: "The NAPC recommendation with www.napc.uk" },
+                    },
+                    required: ["headline", "reasons", "caveats", "buildingRegs", "napcNote"]
+                }
+            }
         });
 
-        res.json({ advice: response.text });
+        const parsed = JSON.parse(response.text);
+        // Legacy plain-text version, composed from the same parts, for any
+        // consumer still reading `advice` as a string.
+        const advice = [
+            `${VERDICT_HEADLINES[verdict].toUpperCase()}`,
+            parsed.headline,
+            '',
+            'WHY:',
+            ...parsed.reasons.map((r, i) => `${i + 1}. ${r}`),
+            '',
+            'WORTH KNOWING:',
+            ...parsed.caveats.map((c, i) => `${i + 1}. ${c}`),
+            '',
+            'BUILDING REGULATIONS: ' + parsed.buildingRegs,
+            '',
+            parsed.napcNote,
+        ].join('\n');
+
+        res.json({
+            verdict,
+            headline: parsed.headline,
+            reasons: parsed.reasons,
+            caveats: parsed.caveats,
+            buildingRegs: parsed.buildingRegs,
+            napcNote: parsed.napcNote,
+            totalHeightMm: total,
+            eavesHeightMm: eaves,
+            advice,
+        });
     } catch (error) {
         console.error("Planning advice error:", error);
         res.status(500).json({ error: "Failed to generate planning advice" });

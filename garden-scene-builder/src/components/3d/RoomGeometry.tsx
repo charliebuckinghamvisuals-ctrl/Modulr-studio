@@ -28,30 +28,45 @@ function DimText({ value, onValueChange, position, rotation, children, isDraggab
   if (hideIfZero && Number(value) === 0) return null;
 
   if (isExporting) {
+    // PDF-bound labels read like architectural drawings: dark figures on a
+    // white plate with a hairline frame, sized to the number. The old dark
+    // blob at fixed width clipped long values and sank into the linework.
+    const label = String(value);
+    const plateW = 0.28 + label.length * 0.11;
     return (
       <group position={position}>
         <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
-          <mesh position={[0,0,-0.01]}>
-            <planeGeometry args={[0.8, 0.3]} />
+          <mesh position={[0, 0, -0.012]}>
+            <planeGeometry args={[plateW + 0.04, 0.34]} />
             <meshBasicMaterial color="#3b4d4a" />
           </mesh>
+          <mesh position={[0, 0, -0.01]}>
+            <planeGeometry args={[plateW, 0.3]} />
+            <meshBasicMaterial color="#ffffff" />
+          </mesh>
           <Text
-            color="#ffffff"
-            fontSize={0.15}
+            color="#1d1d1f"
+            fontSize={0.17}
             anchorX="center"
             anchorY="middle"
           >
-            {String(value)}
+            {label}
           </Text>
         </Billboard>
       </group>
     );
   }
 
+  const isPlanLabel = viewMode === 'plan';
+
   return (
     <Html center position={position} transform rotation={rotation}>
-      <div 
-        className={`bg-[#3b4d4a] border border-[#3b4d4a] rounded-full font-mono text-[8px] tracking-wider whitespace-nowrap px-1.5 py-0.5 text-white opacity-90 shadow-md transition-all duration-200 ${onValueChange ? (isEditing ? 'cursor-auto ring-1 ring-[#2d3a38]' : 'cursor-pointer hover:bg-[#2d3a38] hover:scale-105') : 'pointer-events-none'}`}
+      <div
+        className={`${isPlanLabel
+          // Plan view is a working drawing: bigger, dark-on-light labels that
+          // stand clear of the dimension lines instead of tiny dark blobs.
+          ? 'bg-white border border-[#3b4d4a]/50 rounded-md font-mono text-[11px] font-bold tracking-wide whitespace-nowrap px-2 py-0.5 text-[#1d1d1f] shadow'
+          : 'bg-[#3b4d4a] border border-[#3b4d4a] rounded-full font-mono text-[8px] tracking-wider whitespace-nowrap px-1.5 py-0.5 text-white opacity-90 shadow-md'} transition-all duration-200 ${onValueChange ? (isEditing ? 'cursor-auto ring-1 ring-[#2d3a38]' : 'cursor-pointer hover:scale-105') : 'pointer-events-none'}`}
         style={{ pointerEvents: (isEditing || onValueChange || isDraggable) ? 'auto' : 'none' }}
         onClick={(e) => {
           if (onValueChange && !isEditing) {
@@ -70,7 +85,7 @@ function DimText({ value, onValueChange, position, rotation, children, isDraggab
               ref={inputRef}
               type="number"
               autoFocus
-              className="min-w-[40px] w-auto max-w-[80px] text-center outline-none bg-transparent text-white font-bold" 
+              className={`min-w-[40px] w-auto max-w-[80px] text-center outline-none bg-transparent font-bold ${isPlanLabel ? 'text-[#1d1d1f]' : 'text-white'}`}
               value={tempValue} 
               onChange={e => setTempValue(e.target.value)}
               onFocus={e => e.target.select()}
@@ -607,10 +622,11 @@ export function RoomGeometry() {
             {/* CornerCut Outer Cutout */}
             
 
-            {/* Gable Roof Cuts */}
-            {/* gable subtractions removed temporarily */}
-          
-            {isGable && (
+            {/* Gable end triangles. NEVER in plan view: a floor plan has no
+                gable ends, and their CSG faces sit coplanar with the interior
+                cutout boundary - the artifact faces that produced read as
+                external cladding covering the whole floor from above. */}
+            {isGable && !isPlanView && (
 
           
               <>
@@ -1828,8 +1844,10 @@ export function RoomGeometry() {
             </group>
           )}
 
-          {/* Back Height */}
-          {!isPlanView && (
+          {/* Back Height. Never on a gable - a gable is symmetric, its one
+              height story is eaves/ridge, and a separate back figure was how
+              stale nonsense numbers reached the 3D view and PDF. */}
+          {!isPlanView && !isGable && (
           <group position={[-w/2 - 0.5, (backH + baseH + roofH)/2, -d/2]}>
             <Line points={[[0, -(backH + baseH + roofH)/2, 0], [0, (backH + baseH + roofH)/2, 0]]} color="#000" lineWidth={1} />
             <Line points={[[-0.05, -(backH + baseH + roofH)/2 - 0.05, 0], [0.05, -(backH + baseH + roofH)/2 + 0.05, 0]]} color="#000" lineWidth={1} />

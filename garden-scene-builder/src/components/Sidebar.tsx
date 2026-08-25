@@ -189,7 +189,10 @@ export function Sidebar() {
                       // a near-flat pancake that looked broken.
                       const eavesTotal = (room.heightMm ?? 2350) + baseH + roofH;
                       const rise = Math.max(roofH, 1000);
-                      updateRoom({ shape: 'Gable', heightMm: eavesTotal + rise, roofHeightMm: rise });
+                      // backHeightMm is a flat/pent concept a gable ignores -
+                      // but stale values leaked into the PDF ("2010mm at
+                      // back"), so it is normalised to the front wall height.
+                      updateRoom({ shape: 'Gable', heightMm: eavesTotal + rise, roofHeightMm: rise, backHeightMm: room.heightMm ?? 2350 });
                     } else {
                       const eavesTotal = (room.heightMm ?? 2350) - roofH;
                       updateRoom({ shape: 'Box', heightMm: Math.max(10, eavesTotal - baseH - 200), roofHeightMm: 200 });
@@ -200,6 +203,40 @@ export function Sidebar() {
                 ))}
               </div>
             </CollapsibleSection>
+
+            {/* Live permitted-development traffic light. Pure client-side
+                maths, MIRRORING pdVerdict in server.js (keep in sync):
+                green <= 2.5m total; amber within Class E limits but needs 2m+
+                boundary siting; red exceeds the PD envelope. Updates as the
+                user resizes, so planning becomes a design constraint they can
+                feel - drag the ridge past 4m and watch it go red. */}
+            {(() => {
+              const isG = room.shape === 'Gable';
+              const baseH = room.baseHeightMm ?? 100;
+              const roofH = room.roofHeightMm ?? 200;
+              const frontTotal = (room.heightMm ?? 2350) + (isG ? 0 : baseH + roofH);
+              const backTotal = isG ? frontTotal : (room.backHeightMm ?? room.heightMm ?? 2350) + baseH + roofH;
+              const total = Math.max(frontTotal, backTotal);
+              const eaves = isG ? (room.heightMm ?? 2350) - roofH : total;
+              const light = total <= 2500
+                ? { key: 'green', bg: 'bg-emerald-600', label: 'Likely Permitted Development', sub: 'Under 2.5m - can sit anywhere on the plot' }
+                : (isG ? (eaves <= 2500 && total <= 4000) : total <= 3000)
+                  ? { key: 'amber', bg: 'bg-amber-500', label: 'PD with conditions', sub: 'Only if sited 2m+ from every boundary - get advice' }
+                  : { key: 'red', bg: 'bg-red-600', label: 'Permission likely required', sub: isG ? 'Lower the ridge to 4000mm to fit PD, or apply' : 'Lower the height to 3000mm to fit PD, or apply' };
+              return (
+                <div className={`${light.bg} text-white rounded-xl px-3 py-2.5 flex items-center gap-2.5`}>
+                  <span className="flex gap-1 shrink-0">
+                    {(['green', 'amber', 'red'] as const).map(k => (
+                      <span key={k} className={`w-2 h-2 rounded-full ${k === light.key ? 'bg-white' : 'bg-white/30'}`} />
+                    ))}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[11px] font-bold leading-tight">{light.label}</span>
+                    <span className="block text-[9px] opacity-85 leading-tight">{light.sub}</span>
+                  </span>
+                </div>
+              );
+            })()}
 
             <CollapsibleSection title="Dimensions" defaultOpen={true}>
               <div className="space-y-3">

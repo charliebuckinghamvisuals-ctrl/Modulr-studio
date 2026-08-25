@@ -124,21 +124,27 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       const backImg = await takeScreenshot('back', '3d', true);
       const perspectiveImg = await takeScreenshot('perspective', '3d', false);
 
-      // Fetch Planning Advice from API
+      // Fetch Planning Advice from API. The server computes the traffic-light
+      // verdict from the totals sent here, so the numbers must be the REAL
+      // ground-to-top figures for the roof shape.
       let planningAdvice = '';
+      let planning: any = null;
       try {
         // For Gable, heightMm is already the total height — adding base+roof
         // again overstated the building by ~450mm in the planning advice.
-        const heightExtra = scene.room.shape === 'Gable' ? 0 : (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
+        const isGablePdf = scene.room.shape === 'Gable';
+        const heightExtra = isGablePdf ? 0 : (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
         const totalFrontHeight = scene.room.heightMm + heightExtra;
-        const totalBackHeight = (scene.room.backHeightMm ?? scene.room.heightMm) + heightExtra;
-        
+        const totalBackHeight = isGablePdf ? totalFrontHeight : (scene.room.backHeightMm ?? scene.room.heightMm) + heightExtra;
+
         const augmentedRoomDetails = {
            ...scene.room,
            overallTotalFrontHeightMm: totalFrontHeight,
            overallTotalBackHeightMm: totalBackHeight,
-           heightMm: totalFrontHeight, 
-           backHeightMm: totalBackHeight 
+           overallTotalHeightMm: Math.max(totalFrontHeight, totalBackHeight),
+           eavesHeightMm: isGablePdf ? scene.room.heightMm - (scene.room.roofHeightMm || 200) : Math.max(totalFrontHeight, totalBackHeight),
+           heightMm: totalFrontHeight,
+           backHeightMm: totalBackHeight
         };
 
         const response = await fetch('/api/planning-advice', {
@@ -149,6 +155,7 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
         if (response.ok) {
           const data = await response.json();
           planningAdvice = data.advice;
+          if (data.verdict) planning = data;
         }
       } catch (e) {
         console.error("Failed to fetch planning advice", e);
@@ -379,12 +386,23 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       const colW = (CONTENT_W - colGap) / 2;
 
       let leftY = sectionTitle('Specification', y);
-      leftY = specRow('Shape', String(scene.room.shape), M, leftY, colW);
+      const isGableSpec = scene.room.shape === 'Gable';
+      leftY = specRow('Roof', isGableSpec ? 'Gable' : 'Flat', M, leftY, colW);
       leftY = specRow('Width', `${scene.room.widthMm} mm`, M, leftY, colW);
       leftY = specRow('Depth', `${scene.room.depthMm} mm`, M, leftY, colW);
-      leftY = specRow('Height (front)', `${totalHeightFront} mm`, M, leftY, colW);
-      if (totalHeightBack !== totalHeightFront) {
-        leftY = specRow('Height (back)', `${totalHeightBack} mm`, M, leftY, colW);
+      if (isGableSpec) {
+        // A gable has ONE height story: eaves and ridge. Front/back height is
+        // flat-roof vocabulary, and printing the stored backHeightMm here
+        // produced nonsense like "3500mm front, 2010mm back" from a stale
+        // pre-switch value.
+        leftY = specRow('Eaves height', `${scene.room.heightMm - (scene.room.roofHeightMm || 200)} mm`, M, leftY, colW);
+        leftY = specRow('Ridge height', `${scene.room.heightMm} mm`, M, leftY, colW);
+        leftY = specRow('Fascia depth', `${scene.room.gableFasciaMm ?? 100} mm`, M, leftY, colW);
+      } else {
+        leftY = specRow('Height (front)', `${totalHeightFront} mm`, M, leftY, colW);
+        if (totalHeightBack !== totalHeightFront) {
+          leftY = specRow('Height (back)', `${totalHeightBack} mm`, M, leftY, colW);
+        }
       }
       if (scene.room.lShapeCutoutWidthMm && !['Box', 'Quba', 'Gable'].includes(scene.room.shape as string)) {
         leftY = specRow('Cutout width', `${scene.room.lShapeCutoutWidthMm} mm`, M, leftY, colW);
@@ -543,7 +561,9 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.setTextColor(...MUTED);
-      const heightNote = totalHeightBack !== totalHeightFront
+      const heightNote = scene.room.shape === 'Gable'
+        ? `Eaves height ${scene.room.heightMm - (scene.room.roofHeightMm || 200)} mm, ridge height ${scene.room.heightMm} mm. All dimensions in millimetres.`
+        : totalHeightBack !== totalHeightFront
         ? `Overall height ${totalHeightFront} mm at the front, ${totalHeightBack} mm at the rear. All dimensions in millimetres.`
         : `Overall height ${totalHeightFront} mm. All dimensions in millimetres.`;
       pdf.text(heightNote, M, noteY);
@@ -558,6 +578,46 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
         drawHeader('Planning Guidance');
 
         let pgY = sectionTitle('Planning Guidance', HEADER_H + 16);
+
+        /**
+         * TRAFFIC LIGHT verdict banner. The colour comes from the server's
+         * CODE-computed Class E check (never from AI), so the light can be
+         * trusted: green = PD anywhere on the plot, amber = PD only when
+         * sited 2m+ from boundaries, red = outside the PD envelope.
+         */
+        if (planning?.verdict) {
+          const LIGHT: Record<string, { rgb: [number, number, number]; label: string }> = {
+            green: { rgb: [22, 130, 70], label: 'LIKELY PERMITTED DEVELOPMENT' },
+            amber: { rgb: [200, 130, 20], label: 'PD WITH CONDITIONS - GET ADVICE' },
+            red:   { rgb: [190, 50, 45], label: 'PLANNING PERMISSION LIKELY REQUIRED' },
+          };
+          const L = LIGHT[planning.verdict] || LIGHT.amber;
+          pdf.setFillColor(...L.rgb);
+          pdf.rect(M, pgY - 4, CONTENT_W, 16, 'F');
+          // The three dots make the traffic light legible even in greyscale print.
+          const dotY = pgY + 4;
+          (['green', 'amber', 'red'] as const).forEach((k, i) => {
+            const active = k === planning.verdict;
+            pdf.setFillColor(255, 255, 255);
+            if (active) pdf.circle(M + 6 + i * 7, dotY, 2.4, 'F');
+            else { pdf.setDrawColor(255, 255, 255); pdf.setLineWidth(0.4); pdf.circle(M + 6 + i * 7, dotY, 1.6, 'S'); }
+          });
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(11);
+          pdf.text(L.label, M + 28, pgY + 3);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(8);
+          pdf.text(`Overall ${planning.totalHeightMm} mm · eaves ${planning.eavesHeightMm} mm`, M + 28, pgY + 8);
+          pgY += 18;
+
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(9.5);
+          pdf.setTextColor(...INK);
+          const head = pdf.splitTextToSize(planning.headline || '', CONTENT_W);
+          pdf.text(head, M, pgY + 2);
+          pgY += head.length * 4.6 + 5;
+        }
 
         // Disclaimer, boxed so it cannot be mistaken for the advice itself.
         // Previously this claimed the statement was "accurate", which is not a
@@ -579,7 +639,22 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
 
         pdf.setFontSize(9);
         pdf.setTextColor(...INK);
-        const splitText = pdf.splitTextToSize(planningAdvice, CONTENT_W);
+        // Structured verdict: banner carries the headline, so the body is the
+        // reasons/caveats/NAPC only. Legacy string keeps working as fallback.
+        const bodyText = planning?.verdict
+          ? [
+              'WHY THIS VERDICT:',
+              ...planning.reasons.map((r: string, i: number) => `${i + 1}. ${r}`),
+              '',
+              'WORTH KNOWING:',
+              ...planning.caveats.map((c: string, i: number) => `${i + 1}. ${c}`),
+              '',
+              'BUILDING REGULATIONS: ' + planning.buildingRegs,
+              '',
+              planning.napcNote,
+            ].join('\n')
+          : planningAdvice;
+        const splitText = pdf.splitTextToSize(bodyText, CONTENT_W);
         for (let i = 0; i < splitText.length; i++) {
           if (pgY > FOOTER_Y - 12) {
             drawFooter(pageNo);

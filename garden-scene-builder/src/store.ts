@@ -274,7 +274,17 @@ export const useStore = create<AppState>((set, get) => ({
     selectedElementId: null,
   })),
 
-  updateRoom: (updates) => set((state) => {
+  updateRoom: (updates) => {
+    /**
+     * Snapshot BEFORE every room change, at the store level. Individual UI
+     * paths (shape picker, typed dimensions, door edits) kept forgetting to
+     * call saveState, so Undo skipped their changes and jumped to whatever
+     * older snapshot existed. saveState's own 1-second collapse turns slider
+     * drags and per-frame updates into a single undo step, so calling it
+     * unconditionally here is safe.
+     */
+    get().saveState();
+    return set((state) => {
     let finalUpdates = { ...updates };
     const currentRoom = state.scene.room;
     
@@ -297,7 +307,8 @@ export const useStore = create<AppState>((set, get) => ({
     return {
       scene: { ...state.scene, room: { ...state.scene.room, ...finalUpdates } }
     };
-  }),
+  });
+  },
 
   updatePricing: (updates) => set((state) => ({
     scene: { ...state.scene, pricing: { ...state.scene.pricing, ...updates } }
@@ -621,3 +632,9 @@ export const useStore = create<AppState>((set, get) => ({
     return baseStructure + claddingPrice + floorPrice + roofPrice + doorPrice + windowsPrice + skylightsPrice + partitionsPrice + deckingPrice + pictureFramePrice;
   }
 }));
+
+// Debug handle for development tooling - lets DevTools inspect the undo
+// stack and scene without React DevTools. Harmless in production.
+if (typeof window !== 'undefined') {
+  (window as any).__modulrStore = useStore;
+}
