@@ -442,12 +442,6 @@ export function RoomGeometry() {
   const ROOF_LIP = 0.05;
   const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohLeft) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, roofD + ROOF_LIP * 2, false, 0, 0, 0), [w, ohLeft, gablePitch, roofD, gableFascia]);
   const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohRight) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, roofD + ROOF_LIP * 2, false, 0, 0, 0), [w, ohRight, gablePitch, roofD, gableFascia]);
-  // Gable-end wall slabs (the triangles are CSG-cut from these at render).
-  // Real walls, clad like walls - not roof, not fascia. isVertical MUST match
-  // the wall cladding box, or the triangle's boards run 90 degrees to the
-  // wall below it.
-  const gableEndFrontGeom = useMemo(() => createWorldScaleBoxGeometry(w, roofHRaw, wallThickness, false, 0, 0, 0, isVertical), [w, roofHRaw, wallThickness, isVertical]);
-  const gableEndBackGeom = useMemo(() => createWorldScaleBoxGeometry(w, roofHRaw, wallThickness, false, 0, 0, 0, isVertical), [w, roofHRaw, wallThickness, isVertical]);
 
 
   const renderBaseMeshes = () => {
@@ -887,30 +881,11 @@ export function RoomGeometry() {
               <meshStandardMaterial color={roofColorHex} metalness={0.4} roughness={0.5} />
             </mesh>
 
-            {/* Gable-end WALLS: the eaves-to-ridge triangles are wall, clad
-                like walls. Thin slabs aligned with the wall faces, cut to the
-                roof slope - replacing the old fascia-coloured prism ends that
-                buried the cladding. */}
-            {([['front', d/2 - wallThickness/2], ['back', -(d/2 - wallThickness/2)]] as const).map(([side, zAbs]) => (
-              <mesh key={`gable-end-${side}`} position={[-roofX, roofH/2, zAbs - roofZ]} castShadow receiveShadow>
-                {/* EXACTLY the wall material recipe (same spread, same
-                    metalness, same bumpScale, AO map included) - a hand-picked
-                    subset of the texture props read as a subtly different
-                    material on the same elevation. */}
-                <meshStandardMaterial color="#ffffff" {...(side === 'front' ? texFront : texBack)} metalness={0.1} bumpScale={0.1} />
-                <Geometry>
-                  <Base>
-                    <primitive object={side === 'front' ? gableEndFrontGeom : gableEndBackGeom} attach="geometry" />
-                  </Base>
-                  <Subtraction position={[-w/4 - Math.sin(gablePitch) * w/2, Math.cos(gablePitch) * w/2, 0]} rotation={[0, 0, gablePitch]}>
-                    <boxGeometry args={[w * 2, w, wallThickness + 2]} />
-                  </Subtraction>
-                  <Subtraction position={[w/4 + Math.sin(gablePitch) * w/2, Math.cos(gablePitch) * w/2, 0]} rotation={[0, 0, -gablePitch]}>
-                    <boxGeometry args={[w * 2, w, wallThickness + 2]} />
-                  </Subtraction>
-                </Geometry>
-              </mesh>
-            ))}
+            {/* NO separate gable-end meshes here. The wall mesh itself already
+                ADDS clad gable triangles (gableTriangleGeom) as part of the
+                same CSG piece, with UVs that continue the wall's boards. A
+                second overlapping triangle z-fought with it - the "glitching
+                like it's not the same piece" was two coplanar copies. */}
           </group>
         )}
         {!isPlanView && !isGable && (
