@@ -170,6 +170,20 @@ export function Sidebar() {
 
         {tab === 'building' && (
           <>
+            {/* Shape comes FIRST: it is the decision everything else depends
+                on. It used to live six sections down inside "Base Model &
+                Features", where even the owner could not find the Gable
+                option. */}
+            <CollapsibleSection title="Roof Shape" defaultOpen={true}>
+              <div className="grid grid-cols-2 gap-2">
+                {(['Box', 'Gable'] as const).map((shape) => (
+                  <div key={shape} onClick={() => updateRoom({ shape: shape as any })} className={`p-3 rounded-xl text-center cursor-pointer transition-all ${room.shape === shape ? 'bg-[#3b4d4a] text-white shadow-md' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
+                    <span className="text-[11px] font-semibold tracking-wide">{shape === 'Box' ? 'Flat Roof' : 'Gable Roof'}</span>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
+
             <CollapsibleSection title="Dimensions" defaultOpen={true}>
               <div className="space-y-3">
                 {[
@@ -510,14 +524,7 @@ export function Sidebar() {
             </CollapsibleSection>
 
             <CollapsibleSection title="Base Model & Features" defaultOpen={true}>
-              <div className="grid grid-cols-2 gap-2">
-                {['Box', 'Gable'].map((shape) => (
-                  <div key={shape} onClick={() => updateRoom({ shape: shape as any })} className={`p-3 rounded-xl text-center cursor-pointer transition-all ${room.shape === shape ? 'bg-[#3b4d4a] text-white shadow-md' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
-                    <span className="text-[11px] font-semibold tracking-wide">{shape}</span>
-                  </div>
-                ))}
-              </div>
-              
+
               <div className="space-y-3">
                 {[
                   { label: 'Has Canopy', key: 'hasCanopy' as const },
