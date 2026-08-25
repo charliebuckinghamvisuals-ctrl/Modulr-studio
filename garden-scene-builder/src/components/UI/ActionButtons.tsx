@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DoorOpen, DoorClosed, FileText } from 'lucide-react';
+import { DoorOpen, DoorClosed, FileText, Save } from 'lucide-react';
 import { useStore } from '../../store';
 import { ExportPDFModal } from './ExportPDFModal';
 
@@ -19,6 +19,20 @@ export function ActionButtons() {
     }
   };
 
+  /**
+   * Saving was only reachable from inside the PDF export flow - to file a
+   * design you had to pretend to export. Same message, first-class button:
+   * the host app opens its name-and-project dialog over the configurator.
+   */
+  const handleSaveDesign = () => {
+    window.parent.postMessage({
+      type: 'SAVE_3D_DESIGN',
+      scene: useStore.getState().scene,
+      price: useStore.getState().calculatePrice(),
+      savedAt: Date.now(),
+    }, window.location.origin);
+  };
+
   return (
     <>
       {(viewMode === '3d' || viewMode === 'walking') && !isExporting && (
@@ -29,7 +43,14 @@ export function ActionButtons() {
           >
             Send to Render Engine
           </button>
-          <button 
+          <button
+            onClick={handleSaveDesign}
+            className="bg-white/90 backdrop-blur-md text-[#3b4d4a] border border-[#3b4d4a]/20 px-6 py-3 rounded-full font-semibold shadow-md hover:bg-[#3b4d4a] hover:text-white transition-all flex items-center gap-2 text-sm cursor-pointer"
+          >
+            <Save size={18} />
+            Save Design
+          </button>
+          <button
             onClick={() => setShowExportModal(true)}
             className="bg-white/90 backdrop-blur-md text-[#3b4d4a] border border-[#3b4d4a]/20 px-6 py-3 rounded-full font-semibold shadow-md hover:bg-[#3b4d4a] hover:text-white transition-all flex items-center gap-2 text-sm cursor-pointer"
           >
