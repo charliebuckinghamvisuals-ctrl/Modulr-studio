@@ -439,6 +439,10 @@ export function RoomGeometry() {
   const gableFascia = Math.min(0.4, Math.max(0.05, (room.gableFasciaMm ?? 100) / 1000));
   const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohLeft) / Math.cos(gablePitch), gableFascia, roofD, false, 0, 0, 0), [w, ohLeft, gablePitch, roofD, gableFascia]);
   const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohRight) / Math.cos(gablePitch), gableFascia, roofD, false, 0, 0, 0), [w, ohRight, gablePitch, roofD, gableFascia]);
+  // Gable-end wall slabs (the triangles are CSG-cut from these at render).
+  // Real walls, clad like walls - not roof, not fascia.
+  const gableEndFrontGeom = useMemo(() => createWorldScaleBoxGeometry(w, roofHRaw, wallThickness, false, 0, 0, 0), [w, roofHRaw, wallThickness]);
+  const gableEndBackGeom = useMemo(() => createWorldScaleBoxGeometry(w, roofHRaw, wallThickness, false, 0, 0, 0), [w, roofHRaw, wallThickness]);
 
 
   const renderBaseMeshes = () => {
@@ -869,6 +873,38 @@ export function RoomGeometry() {
                 </mesh>
               </>
             )}
+
+            {/* Ridge cap: the two sloped slabs meet square-cut at the apex,
+                which left an open V gap along the ridge. A real roof closes
+                this with a ridge piece - so does this one. */}
+            <mesh position={[-roofX, roofH + gableFascia / (2 * Math.cos(gablePitch)), 0]} castShadow>
+              <boxGeometry args={[0.24 + gableFascia, 0.07, roofD + 0.02]} />
+              <meshStandardMaterial color={roofColorHex} metalness={0.4} roughness={0.5} />
+            </mesh>
+
+            {/* Gable-end WALLS: the eaves-to-ridge triangles are wall, clad
+                like walls. Thin slabs aligned with the wall faces, cut to the
+                roof slope - replacing the old fascia-coloured prism ends that
+                buried the cladding. */}
+            {([['front', d/2 - wallThickness/2], ['back', -(d/2 - wallThickness/2)]] as const).map(([side, zAbs]) => (
+              <mesh key={`gable-end-${side}`} position={[-roofX, roofH/2, zAbs - roofZ]} castShadow receiveShadow>
+                {(() => {
+                  const tex = side === 'front' ? texFront : texBack;
+                  return <meshStandardMaterial color={tex.color} map={tex.map} normalMap={tex.normalMap} roughnessMap={tex.roughnessMap} roughness={tex.roughness} metalness={0.05} bumpScale={0.1} />;
+                })()}
+                <Geometry>
+                  <Base>
+                    <primitive object={side === 'front' ? gableEndFrontGeom : gableEndBackGeom} attach="geometry" />
+                  </Base>
+                  <Subtraction position={[-w/4 - Math.sin(gablePitch) * w/2, Math.cos(gablePitch) * w/2, 0]} rotation={[0, 0, gablePitch]}>
+                    <boxGeometry args={[w * 2, w, wallThickness + 2]} />
+                  </Subtraction>
+                  <Subtraction position={[w/4 + Math.sin(gablePitch) * w/2, Math.cos(gablePitch) * w/2, 0]} rotation={[0, 0, -gablePitch]}>
+                    <boxGeometry args={[w * 2, w, wallThickness + 2]} />
+                  </Subtraction>
+                </Geometry>
+              </mesh>
+            ))}
           </group>
         )}
         {!isPlanView && !isGable && (
@@ -887,10 +923,15 @@ export function RoomGeometry() {
           </mesh>
         )}
 
-        {/* Roof Fascia & EPDM flat roof */}
-        {!isPlanView && (
-          <group 
-            position={[roofX, isGable ? h + roofH/2 : (frontH + backH)/2 + roofH/2, roofZ]} 
+        {/* Roof Fascia & EPDM flat roof.
+            NOT for gables: on a gable this prism's end faces painted a
+            fascia-coloured triangle over the entire gable end, its cut faces
+            z-fought with the sloped slabs, and the flat "flashing" sheet at
+            ridge height read as a giant dark plate floating on the roof. The
+            gable's ends, fascia and ridge are built explicitly below. */}
+        {!isPlanView && !isGable && (
+          <group
+            position={[roofX, (frontH + backH)/2 + roofH/2, roofZ]}
             rotation={[isPitched && !isGable ? roofPitch : 0, 0, 0]}
           >
             <mesh castShadow receiveShadow position={[0, 0, 0]}>
@@ -915,25 +956,13 @@ export function RoomGeometry() {
                     return <meshStandardMaterial key={matKey} color="#2d3032" roughness={0.6} metalness={0.2} />; // anthracite default
                   }
                 };
-                /**
-                 * On a GABLE this prism's front/back faces are the gable-end
-                 * TRIANGLES - which are wall, not roof. Painting them fascia
-                 * colour buried the cladding under a black triangle the full
-                 * height of the rise. They now wear the wall cladding, and the
-                 * only visible fascia is the real one: the 100mm bargeboard
-                 * edge of the sloped roof slabs.
-                 */
-                const claddingMat = (side) => {
-                  const tex = side === 'front' ? texFront : texBack;
-                  return <meshStandardMaterial key={'gable-end-' + side + '-' + room.cladding + '-' + room.claddingOrientation} color={tex.color} map={tex.map} normalMap={tex.normalMap} roughnessMap={tex.roughnessMap} roughness={tex.roughness} metalness={0.05} bumpScale={0.1} />;
-                };
                 return [
                   React.cloneElement(getFasciaMat('right'), { key: 'mat-0', attach: 'material-0' }),
                   React.cloneElement(getFasciaMat('left'), { key: 'mat-1', attach: 'material-1' }),
                   <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
                   <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
-                  React.cloneElement(isGable ? claddingMat('front') : getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }),
-                  React.cloneElement(isGable ? claddingMat('back') : getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }),
+                  React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }),
+                  React.cloneElement(getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }),
                 ];
               })()}
               <Geometry>
