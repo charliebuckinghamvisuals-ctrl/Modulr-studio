@@ -191,6 +191,19 @@ export const setConfigSpec = (spec: Record<string, unknown> | null) => {
 };
 
 /**
+ * Result of the server's automatic quality check on the most recent render -
+ * counts of doors/windows/roof compared against the configurator spec (or the
+ * source image). Surfaced in the UI as the "checked" badge.
+ */
+export interface RenderVerification {
+    checked: boolean;
+    passed?: boolean;
+    retried?: boolean;
+}
+let lastVerification: RenderVerification | null = null;
+export const getLastVerification = (): RenderVerification | null => lastVerification;
+
+/**
  * The client's garden, as a written brief rather than a photograph.
  *
  * Set from the Garden panel and sent with every render, so a whole job's worth
@@ -266,6 +279,7 @@ export const renderBuilding = async (
     }
 
     const data = await response.json();
+    lastVerification = data.verification || null;
     return data.result;
 
   } catch (error) {

@@ -368,6 +368,9 @@ const isTesterUser = (user) =>
 // Tester allowance. 40 renders is roughly £5 of 4K image generation at current
 // Gemini rates, which is the budget agreed per tester.
 const TESTER_RENDERS = 40;
+
+/** Standard plan: renders per calendar month. Matches the pricing page. */
+const STANDARD_RENDERS_PER_MONTH = 100;
 const TESTER_DAYS = 7;
 
 /**
@@ -546,6 +549,37 @@ const checkTesterRender = async (user) => {
     }
 };
 
+/**
+ * Standard plan allowance: N renders per CALENDAR month.
+ *
+ * Same transactional, fail-closed shape as the tester counter. Keyed on the
+ * month string so the counter resets itself - no cron, no cleanup job; a new
+ * month simply reads as zero used.
+ */
+const checkStandardRender = async (user) => {
+    if (!db) return { allowed: true };
+    const userRef = db.collection('users').doc(user.uid);
+    const monthKey = new Date().toISOString().slice(0, 7); // e.g. "2026-08"
+    try {
+        return await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(userRef);
+            const data = snap.exists ? snap.data() : null;
+            const used = (data?.standardMonth === monthKey ? data?.standardRendersUsed : 0) || 0;
+            if (used >= STANDARD_RENDERS_PER_MONTH) {
+                return { allowed: false, status: 402, error: `You've used all ${STANDARD_RENDERS_PER_MONTH} renders this month. Your allowance resets on the 1st, or upgrade to Business for unlimited renders.` };
+            }
+            transaction.set(userRef, {
+                standardMonth: monthKey,
+                standardRendersUsed: used + 1,
+            }, { merge: true });
+            return { allowed: true, rendersLeft: STANDARD_RENDERS_PER_MONTH - (used + 1) };
+        });
+    } catch (e) {
+        console.error('[STANDARD] Check failed:', e.message || e);
+        return { allowed: false, status: 503, error: 'Render service temporarily unavailable. Please try again shortly.' };
+    }
+};
+
 const enforceRenderAccess = async (req, creditCost) => {
     // Master account — always allowed. Keyed on UID allowlist, never on the
     // email claim, and never on a Firestore field the user's document controls.
@@ -591,7 +625,24 @@ const enforceRenderAccess = async (req, creditCost) => {
 
     // Unlimited plans render without metering.
     if (UNLIMITED_PLANS.has(userPlan)) {
-        return { allowed: true, unlimited: true };
+        return { allowed: true, unlimited: true, plan: userPlan };
+    }
+
+    /**
+     * Standard: monthly render counter, and the caller must clamp resolution -
+     * isHighQuality arrives from the client and cannot be trusted to respect
+     * the plan's 1080p ceiling. Analysis calls ride free, same reasoning as
+     * testers: every upload triggers one automatically.
+     */
+    if (userPlan === 'standard') {
+        if (creditCost === CREDIT_COSTS.ANALYSIS) {
+            return { allowed: true, plan: 'standard' };
+        }
+        const check = await checkStandardRender(req.user);
+        if (!check.allowed) {
+            return { allowed: false, status: check.status || 402, body: { error: check.error } };
+        }
+        return { allowed: true, rendersLeft: check.rendersLeft, plan: 'standard' };
     }
 
     if (userPlan === 'free') {
@@ -1201,6 +1252,51 @@ RULES FOR YOUR ANSWER:
     }
 });
 
+/**
+ * Public client-share endpoint - the read side of "share this project with
+ * your customer". Registered BEFORE the master lock because the whole point
+ * is that the homeowner has no account.
+ *
+ * The token is a 128-bit random string the owner generated; possession of it
+ * IS the authorisation, like an unlisted YouTube link. Only presentation
+ * fields ever leave: name, estimate and image assets. Client contact details
+ * and notes are private CRM data and are deliberately never included.
+ */
+const shareLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 120,
+    keyGenerator: (req) => ipKeyGenerator(req.ip) || 'unknown',
+    message: { error: 'Too many requests. Please try again shortly.' },
+    validate: { ip: false, xForwardedForHeader: false }
+});
+
+app.get('/api/share/:token', shareLimiter, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Sharing is temporarily unavailable.' });
+        const token = String(req.params.token || '');
+        if (!/^[a-f0-9]{32}$/.test(token)) {
+            return res.status(404).json({ error: 'This share link is not valid.' });
+        }
+        const snap = await db.collection('projects').where('shareToken', '==', token).limit(1).get();
+        if (snap.empty) {
+            return res.status(404).json({ error: 'This share link is not valid or has been disabled.' });
+        }
+        const p = snap.docs[0].data();
+        const assets = Array.isArray(p.assets) ? p.assets : [];
+        res.json({
+            name: typeof p.name === 'string' ? p.name.slice(0, 120) : 'Project',
+            estimateValue: typeof p.estimateValue === 'number' ? p.estimateValue : null,
+            images: assets
+                .filter(a => a && typeof a.downloadUrl === 'string' && typeof a.contentType === 'string' && a.contentType.startsWith('image/'))
+                .slice(0, 24)
+                .map(a => ({ url: a.downloadUrl, name: typeof a.name === 'string' ? a.name.slice(0, 80) : 'render', kind: a.kind || 'other' })),
+        });
+    } catch (e) {
+        console.error('share fetch error:', e);
+        res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
+    }
+});
+
 // Protect all API routes and enforce master lock
 app.use('/api', verifyFirebaseToken, enforceMasterLock);
 
@@ -1331,7 +1427,7 @@ app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
         throw new Error("No image generated");
     } catch (error) {
         console.error("Line drawing error:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }
 });
 
@@ -1402,7 +1498,7 @@ app.post('/api/analyzeComponents', userAiLimiter, async (req, res) => {
     } catch (error) {
         console.error("analyzeComponents error:", error, error.stack);
         // Removed require('fs') to prevent node crashes
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }
 });
 
@@ -1410,7 +1506,7 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
     try {
         const base64Image      = sanitizeString(req.body.base64Image, 10_000_000);
         const additionalPrompt = sanitizeString(req.body.additionalPrompt, 2000);
-        const isHighQuality    = sanitizeBool(req.body.isHighQuality);
+        let isHighQuality    = sanitizeBool(req.body.isHighQuality);
         const ratio            = sanitizeString(req.body.ratio, 10);
         const isProMode        = sanitizeBool(req.body.isProMode);
         const orientation      = sanitizeString(req.body.orientation, 50);
@@ -1435,6 +1531,10 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
         if (!access.allowed) {
             return res.status(access.status).json(access.body);
         }
+
+        // Standard plan is 1080p-class: the 4K flag from the client is
+        // overridden server-side, never trusted.
+        if (access.plan === 'standard') isHighQuality = false;
 
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
 
@@ -1741,7 +1841,7 @@ ${lines.join('\n')}
                         // forced to 16:9, so the composition the user set up in the
                         // configurator survives. Fallback guards against an empty ratio.
                         aspectRatio: (isHighQuality && !isSketchUpMode) ? "16:9" : (ratio || "16:9"),
-                        imageSize: isHighQuality ? "4K" : "1K",
+                        imageSize: isHighQuality ? "4K" : "2K",
                         ...(seed !== undefined && !isNaN(seed) && { seed })
                     },
                     temperature: 0.2,
@@ -1762,29 +1862,22 @@ ${lines.join('\n')}
          * VERIFICATION PASS - the render is inspected before the customer sees it.
          *
          * A cheap vision call counts what is actually IN the finished image and
-         * compares it against the configurator spec - the one place we hold
-         * ground truth. Only countable, spec-backed facts are checked (door
-         * sets, windows, roof form); subjective quality cannot be judged this
-         * way and is not attempted.
+         * compares it against ground truth. Ground truth comes from the
+         * configurator spec when there is one; for photo and SketchUp uploads
+         * the SOURCE image supplies it instead - the geometry lock says the
+         * output must show exactly the openings the source shows, so the
+         * source's own counts are the truth to hold the render to.
          *
          * Fails soft by design: if the inspector itself errors, the render is
          * treated as passing. A QA outage must never take rendering down.
          */
-        const verifyAgainstSpec = async (renderB64, spec) => {
+        const inspectBuilding = async (b64) => {
             try {
-                const expected = {
-                    doors: Array.isArray(spec.doors) ? Math.min(spec.doors.length, 12) : null,
-                    windows: Array.isArray(spec.windows) ? Math.min(spec.windows.length, 12) : null,
-                    roof: spec.shape ? (spec.shape === 'Gable' ? 'gable' : 'flat') : null,
-                };
-                if (expected.doors === null && expected.windows === null && expected.roof === null) {
-                    return { pass: true, failures: [], skipped: true };
-                }
                 const resp = await ai.models.generateContent({
                     model: 'gemini-3.5-flash-lite',
                     contents: {
-                        parts: [fileToGenerativePart(renderB64, "image/jpeg"), { text:
-                            'This is a render of a single garden building. Count only what is clearly visible on the BUILDING itself; ignore fences, other structures and background. Glazed doors are doors, not windows - do not count door glazing as windows.' }]
+                        parts: [fileToGenerativePart(b64, "image/jpeg"), { text:
+                            'This is an image of a single garden building. Count only what is clearly visible on the BUILDING itself; ignore fences, other structures and background. Glazed doors are doors, not windows - do not count door glazing as windows.' }]
                     },
                     config: {
                         responseMimeType: "application/json",
@@ -1799,58 +1892,99 @@ ${lines.join('\n')}
                         }
                     }
                 });
-                const seen = JSON.parse(resp.text);
-                const failures = [];
-                if (expected.doors !== null && seen.doorSets !== expected.doors) failures.push(`the render shows ${seen.doorSets} exterior door set(s) but the configured building has EXACTLY ${expected.doors}`);
-                if (expected.windows !== null && seen.windows !== expected.windows) failures.push(`the render shows ${seen.windows} window(s) but the configured building has EXACTLY ${expected.windows}`);
-                if (expected.roof && seen.roofForm !== 'other' && seen.roofForm !== expected.roof) failures.push(`the render shows a ${seen.roofForm} roof but the configured building has a ${expected.roof} roof`);
-                return { pass: failures.length === 0, failures };
+                return JSON.parse(resp.text);
             } catch (e) {
-                console.warn('[VERIFY] inspection errored, treating render as passing:', e.message || e);
-                return { pass: true, failures: [], skipped: true };
+                console.warn('[VERIFY] inspection errored:', e.message || e);
+                return null;
             }
+        };
+        const compareCounts = (expected, seen, truthWord) => {
+            const failures = [];
+            if (expected.doors !== null && seen.doorSets !== expected.doors) failures.push(`the render shows ${seen.doorSets} exterior door set(s) but the ${truthWord} has EXACTLY ${expected.doors}`);
+            if (expected.windows !== null && seen.windows !== expected.windows) failures.push(`the render shows ${seen.windows} window(s) but the ${truthWord} has EXACTLY ${expected.windows}`);
+            if (expected.roof && seen.roofForm !== 'other' && seen.roofForm !== expected.roof) failures.push(`the render shows a ${seen.roofForm} roof but the ${truthWord} has a ${expected.roof} roof`);
+            return failures;
         };
 
         let b64Data = await runRender(prompt);
         if (!b64Data) throw new Error("No render generated. Check server logs for response payload.");
 
         /**
-         * Verify + ONE corrective retry, only where a configurator spec gives
-         * us ground truth. The retry is an internal cost, not re-charged to the
-         * user - it exists to fix our mistake, not to bill twice. Whichever
-         * attempt fails fewer checks is the one the customer receives.
+         * Verify + ONE corrective retry. The retry is an internal cost, not
+         * re-charged to the user - it exists to fix OUR mistake, not to bill
+         * twice. Whichever attempt fails fewer checks is what the customer
+         * receives. Wrapped so no verification error can fail a good render.
          */
         let verification = { checked: false };
-        const specForVerify = req.body.configSpec;
-        if (specForVerify && typeof specForVerify === 'object') {
-            const first = await verifyAgainstSpec(b64Data, specForVerify);
-            verification = { checked: !first.skipped, passed: first.pass, retried: false };
-            if (!first.pass) {
-                console.warn('[VERIFY] render failed checks, retrying once:', first.failures.join('; '));
-                const correction = `
+        try {
+            const specForVerify = req.body.configSpec;
+            let expected = null;
+            let truthWord = 'configured building';
+            if (specForVerify && typeof specForVerify === 'object') {
+                expected = {
+                    doors: Array.isArray(specForVerify.doors) ? Math.min(specForVerify.doors.length, 12) : null,
+                    windows: Array.isArray(specForVerify.windows) ? Math.min(specForVerify.windows.length, 12) : null,
+                    roof: specForVerify.shape ? (specForVerify.shape === 'Gable' ? 'gable' : 'flat') : null,
+                };
+            } else if (!studioBackground) {
+                const src = await inspectBuilding(base64Image);
+                if (src) {
+                    expected = { doors: src.doorSets, windows: src.windows, roof: src.roofForm !== 'other' ? src.roofForm : null };
+                    truthWord = 'source image';
+                }
+            }
+            if (expected && !(expected.doors === null && expected.windows === null && expected.roof === null)) {
+                const firstSeen = await inspectBuilding(b64Data);
+                if (firstSeen) {
+                    const failures = compareCounts(expected, firstSeen, truthWord);
+                    verification = { checked: true, passed: failures.length === 0, retried: false };
+                    if (failures.length) {
+                        console.warn('[VERIFY] render failed checks, retrying once:', failures.join('; '));
+                        const correction = `
 
       PREVIOUS ATTEMPT REJECTED - CORRECTIONS REQUIRED:
       A previous render of this exact scene was rejected by quality control because:
-${first.failures.map(f => `      - ${f}`).join('\n')}
-      Fix these exactly. The CONFIGURED DIMENSIONS AND COUNTS section is the
-      absolute truth for what exists on this building.`;
-                const retryB64 = await runRender(prompt + correction);
-                if (retryB64) {
-                    const second = await verifyAgainstSpec(retryB64, specForVerify);
-                    verification = { checked: true, passed: second.pass, retried: true };
-                    if ((second.failures || []).length <= first.failures.length) {
-                        b64Data = retryB64;
+${failures.map(f => `      - ${f}`).join('\n')}
+      Fix these exactly. ${specForVerify ? 'The CONFIGURED DIMENSIONS AND COUNTS section is the absolute truth for what exists on this building.' : 'The SOURCE image is the absolute truth - reproduce exactly the doors, windows and roof it shows, nothing more and nothing less.'}`;
+                        const retryB64 = await runRender(prompt + correction);
+                        if (retryB64) {
+                            const secondSeen = await inspectBuilding(retryB64);
+                            const failures2 = secondSeen ? compareCounts(expected, secondSeen, truthWord) : [];
+                            verification = { checked: true, passed: failures2.length === 0, retried: true };
+                            if (failures2.length <= failures.length) b64Data = retryB64;
+                            if (failures2.length) console.warn('[VERIFY] retry still failing checks, returning best attempt:', failures2.join('; '));
+                        }
                     }
-                    if (!second.pass) console.warn('[VERIFY] retry still failing checks, returning best attempt:', (second.failures || []).join('; '));
                 }
             }
+        } catch (e) {
+            console.warn('[VERIFY] verification skipped:', e.message || e);
+        }
+
+        /**
+         * Cost log - one small fire-and-forget document per render. A month of
+         * these answers the real cost-per-render question (Google billing /
+         * count by model+size) and shows whether any account's usage is out of
+         * line, without slowing the response down.
+         */
+        if (db) {
+            db.collection('renderLog').add({
+                uid: req.user?.uid || 'unknown',
+                endpoint: 'renderBuilding',
+                model: 'gemini-3-pro-image',
+                imageSize: isHighQuality ? '4K' : '2K',
+                sketchUpMode: isSketchUpMode,
+                verified: verification.checked ? verification.passed : null,
+                retried: !!verification.retried,
+                ts: admin.firestore.FieldValue.serverTimestamp(),
+            }).catch(e => console.warn('[COSTLOG] write failed:', e.message || e));
         }
 
         return res.json({ result: b64Data, verification });
     } catch (error) {
         console.error("Render error in /api/renderBuilding:", error, error.stack);
-        // Removed require('fs') to prevent node crashes
-        res.status(500).json({ error: error.message });
+        // Log the real error above; never echo internals to the client.
+        res.status(500).json({ error: 'The render could not be completed. Please try again in a moment.' });
     }
 });
 
@@ -1859,7 +1993,7 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
         const base64Image   = sanitizeString(req.body.base64Image, 10_000_000);
         const maskImage     = sanitizeString(req.body.maskImage, 10_000_000);
         const editPrompt    = sanitizeString(req.body.editPrompt, 1000); // embedded directly in prompt — strict cap
-        const isHighQuality = sanitizeBool(req.body.isHighQuality);
+        let isHighQuality = sanitizeBool(req.body.isHighQuality);
         const ratio         = sanitizeString(req.body.ratio, 10);
         const isProMode     = sanitizeBool(req.body.isProMode);
 
@@ -1869,6 +2003,10 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
         if (!access.allowed) {
             return res.status(access.status).json(access.body);
         }
+
+        // Standard plan is 1080p-class: the 4K flag from the client is
+        // overridden server-side, never trusted.
+        if (access.plan === 'standard') isHighQuality = false;
 
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
 
@@ -1910,7 +2048,7 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
                 outputMimeType: "image/jpeg",
                 imageConfig: {
                     aspectRatio: ratio,
-                    imageSize: isHighQuality ? "4K" : "1K",
+                    imageSize: isHighQuality ? "4K" : "2K",
                     editMode: "EDIT_MODE_DEFAULT"
                 },
                 temperature: 0.2
@@ -1926,7 +2064,7 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
 
     } catch (error) {
         console.error("Edit error:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }
 });
 
@@ -1999,7 +2137,7 @@ app.post('/api/analyzeMaterials', userAiLimiter, async (req, res) => {
 
     } catch (error) {
         console.error("Material analysis error:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }
 });
 
@@ -2137,14 +2275,14 @@ app.post('/api/analyzeScene', userAiLimiter, async (req, res) => {
         res.json({ result });
     } catch (error) {
         console.error("Scene analysis error:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }
 });
 
 app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
     try {
         const base64Image   = sanitizeString(req.body.base64Image, 10_000_000);
-        const isHighQuality = sanitizeBool(req.body.isHighQuality);
+        let isHighQuality = sanitizeBool(req.body.isHighQuality);
         const ratio         = sanitizeString(req.body.ratio, 10);
         const isProMode     = sanitizeBool(req.body.isProMode);
         const rawWeather    = req.body.weather || {};
@@ -2160,6 +2298,10 @@ app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
         if (!access.allowed) {
             return res.status(access.status).json(access.body);
         }
+
+        // Standard plan is 1080p-class: the 4K flag from the client is
+        // overridden server-side, never trusted.
+        if (access.plan === 'standard') isHighQuality = false;
 
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
 
@@ -2195,7 +2337,7 @@ app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
                 outputMimeType: "image/jpeg",
                 imageConfig: {
                     aspectRatio: ratio,
-                    imageSize: isHighQuality ? "4K" : "1K"
+                    imageSize: isHighQuality ? "4K" : "2K"
                 },
                 temperature: 0.2
             }
@@ -2210,7 +2352,7 @@ app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
 
     } catch (error) {
         console.error("Weather error:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }
 });
 
@@ -2362,7 +2504,7 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
 
     } catch (error) {
         console.error("Scene Studio error:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }
 });
 
@@ -2474,7 +2616,7 @@ app.get('/api/animation/status', async (req, res) => {
         res.json({ state, ready: state === 'ACTIVE' });
     } catch (error) {
         console.error('Animation status error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }
 });
 
@@ -2506,7 +2648,7 @@ app.get('/api/animation/video', async (req, res) => {
 
     } catch (error) {
         console.error('Animation download error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }
 });
 

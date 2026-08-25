@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { AppStage, MaterialConfig, WeatherConfig, ProcessingState, LibraryMaterialItem, MaterialLibrary } from '../types';
 import { PRESET_MATERIALS, WEATHER_CONDITIONS, SEASONS } from '../constants';
-import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor, setConfigSpec, describeGarden, getSceneContext, setSceneContext } from '../services/geminiService';
+import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor, setConfigSpec, describeGarden, getSceneContext, setSceneContext, getLastVerification, RenderVerification } from '../services/geminiService';
 import { saveToHistory } from '../services/historyService';
 import { trackFeatureUsage } from '../services/analytics';
 import { db, auth } from '../services/firebase';
@@ -93,6 +93,10 @@ export const useAppEngine = () => {
     // Camera effects (depth of field, background bokeh) are OFF by default -
     // the base output is a deep-focus archviz frame; this opts into the DSLR look.
     const [cameraEffects, setCameraEffects] = useState(false);
+    // Seed of the last render, so "same look" re-renders are possible.
+    const [lastSeed, setLastSeed] = useState<number | null>(null);
+    // The server's automatic quality-check result for the last render.
+    const [renderVerification, setRenderVerification] = useState<RenderVerification | null>(null);
     const [isBatchMode, setIsBatchMode] = useState(false);
     const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
     const [isAnalyzingMaterials, setIsAnalyzingMaterials] = useState(false);
@@ -637,7 +641,13 @@ export const useAppEngine = () => {
         }
     };
 
-    const handleRender = async () => {
+    /**
+     * opts.reuseSeed re-renders with the LAST seed ("same look") - materials
+     * can change while the composition stays put. Default is a fresh random
+     * seed each time ("new look"). Guarded against a click event arriving as
+     * the first argument from onClick={handleRender}.
+     */
+    const handleRender = async (opts?: { reuseSeed?: boolean }) => {
         const source = originalImage;
         if (!source) return;
 
@@ -646,10 +656,17 @@ export const useAppEngine = () => {
             : 'Rendering photorealistic textures and lighting...';
         const weatherPrompt = weather.condition !== 'auto' ? `Weather condition: ${weather.condition}. ` : '';
         const finalPrompt = weatherPrompt + additionalPrompt;
-        
+
+        const seed = (opts && opts.reuseSeed === true && lastSeed !== null)
+            ? lastSeed
+            : Math.floor(Math.random() * 2_000_000_000);
+        setLastSeed(seed);
+        setRenderVerification(null);
+
         setProcessing({ isLoading: true, message: loadingMsg });
         try {
-            const result = await renderBuilding(source, materials, finalPrompt, isHighQuality, isProMode, activeStage === AppStage.STUDIO ? selectedAngle : undefined, isSketchUpMode, activeStage === AppStage.STUDIO ? studioBackground : undefined, false, undefined, cameraEffects);
+            const result = await renderBuilding(source, materials, finalPrompt, isHighQuality, isProMode, activeStage === AppStage.STUDIO ? selectedAngle : undefined, isSketchUpMode, activeStage === AppStage.STUDIO ? studioBackground : undefined, false, seed, cameraEffects);
+            setRenderVerification(getLastVerification());
             trackFeatureUsage('render_engine');
             setRenderedImage(result);
 
@@ -965,6 +982,7 @@ export const useAppEngine = () => {
         downloadFormat, setDownloadFormat,
         isSketchUpMode, setIsSketchUpMode,
         cameraEffects, setCameraEffects,
+        lastSeed, renderVerification,
         isBatchMode, setIsBatchMode,
         userPlan, setUserPlan,
         studioBackground, setStudioBackground, selectedAngle, setSelectedAngle,
