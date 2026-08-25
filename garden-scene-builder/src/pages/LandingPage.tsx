@@ -292,7 +292,7 @@ export default function LandingPage() {
               </div>
               <h2 className="text-4xl md:text-5xl font-light tracking-tight mb-6">Expert planning advice, built in.</h2>
               <p className="text-lg text-white/70 font-light leading-relaxed mb-8">
-                Navigating Permitted Development rules and planning permissions can be daunting. We've partnered with the National Annexe Planning Consultancy (NAPC) to ensure your dream space can become a reality.
+                Navigating Permitted Development rules and planning permissions can be daunting. We've partnered with the National Annexe Planning Company (NAPC) to ensure your dream space can become a reality.
               </p>
               
               <ul className="space-y-6 mb-10">

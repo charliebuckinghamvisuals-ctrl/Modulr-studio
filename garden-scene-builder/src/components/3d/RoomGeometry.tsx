@@ -1548,6 +1548,63 @@ export function RoomGeometry() {
             </mesh>
           )
           })}
+
+          {/* Opening dimension chains: wall edge -> opening -> gap -> wall edge,
+              one running chain per wall that has doors or windows. This is what
+              a builder actually sets out from - the overall dims alone don't
+              say WHERE the openings sit. Read-only labels; positions are edited
+              on the openings themselves. LShape skipped: offsets there are not
+              relative to a single straight wall. */}
+          {room.showDimensions && room.shape !== 'LShape' && (['front', 'back', 'left', 'right'] as const).map(side => {
+            const horiz = side === 'front' || side === 'back';
+            const L = horiz ? w : d;
+            const openings = [
+              ...(room.doors || []).filter(dr => dr.wall === side).map(dr => ({ c: (dr.offsetMm || 0) / 1000, hw: (dr.widthMm / 1000) / 2 })),
+              ...room.windows.filter(wn => wn.wall === side).map(wn => ({ c: (wn.offsetMm ?? 0) / 1000, hw: (wn.widthMm / 1000) / 2 })),
+            ].sort((a, b) => a.c - b.c);
+            if (openings.length === 0) return null;
+
+            const pts: number[] = [-L / 2];
+            openings.forEach(o => {
+              pts.push(Math.max(-L / 2, o.c - o.hw), Math.min(L / 2, o.c + o.hw));
+            });
+            pts.push(L / 2);
+
+            const off = 0.45; // between the wall face and the overall dimension line
+            const base: [number, number, number] =
+              side === 'front' ? [0, 0, d / 2 + off]
+              : side === 'back' ? [0, 0, -d / 2 - off]
+              : side === 'left' ? [-w / 2 - off, 0, 0]
+              : [w / 2 + off, 0, 0];
+            const rotText: [number, number, number] =
+              side === 'front' ? [-Math.PI / 2, 0, 0]
+              : side === 'back' ? [-Math.PI / 2, 0, Math.PI]
+              : side === 'left' ? [-Math.PI / 2, 0, -Math.PI / 2]
+              : [-Math.PI / 2, 0, Math.PI / 2];
+
+            return (
+              <group key={`chain-${side}`} position={base}>
+                <Line points={horiz ? [[-L / 2, 0, 0], [L / 2, 0, 0]] : [[0, 0, -L / 2], [0, 0, L / 2]]} color="#000" lineWidth={0.75} />
+                {pts.map((p, i) => (
+                  <Line key={`tick-${i}`} points={horiz ? [[p, 0, -0.06], [p, 0, 0.06]] : [[-0.06, 0, p], [0.06, 0, p]]} color="#000" lineWidth={0.75} />
+                ))}
+                {pts.slice(0, -1).map((p, i) => {
+                  const q = pts[i + 1];
+                  const segMm = Math.round((q - p) * 1000);
+                  if (segMm < 1) return null;
+                  const mid = (p + q) / 2;
+                  return (
+                    <DimText
+                      key={`seg-${i}`}
+                      position={horiz ? [mid, 0, 0] : [0, 0, mid]}
+                      rotation={rotText}
+                      value={segMm}
+                    />
+                  );
+                })}
+              </group>
+            );
+          })}
         </group>
       )}
 
@@ -1678,8 +1735,9 @@ export function RoomGeometry() {
             )}
           </group>
           )}
-          {/* Roof Height (Ridge) Handle */}
-          {(isGable || isPitched) && room.showDimensions && (
+          {/* Roof Height (Ridge) Handle. Never on plans: a HEIGHT floating on a
+              top-down drawing read as a mystery "300mm" on the exported PDF. */}
+          {(isGable || isPitched) && room.showDimensions && !isPlanView && (
             <group position={[0, h + roofH + 0.1, d/2 + 0.1]} rotation={[0, 0, 0]}>
               <DimText 
                 position={[0, 0, 0]}

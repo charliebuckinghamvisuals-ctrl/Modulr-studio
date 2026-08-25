@@ -95,17 +95,30 @@ const PRICE_CATALOG = {
  * away. That is what separates an architectural photograph from a wide shot of
  * a garden that happens to contain a building.
  */
-const MODULR_HOUSE_STYLE = `
+/**
+ * House style, parameterised by the Camera Effects toggle.
+ *
+ * Default (false) is a pure archviz presentation: DEEP focus, everything sharp,
+ * no photographic affectations - the way an offline renderer outputs a frame
+ * before anyone adds camera post. The toggle opts back INTO the DSLR look
+ * (depth of field, background bokeh, foreground softening) for users who want
+ * a photographic feel. Blur must never be the default it silently was.
+ */
+const buildHouseStyle = (cameraEffects) => `
       HOUSE STYLE - APPLY TO EVERY RENDER:
 
       CAMERA & FOCUS:
       - Full-frame DSLR, 35-50mm lens, eye level, natural three-quarter viewpoint.
-      - Shallow-to-moderate depth of field. The BUILDING IS THE SUBJECT and must be
-        tack sharp from corner to corner.
+${cameraEffects ? `      - CAMERA EFFECTS ON: shallow-to-moderate depth of field. The BUILDING IS THE
+        SUBJECT and must be tack sharp from corner to corner.
       - The background - fences, neighbouring rooflines, distant planting - falls
         gently out of focus. Soft, natural bokeh. Never blur the building itself.
       - Foreground grass immediately nearest the camera may soften slightly. Keep
-        the frame clear of clutter; nothing should compete with the building.
+        the frame clear of clutter; nothing should compete with the building.` : `      - DEEP FOCUS - NO CAMERA EFFECTS: the ENTIRE frame is tack sharp, front to
+        back - building, garden, fences and background alike. NO depth of field,
+        NO background blur, NO bokeh, NO foreground softening, NO motion blur.
+        Render as an offline archviz engine outputs a frame: everything in focus.
+      - Keep the frame clear of clutter; nothing should compete with the building.`}
 
       LIGHTING:
       - Soft, bright, overcast daylight. Diffuse and even, no harsh direct sun,
@@ -115,7 +128,7 @@ const MODULR_HOUSE_STYLE = `
 
       COMPOSITION & CONTEXT:
       - A realistic UK domestic rear garden: mown lawn, timber fence panels with
-        concrete posts, mature planting, neighbouring rooftops soft in the distance.
+        concrete posts, mature planting, neighbouring rooftops in the distance.
       - The building occupies the majority of the frame with comfortable breathing
         space. Not a wide landscape shot.
       - Horizon level, verticals true, no wide-angle distortion or converging walls.
@@ -124,6 +137,13 @@ const MODULR_HOUSE_STYLE = `
       - Neutral, true-to-life colour grade. Materials read at their real colour.
       - No oversaturation, no HDR halos, no heavy vignette, no lens flare.
       - Crisp micro-texture: timber grain, board joints, glass reflections, grass blades.
+      - Presentation condition: every material newly installed, clean and true. No
+        moss, staining, weathering or garden clutter - this is a marketing visual.
+      - ZERO AI ARTIFACTS: no warped or wavy lines that should be straight, no
+        melted or merged elements, no duplicated fence posts or cladding boards,
+        no smudged painterly patches, no impossible reflections, no inconsistent
+        shadow directions. Glazing bars perfectly straight and evenly spaced;
+        cladding boards parallel with even gaps.
 `;
 
 /**
@@ -1009,7 +1029,7 @@ Always use these numbers when assessing height for Permitted Development limits.
 Provide a simplified assessment covering:
 1. Do I need planning permission? (A simple summary of Permitted Development Rights based on dimensions and roof style, avoiding confusing jargon).
 2. Building Regulations (a simple summary based on size, boundary, and use).
-3. Recommendation: You must strongly recommend the National Association of Planning Consultants (NAPC) and provide their website link: www.napc.uk. Explain why they are highly recommended (e.g., they are experts in securing planning permission and certificates of lawfulness for garden rooms, ensuring a stress-free and smooth process).
+3. Recommendation: You must strongly recommend the National Annexe Planning Company (NAPC) and provide their website link: www.napc.uk. Explain why they are highly recommended (e.g., they are experts in securing planning permission and certificates of lawfulness for garden rooms, ensuring a stress-free and smooth process).
 
 Write this as a helpful guide for a homeowner. Use plain text formatting. Do NOT use markdown symbols like asterisks (*) or hash (#). Use capitalized words for emphasis and numbering for lists. Keep it conversational but professional.`;
 
@@ -1076,6 +1096,108 @@ app.post('/api/beta/redeem', verifyFirebaseToken, betaLimiter, async (req, res) 
     } catch (e) {
         console.error('[BETA] Failed to grant access:', e);
         res.status(500).json({ error: 'Could not activate your account. Please try again.' });
+    }
+});
+
+/**
+ * Free public planning checker - a lead-gen tool, deliberately open to anyone.
+ *
+ * Registered BEFORE the master lock for the same reason as beta redemption:
+ * its whole point is that no account is needed. It spends real Gemini tokens
+ * with nobody to bill, so the per-IP daily cap is strict, and the refusal
+ * message itself sends people to NAPC - even the rate limit is marketing.
+ */
+const planningCheckLimiter = rateLimit({
+    windowMs: 24 * 60 * 60 * 1000,
+    max: 10,
+    keyGenerator: (req) => ipKeyGenerator(req.ip) || 'unknown',
+    message: { error: 'Daily limit reached for the free checker. For a full assessment, speak to the National Annexe Planning Company at www.napc.uk.' },
+    validate: { ip: false, xForwardedForHeader: false }
+});
+
+app.post('/api/public/planning-check', planningCheckLimiter, async (req, res) => {
+    try {
+        // Forgiving units: this trade thinks in millimetres, so "8000" in a
+        // metres box means 8m. Anything over 100 is unambiguously mm.
+        const num = (v, max) => {
+            let n = parseFloat(v);
+            if (!isFinite(n) || n <= 0) return null;
+            if (n > 100) n = n / 1000;
+            return n <= max ? Math.round(n * 100) / 100 : null;
+        };
+        const widthM     = num(req.body.widthM, 50);
+        const depthM     = num(req.body.depthM, 50);
+        const heightM    = num(req.body.heightM, 20);
+        const boundaryM  = num(req.body.boundaryM, 1000);
+        const description = sanitizeString(req.body.description, 600);
+        const isHouse       = sanitizeBool(req.body.isHouse);
+        const designatedLand = sanitizeBool(req.body.designatedLand);
+        const forwardOfHouse = sanitizeBool(req.body.forwardOfHouse);
+        const useRaw = sanitizeString(req.body.use, 20);
+        const useLabel = {
+            incidental: 'incidental use - office, gym, studio or hobby room',
+            garage: 'a garage or carport (incidental use; note any NEW driveway, access or dropped kerb is separate from Class E and may need its own consent)',
+            sleeping: 'guest room / occasional sleeping accommodation',
+            annexe: 'a self-contained annexe with kitchen/bathroom, lived in',
+            other: 'unspecified - judge from the description',
+        }[useRaw] || 'unspecified - judge from the description';
+        if (!widthM || !depthM || !heightM || boundaryM === null || !description.trim()) {
+            return res.status(400).json({ error: 'Please fill in the dimensions, boundary distance and a short description.' });
+        }
+
+        const prompt = `
+You are a UK planning guidance assistant assessing whether a proposed garden building is LIKELY to fall under Permitted Development (Class E, Part 1, Schedule 2 of the GPDO 2015 - outbuildings), or LIKELY to need planning permission.
+
+THE PROPOSAL:
+- Footprint: ${widthM}m wide x ${depthM}m deep
+- Maximum height: ${heightM}m
+- Distance to the nearest boundary: ${boundaryM}m
+- The property is ${isHouse ? 'a house' : 'NOT confirmed to be a house (may be a flat/maisonette - flats have NO permitted development rights for outbuildings)'}
+- On designated land (conservation area / AONB / National Park / World Heritage Site) or listed: ${designatedLand ? 'YES' : 'not stated - assume no but caveat it'}
+- Position relative to the house: ${forwardOfHouse ? 'IN FRONT of the principal elevation (between the house and the road) - this alone fails Class E' : 'behind or beside the house (not forward of the principal elevation)'}
+- Stated main use: ${useLabel}
+- The applicant describes it as: "${description}"
+
+APPLY THE CLASS E TESTS, including:
+- Within 2m of a boundary, TOTAL height must not exceed 2.5m.
+- Beyond 2m: max eaves 2.5m; max overall height 4m (dual-pitched roof) or 3m (any other roof).
+- Single storey only; no verandas, balconies or raised platforms over 300mm.
+- Not forward of the principal elevation.
+- Outbuildings + extensions must not cover more than 50% of the curtilage.
+- Use must be incidental to the enjoyment of the dwellinghouse (a garden office or gym usually qualifies; SLEEPING accommodation / self-contained annexe does NOT and typically needs permission).
+- Designated land and listed buildings carry extra restrictions: no outbuildings between a side elevation and the boundary on designated land; on National Parks / AONB / the Broads / World Heritage Sites, a building MORE THAN 20m from the house is limited to 10 square metres total; listed buildings have NO Class E rights at all.
+- Houses created by prior-approval conversions (Class Q barn conversions, Class M, MA, N, P, PA, G) have NO Class E rights - if the description hints the house is a conversion, caveat this.
+- Local authorities can remove PD rights via Article 4 directions or conditions on earlier permissions - always caveat that the applicant should confirm none apply.
+
+RULES FOR YOUR ANSWER:
+- Be honest about what you cannot know from this information; put those in caveats.
+- This is guidance, NOT legal advice or a formal determination - only a Lawful Development Certificate or planning decision settles it.
+- In napcNote, direct the user to the National Annexe Planning Company (NAPC) at www.napc.uk for a professional assessment, certificates of lawfulness and planning applications - especially if the verdict is not clearly permitted development.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-pro-latest',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        verdict: { type: Type.STRING, enum: ["likely_permitted_development", "likely_needs_permission", "unclear"] },
+                        headline: { type: Type.STRING, description: "One-sentence plain-English answer" },
+                        reasons: { type: Type.ARRAY, items: { type: Type.STRING }, description: "The specific Class E tests this proposal passes or fails" },
+                        caveats: { type: Type.ARRAY, items: { type: Type.STRING }, description: "What could change the answer" },
+                        napcNote: { type: Type.STRING, description: "Referral to NAPC (www.napc.uk)" },
+                    },
+                    required: ["verdict", "headline", "reasons", "caveats", "napcNote"]
+                }
+            }
+        });
+        const text = response.text;
+        if (!text) throw new Error('No answer returned');
+        res.json({ result: JSON.parse(text) });
+    } catch (e) {
+        console.error('planning-check error:', e);
+        res.status(500).json({ error: 'The checker could not run just now. Please try again in a moment.' });
     }
 });
 
@@ -1234,7 +1356,12 @@ app.post('/api/analyzeComponents', userAiLimiter, async (req, res) => {
          - Stippled: "Render".
          - Grid: "Tiles".
       5. DOORS: Describe material, color, and glazing zone (e.g. "top-half glazed").
-      6. Return ONLY a valid JSON object.
+      6. ABSENT ELEMENTS: If an element is not clearly visible in the image, return
+         exactly 'none' for that field. This applies to EVERY field - windows, doors,
+         decking alike. A building with no windows gets windows: 'none'. NEVER assume
+         an element exists because buildings usually have one; describe only what is
+         actually in the image. Glazed doors are doors, not windows.
+      7. Return ONLY a valid JSON object.
     `;
 
         const response = await ai.models.generateContent({
@@ -1290,7 +1417,9 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
         const isSketchUpMode   = sanitizeBool(req.body.isSketchUpMode);
         const studioBackground = sanitizeString(req.body.studioBackground, 200);
         const isBatchSequence  = sanitizeBool(req.body.isBatchSequence);
+        const cameraEffects    = sanitizeBool(req.body.cameraEffects);
         const seed             = req.body.seed ? parseInt(req.body.seed) : undefined;
+        const houseStyleBlock  = buildHouseStyle(cameraEffects);
         // Sanitize each material field individually — they are embedded directly in AI prompts
         const rawMats          = req.body.materials || {};
         const materials = {
@@ -1341,7 +1470,7 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                     lines.push(`  - Door ${i + 1}: ${Math.max(1, parseInt(dr.leaves) || 1)} leaf, ${mm(dr.widthMm) || 'unspecified width'} x ${mm(dr.heightMm) || 'unspecified height'}, ${style}, on the ${sanitizeString(String(dr.wall || ''), 10) || 'front'} elevation.`);
                 });
                 const windows = Array.isArray(spec.windows) ? spec.windows.slice(0, 12) : [];
-                lines.push(`- Windows: EXACTLY ${windows.length}.`);
+                lines.push(`- Windows: EXACTLY ${windows.length}.${windows.length ? '' : ` This building has NO windows. Do not add any window openings on any elevation.${doors.length ? ' The only glazing is in the door sets listed above.' : ''}`}`);
                 windows.forEach((wn, i) => {
                     const style = wn.style === 'crittall' ? 'Crittall-style glazing bar grid' : 'standard';
                     lines.push(`  - Window ${i + 1}: ${mm(wn.widthMm) || '?'} x ${mm(wn.heightMm) || '?'}, ${style}, ${sanitizeString(String(wn.wall || ''), 10) || 'front'} elevation.`);
@@ -1379,6 +1508,28 @@ ${lines.map(l => '      ' + l).join('\n')}
             }
         };
         const configSpecBlock = buildConfigSpecBlock(req.body.configSpec);
+
+        /**
+         * The spec is ground truth for what EXISTS; the material analyser only
+         * knows what a screenshot looks like. On a windowless building the
+         * analyser still returns a windows description (its schema demands
+         * one), which lands in MATERIAL ASSIGNMENTS as "Windows: grey
+         * aluminium..." two lines under "Windows: EXACTLY 0" - and the model
+         * resolves that contradiction by inventing windows. When the spec says
+         * an element has zero instances, its material line must say so too,
+         * not describe a material for it.
+         */
+        {
+            const spec = req.body.configSpec;
+            if (spec && typeof spec === 'object') {
+                if (Array.isArray(spec.windows) && spec.windows.length === 0) {
+                    materials.windows = 'NONE. This building has zero windows - do not render any window openings.';
+                }
+                if (Array.isArray(spec.doors) && spec.doors.length === 0) {
+                    materials.doors = 'NONE. This building has zero exterior door sets - do not render any.';
+                }
+            }
+        }
 
         /**
          * SITE CONTEXT - rebuild the client's garden around the building.
@@ -1453,13 +1604,21 @@ ${lines.join('\n')}
       - Target: 8K-UHD Photograph-Quality Architectural Visualization.
       - Quality: Ultra-realistic, Physically Based Rendering (PBR), sharp focus, hyper-detailed micro-textures.
 
-      WHAT THE INPUT IS:
-      The source is a flat-shaded 3D model preview (CAD / SketchUp / configurator).
-      Treat it STRICTLY as a geometry, layout and composition reference. It is NOT
-      a photograph and its appearance must NOT be preserved.
+      WHAT THE INPUT IS - AND WHAT YOU ARE:
+      The source is the flat-shaded viewport of a finished 3D model (CAD /
+      SketchUp / configurator) - the equivalent of SketchUp's solid mode. YOU
+      are the offline render engine that scene has been sent to. Behave exactly
+      as Blender Cycles or V-Ray behaves when the artist clicks Render: the
+      scene's geometry is ALREADY FINAL and is not yours to edit. A render
+      engine physically cannot add a window, move a door, change a roof line or
+      resize a wall - it can only light and shade the polygons it was handed.
+      Hold yourself to that standard. The input is NOT a photograph and its
+      flat-shaded appearance must NOT be preserved - but its geometry is the
+      complete and only truth.
 
       TASK: Produce a full photorealistic architectural render of this exact building.
-      This is a COMPLETE RE-RENDER, not an upscale, filter or enhancement pass.
+      This is a COMPLETE RE-RENDER of materials and lighting, not an upscale, filter
+      or enhancement pass - and not a redesign.
 
       YOU MUST REPLACE, NOT PRESERVE:
       - Discard the model's flat fill colours, uniform shading and plastic CGI look entirely.
@@ -1467,8 +1626,9 @@ ${lines.join('\n')}
       - Rebuild all lighting from scratch: real sun angle, soft sky fill, global illumination,
         contact shadows, ambient occlusion in every recess and reveal.
       - Add authentic surface detail: timber grain and board joints, metal seams and standing
-        ribs, glass with real reflections, refraction and interior falloff, subtle dirt and
-        weathering at ground level.
+        ribs, glass with real reflections, refraction and interior falloff. Materials are
+        NEWLY INSTALLED and immaculate - no dirt, staining, moss or weathering. This is a
+        presentation visual, not a survey photo.
       - Materials must respond physically to light: correct roughness, specularity and
         reflectance for each surface.
 
@@ -1476,6 +1636,10 @@ ${lines.join('\n')}
       - STRICT GEOMETRY LOCK: reproduce the EXACT structure, proportions, roof pitch, and
         window and door positions shown. Changing the appearance is required; changing the
         DESIGN is forbidden.
+      - OPENINGS ARE A ONE-TO-ONE MAPPING: every door and window in the render must be
+        visible in the source, and every door and window in the source must appear in the
+        render - same position, same size, same count. If an opening is not in the source,
+        it does not exist. A blank wall in the model stays a blank wall in the render.
       - NO HALLUCINATIONS: do NOT invent structures, decking, patios, porches or raised
         platforms that are not present in the source.
       - PRESERVE THE COMPOSITION: keep the same camera angle and framing.
@@ -1499,15 +1663,16 @@ ${lines.join('\n')}
 
       ${siteContextBlock}
 
-      ${MODULR_HOUSE_STYLE}
+      ${houseStyleBlock}
 
       SCENE MODIFICATIONS: ${additionalPrompt || 'None'}
       ${studioBackground ? `\n      STUDIO OVERRIDE - THIS SUPERSEDES THE HOUSE STYLE COMPOSITION AND CONTEXT RULES ABOVE: Render this building completely isolated on a ${studioBackground}. Do NOT render grass, trees, fences, skies, or any natural environment. Pure studio lighting only. Keep the house style's camera, focus and finish guidance - the building must still be tack sharp with true-to-life material colour.` : ''}
       ${isBatchSequence ? `\n      BATCH SEQUENCE CONTINUITY: This image is one angle of a multi-angle set of the SAME property, rendered independently. You cannot see the other angles, so do not try to recall them - reproduce the SITE CONTEXT above exactly as written, because every angle in this set is given the identical description. Same boundary treatment, same planting, same paving, same sun position and time of day, same weather and sky. Nothing about the setting may differ between angles except the viewpoint.` : ''}
 
-      FINAL OUTPUT: The result must be indistinguishable from a real architectural photograph
-      (DSLR quality). It must NOT look like a 3D model, a game engine screenshot, or a
-      retouched CAD export.
+      FINAL OUTPUT: The quality bar is a flagship offline archviz render - Blender Cycles /
+      V-Ray with professional post-production. Physically accurate light and materials,
+      crisp true edges, immaculate presentation. It must NOT look like a raw game-engine
+      screenshot, a flat CAD export, or an obviously AI-generated image.
       CRITICAL: Output resolution 3840 x 2160 pixels (4K UHD).
     `;
 
@@ -1542,48 +1707,146 @@ ${lines.join('\n')}
 
       ${siteContextBlock}
 
-      ${MODULR_HOUSE_STYLE}
+      ${houseStyleBlock}
 
       SCENE MODIFICATIONS: ${additionalPrompt || 'None'}
       ${studioBackground ? `\n      STUDIO OVERRIDE - THIS SUPERSEDES THE HOUSE STYLE COMPOSITION AND CONTEXT RULES ABOVE: Render this building completely isolated on a ${studioBackground}. Do NOT render grass, trees, fences, skies, or any natural environment. Pure studio lighting only. Keep the house style's camera, focus and finish guidance - the building must still be tack sharp with true-to-life material colour.` : ''}
       ${isBatchSequence ? `\n      BATCH SEQUENCE CONTINUITY: This image is one angle of a multi-angle set of the SAME property, rendered independently. You cannot see the other angles, so do not try to recall them - reproduce the SITE CONTEXT above exactly as written, because every angle in this set is given the identical description. Same boundary treatment, same planting, same paving, same sun position and time of day, same weather and sky. Nothing about the setting may differ between angles except the viewpoint.` : ''}
 
-      FINAL OUTPUT: The result must be indistinguishable from a real architectural photograph (DSLR quality).
+      FINAL OUTPUT: The quality bar is a flagship offline archviz render - Blender Cycles /
+      V-Ray with professional post-production. Physically accurate light and materials, crisp
+      true edges, immaculate presentation - not an obviously AI-generated image.
       CRITICAL: Output resolution 3840 x 2160 pixels (4K UHD).
     `;
 
         const prompt = isSketchUpMode ? sketchUpPrompt : standardPrompt;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-image',
-            contents: {
-                parts: [imagePart, { text: prompt }]
-            },
-            config: {
-                outputMimeType: "image/jpeg",
-                imageConfig: {
-                    // CGI-model sources keep the source framing rather than being
-                    // forced to 16:9, so the composition the user set up in the
-                    // configurator survives. Fallback guards against an empty ratio.
-                    aspectRatio: (isHighQuality && !isSketchUpMode) ? "16:9" : (ratio || "16:9"),
-                    imageSize: isHighQuality ? "4K" : "1K",
-                    ...(seed !== undefined && !isNaN(seed) && { seed })
+        /** Run one generation pass; returns the image as base64, or null. */
+        const runRender = async (promptText) => {
+            const response = await ai.models.generateContent({
+                // Every plan renders on Gemini's best image model (Nano Banana
+                // Pro): quality is the product and must not differ by tier -
+                // plans differ on volume and resolution, never on fidelity.
+                // Costs $0.134/image at 1K-2K and $0.24 at 4K (verified
+                // ai.google.dev/gemini-api/docs/pricing, Aug 2026) - factor
+                // this into per-render cost when billing goes live.
+                model: 'gemini-3-pro-image',
+                contents: {
+                    parts: [imagePart, { text: promptText }]
                 },
-                temperature: 0.2,
-                ...(seed !== undefined && !isNaN(seed) && { seed })
+                config: {
+                    outputMimeType: "image/jpeg",
+                    imageConfig: {
+                        // CGI-model sources keep the source framing rather than being
+                        // forced to 16:9, so the composition the user set up in the
+                        // configurator survives. Fallback guards against an empty ratio.
+                        aspectRatio: (isHighQuality && !isSketchUpMode) ? "16:9" : (ratio || "16:9"),
+                        imageSize: isHighQuality ? "4K" : "1K",
+                        ...(seed !== undefined && !isNaN(seed) && { seed })
+                    },
+                    temperature: 0.2,
+                    ...(seed !== undefined && !isNaN(seed) && { seed })
+                }
+            });
+            for (const part of response.candidates?.[0]?.content?.parts || []) {
+                if (part.inlineData) {
+                    const rData = part.inlineData.data;
+                    return Buffer.isBuffer(rData) ? rData.toString("base64") : ((rData instanceof Uint8Array || rData instanceof ArrayBuffer) ? Buffer.from(rData).toString("base64") : rData);
+                }
             }
-        });
+            console.error("No render generated. Response data:", JSON.stringify(response, null, 2));
+            return null;
+        };
 
-        for (const part of response.candidates?.[0]?.content?.parts || []) {
-            if (part.inlineData) {
-                const rData = part.inlineData.data;
-                const b64Data = Buffer.isBuffer(rData) ? rData.toString("base64") : ((rData instanceof Uint8Array || rData instanceof ArrayBuffer) ? Buffer.from(rData).toString("base64") : rData);
-                return res.json({ result: b64Data });
+        /**
+         * VERIFICATION PASS - the render is inspected before the customer sees it.
+         *
+         * A cheap vision call counts what is actually IN the finished image and
+         * compares it against the configurator spec - the one place we hold
+         * ground truth. Only countable, spec-backed facts are checked (door
+         * sets, windows, roof form); subjective quality cannot be judged this
+         * way and is not attempted.
+         *
+         * Fails soft by design: if the inspector itself errors, the render is
+         * treated as passing. A QA outage must never take rendering down.
+         */
+        const verifyAgainstSpec = async (renderB64, spec) => {
+            try {
+                const expected = {
+                    doors: Array.isArray(spec.doors) ? Math.min(spec.doors.length, 12) : null,
+                    windows: Array.isArray(spec.windows) ? Math.min(spec.windows.length, 12) : null,
+                    roof: spec.shape ? (spec.shape === 'Gable' ? 'gable' : 'flat') : null,
+                };
+                if (expected.doors === null && expected.windows === null && expected.roof === null) {
+                    return { pass: true, failures: [], skipped: true };
+                }
+                const resp = await ai.models.generateContent({
+                    model: 'gemini-3.5-flash-lite',
+                    contents: {
+                        parts: [fileToGenerativePart(renderB64, "image/jpeg"), { text:
+                            'This is a render of a single garden building. Count only what is clearly visible on the BUILDING itself; ignore fences, other structures and background. Glazed doors are doors, not windows - do not count door glazing as windows.' }]
+                    },
+                    config: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: Type.OBJECT,
+                            properties: {
+                                doorSets: { type: Type.INTEGER, description: "Number of exterior door sets on the building" },
+                                windows: { type: Type.INTEGER, description: "Number of windows, excluding glazing that is part of a door" },
+                                roofForm: { type: Type.STRING, enum: ["flat", "gable", "other"] },
+                            },
+                            required: ["doorSets", "windows", "roofForm"]
+                        }
+                    }
+                });
+                const seen = JSON.parse(resp.text);
+                const failures = [];
+                if (expected.doors !== null && seen.doorSets !== expected.doors) failures.push(`the render shows ${seen.doorSets} exterior door set(s) but the configured building has EXACTLY ${expected.doors}`);
+                if (expected.windows !== null && seen.windows !== expected.windows) failures.push(`the render shows ${seen.windows} window(s) but the configured building has EXACTLY ${expected.windows}`);
+                if (expected.roof && seen.roofForm !== 'other' && seen.roofForm !== expected.roof) failures.push(`the render shows a ${seen.roofForm} roof but the configured building has a ${expected.roof} roof`);
+                return { pass: failures.length === 0, failures };
+            } catch (e) {
+                console.warn('[VERIFY] inspection errored, treating render as passing:', e.message || e);
+                return { pass: true, failures: [], skipped: true };
+            }
+        };
+
+        let b64Data = await runRender(prompt);
+        if (!b64Data) throw new Error("No render generated. Check server logs for response payload.");
+
+        /**
+         * Verify + ONE corrective retry, only where a configurator spec gives
+         * us ground truth. The retry is an internal cost, not re-charged to the
+         * user - it exists to fix our mistake, not to bill twice. Whichever
+         * attempt fails fewer checks is the one the customer receives.
+         */
+        let verification = { checked: false };
+        const specForVerify = req.body.configSpec;
+        if (specForVerify && typeof specForVerify === 'object') {
+            const first = await verifyAgainstSpec(b64Data, specForVerify);
+            verification = { checked: !first.skipped, passed: first.pass, retried: false };
+            if (!first.pass) {
+                console.warn('[VERIFY] render failed checks, retrying once:', first.failures.join('; '));
+                const correction = `
+
+      PREVIOUS ATTEMPT REJECTED - CORRECTIONS REQUIRED:
+      A previous render of this exact scene was rejected by quality control because:
+${first.failures.map(f => `      - ${f}`).join('\n')}
+      Fix these exactly. The CONFIGURED DIMENSIONS AND COUNTS section is the
+      absolute truth for what exists on this building.`;
+                const retryB64 = await runRender(prompt + correction);
+                if (retryB64) {
+                    const second = await verifyAgainstSpec(retryB64, specForVerify);
+                    verification = { checked: true, passed: second.pass, retried: true };
+                    if ((second.failures || []).length <= first.failures.length) {
+                        b64Data = retryB64;
+                    }
+                    if (!second.pass) console.warn('[VERIFY] retry still failing checks, returning best attempt:', (second.failures || []).join('; '));
+                }
             }
         }
-        
-        console.error("No render generated. Response data:", JSON.stringify(response, null, 2));
-        throw new Error("No render generated. Check server logs for response payload.");
+
+        return res.json({ result: b64Data, verification });
     } catch (error) {
         console.error("Render error in /api/renderBuilding:", error, error.stack);
         // Removed require('fs') to prevent node crashes

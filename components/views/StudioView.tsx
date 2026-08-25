@@ -11,9 +11,10 @@ interface StudioViewProps {
     engine: any; // We just pass the entire useAppEngine object for simplicity
     selectedBatchIndex: number;
     setSelectedBatchIndex: (idx: number) => void;
+    onSaveToProject?: (image: string) => void;
 }
 
-export const StudioView: React.FC<StudioViewProps> = ({ engine, selectedBatchIndex, setSelectedBatchIndex }) => {
+export const StudioView: React.FC<StudioViewProps> = ({ engine, selectedBatchIndex, setSelectedBatchIndex, onSaveToProject }) => {
     const backgrounds = ['Pure White Studio', 'Soft Gradient Studio', 'Dark/Anthracite Studio'];
     const [openCategoryDropdown, setOpenCategoryDropdown] = useState<string | null>(null);
 
@@ -114,6 +115,7 @@ export const StudioView: React.FC<StudioViewProps> = ({ engine, selectedBatchInd
             onBatchSelect={setSelectedBatchIndex}
             placeholder="Ready for Studio Render"
             onDownload={engine.handleDownload}
+            onSaveToProject={onSaveToProject}
             onFormatChange={engine.setDownloadFormat}
             downloadFormat={engine.downloadFormat}
             onInputClick={() => {}} // Inputs handled by slots

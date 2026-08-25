@@ -291,7 +291,7 @@ export const AboutView: React.FC = () => {
                         <div className="lg:col-span-7 space-y-7">
                             <p className={TYPE.body}>
                                 Modulr Studio was developed by <strong className="text-primary">NAPC Ltd</strong> - 
-                                the National Annexe Providers Consultancy - the UK's first and only planning
+                                the National Annexe Planning Company - the UK's first and only planning
                                 and development consultancy dedicated to garden rooms, annexes and mobile homes.
                             </p>
                             <p className={TYPE.body}>

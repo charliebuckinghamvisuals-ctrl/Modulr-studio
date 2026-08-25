@@ -3,16 +3,21 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../services/firebase';
 
+export type PdfTemplate = 'classic' | 'minimal' | 'bold';
+
 export interface BrandingData {
     logo: string | null;
     primaryColor: string;
     contactInfo: string;
+    /** PDF export design - read by the 3D Configurator via the localStorage mirror. */
+    pdfTemplate: PdfTemplate;
 }
 
 const DEFAULT_BRANDING: BrandingData = {
     logo: null,
     primaryColor: '#0f172a', // default slate-900
     contactInfo: '',
+    pdfTemplate: 'classic',
 };
 
 /**

@@ -90,6 +90,9 @@ export const useAppEngine = () => {
     const [refinementPrompt, setRefinementPrompt] = useState('');
     const [downloadFormat, setDownloadFormat] = useState<'png' | 'jpg'>('png');
     const [isSketchUpMode, setIsSketchUpMode] = useState(false);
+    // Camera effects (depth of field, background bokeh) are OFF by default -
+    // the base output is a deep-focus archviz frame; this opts into the DSLR look.
+    const [cameraEffects, setCameraEffects] = useState(false);
     const [isBatchMode, setIsBatchMode] = useState(false);
     const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
     const [isAnalyzingMaterials, setIsAnalyzingMaterials] = useState(false);
@@ -570,7 +573,7 @@ export const useAppEngine = () => {
 
         setProcessing({ isLoading: true, message: 'Refining and enhancing render...' });
         try {
-            const result = await renderBuilding(renderedImage, materials, refinementPrompt, true, isProMode, undefined, isSketchUpMode);
+            const result = await renderBuilding(renderedImage, materials, refinementPrompt, true, isProMode, undefined, isSketchUpMode, undefined, false, undefined, cameraEffects);
             setRenderedImage(result);
             setRefinementPrompt('');
             await saveToHistory({
@@ -646,7 +649,7 @@ export const useAppEngine = () => {
         
         setProcessing({ isLoading: true, message: loadingMsg });
         try {
-            const result = await renderBuilding(source, materials, finalPrompt, isHighQuality, isProMode, activeStage === AppStage.STUDIO ? selectedAngle : undefined, isSketchUpMode, activeStage === AppStage.STUDIO ? studioBackground : undefined);
+            const result = await renderBuilding(source, materials, finalPrompt, isHighQuality, isProMode, activeStage === AppStage.STUDIO ? selectedAngle : undefined, isSketchUpMode, activeStage === AppStage.STUDIO ? studioBackground : undefined, false, undefined, cameraEffects);
             trackFeatureUsage('render_engine');
             setRenderedImage(result);
 
@@ -728,7 +731,8 @@ export const useAppEngine = () => {
                     isSketchUpMode,
                     isStudioReq ? studioBackground : undefined,
                     true, // isBatchSequence
-                    batchSeed
+                    batchSeed,
+                    cameraEffects
                 );
                 
                 newRenders[slotIndex] = result;
@@ -876,7 +880,10 @@ export const useAppEngine = () => {
                 isProMode,
                 undefined,
                 isSketchUpMode,
-                undefined
+                undefined,
+                false,
+                undefined,
+                cameraEffects
             );
             trackFeatureUsage('material_studio_change');
             setMaterialStudioImage(result);
@@ -957,6 +964,7 @@ export const useAppEngine = () => {
         refinementPrompt, setRefinementPrompt,
         downloadFormat, setDownloadFormat,
         isSketchUpMode, setIsSketchUpMode,
+        cameraEffects, setCameraEffects,
         isBatchMode, setIsBatchMode,
         userPlan, setUserPlan,
         studioBackground, setStudioBackground, selectedAngle, setSelectedAngle,

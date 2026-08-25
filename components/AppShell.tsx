@@ -117,6 +117,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     { id: AppStage.WHY, label: 'Why Modulr' },
     { id: AppStage.GALLERY, label: 'Gallery' },
     { id: AppStage.ANIMATIONS, label: 'Animations' },
+    { id: AppStage.PLANNING_CHECKER, label: 'Planning Check' },
     { id: AppStage.GUIDE, label: 'Guide' },
     { id: AppStage.ABOUT, label: 'About' },
     { id: AppStage.PRICING, label: 'Pricing' },

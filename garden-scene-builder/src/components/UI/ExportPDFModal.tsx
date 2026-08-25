@@ -19,6 +19,14 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
     address: '',
     projectName: 'Garden Room Project',
     notes: '',
+    /**
+     * What the PDF says about money. 'estimate' shows the configurator's
+     * calculated figure; 'actual' shows the price the company typed (they
+     * know their real quote better than our calculator); 'none' omits the
+     * price section entirely - some firms never put numbers on a proposal.
+     */
+    priceMode: 'estimate' as 'estimate' | 'actual' | 'none',
+    actualPrice: '',
   });
 
   const autoCrop = (base64: string): Promise<ShotResult> => {
@@ -157,7 +165,7 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       // now the PDF ignored this entirely and hardcoded Modulr's own colour,
       // which is why no customer logo or colour ever appeared.
       const brand = (() => {
-        const fallback = { logo: null as string | null, primaryColor: '#3b4d4a', contactInfo: '' };
+        const fallback = { logo: null as string | null, primaryColor: '#3b4d4a', contactInfo: '', pdfTemplate: 'classic' };
         try {
           const raw = localStorage.getItem('modulr_branding');
           return raw ? { ...fallback, ...JSON.parse(raw) } : fallback;
@@ -169,6 +177,10 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
         return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [59, 77, 74];
       };
       const BRAND = hexToRgb(brand.primaryColor);
+      // PDF design, chosen in Account > Company Branding. 'classic' is the
+      // original look; unknown values fall back to it so old caches never break.
+      const template: 'classic' | 'minimal' | 'bold' =
+        brand.pdfTemplate === 'minimal' ? 'minimal' : brand.pdfTemplate === 'bold' ? 'bold' : 'classic';
       const INK: [number, number, number] = [38, 42, 45];
       const MUTED: [number, number, number] = [122, 130, 134];
       const HAIRLINE: [number, number, number] = [222, 226, 228];
@@ -195,6 +207,29 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       }
 
       const drawHeader = (title: string) => {
+        if (template === 'minimal') {
+          // No band: logo (or wordmark) on white, hairline underneath. Brand
+          // colour appears only in the wordmark and section rules.
+          if (logoMeta) {
+            const h = 11;
+            const w = Math.min(44, h * logoMeta.ratio);
+            try { pdf.addImage(logoMeta.data, logoMeta.fmt, M, (HEADER_H - h) / 2, w, h); } catch { /* skip bad logo */ }
+          } else {
+            pdf.setTextColor(...BRAND);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(11);
+            pdf.text('MODULR STUDIO', M, HEADER_H / 2 + 1.5);
+          }
+          pdf.setTextColor(...MUTED);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(8.5);
+          pdf.text(title.toUpperCase(), pageWidth - M, HEADER_H / 2 + 1, { align: 'right' });
+          pdf.setDrawColor(...HAIRLINE);
+          pdf.setLineWidth(0.2);
+          pdf.line(M, HEADER_H - 2, pageWidth - M, HEADER_H - 2);
+          return;
+        }
+
         pdf.setFillColor(...BRAND);
         pdf.rect(0, 0, pageWidth, HEADER_H, 'F');
 
@@ -227,15 +262,19 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
         pdf.text(String(page), pageWidth - M, FOOTER_Y, { align: 'right' });
       };
 
-      /** Section heading with a rule under it. */
-      const sectionTitle = (label: string, y: number) => {
+      /**
+       * Section heading with a rule under it. `x` defaults to the left margin;
+       * a heading over a right-hand column MUST pass its own x - drawing every
+       * title at M is what printed "Openings & Fixtures" on top of "Finishes".
+       */
+      const sectionTitle = (label: string, y: number, x: number = M) => {
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(11);
         pdf.setTextColor(...BRAND);
-        pdf.text(label.toUpperCase(), M, y);
+        pdf.text(label.toUpperCase(), x, y);
         pdf.setDrawColor(...BRAND);
         pdf.setLineWidth(0.5);
-        pdf.line(M, y + 1.8, M + 14, y + 1.8);
+        pdf.line(x, y + 1.8, x + 14, y + 1.8);
         return y + 9;
       };
 
@@ -268,30 +307,69 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       const totalHeightFront = scene.room.heightMm + pdfHeightExtra;
       const totalHeightBack = (scene.room.backHeightMm ?? scene.room.heightMm) + pdfHeightExtra;
       const totalPrice = useStore.getState().calculatePrice();
+      /**
+       * The figure the PDF shows. null = no price section at all. In 'actual'
+       * mode an empty/invalid entry omits the price rather than silently
+       * falling back to the estimate the user chose not to show.
+       */
+      const parsedActual = parseFloat(formData.actualPrice.replace(/[£,\s]/g, ''));
+      const pdfPrice: number | null =
+        formData.priceMode === 'none' ? null
+        : formData.priceMode === 'actual' ? (isFinite(parsedActual) && parsedActual > 0 ? Math.round(parsedActual) : null)
+        : Math.round(totalPrice);
       const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
       // ── Page 1: Cover ─────────────────────────────────────────────────────
-      drawHeader('Design Proposal');
-
-      let y = HEADER_H + 18;
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(22);
-      pdf.setTextColor(...INK);
-      pdf.text(formData.projectName || 'Garden Room', M, y);
-
-      y += 9;
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9.5);
-      pdf.setTextColor(...MUTED);
       const meta = [
         formData.name ? `Prepared for ${formData.name}` : null,
         formData.address || null,
         new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
       ].filter(Boolean).join('   ·   ');
-      pdf.text(meta, M, y);
+
+      let y: number;
+      if (template === 'bold') {
+        // Deep brand-colour masthead with the title inside it - the whole
+        // cover leads with the company's colour rather than a slim band.
+        const MAST_H = 58;
+        pdf.setFillColor(...BRAND);
+        pdf.rect(0, 0, pageWidth, MAST_H, 'F');
+        if (logoMeta) {
+          const h = 12;
+          const w = Math.min(48, h * logoMeta.ratio);
+          try { pdf.addImage(logoMeta.data, logoMeta.fmt, M, 10, w, h); } catch { /* skip bad logo */ }
+        } else {
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(12);
+          pdf.text('MODULR STUDIO', M, 17);
+        }
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9);
+        pdf.text('DESIGN PROPOSAL', pageWidth - M, 17, { align: 'right' });
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(24);
+        pdf.text(formData.projectName || 'Garden Room', M, MAST_H - 18);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9.5);
+        pdf.text(meta, M, MAST_H - 9);
+        y = MAST_H + 10;
+      } else {
+        drawHeader('Design Proposal');
+        y = HEADER_H + 18;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(22);
+        pdf.setTextColor(...INK);
+        pdf.text(formData.projectName || 'Garden Room', M, y);
+        y += 9;
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9.5);
+        pdf.setTextColor(...MUTED);
+        pdf.text(meta, M, y);
+        y += 8;
+      }
 
       // Hero image
-      y += 8;
       const heroH = 92;
       drawImageFit(perspectiveImg, M, y, CONTENT_W, heroH);
       y += heroH + 12;
@@ -313,25 +391,31 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       }
 
       const rightX = M + colW + colGap;
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(11);
-      pdf.setTextColor(...BRAND);
-      pdf.text('ESTIMATE', rightX, y);
-      pdf.setDrawColor(...BRAND);
-      pdf.setLineWidth(0.5);
-      pdf.line(rightX, y + 1.8, rightX + 14, y + 1.8);
+      let rightY = y;
+      if (pdfPrice !== null) {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(11);
+        pdf.setTextColor(...BRAND);
+        pdf.text(formData.priceMode === 'actual' ? 'PRICE' : 'ESTIMATE', rightX, y);
+        pdf.setDrawColor(...BRAND);
+        pdf.setLineWidth(0.5);
+        pdf.line(rightX, y + 1.8, rightX + 14, y + 1.8);
 
-      let rightY = y + 12;
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(21);
-      pdf.setTextColor(...INK);
-      pdf.text(`£${totalPrice.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`, rightX, rightY);
+        rightY = y + 12;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(21);
+        pdf.setTextColor(...INK);
+        pdf.text(`£${pdfPrice.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`, rightX, rightY);
 
-      rightY += 7;
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(8);
-      pdf.setTextColor(...MUTED);
-      pdf.text(pdf.splitTextToSize('Indicative only, based on the design, size and materials selected. Not a formal quotation.', colW), rightX, rightY);
+        rightY += 7;
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(...MUTED);
+        const priceNote = formData.priceMode === 'actual'
+          ? 'Price for the design as specified. Any variations will be quoted separately.'
+          : 'Indicative only, based on the design, size and materials selected. Not a formal quotation.';
+        pdf.text(pdf.splitTextToSize(priceNote, colW), rightX, rightY);
+      }
 
       if (formData.notes) {
         const notesY = Math.max(leftY, rightY + 14) + 6;
@@ -364,7 +448,7 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       finY = specRow('Frames', titleCase(String(scene.room.frameColor)), M, finY, colW);
       finY = specRow('Floor', titleCase(String(scene.room.interiorFloorType || 'Oak')), M, finY, colW);
 
-      let openY = sectionTitle('Openings & Fixtures', p2y);
+      let openY = sectionTitle('Openings & Fixtures', p2y, rightX);
       // The schedule lists the building's actual openings — doors, windows,
       // skylights. It previously grouped scene.objects, which put the garden
       // furniture (trees, sofas) under "Openings" and omitted every real door
@@ -568,12 +652,21 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
             <button
               onClick={() => {
                 try {
-                  window.parent.postMessage({
-                    type: 'SAVE_3D_DESIGN',
-                    scene: useStore.getState().scene,
-                    price: useStore.getState().calculatePrice(),
-                    savedAt: Date.now(),
-                  }, window.location.origin);
+                  {
+                    // The project record keeps a company-entered price over the
+                    // calculator's; "no price on the PDF" still saves the
+                    // estimate internally - hiding it from a client document is
+                    // not the same as not wanting it in the CRM.
+                    const est = useStore.getState().calculatePrice();
+                    const typed = parseFloat(formData.actualPrice.replace(/[£,\s]/g, ''));
+                    const price = formData.priceMode === 'actual' && isFinite(typed) && typed > 0 ? Math.round(typed) : est;
+                    window.parent.postMessage({
+                      type: 'SAVE_3D_DESIGN',
+                      scene: useStore.getState().scene,
+                      price,
+                      savedAt: Date.now(),
+                    }, window.location.origin);
+                  }
                   setSaveState('saved');
                 } catch (e) {
                   console.error('Could not hand the design to the host app', e);
@@ -653,8 +746,43 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="space-y-1">
+             <label className="text-xs font-semibold text-gray-600">Pricing on the PDF</label>
+             <div className="grid grid-cols-3 gap-2">
+               {([
+                 { id: 'estimate', label: 'Estimate' },
+                 { id: 'actual', label: 'My price' },
+                 { id: 'none', label: 'No price' },
+               ] as const).map(opt => (
+                 <button
+                   key={opt.id}
+                   type="button"
+                   onClick={() => setFormData({ ...formData, priceMode: opt.id })}
+                   className={`py-2 rounded-lg text-xs font-semibold border transition-colors ${formData.priceMode === opt.id ? 'bg-[#3b4d4a] text-white border-[#3b4d4a]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#3b4d4a]/40'}`}
+                 >
+                   {opt.label}
+                 </button>
+               ))}
+             </div>
+             {formData.priceMode === 'estimate' && (
+               <p className="text-[11px] text-gray-400">Shows the configurator&rsquo;s calculated estimate.</p>
+             )}
+             {formData.priceMode === 'actual' && (
+               <input
+                 value={formData.actualPrice}
+                 onChange={(e) => setFormData({ ...formData, actualPrice: e.target.value })}
+                 inputMode="decimal"
+                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3b4d4a] focus:border-transparent"
+                 placeholder="Your confirmed price, e.g. 24500"
+               />
+             )}
+             {formData.priceMode === 'none' && (
+               <p className="text-[11px] text-gray-400">The PDF will not mention price at all.</p>
+             )}
+          </div>
+
+          <div className="space-y-1">
              <label className="text-xs font-semibold text-gray-600">Additional Notes</label>
-             <textarea 
+             <textarea
                value={formData.notes}
                onChange={(e) => setFormData({...formData, notes: e.target.value})}
                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3b4d4a] focus:border-transparent resize-none h-20" 

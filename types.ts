@@ -14,6 +14,7 @@ export enum AppStage {
   AUTH = 'auth',
   ACCOUNT = 'account',
   DESIGNER = 'designer',
+  PLANNING_CHECKER = 'planning_checker',
   PROJECTS = 'projects',
   ANIMATION_STUDIO = 'animation_studio',
   /** Social/marketing asset builder — renders out as posts, not as renders. */

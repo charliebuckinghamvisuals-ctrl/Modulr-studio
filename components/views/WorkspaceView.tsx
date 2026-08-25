@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, Upload, Loader2, RotateCcw } from 'lucide-react';
+import { Download, Upload, Loader2, RotateCcw, FolderOpen } from 'lucide-react';
 import { Button } from '../Button';
 import { CompareSlider } from '../CompareSlider';
 import { SkeletonLoader } from '../SkeletonLoader';
@@ -17,6 +17,8 @@ interface WorkspaceViewProps {
     isLoading?: boolean;
     loadingMessage?: string;
     onDownload: (base64Data: string, filename: string) => void;
+    /** Offer "Save to Project" on the finished image. */
+    onSaveToProject?: (image: string) => void;
     onInputClick: () => void;
     /** Empty the workspace without leaving the tool. */
     onReset?: () => void;
@@ -43,6 +45,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     isLoading,
     loadingMessage,
     onDownload,
+    onSaveToProject,
     onInputClick,
     onReset,
     downloadFormat,
@@ -240,6 +243,11 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                                     JPG
                                 </button>
                             </div>
+                            {onSaveToProject && (
+                                <Button variant="secondary" size="sm" onClick={() => onSaveToProject(primaryImg)} icon={<FolderOpen size={14} />}>
+                                    Save to Project
+                                </Button>
+                            )}
                             <Button variant="secondary" size="sm" onClick={() => onDownload(primaryImg, 'modulr-export.jpg')} icon={<Download size={14} />}>
                                 Save Output
                             </Button>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Grid, Download, CheckCircle, Circle, Loader2, Upload, Layers, Palette, X } from 'lucide-react';
+import { Grid, Download, CheckCircle, Circle, Loader2, Upload, Layers, Palette, X, FolderOpen } from 'lucide-react';
 import { Button } from '../Button';
 import { RENDER_CANVAS, WORKSPACE_HEIGHT } from '../canvasStyles';
 import { MaterialVisualPicker } from '../MaterialVisualPicker';
@@ -9,6 +9,7 @@ import { MaterialConfig, MaterialLibrary } from '../../types';
 export type MaterialStudioMode = 'closeup' | 'change';
 
 interface MaterialStudioViewProps {
+    onSaveToProject?: (image: string) => void;
     detectedDetails: string[];
     selectedDetails: string[];
     toggleDetailSelection: (detail: string) => void;
@@ -57,6 +58,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
     originalImage,
     materialStudioImage,
     handleDownload,
+    onSaveToProject,
     onOpenSceneUpload,
     downloadFormat,
     onFormatChange,
@@ -278,6 +280,15 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                                         JPG
                                     </button>
                                 </div>
+                                {onSaveToProject && materialStudioImage && (
+                                    <button
+                                        onClick={() => onSaveToProject(materialStudioImage)}
+                                        className="p-3 bg-white text-black rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center border border-white/20 shadow-2xl scale-100 active:scale-95"
+                                        title="Save to Project"
+                                    >
+                                        <FolderOpen size={20} />
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => handleDownload(materialStudioImage, 'MaterialStudio')}
                                     className="p-3 bg-white text-black rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center border border-white/20 shadow-2xl scale-100 active:scale-95"

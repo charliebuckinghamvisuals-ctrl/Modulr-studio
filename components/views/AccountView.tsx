@@ -434,6 +434,63 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                                 </div>
                             </div>
                             
+                            {/* PDF design template */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/40 pl-1">PDF Design</label>
+                                <p className="text-xs text-secondary pl-1">How your exported design proposals look.</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    {([
+                                        { id: 'classic', name: 'Classic', desc: 'Colour header band on every page with your logo. The original look.' },
+                                        { id: 'minimal', name: 'Minimal', desc: 'Clean white pages, hairline rules. Your colour used sparingly as an accent.' },
+                                        { id: 'bold', name: 'Bold', desc: 'Deep colour masthead on the cover with the project title inside it.' },
+                                    ] as const).map(t => {
+                                        const selected = (branding.pdfTemplate || 'classic') === t.id;
+                                        return (
+                                            <button
+                                                key={t.id}
+                                                onClick={() => setBranding({ pdfTemplate: t.id })}
+                                                className={`text-left p-4 rounded-2xl border-2 transition-all ${selected ? 'border-accent bg-accent/5 shadow-sm' : 'border-border bg-slate-50 hover:border-accent/40'}`}
+                                            >
+                                                {/* Tiny page preview drawn with divs, tinted by the user's colour */}
+                                                <div className="w-full h-16 rounded-lg bg-white border border-border overflow-hidden mb-3">
+                                                    {t.id === 'classic' && (
+                                                        <>
+                                                            <div className="h-3 w-full" style={{ background: branding.primaryColor }} />
+                                                            <div className="p-1.5 space-y-1">
+                                                                <div className="h-1.5 w-1/2 rounded bg-slate-300" />
+                                                                <div className="h-6 w-full rounded bg-slate-100" />
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                    {t.id === 'minimal' && (
+                                                        <div className="p-1.5 space-y-1">
+                                                            <div className="flex justify-between items-center">
+                                                                <div className="h-1.5 w-1/4 rounded" style={{ background: branding.primaryColor }} />
+                                                                <div className="h-1 w-1/5 rounded bg-slate-200" />
+                                                            </div>
+                                                            <div className="h-px w-full bg-slate-200" />
+                                                            <div className="h-6 w-full rounded bg-slate-100" />
+                                                        </div>
+                                                    )}
+                                                    {t.id === 'bold' && (
+                                                        <>
+                                                            <div className="h-8 w-full p-1.5 flex flex-col justify-end" style={{ background: branding.primaryColor }}>
+                                                                <div className="h-1.5 w-1/2 rounded bg-white/80" />
+                                                            </div>
+                                                            <div className="p-1.5">
+                                                                <div className="h-4 w-full rounded bg-slate-100" />
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                <span className={`block text-xs font-bold ${selected ? 'text-accent' : 'text-primary'}`}>{t.name}</span>
+                                                <span className="block text-[10px] text-secondary mt-0.5 leading-snug">{t.desc}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
                             {/* Contact Info */}
                             <div className="space-y-2">
                                 <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/40 pl-1">Contact Information (Header)</label>
