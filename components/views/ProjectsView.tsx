@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 import {
     FolderOpen, Plus, Trash2, MapPin, User, FileText, Image as ImageIcon,
-    Upload, Loader2, ArrowLeft, PoundSterling, Paperclip, Trophy, Lock,
+    Upload, Loader2, ArrowLeft, PoundSterling, Paperclip, Trophy, Lock, Box,
 } from 'lucide-react';
 import { DraftingBackground } from '../DraftingBackground';
 import { Button } from '../Button';
@@ -15,6 +15,7 @@ import {
     uploadAsset, removeAsset, MAX_ASSET_BYTES,
 } from '../../services/projectService';
 import { isWon } from '../../services/projectMetrics';
+import { setPendingDesign } from '../../services/designHandoff';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
     lead: 'Lead',
@@ -436,6 +437,20 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                                         <span className="text-xs text-slate-400 flex items-center gap-1.5">
                                             <Loader2 size={12} className="animate-spin" /> Saving
                                         </span>
+                                    )}
+                                    {active.scene3d && (
+                                        <button
+                                            onClick={() => {
+                                                if (!setPendingDesign(active.scene3d!)) {
+                                                    toast.error('That saved design could not be read.');
+                                                    return;
+                                                }
+                                                onNavigate?.(AppStage.DESIGNER);
+                                            }}
+                                            className="flex items-center gap-2 text-sm font-semibold text-accent hover:opacity-80 transition-opacity"
+                                        >
+                                            <Box size={16} /> Open in 3D Designer
+                                        </button>
                                     )}
                                     <button
                                         onClick={() => handleDelete(active)}

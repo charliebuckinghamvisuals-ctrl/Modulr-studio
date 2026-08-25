@@ -38,3 +38,10 @@ modulr-sketchup-plugin/
 # Large generated artefacts - not source
 MODULR_FULL_CODEBASE_FOR_AUDIT.txt
 bundle_code.js
+
+# design-sync (claude.ai/design import) — staged scripts + generated output
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules

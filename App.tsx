@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, Grid, Layers, Sparkles, PenTool, Image as ImageIcon, Settings, History, ChevronDown, Loader2, Upload, CloudSun } from 'lucide-react';
+import { Zap, Grid, Layers, Sparkles, PenTool, Image as ImageIcon, Settings, History, ChevronDown, Loader2, Upload, CloudSun, Aperture } from 'lucide-react';
 import { ToggleSwitch } from './components/ToggleSwitch';
 import { Toaster, toast } from 'react-hot-toast';
 import { AppShell } from './components/AppShell';
@@ -11,7 +11,8 @@ import { LoadingOverlay } from './components/LoadingOverlay';
 import { HistoryFooter } from './components/HistoryFooter';
 import { CanvasMask } from './components/CanvasMask';
 import { GardenContextPanel } from './components/GardenContextPanel';
-import { AppStage, HistoryItem } from './types';
+import { AppStage, HistoryItem, ProjectAssetKind } from './types';
+import { SaveToProjectDialog } from './components/SaveToProjectDialog';
 import { WEATHER_CONDITIONS, SEASONS } from './constants';
 import { useAppEngine } from './hooks/useAppEngine';
 import { HomeView } from './components/views/HomeView';
@@ -31,6 +32,7 @@ import { AuthView } from './components/views/AuthView';
 import { AccountView } from './components/views/AccountView';
 import { DesignerView } from './components/views/DesignerView';
 import { ComingSoonView } from './components/views/ComingSoonView';
+import { UpdateNotice } from './components/UpdateNotice';
 import { BetaGate } from './components/BetaGate';
 import { useAuth } from './hooks/useAuth';
 import { useCredits } from './hooks/useCredits';
@@ -42,6 +44,8 @@ const App: React.FC = () => {
     const { hasApiAccess } = useCredits();
     const [maskImage, setMaskImage] = React.useState<string | null>(null);
     const [selectedBatchIndex, setSelectedBatchIndex] = React.useState(0);
+    // "Save to Project" - which finished image is being filed, and as what.
+    const [projectSave, setProjectSave] = React.useState<{ image: string; kind: ProjectAssetKind; name: string } | null>(null);
     const [openCategoryDropdown, setOpenCategoryDropdown] = React.useState<string | null>(null);
     const [savingPresetKey, setSavingPresetKey] = React.useState<string | null>(null);
     const [presetName, setPresetName] = React.useState('');
@@ -124,11 +128,27 @@ const App: React.FC = () => {
         />
     );
 
+    /**
+     * Camera effects opt-in. Default output is a deep-focus archviz frame -
+     * everything sharp, no photographic blur. This toggle adds the DSLR look:
+     * depth of field, background bokeh, foreground softening.
+     */
+    const CameraEffectsToggle = () => (
+        <ToggleSwitch
+            isOn={engine.cameraEffects}
+            onToggle={() => engine.setCameraEffects(!engine.cameraEffects)}
+            label={engine.cameraEffects ? 'Camera Effects' : 'Deep Focus'}
+            icon={<Aperture size={14} className={engine.cameraEffects ? 'text-accent' : 'text-slate-400'} />}
+            activeColor="bg-accent"
+        />
+    );
+
     const renderEngineControls = (
         <>
             <div className="flex flex-col gap-2 w-full">
                 <QualityToggle />
                 <ProModelToggle />
+                <CameraEffectsToggle />
                 <ToggleSwitch 
                     isOn={engine.isBatchMode} 
                     onToggle={() => {
@@ -873,6 +893,7 @@ const App: React.FC = () => {
                     originalImage={engine.getRenderUrl(engine.originalImage)}
                     materialStudioImage={engine.getRenderUrl(engine.materialStudioImage)}
                     handleDownload={engine.handleDownload}
+                    onSaveToProject={(img) => setProjectSave({ image: img, kind: 'exterior_render', name: 'material-studio' })}
                     downloadFormat={engine.downloadFormat}
                     onFormatChange={engine.setDownloadFormat}
                     onOpenSceneUpload={() => engine.materialInputRef.current?.click()}
@@ -907,6 +928,7 @@ const App: React.FC = () => {
                     onBatchSelect={setSelectedBatchIndex}
                     placeholder="Ready to Render"
                     onDownload={engine.handleDownload}
+                    onSaveToProject={(img) => setProjectSave({ image: img, kind: 'exterior_render', name: 'render-engine' })}
                     onFormatChange={engine.setDownloadFormat}
                     downloadFormat={engine.downloadFormat}
                     onInputClick={engine.isBatchMode ? undefined : () => engine.fileInputRef.current?.click()}
@@ -920,10 +942,11 @@ const App: React.FC = () => {
             )}
 
             {engine.activeStage === AppStage.STUDIO && (
-                <StudioView 
+                <StudioView
                     engine={engine}
                     selectedBatchIndex={selectedBatchIndex}
                     setSelectedBatchIndex={setSelectedBatchIndex}
+                    onSaveToProject={(img) => setProjectSave({ image: img, kind: 'exterior_render', name: 'studio-render' })}
                 />
             )}
 
@@ -936,6 +959,7 @@ const App: React.FC = () => {
                     secondaryImg={engine.getRenderUrl(engine.originalImage)}
                     placeholder="Upload a render to change its weather"
                     onDownload={engine.handleDownload}
+                    onSaveToProject={(img) => setProjectSave({ image: img, kind: 'exterior_render', name: 'weather-lab' })}
                     onFormatChange={engine.setDownloadFormat}
                     downloadFormat={engine.downloadFormat}
                     onInputClick={() => engine.fileInputRef.current?.click()}
@@ -955,6 +979,7 @@ const App: React.FC = () => {
                     secondaryImg={engine.getRenderUrl(engine.lineSourceImage || engine.originalImage)}
                     placeholder="Ready for CAD"
                     onDownload={engine.handleDownload}
+                    onSaveToProject={(img) => setProjectSave({ image: img, kind: 'line_drawing', name: 'line-drawing' })}
                     onFormatChange={engine.setDownloadFormat}
                     downloadFormat={engine.downloadFormat}
                     onInputClick={() => engine.fileInputRef.current?.click()}
@@ -1029,6 +1054,14 @@ const App: React.FC = () => {
                 {renderAppContent()}
                 {showBetaGate && <BetaGate onGranted={() => engine.setActiveStage(engine.activeStage)} />}
             </div>
+            <SaveToProjectDialog
+                image={projectSave?.image ?? null}
+                assetKind={projectSave?.kind ?? 'other'}
+                defaultName={projectSave?.name ?? 'modulr-export'}
+                onClose={() => setProjectSave(null)}
+            />
+            {/* One-time release announcement for signed-in users */}
+            {hasAccess && <UpdateNotice />}
         </div>
     );
 };

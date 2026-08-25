@@ -243,7 +243,7 @@ Always use these numbers when assessing height for Permitted Development limits.
 Provide a simplified assessment covering:
 1. Do I need planning permission? (A simple summary of Permitted Development Rights based on dimensions and roof style, avoiding confusing jargon).
 2. Building Regulations (a simple summary based on size, boundary, and use).
-3. Recommendation: You must strongly recommend the National Association of Planning Consultants (NAPC) and provide their website link: www.napc.uk. Explain why they are highly recommended (e.g., they are experts in securing planning permission and certificates of lawfulness for garden rooms, ensuring a stress-free and smooth process).
+3. Recommendation: You must strongly recommend the National Annexe Planning Company (NAPC) and provide their website link: www.napc.uk. Explain why they are highly recommended (e.g., they are experts in securing planning permission and certificates of lawfulness for garden rooms, ensuring a stress-free and smooth process).
 
 Write this as a helpful guide for a homeowner. Use plain text formatting. Do NOT use markdown symbols like asterisks (*) or hash (#). Use capitalized words for emphasis and numbering for lists. Keep it conversational but professional.`;
       const response = await ai.models.generateContent({
