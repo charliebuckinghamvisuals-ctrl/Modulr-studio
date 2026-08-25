@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SceneState, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, Door, InteriorDoorData } from './types';
+import { SceneState, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AppState {
@@ -61,6 +61,9 @@ interface AppState {
   addPartition: () => void;
   updatePartition: (id: string, updates: Partial<PartitionData>) => void;
   removePartition: (id: string) => void;
+  addPartitionDoor: (partitionId: string) => void;
+  updatePartitionDoor: (partitionId: string, doorId: string, updates: Partial<PartitionDoor>) => void;
+  removePartitionDoor: (partitionId: string, doorId: string) => void;
   
     addInteriorDoor: () => void;
   updateInteriorDoor: (id: string, updates: Partial<InteriorDoorData>) => void;
@@ -478,7 +481,7 @@ export const useStore = create<AppState>((set, get) => ({
     }
   })),
 
-  addPartition: () => set((state) => ({
+  addPartition: () => { get().saveState(); return set((state) => ({
     scene: {
       ...state.scene,
       room: {
@@ -492,13 +495,14 @@ export const useStore = create<AppState>((set, get) => ({
             lengthMm: 2000,
             thicknessMm: 100,
             rotation: 0,
+            doors: [],
           }
         ]
       }
     }
-  })),
+  })); },
 
-  updatePartition: (id, updates) => set((state) => ({
+  updatePartition: (id, updates) => { get().saveState(); return set((state) => ({
     scene: {
       ...state.scene,
       room: {
@@ -506,7 +510,48 @@ export const useStore = create<AppState>((set, get) => ({
         partitions: (state.scene.room.partitions || []).map(p => p.id === id ? { ...p, ...updates } : p)
       }
     }
-  })),
+  })); },
+
+  /**
+   * Doors that BELONG to an internal wall. All three go through the same
+   * partitions array, so the door travels when the wall moves and undo
+   * captures each change like any other room edit.
+   */
+  addPartitionDoor: (partitionId) => { get().saveState(); return set((state) => ({
+    scene: {
+      ...state.scene,
+      room: {
+        ...state.scene.room,
+        partitions: (state.scene.room.partitions || []).map(p => p.id === partitionId
+          ? { ...p, doors: [...(p.doors || []), { id: uuidv4(), offsetMm: 0, widthMm: 800, heightMm: 2000 }] }
+          : p)
+      }
+    }
+  })); },
+
+  updatePartitionDoor: (partitionId, doorId, updates) => { get().saveState(); return set((state) => ({
+    scene: {
+      ...state.scene,
+      room: {
+        ...state.scene.room,
+        partitions: (state.scene.room.partitions || []).map(p => p.id === partitionId
+          ? { ...p, doors: (p.doors || []).map(dr => dr.id === doorId ? { ...dr, ...updates } : dr) }
+          : p)
+      }
+    }
+  })); },
+
+  removePartitionDoor: (partitionId, doorId) => { get().saveState(); return set((state) => ({
+    scene: {
+      ...state.scene,
+      room: {
+        ...state.scene.room,
+        partitions: (state.scene.room.partitions || []).map(p => p.id === partitionId
+          ? { ...p, doors: (p.doors || []).filter(dr => dr.id !== doorId) }
+          : p)
+      }
+    }
+  })); },
 
   removePartition: (id) => set((state) => ({
     scene: {

@@ -62,6 +62,16 @@ export interface InteriorDoorData {
   heightMm: number;
 }
 
+/** A doorway belonging to an internal wall. Offset is measured along the
+ *  wall from its CENTRE, so doors travel with the wall when it moves -
+ *  the old world-positioned interior doors got left behind. */
+export interface PartitionDoor {
+  id: string;
+  offsetMm: number;
+  widthMm: number;
+  heightMm: number;
+}
+
 export interface PartitionData {
   id: string;
   xMm: number;
@@ -69,6 +79,7 @@ export interface PartitionData {
   lengthMm: number;
   thicknessMm: number;
   rotation: 0 | 90;
+  doors?: PartitionDoor[];
 }
 
 export interface Room {

@@ -54,6 +54,8 @@ function DeferredInput({ type, value, onChange, className, ...props }: any) {
 export function Sidebar() {
   const store = useStore.getState();
   const wrap = (fn: any) => (...args: any[]) => { store.saveState(); fn(...args); };
+  // Reactive read so the selected wall's card highlights as selection changes.
+  const selectedElementId = useStore(s => s.selectedElementId);
 
   const { room, env, viewMode, areDoorsOpen, toggleDoors } = useStore(useShallow(s => ({
     room: s.scene.room,
@@ -750,23 +752,47 @@ export function Sidebar() {
             </CollapsibleSection>
 
             <CollapsibleSection title="Internal Walls">
-              <div className="flex gap-2 mb-4">
-                <button onClick={wrap(store.addPartition)} className="flex-1 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm">+ Wall</button>
-                <button onClick={wrap(store.addInteriorDoor)} className="flex-1 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm">+ Door</button>
-              </div>
+              {/* ONE system: walls own their doors. The old separate "+ Door"
+                  created world-positioned doors that stayed behind when their
+                  wall moved; new doors are added per-wall below. */}
+              <button onClick={wrap(store.addPartition)} className="w-full bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm mb-4">+ Add Internal Wall</button>
+              <p className="text-[10px] text-gray-400 mb-3 leading-snug">Click a wall in the 3D view to select it, then drag its body to move (it snaps to the room and other walls), red ends to resize, green handles to slide doors.</p>
               <div className="space-y-3">
                 {room.partitions?.map((part, i) => (
-                  <div key={part.id} className="p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-4 relative group">
-                    <button onClick={() => wrap(store.removePartition)(part.id)} className="absolute top-3 right-3 text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div key={part.id} onClick={() => store.setSelectedElementId(`part-${part.id}`)} className={`p-4 bg-white border rounded-xl shadow-sm space-y-3 relative group cursor-pointer transition-colors ${selectedElementId === `part-${part.id}` ? 'border-[#3b4d4a]' : 'border-black/5'}`}>
+                    <button onClick={(e) => { e.stopPropagation(); wrap(store.removePartition)(part.id); }} className="absolute top-3 right-3 text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Trash2 size={14} />
                     </button>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-gray-800">Wall #{i + 1}</span>
-                      <button onClick={(e) => wrap(store.updatePartition)(part.id, { rotation: part.rotation === 0 ? 90 : 0 })} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors bg-blue-50 px-2 py-1 rounded">
+                      <button onClick={(e) => { e.stopPropagation(); wrap(store.updatePartition)(part.id, { rotation: part.rotation === 0 ? 90 : 0 }); }} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors bg-blue-50 px-2 py-1 rounded">
                         Rotate 90°
                       </button>
+                      <span className="text-[10px] text-gray-400">{part.rotation === 0 ? 'runs left-right' : 'runs front-back'}</span>
                     </div>
-<DimensionSlider label="Length" min={400} max={6000} step={100} value={part.lengthMm} onChange={(v) => wrap(store.updatePartition)(part.id, { lengthMm: v })} />
+                    <DimensionSlider label="Length" min={400} max={6000} step={100} value={part.lengthMm} onChange={(v) => wrap(store.updatePartition)(part.id, { lengthMm: v })} />
+
+                    <div className="border-t border-black/5 pt-3 space-y-2">
+                      {(part.doors || []).map((dr, di) => (
+                        <div key={dr.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-2.5 py-2">
+                          <span className="text-[10px] font-semibold text-gray-600 shrink-0">Door {di + 1}</span>
+                          <input type="number" step={50} value={dr.widthMm} title="Width (mm)"
+                            onChange={(e) => wrap(store.updatePartitionDoor)(part.id, dr.id, { widthMm: Math.max(400, Number(e.target.value) || 800) })}
+                            className="w-16 bg-white border border-gray-200 rounded px-1.5 py-1 text-[10px] text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#3b4d4a]" />
+                          <span className="text-[9px] text-gray-400">w</span>
+                          <input type="number" step={50} value={dr.heightMm} title="Height (mm)"
+                            onChange={(e) => wrap(store.updatePartitionDoor)(part.id, dr.id, { heightMm: Math.max(1600, Number(e.target.value) || 2000) })}
+                            className="w-16 bg-white border border-gray-200 rounded px-1.5 py-1 text-[10px] text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#3b4d4a]" />
+                          <span className="text-[9px] text-gray-400">h</span>
+                          <button onClick={(e) => { e.stopPropagation(); wrap(store.removePartitionDoor)(part.id, dr.id); }} className="ml-auto text-red-400 hover:text-red-500">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      ))}
+                      <button onClick={(e) => { e.stopPropagation(); wrap(store.addPartitionDoor)(part.id); store.setSelectedElementId(`part-${part.id}`); }} className="w-full text-[10px] font-semibold text-[#3b4d4a] bg-[#3b4d4a]/5 hover:bg-[#3b4d4a]/10 rounded-lg py-1.5 transition-colors">
+                        + Door in this wall
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {!room.partitions?.length && <p className="text-xs text-gray-400 text-center py-4">No internal walls</p>}
