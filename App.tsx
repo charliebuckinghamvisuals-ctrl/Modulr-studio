@@ -1059,11 +1059,17 @@ const App: React.FC = () => {
     const showBetaGate = !hasAccess && GATED_STAGES.has(engine.activeStage);
 
     return (
-        <div className="animate-app-startup opacity-0">
-            <div className={showBetaGate ? 'relative' : undefined}>
-                {renderAppContent()}
-                {showBetaGate && <BetaGate onGranted={() => engine.setActiveStage(engine.activeStage)} />}
+        <>
+            <div className="animate-app-startup opacity-0">
+                <div className={showBetaGate ? 'relative' : undefined}>
+                    {renderAppContent()}
+                    {showBetaGate && <BetaGate onGranted={() => engine.setActiveStage(engine.activeStage)} />}
+                </div>
             </div>
+            {/* Overlays live OUTSIDE the animated root. While that div animates
+                (and, in Chrome, forever after - fill-forwards retains an identity
+                matrix) it is a containing block, so position:fixed inside it
+                anchors to the page, not the viewport. */}
             <SaveToProjectDialog
                 image={projectSave?.image ?? null}
                 assetKind={projectSave?.kind ?? 'other'}
@@ -1072,7 +1078,7 @@ const App: React.FC = () => {
             />
             {/* One-time release announcement for signed-in users */}
             {hasAccess && <UpdateNotice />}
-        </div>
+        </>
     );
 };
 

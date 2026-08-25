@@ -12,7 +12,7 @@ const UPDATE_ID = '2026-08-render-accuracy';
 const IMPROVEMENTS = [
     {
         title: 'Render accuracy',
-        detail: 'We spotted a few anomalies where renders could show windows or doors that weren’t in your design — especially from the 3D Configurator. That’s fixed, and every configurator render is now automatically checked against your exact configuration before you see it.',
+        detail: 'We spotted a few anomalies where renders could show windows or doors that weren’t in your design, especially from the 3D Configurator. That’s fixed, and every configurator render is now automatically checked against your exact configuration before you see it.',
     },
     {
         title: 'Sharper, cleaner renders',
@@ -20,7 +20,7 @@ const IMPROVEMENTS = [
     },
     {
         title: 'Save to Projects from every tool',
-        detail: 'Renders, weather shots, line drawings and 3D designs can now be saved straight into a project folder — existing or new — and reopened later.',
+        detail: 'Renders, weather shots, line drawings and 3D designs can now be saved straight into a project folder, existing or new, and reopened later.',
     },
     {
         title: 'Better PDF proposals',
@@ -65,7 +65,7 @@ export const UpdateNotice: React.FC = () => {
                 </div>
                 <div className="p-6 space-y-4 max-h-[55vh] overflow-y-auto">
                     <p className="text-xs text-slate-500">
-                        Thanks for testing Modulr Studio during the beta — your feedback drives these directly.
+                        Thanks for testing Modulr Studio during the beta. Your feedback drives these directly.
                     </p>
                     {IMPROVEMENTS.map(item => (
                         <div key={item.title} className="flex gap-3">
@@ -82,7 +82,7 @@ export const UpdateNotice: React.FC = () => {
                         onClick={dismiss}
                         className="w-full py-3 bg-accent text-white rounded-2xl text-sm font-bold hover:opacity-90 transition-opacity"
                     >
-                        Great — let’s go
+                        Great, let&rsquo;s go
                     </button>
                 </div>
             </div>
