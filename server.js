@@ -1067,7 +1067,8 @@ const enforceMasterLock = (req, res, next) => {
  * The light must never hallucinate, so the thresholds live here as plain
  * maths (verified UK GPDO Class E, Aug 2026) and the model is only allowed
  * to explain a verdict it is handed - never to decide one:
- *   green - total height <= 2.5m: PD anywhere on the plot, even at a boundary
+ *   green - total height <= 2.5m: no 2m boundary set-off needed (the other
+ *           Class E conditions - behind the house, coverage, use - still apply)
  *   amber - within the limits (gable: eaves <= 2.5m and ridge <= 4m;
  *           flat: total <= 3m) BUT only when sited 2m+ from every boundary,
  *           which the configurator cannot know - so: fine if positioned
@@ -1102,6 +1103,64 @@ app.post('/api/planning-advice', aiLimiter, async (req, res) => {
             red: 'Planning permission likely required',
         };
 
+        /**
+         * The PD CHECKLIST - each Class E criterion as pass / fail / unknown,
+         * all decided by code from the design's real numbers. 'unknown' means
+         * the configurator cannot know it (siting, land status, use) - those
+         * render amber and are exactly the questions NAPC answers.
+         */
+        const maxTotal = isGableRoof ? 4000 : 3000;
+        const checks = [
+            {
+                label: `Overall height within the ${isGableRoof ? '4.0m dual-pitch' : '3.0m'} limit`,
+                status: total <= maxTotal ? 'pass' : 'fail',
+                detail: `This design: ${(total / 1000).toFixed(2)}m`,
+            },
+            ...(isGableRoof ? [{
+                label: 'Eaves height within the 2.5m limit',
+                status: eaves <= 2500 ? 'pass' : 'fail',
+                detail: `This design: ${(eaves / 1000).toFixed(2)}m`,
+            }] : []),
+            {
+                label: 'Buildable within 2m of a boundary',
+                status: total <= 2500 ? 'pass' : (total <= maxTotal ? 'unknown' : 'fail'),
+                detail: total <= 2500
+                    ? 'Under 2.5m overall - no 2m boundary set-off needed'
+                    : (total <= maxTotal ? 'Over 2.5m - must sit 2m+ from every boundary' : 'Exceeds PD limits regardless of siting'),
+            },
+            {
+                label: 'Single storey',
+                status: 'pass',
+                detail: 'All configurator designs are single storey',
+            },
+            {
+                label: 'Behind the front of the house',
+                status: 'unknown',
+                detail: 'Depends on siting - not forward of the principal elevation',
+            },
+            {
+                label: 'Garden coverage under 50%',
+                status: 'unknown',
+                detail: 'Total of all outbuildings and extensions on the plot',
+            },
+            {
+                label: 'Incidental use (no sleeping accommodation)',
+                status: 'unknown',
+                detail: 'Office, gym or studio qualifies; an annexe does not',
+            },
+            {
+                label: 'Not listed / designated land restrictions',
+                status: 'unknown',
+                detail: 'Conservation areas, AONB and listed buildings carry extra rules',
+            },
+        ];
+        /**
+         * Indicative likelihood score. Deterministic and deliberately simple:
+         * anchored on the verdict, because the dims are the only part we can
+         * actually measure - the unknowns assume typical siting and use.
+         */
+        const score = verdict === 'green' ? 90 : verdict === 'amber' ? 65 : 15;
+
         const prompt = `You are a professional but very approachable UK planning consultant explaining a
 PRE-COMPUTED permitted development verdict to a homeowner. You must NOT change the verdict - your job is
 to explain it clearly and helpfully.
@@ -1116,7 +1175,7 @@ THE COMPUTED FACTS (authoritative - use these numbers):
 - VERDICT: ${verdict.toUpperCase()} - "${VERDICT_HEADLINES[verdict]}"
 
 VERDICT MEANINGS (Class E, GPDO 2015):
-- GREEN: total height <= 2.5m, so it can sit ANYWHERE on the plot including within 2m of a boundary.
+- GREEN: total height <= 2.5m, so the 2m boundary set-off does NOT apply - it can sit right against a fence. Be clear the OTHER Class E conditions still apply: behind the front of the house, coverage, incidental use, and no side-of-house placement on designated land.
 - AMBER: within the height limits (${isGableRoof ? 'eaves <= 2.5m, ridge <= 4m for a dual-pitched roof' : 'overall <= 3m'}) BUT
   this only applies when the building is sited 2m or more from EVERY boundary. The siting is not known,
   so the owner must confirm it. ${!isGableRoof && total > 2500 ? 'Also caveat: some authorities apply the 2.5m eaves rule strictly to flat roofs - worth professional confirmation.' : ''}
@@ -1178,6 +1237,8 @@ Plain English, no jargon, no markdown symbols.`;
             napcNote: parsed.napcNote,
             totalHeightMm: total,
             eavesHeightMm: eaves,
+            checks,
+            score,
             advice,
         });
     } catch (error) {

@@ -616,7 +616,78 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
           pdf.setTextColor(...INK);
           const head = pdf.splitTextToSize(planning.headline || '', CONTENT_W);
           pdf.text(head, M, pgY + 2);
-          pgY += head.length * 4.6 + 5;
+          pgY += head.length * 4.6 + 6;
+
+          /**
+           * THE CHECKLIST: every Class E criterion as a drawn tick / cross /
+           * query (glyphs are drawn with lines because the built-in PDF fonts
+           * have no checkmark character). Statuses come from the server's
+           * code-computed checks, never from AI.
+           */
+          if (Array.isArray(planning.checks) && planning.checks.length) {
+            const GREEN: [number, number, number] = [22, 130, 70];
+            const RED: [number, number, number] = [190, 50, 45];
+            const AMBERC: [number, number, number] = [200, 130, 20];
+            const drawStatusIcon = (status: string, cx: number, cy: number) => {
+              const r = 2.4;
+              const col = status === 'pass' ? GREEN : status === 'fail' ? RED : AMBERC;
+              pdf.setFillColor(...col);
+              pdf.circle(cx, cy, r, 'F');
+              pdf.setDrawColor(255, 255, 255);
+              pdf.setLineWidth(0.55);
+              if (status === 'pass') {
+                pdf.line(cx - 1.1, cy + 0.1, cx - 0.3, cy + 1.0);
+                pdf.line(cx - 0.3, cy + 1.0, cx + 1.2, cy - 0.9);
+              } else if (status === 'fail') {
+                pdf.line(cx - 0.9, cy - 0.9, cx + 0.9, cy + 0.9);
+                pdf.line(cx - 0.9, cy + 0.9, cx + 0.9, cy - 0.9);
+              } else {
+                pdf.setTextColor(255, 255, 255);
+                pdf.setFont('helvetica', 'bold');
+                pdf.setFontSize(8);
+                pdf.text('?', cx, cy + 1.4, { align: 'center' });
+              }
+            };
+
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(8);
+            pdf.setTextColor(...MUTED);
+            pdf.text('PERMITTED DEVELOPMENT CHECKLIST', M, pgY + 2);
+            pgY += 7;
+            for (const chk of planning.checks) {
+              drawStatusIcon(chk.status, M + 3, pgY);
+              pdf.setFont('helvetica', 'bold');
+              pdf.setFontSize(8.5);
+              pdf.setTextColor(...INK);
+              pdf.text(String(chk.label), M + 9, pgY + 1);
+              pdf.setFont('helvetica', 'normal');
+              pdf.setFontSize(7.5);
+              pdf.setTextColor(...MUTED);
+              pdf.text(String(chk.detail || ''), M + 9, pgY + 5);
+              pgY += 10;
+            }
+            pgY += 2;
+
+            // Indicative likelihood score with a bar the length of the page.
+            if (typeof planning.score === 'number') {
+              const barW = CONTENT_W - 58;
+              const col = planning.verdict === 'green' ? GREEN : planning.verdict === 'amber' ? AMBERC : RED;
+              pdf.setFont('helvetica', 'bold');
+              pdf.setFontSize(9);
+              pdf.setTextColor(...INK);
+              pdf.text(`PD likelihood: ${planning.score}%`, M, pgY + 3);
+              pdf.setFillColor(238, 238, 235);
+              pdf.roundedRect(M + 42, pgY, barW, 4, 2, 2, 'F');
+              pdf.setFillColor(...col);
+              pdf.roundedRect(M + 42, pgY, Math.max(6, barW * planning.score / 100), 4, 2, 2, 'F');
+              pgY += 8;
+              pdf.setFont('helvetica', 'normal');
+              pdf.setFontSize(7);
+              pdf.setTextColor(...MUTED);
+              pdf.text('Indicative only, based on the measurable design. Items marked "?" depend on siting, land status and use - assumed typical.', M, pgY + 1);
+              pgY += 7;
+            }
+          }
         }
 
         // Disclaimer, boxed so it cannot be mistaken for the advice itself.
@@ -641,11 +712,10 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
         pdf.setTextColor(...INK);
         // Structured verdict: banner carries the headline, so the body is the
         // reasons/caveats/NAPC only. Legacy string keeps working as fallback.
+        // The checklist above IS the "why", so the body carries only what the
+        // ticks cannot: caveats, Building Regs and the NAPC route.
         const bodyText = planning?.verdict
           ? [
-              'WHY THIS VERDICT:',
-              ...planning.reasons.map((r: string, i: number) => `${i + 1}. ${r}`),
-              '',
               'WORTH KNOWING:',
               ...planning.caveats.map((c: string, i: number) => `${i + 1}. ${c}`),
               '',

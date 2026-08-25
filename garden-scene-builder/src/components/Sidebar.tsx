@@ -221,7 +221,7 @@ export function Sidebar() {
               const total = Math.max(frontTotal, backTotal);
               const eaves = isG ? (room.heightMm ?? 2350) - roofH : total;
               const light = total <= 2500
-                ? { key: 'green', bg: 'bg-emerald-600', label: 'Likely Permitted Development', sub: 'Under 2.5m - can sit anywhere on the plot' }
+                ? { key: 'green', bg: 'bg-emerald-600', label: 'Likely Permitted Development', sub: 'Under 2.5m - no boundary set-off (still behind the house)' }
                 : (isG ? (eaves <= 2500 && total <= 4000) : total <= 3000)
                   ? { key: 'amber', bg: 'bg-amber-500', label: 'PD with conditions', sub: 'Only if sited 2m+ from every boundary - get advice' }
                   : { key: 'red', bg: 'bg-red-600', label: 'Permission likely required', sub: isG ? 'Lower the ridge to 4000mm to fit PD, or apply' : 'Lower the height to 3000mm to fit PD, or apply' };
