@@ -435,14 +435,19 @@ export function RoomGeometry() {
   // user's Overhangs & Canopy setting.
   const roofFlatGeom = useMemo(() => createWorldScaleBoxGeometry(roofW, roofH, roofD, false, 0, 0, 0), [roofW, roofH, roofD]);
   // The slab thickness IS the visible fascia (bargeboard) depth on a gable -
-  // user-adjustable, 100mm by default.
+  // user-adjustable, 100mm by default. Every roof edge overhangs 50mm: the
+  // slabs run 50mm past both gable ends and 50mm past the eaves, like a real
+  // roof line, instead of finishing dead flush with the cladding.
   const gableFascia = Math.min(0.4, Math.max(0.05, (room.gableFasciaMm ?? 100) / 1000));
-  const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohLeft) / Math.cos(gablePitch), gableFascia, roofD, false, 0, 0, 0), [w, ohLeft, gablePitch, roofD, gableFascia]);
-  const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohRight) / Math.cos(gablePitch), gableFascia, roofD, false, 0, 0, 0), [w, ohRight, gablePitch, roofD, gableFascia]);
+  const ROOF_LIP = 0.05;
+  const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohLeft) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, roofD + ROOF_LIP * 2, false, 0, 0, 0), [w, ohLeft, gablePitch, roofD, gableFascia]);
+  const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohRight) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, roofD + ROOF_LIP * 2, false, 0, 0, 0), [w, ohRight, gablePitch, roofD, gableFascia]);
   // Gable-end wall slabs (the triangles are CSG-cut from these at render).
-  // Real walls, clad like walls - not roof, not fascia.
-  const gableEndFrontGeom = useMemo(() => createWorldScaleBoxGeometry(w, roofHRaw, wallThickness, false, 0, 0, 0), [w, roofHRaw, wallThickness]);
-  const gableEndBackGeom = useMemo(() => createWorldScaleBoxGeometry(w, roofHRaw, wallThickness, false, 0, 0, 0), [w, roofHRaw, wallThickness]);
+  // Real walls, clad like walls - not roof, not fascia. isVertical MUST match
+  // the wall cladding box, or the triangle's boards run 90 degrees to the
+  // wall below it.
+  const gableEndFrontGeom = useMemo(() => createWorldScaleBoxGeometry(w, roofHRaw, wallThickness, false, 0, 0, 0, isVertical), [w, roofHRaw, wallThickness, isVertical]);
+  const gableEndBackGeom = useMemo(() => createWorldScaleBoxGeometry(w, roofHRaw, wallThickness, false, 0, 0, 0, isVertical), [w, roofHRaw, wallThickness, isVertical]);
 
 
   const renderBaseMeshes = () => {
@@ -792,7 +797,7 @@ export function RoomGeometry() {
         {!isPlanView && isGable && (
           <group position={[roofX, h, roofZ]}>
             {/* Left Roof Plane */}
-            <mesh position={[-w/4 - ohLeft/2, roofH/2 - ohLeft * Math.tan(gablePitch)/2, 0]} rotation={[0, 0, gablePitch]} castShadow receiveShadow>
+            <mesh position={[-w/4 - ohLeft/2 - (ROOF_LIP/2) * Math.cos(gablePitch), roofH/2 - ohLeft * Math.tan(gablePitch)/2 - (ROOF_LIP/2) * Math.sin(gablePitch), 0]} rotation={[0, 0, gablePitch]} castShadow receiveShadow>
                <primitive object={roofGableLeftGeom} attach="geometry" />
 
                {(() => {
@@ -827,7 +832,7 @@ export function RoomGeometry() {
 
             </mesh>
             {/* Right Roof Plane */}
-            <mesh position={[w/4 + ohRight/2, roofH/2 - ohRight * Math.tan(gablePitch)/2, 0]} rotation={[0, 0, -gablePitch]} castShadow receiveShadow>
+            <mesh position={[w/4 + ohRight/2 + (ROOF_LIP/2) * Math.cos(gablePitch), roofH/2 - ohRight * Math.tan(gablePitch)/2 - (ROOF_LIP/2) * Math.sin(gablePitch), 0]} rotation={[0, 0, -gablePitch]} castShadow receiveShadow>
                <primitive object={roofGableRightGeom} attach="geometry" />
                
                {(() => {
@@ -878,7 +883,7 @@ export function RoomGeometry() {
                 which left an open V gap along the ridge. A real roof closes
                 this with a ridge piece - so does this one. */}
             <mesh position={[-roofX, roofH + gableFascia / (2 * Math.cos(gablePitch)), 0]} castShadow>
-              <boxGeometry args={[0.24 + gableFascia, 0.07, roofD + 0.02]} />
+              <boxGeometry args={[0.24 + gableFascia, 0.07, roofD + ROOF_LIP * 2 + 0.02]} />
               <meshStandardMaterial color={roofColorHex} metalness={0.4} roughness={0.5} />
             </mesh>
 
