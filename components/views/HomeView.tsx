@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, ClipboardCheck } from 'lucide-react';
 import { AppStage } from '../../types';
 import { CompareSlider } from '../CompareSlider';
 import { Button } from '../Button';
@@ -187,11 +187,57 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                             />
                             <FeatureCard
                                 title="3D Configurator"
-                                description="A focused, fast builder for standard building types (Box, L-Shape, Gable). Define the footprint quickly, render it beautifully-no overcomplicated design tools needed."
-                                badge="In Development"
+                                description="Build the room to real dimensions in the browser: box or gable, eaves and ridge heights, internal walls, glazing and cladding. Live costing as you go, and any view sends straight into the Render Engine."
+                                badge="Beta"
+                            />
+                            <FeatureCard
+                                title="Animation Studio"
+                                description="Turn a finished render into a short cinematic clip. A slow push in, a gentle pan, a breeze through the planting-a moving hero for your website or a social post, from a still you already have."
+                                badge="New"
+                            />
+                            <FeatureCard
+                                title="Projects & Client Sharing"
+                                description="Every client, address, value and file kept together against the job. Send a read-only proposal link instead of six attachments, with your contact details never leaving your account."
+                                badge="New"
+                            />
+                            <FeatureCard
+                                title="Planning Checker"
+                                description="Answer a few questions about the plot and find out whether a scheme reads as permitted development or needs a full application-with the limits it was measured against, not just a verdict."
+                                badge="Free"
                             />
                         </div>
                     </div>
+
+                {/* 6. Free Planning Checker. Deliberately after the feature grid
+                    rather than in it - it is the only thing here that costs
+                    nothing and needs no account, and that is worth stating
+                    plainly rather than as one tile among nine. */}
+                <div className="w-full pb-24">
+                    <div className="glass-panel p-10 md:p-14 rounded-[2.5rem] border border-border bg-gradient-to-br from-white/80 to-accent/5 backdrop-blur-3xl overflow-hidden relative text-center">
+                        <div className="absolute top-0 left-0 w-96 h-96 bg-accent/5 blur-[100px] -ml-48 -mt-48 pointer-events-none"></div>
+                        <div className="space-y-5 relative z-10 max-w-3xl mx-auto">
+                            <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-accent">Free, no account needed</span>
+                            <h3 className="text-accent font-bold text-3xl">Will it need planning permission?</h3>
+                            <p className="text-slate-600 leading-relaxed text-lg">
+                                Answer a few questions about the plot, the height and the boundary, and the Planning Checker tells you whether the scheme is likely to fall under permitted development or need a full application. It shows the limits it measured you against, so you can take the answer to a client rather than just to yourself.
+                            </p>
+                            <p className="text-slate-500 text-sm">
+                                Built by NAPC, the UK's only planning consultancy dedicated to garden rooms and annexes. An indication, not a determination-we can confirm it in writing when it matters.
+                            </p>
+                            {onNavigate && (
+                                <div className="flex justify-center pt-2">
+                                    <Button
+                                        onClick={() => onNavigate(AppStage.PLANNING_CHECKER)}
+                                        className="px-10 py-4"
+                                        icon={<ClipboardCheck size={20} />}
+                                    >
+                                        Check a scheme
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
             </div >
         </div >
     );

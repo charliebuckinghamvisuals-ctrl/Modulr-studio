@@ -159,16 +159,23 @@ const UNLIMITED_PLANS = new Set(['business', 'master']);
 /**
  * Plans that include the Projects directory.
  *
- * Projects is a Business feature. It is not merely a screen: it stores client
- * names, addresses, quote values and uploaded files, all of which sit on our
- * Firestore and Storage bill for as long as the account exists — so it is not
+ * Projects is on every PAID plan, Standard included. It stores client names,
+ * addresses, quote values and uploaded files, all of which sit on our Firestore
+ * and Storage bill for as long as the account exists — so it is still not
  * something a free or trial account gets.
+ *
+ * Standard was moved in here deliberately. Holding it back made Standard a tier
+ * where nothing the customer produced was ever saved, which gave them no reason
+ * to stay past the month they stopped needing a render; the storage costs
+ * pennies and the retention is worth far more than the upsell it was protecting.
+ * Business is still distinguished by unlimited rendering, 4K, the configurator
+ * and Animation Studio.
  *
  * `master` is here because the owner must never be locked out of their own
  * application, and `tester` because the point of tester access is to evaluate
  * the product; a tester who cannot open Projects cannot report on it.
  */
-const PROJECT_PLANS = new Set(['business', 'master', 'tester', 'beta']);
+const PROJECT_PLANS = new Set(['standard', 'business', 'master', 'tester', 'beta']);
 
 /**
  * Plans that may generate animations.

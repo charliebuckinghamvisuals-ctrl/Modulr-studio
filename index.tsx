@@ -26,14 +26,15 @@ root.render(
 );
 
 // Fade the static splash out once React has actually mounted something -
-// but hold it on screen for a MINIMUM of 2 seconds (Charlie's call, 25 Aug
-// 2026): a branded beat rather than a flicker on fast connections. It is a
+// but hold it on screen for a MINIMUM of 4 seconds (Charlie's call, 25 Aug
+// 2026, raised from 2): a branded beat rather than a flicker on fast
+// connections. It is a
 // floor, not a fake countdown - on slow loads the splash still stays until
 // the app is genuinely ready.
 // Timer-based rather than requestAnimationFrame: rAF pauses in background
 // tabs, and a user who opens the app in a background tab would otherwise
 // come back to a splash that never went away.
-const SPLASH_MIN_MS = 2000;
+const SPLASH_MIN_MS = 4000;
 const splashShownAt = performance.now();
 const dismissSplash = () => {
   const splash = document.getElementById('splash');

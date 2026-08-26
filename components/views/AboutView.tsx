@@ -2,6 +2,7 @@ import React from 'react';
 import {
     Phone, Mail, ArrowRight, ExternalLink, Box, Layers,
     PenTool, Palette, CloudSun, FolderOpen, ShieldCheck, FileText, Lock,
+    Film, ClipboardCheck,
 } from 'lucide-react';
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
@@ -46,15 +47,17 @@ const TOOLS: Tool[] = [
         image: '/gallery-1.jpg',
         tagline: 'Design the building before you render it',
         body:
-            'Build a garden room or annexe to real dimensions in your browser - footprint, wall and ridge heights, roof form, glazing, internal walls, decking and cladding. Because the geometry is real rather than generated, what you see is what gets built, and every view stays consistent with every other view.',
+            'Build a garden room or annexe to real dimensions in your browser - footprint, eaves and ridge heights, box or gable roof, glazing, internal walls, decking and cladding. Because the geometry is real rather than generated, what you see is what gets built, and every view stays consistent with every other view.',
         points: [
-            'Box and gable forms with adjustable pitch, overhangs and canopy',
-            'Doors, windows, skylights and internal partitions positioned to the millimetre',
+            'Box and gable forms with true pitch, real bargeboards, adjustable fascia depth and overhangs',
+            'Internal walls as one system: select, drag and snap them, with doors that belong to the wall they sit in',
+            'Every dimension in millimetres, and every drag handle snapping to clean steps',
             'Live cost estimate that updates as the specification changes',
             'Walk-through, plan, elevation and orthographic views',
-            'Send any view straight into the Render Engine in one click',
+            'Save a design to your account and reopen it later, or send any view straight into the Render Engine',
+            'PDF pack with plan, elevations, a permitted development checklist and a planning likelihood score',
         ],
-        status: 'In development',
+        status: 'Beta',
     },
     {
         icon: <Layers size={22} />,
@@ -119,14 +122,46 @@ const TOOLS: Tool[] = [
         image: '/gallery-11.jpg',
         tagline: 'Every job, client and file in one place',
         body:
-            'A directory for the work itself. Client name, address, value and status alongside the renders, floor plans and documents that belong to the job - so a scheme lives in one place rather than scattered across folders, inboxes and desktops.',
+            'A directory for the work itself. Client name, address, value and status alongside the renders, floor plans and documents that belong to the job - so a scheme lives in one place rather than scattered across folders, inboxes and desktops. Send the client a single read-only proposal link instead of six attachments, showing the renders and the estimate while your contact details stay in your account.',
         points: [
             'Client details, address, project value and pipeline status',
             'Attach renders, floor plans and PDFs to the job they belong to',
             'Everything saved to your account and available on any device',
-            'Visible only to you',
+            'Share a read-only proposal link with a client - renders and estimate only, contact details never leave',
+            'Private to you unless you create that link yourself',
         ],
         status: 'New',
+    },
+    {
+        icon: <Film size={22} />,
+        name: 'Animation Studio',
+        image: '/gallery-5.jpg',
+        tagline: 'Make the render move',
+        body:
+            'Turn a finished render into a short cinematic clip - a slow push in, a gentle pan, a breeze through the planting. A moving hero for a website or a social post, made from a still you already have rather than from a film crew.',
+        points: [
+            'Slow push in, pan, gentle arc or locked-off camera moves',
+            'Optional motion blur, breeze, golden hour or a distant figure',
+            'Ten seconds at 720p, downloaded as an MP4',
+            'Works from any finished render, or from an exterior photograph',
+            'Included with the Business plan, with a monthly allowance',
+        ],
+        status: 'New',
+    },
+    {
+        icon: <ClipboardCheck size={22} />,
+        name: 'Planning Checker',
+        image: '/gallery-9.jpg',
+        tagline: 'Know where a scheme stands before you quote it',
+        body:
+            'A free tool, open to anyone without an account. Answer a short set of questions about the plot and the building and it tells you whether the scheme reads as permitted development or is likely to need a full application - with the specific limits it was measured against, rather than just a verdict.',
+        points: [
+            'Checks height, footprint, boundary distance, curtilage and intended use',
+            'A clear traffic light, and the reasoning behind it',
+            'Written against the permitted development rules as they currently stand in England',
+            'Free and public, with NAPC as the confirmation step when you need it in writing',
+        ],
+        status: 'Free',
     },
 ];
 
@@ -246,7 +281,7 @@ export const AboutView: React.FC = () => {
                         <div className="grid lg:grid-cols-12 gap-10 items-end">
                             <div className="lg:col-span-7 space-y-5">
                                 <div className={TYPE.eyebrow}>The platform</div>
-                                <h2 className={TYPE.h2}>Six tools, one workflow.</h2>
+                                <h2 className={TYPE.h2}>Eight tools, one workflow.</h2>
                             </div>
                             <p className={`lg:col-span-5 ${TYPE.body}`}>
                                 Each tool handles one stage of getting a scheme in front of a

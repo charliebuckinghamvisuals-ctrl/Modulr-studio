@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     BookOpen, Box, Layers, PenTool, CloudSun, Palette, FolderOpen, Film,
-    Lightbulb, AlertTriangle, CheckCircle2, ArrowRight,
+    Lightbulb, AlertTriangle, CheckCircle2, ArrowRight, ClipboardCheck,
 } from 'lucide-react';
 import { DraftingBackground } from '../DraftingBackground';
 
@@ -37,25 +37,31 @@ const TOOLS: ToolGuide[] = [
             'Build the actual geometry of a garden room or annexe to real dimensions, then send any view straight into the Render Engine.',
         inputs: ['Nothing. You build it from scratch in the browser.'],
         steps: [
+            'Pick the shape first, box or gable. That choice drives every control that follows.',
             'Set the footprint: width, depth and wall height, in millimetres.',
-            'Choose the form, box or gable, then set the roof pitch and overhangs.',
-            'Position doors, windows, skylights and internal partitions.',
+            'On a gable, set the eaves and ridge heights. The pitch follows from the two, and the bargeboards, fascia depth and roof lip are real geometry rather than a drawn-on line.',
+            'Position doors, windows and skylights. Drag anywhere on the wall or nudge with the keyboard, and every handle snaps to clean steps.',
+            'Add internal walls. Each one is a single object you select and drag, it snaps to the shell, and any door you put in it belongs to that wall and travels with it.',
             'Add decking, a canopy or a picture-frame front if the scheme has them.',
             'Pick cladding, roof and frame finishes to preview the specification.',
             'Watch the live cost estimate update as you go.',
+            'Save Design keeps it on your account so you can reopen it later.',
             'Press Render in Modulr to push the current view into the Render Engine.',
         ],
         uses: [
             'Design live on a client call and agree the size before anyone draws anything',
             'Produce a consistent set of elevations and plans for a quote',
             'Test whether a taller ridge or deeper overhang is worth the cost',
-            'Export a PDF pack with plan, elevations and guidance',
+            'Lay out the inside as well as the outside, so a client can see where the rooms fall',
+            'Export a PDF pack with plan, elevations, a permitted development checklist and a planning likelihood score',
         ],
         tips: [
             'Dimensions here are real, so what you render matches what gets built.',
             'Every view comes from the same model, so your elevations cannot contradict each other.',
+            'The planning score on the PDF is an indication drawn from your own dimensions, not a decision. Use the Planning Checker, or NAPC, when it needs confirming.',
+            'Save before you leave the page. The design lives on your account, not in the browser tab.',
         ],
-        status: 'In development',
+        status: 'Beta',
     },
     {
         icon: <Layers size={22} />,
@@ -69,10 +75,13 @@ const TOOLS: ToolGuide[] = [
             'A view sent over from the 3D Configurator',
         ],
         steps: [
+            'No image to hand? Press Try a sample on the empty state and the engine runs on one of ours.',
             'Upload your image. The engine automatically detects the existing materials.',
             'Review what it found, then change any of the five categories: walls, roof, windows, doors, ground.',
             'Add instructions in the notes box for anything the pickers do not cover.',
             'Render, then download at 4K.',
+            'Not quite right? Same look re-runs it with the design held steady; New look starts the interpretation again.',
+            'Save it to a Project so it survives the browser tab.',
         ],
         uses: [
             'Sell a scheme from a rough SketchUp model before any detailed design work',
@@ -84,6 +93,8 @@ const TOOLS: ToolGuide[] = [
             'The cleaner the input, the more faithful the output. A tidy model screenshot beats a cluttered one.',
             'Use SketchUp mode when the source is an untextured model. It tells the engine to add realism rather than reinterpret the design.',
             'Detected materials are a starting point, not a decision. Change anything that looks wrong before rendering.',
+            'The verification badge on a finished render means the output was checked back against your source image, not just against the settings you chose.',
+            'Same look and New look are the fastest fix for a render that is close but not right. Reach for them before you rewrite the notes.',
         ],
     },
     {
@@ -192,6 +203,7 @@ const TOOLS: ToolGuide[] = [
             'Set a status: lead, quoted, won, lost or complete.',
             'Attach renders, floor plans and documents, tagging what each one is.',
             'Everything saves to your account automatically.',
+            'Copy the share link from the project header to send the client a read-only proposal page.',
         ],
         uses: [
             'Find last March\'s render for a returning client in seconds',
@@ -200,10 +212,38 @@ const TOOLS: ToolGuide[] = [
             'Pick up on a different machine without copying files around',
         ],
         tips: [
-            'Projects are private to your account. Nobody else can see them.',
+            'Projects are private to your account. Nobody else can see them unless you create a share link.',
+            'A share link shows renders and the estimate only. Client contact details never appear on it, and you can disable the link at any time.',
+            'The Save to Project dialog offers your last-opened project first, which is almost always the one you want.',
+            'A project holding a saved 3D design is badged as such on the card.',
             'Attach the source drawing as well as the render. Future you will want it.',
         ],
         status: 'New',
+    },
+    {
+        icon: <ClipboardCheck size={22} />,
+        name: 'Planning Checker',
+        purpose:
+            'Find out whether a scheme is likely to fall under permitted development or need a full planning application, before you spend time quoting it. Free, and open to anyone without an account.',
+        inputs: ['A few facts about the plot and the proposed building. No drawing needed.'],
+        steps: [
+            'Answer the questions: height, footprint, distance to the boundary, what the building is for, and whether the property has anything unusual about it such as a listing or a conservation area.',
+            'Submit. You get a traffic light back: likely permitted development, borderline, or likely to need an application.',
+            'Read the reasoning underneath. It names the specific limits your answers were measured against.',
+            'If it matters commercially, take it to NAPC for written confirmation.',
+        ],
+        uses: [
+            'Qualify an enquiry in two minutes instead of a site visit',
+            'Tell a client early that a 3.2m ridge within 2m of the boundary is a problem',
+            'Put a planning position in the quote rather than leaving it open',
+            'Give prospects something genuinely useful on your website before they ever buy',
+        ],
+        tips: [
+            'It is an indication based on what you enter, not a determination. Only the local authority gives certainty, and NAPC is the step in between.',
+            'Boundary distance is the answer that changes the outcome most often. Measure it rather than estimating.',
+            'The rules it applies are the English permitted development rules. Scotland, Wales and Northern Ireland differ.',
+        ],
+        status: 'Free',
     },
 ];
 
@@ -238,6 +278,16 @@ const WORKFLOWS = [
             'Animation Studio, slow push in, with a gentle breeze',
             'Download the MP4 and drop it straight onto your homepage',
             'Repeat for two or three schemes and run them as a slideshow',
+        ],
+    },
+    {
+        title: 'Qualifying an enquiry before you quote',
+        time: 'About 5 minutes',
+        steps: [
+            'Planning Checker with the height, footprint and boundary distance the client described',
+            'If it comes back borderline, 3D Configurator to try a lower ridge and see what it costs',
+            'Export the PDF pack with the permitted development checklist',
+            'Send it with the quote so the planning position is answered up front',
         ],
     },
     {
@@ -286,6 +336,18 @@ const TROUBLESHOOTING = [
     {
         problem: 'I lost a render',
         fix: 'History only holds recent work on this device. Attach anything you care about to a Project, which saves to your account and is available anywhere.',
+    },
+    {
+        problem: 'I lost a 3D design',
+        fix: 'The configurator does not save on its own. Press Save Design in the toolbar and it goes to your account, where you can reopen it and attach it to a Project.',
+    },
+    {
+        problem: 'The client cannot open the link I sent',
+        fix: 'Share links are unlisted rather than password protected, so the whole URL matters. Copy it from the project header rather than retyping it, and check you have not disabled the link since you sent it.',
+    },
+    {
+        problem: 'The planning result is not what I expected',
+        fix: 'Read the reasoning under the traffic light. It names the limit your answers crossed, and the usual culprit is boundary distance or ridge height. The result is an indication from what you entered, not a determination, and NAPC can confirm it properly.',
     },
 ];
 

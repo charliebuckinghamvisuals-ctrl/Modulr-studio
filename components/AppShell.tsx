@@ -1,6 +1,5 @@
 import React, { ReactNode } from 'react';
 import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool, Lock } from 'lucide-react';
-import { toast } from 'react-hot-toast';
 import { AppStage } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useCredits } from '../hooks/useCredits';
@@ -89,8 +88,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     setIsMobileMenuOpen(false);
   }, [activeStage]);
 
-  const toolItems: Array<{ id: AppStage; label: string; comingSoon?: boolean; locked?: boolean; icon?: React.ReactNode }> = [
-    { id: AppStage.DESIGNER, label: '3D Config', comingSoon: true },
+  const toolItems: Array<{ id: AppStage; label: string; badge?: string; locked?: boolean; icon?: React.ReactNode }> = [
+    { id: AppStage.DESIGNER, label: '3D Config', badge: 'Beta' },
     { id: AppStage.RENDER_ENGINE, label: 'Render Engine' },
     { id: AppStage.LINE_CONVERT, label: 'Line Converter' },
     { id: AppStage.WEATHER_LAB, label: 'Weather Lab' },
@@ -192,7 +191,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
                     <button
                       key={item.id}
                       onClick={() => {
-                        // "Soon" is a label, not a lock. Tools still in
+                        // The badge is a label, not a lock. Tools still in
                         // development stay reachable so they can be tested.
                         onNavigate(item.id);
                         setIsToolsDropdownOpen(false);
@@ -204,7 +203,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
                       }`}
                     >
                       <span>{item.label}</span>
-                      {item.comingSoon && <span className="text-[8px] font-semibold uppercase tracking-wider text-slate-400">Soon</span>}
+                      {item.badge && <span className="text-[8px] font-semibold uppercase tracking-wider text-slate-400">{item.badge}</span>}
                       {item.locked && <Lock size={11} className="text-slate-400 shrink-0" />}
                     </button>
                   );
@@ -367,19 +366,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           {toolItems.map(item => (
             <button
               key={item.id}
-              onClick={() => {
-                if (item.comingSoon) {
-                  toast('3D Configurator is coming soon!', { icon: '🚀' });
-                } else {
-                  onNavigate(item.id);
-                }
-              }}
-              className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-medium transition-all ${item.comingSoon ? 'opacity-50 cursor-not-allowed text-secondary/40' : 'text-secondary/40 hover:bg-slate-50'}`}
+              onClick={() => onNavigate(item.id)}
+              className="w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-medium transition-all text-secondary/40 hover:bg-slate-50"
             >
               <span className="shrink-0 opacity-40">{item.icon}</span>
               <span className="flex items-center">
                 {item.label}
-                {item.comingSoon && <span className="text-[8px] font-bold uppercase tracking-wider bg-[#405a56]/10 text-[#405a56] px-1.5 py-0.5 rounded-full ml-2">Soon</span>}
+                {item.badge && <span className="text-[8px] font-bold uppercase tracking-wider bg-[#405a56]/10 text-[#405a56] px-1.5 py-0.5 rounded-full ml-2">{item.badge}</span>}
                 {item.locked && <Lock size={11} className="text-secondary/40 ml-2 shrink-0" />}
               </span>
               <span className="ml-auto text-[9px] font-bold uppercase bg-slate-100 text-secondary/50 px-2 py-0.5 rounded-full tracking-widest whitespace-nowrap">Desktop</span>
