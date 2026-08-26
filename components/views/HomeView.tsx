@@ -25,9 +25,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                     block now sits on the hero video below, so it is not said
                     twice within one screen. */}
                 <div className="flex flex-col items-center text-center max-w-4xl">
-                    <div className="flex flex-col items-center mb-8 w-full px-4">
-                        <img src="/Logo.png" alt="Modulr Studio Logo" className="h-[24rem] md:h-[32rem] w-auto object-contain drop-shadow-2xl -mt-28 -mb-28 md:-mt-36 md:-mb-36" />
-                        <h1 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-accent font-bold block max-w-4xl mx-auto leading-tight mt-6 text-center w-fit inline-block">
+                    {/* No wordmark here. The header carries the logo a few
+                        pixels above this, so a second one - at 32rem, the
+                        largest thing on the page - meant the brand name was
+                        said twice on one screen, and it was the first thing you
+                        saw as the splash lifted. The headline opens the page
+                        instead. */}
+                    <div className="flex flex-col items-center mb-8 w-full px-4 pt-4">
+                        <h1 className="text-[5.5vw] sm:text-3xl lg:text-4xl text-accent font-bold block max-w-4xl mx-auto leading-tight text-center w-fit inline-block">
                             The pinnacle of AI exterior rendering for garden rooms and annexes.
                         </h1>
                     </div>
