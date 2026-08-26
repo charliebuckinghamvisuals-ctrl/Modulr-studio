@@ -27,7 +27,6 @@ import { GalleryView } from './components/views/GalleryView';
 import { AnimationsView } from './components/views/AnimationsView';
 import { ProjectsView } from './components/views/ProjectsView';
 import { AnimationStudioView } from './components/views/AnimationStudioView';
-import { ContentStudioView } from './components/views/ContentStudioView';
 import { WhyModulrView } from './components/views/WhyModulrView';
 import { AuthView } from './components/views/AuthView';
 import { AccountView } from './components/views/AccountView';
@@ -802,9 +801,6 @@ const App: React.FC = () => {
                 <AnimationStudioView onNavigate={engine.setActiveStage} />
             )}
 
-            {engine.activeStage === AppStage.CONTENT_STUDIO && (
-                <ContentStudioView engine={engine} onNavigate={engine.setActiveStage} />
-            )}
 
             {engine.activeStage === AppStage.WHY && (
                 <WhyModulrView onNavigate={engine.setActiveStage} />

@@ -17,8 +17,6 @@ export enum AppStage {
   PLANNING_CHECKER = 'planning_checker',
   PROJECTS = 'projects',
   ANIMATION_STUDIO = 'animation_studio',
-  /** Social/marketing asset builder — renders out as posts, not as renders. */
-  CONTENT_STUDIO = 'content_studio',
   /** Public showcase of finished animation clips — the moving Gallery. */
   ANIMATIONS = 'animations',
   WHY = 'why'
