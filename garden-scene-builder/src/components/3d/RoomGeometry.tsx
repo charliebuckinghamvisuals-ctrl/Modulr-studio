@@ -28,30 +28,45 @@ function DimText({ value, onValueChange, position, rotation, children, isDraggab
   if (hideIfZero && Number(value) === 0) return null;
 
   if (isExporting) {
+    // PDF-bound labels read like architectural drawings: dark figures on a
+    // white plate with a hairline frame, sized to the number. The old dark
+    // blob at fixed width clipped long values and sank into the linework.
+    const label = String(value);
+    const plateW = 0.28 + label.length * 0.11;
     return (
       <group position={position}>
         <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
-          <mesh position={[0,0,-0.01]}>
-            <planeGeometry args={[0.8, 0.3]} />
+          <mesh position={[0, 0, -0.012]}>
+            <planeGeometry args={[plateW + 0.04, 0.34]} />
             <meshBasicMaterial color="#3b4d4a" />
           </mesh>
+          <mesh position={[0, 0, -0.01]}>
+            <planeGeometry args={[plateW, 0.3]} />
+            <meshBasicMaterial color="#ffffff" />
+          </mesh>
           <Text
-            color="#ffffff"
-            fontSize={0.15}
+            color="#1d1d1f"
+            fontSize={0.17}
             anchorX="center"
             anchorY="middle"
           >
-            {String(value)}
+            {label}
           </Text>
         </Billboard>
       </group>
     );
   }
 
+  const isPlanLabel = viewMode === 'plan';
+
   return (
     <Html center position={position} transform rotation={rotation}>
-      <div 
-        className={`bg-[#3b4d4a] border border-[#3b4d4a] rounded-full font-mono text-[8px] tracking-wider whitespace-nowrap px-1.5 py-0.5 text-white opacity-90 shadow-md transition-all duration-200 ${onValueChange ? (isEditing ? 'cursor-auto ring-1 ring-[#2d3a38]' : 'cursor-pointer hover:bg-[#2d3a38] hover:scale-105') : 'pointer-events-none'}`}
+      <div
+        className={`${isPlanLabel
+          // Plan view is a working drawing: bigger, dark-on-light labels that
+          // stand clear of the dimension lines instead of tiny dark blobs.
+          ? 'bg-white border border-[#3b4d4a]/50 rounded-md font-mono text-[11px] font-bold tracking-wide whitespace-nowrap px-2 py-0.5 text-[#1d1d1f] shadow'
+          : 'bg-[#3b4d4a] border border-[#3b4d4a] rounded-full font-mono text-[8px] tracking-wider whitespace-nowrap px-1.5 py-0.5 text-white opacity-90 shadow-md'} transition-all duration-200 ${onValueChange ? (isEditing ? 'cursor-auto ring-1 ring-[#2d3a38]' : 'cursor-pointer hover:scale-105') : 'pointer-events-none'}`}
         style={{ pointerEvents: (isEditing || onValueChange || isDraggable) ? 'auto' : 'none' }}
         onClick={(e) => {
           if (onValueChange && !isEditing) {
@@ -70,7 +85,7 @@ function DimText({ value, onValueChange, position, rotation, children, isDraggab
               ref={inputRef}
               type="number"
               autoFocus
-              className="min-w-[40px] w-auto max-w-[80px] text-center outline-none bg-transparent text-white font-bold" 
+              className={`min-w-[40px] w-auto max-w-[80px] text-center outline-none bg-transparent font-bold ${isPlanLabel ? 'text-[#1d1d1f]' : 'text-white'}`}
               value={tempValue} 
               onChange={e => setTempValue(e.target.value)}
               onFocus={e => e.target.select()}
@@ -260,6 +275,250 @@ function AnimatedDoorLeaves({ door, frameColorHex, frameThickness, sashThickness
   );
 }
 
+/**
+ * One internal wall: the unified system.
+ *
+ * - Click SELECTS it (persistent, not hover) - the old handles lived behind
+ *   isHovered, so drifting off the tiny handle mid-drag unmounted it and the
+ *   drag died after a step or two.
+ * - Drag the WALL BODY to move it: perpendicular position snaps to other
+ *   parallel walls; the ends snap to the room's inner wall faces and to
+ *   perpendicular internal walls (120mm magnet, 50mm grid otherwise).
+ * - End handles resize, with the moving end snapping to the same targets.
+ * - Doors BELONG to the wall (offset from its centre) so they travel with
+ *   it; each door has a slide handle, and its opening is cut from this
+ *   wall's own geometry in local space.
+ */
+function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; room: any; showDims: boolean }) {
+  const isSelected = useStore(s => s.selectedElementId === `part-${part.id}`);
+  const [dragging, setDragging] = useState(false);
+  const grabRef = useRef<{ dx: number; dz: number } | null>(null);
+  const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
+
+  const pL = part.lengthMm / 1000;
+  const pT = part.thicknessMm / 1000;
+  const pX = part.xMm / 1000;
+  const pZ = part.zMm / 1000;
+  const rotAngle = part.rotation === 90 ? Math.PI / 2 : 0;
+
+  const wallTmm = room.wallThicknessMm || 150;
+  const innerX = room.widthMm / 2 - wallTmm;
+  const innerZ = room.depthMm / 2 - wallTmm;
+  const others = (room.partitions || []).filter((p: any) => p.id !== part.id);
+
+  const snapNear = (v: number, targets: number[], tol = 120) => {
+    let best: number | null = null;
+    for (const t of targets) if (Math.abs(v - t) < tol && (best === null || Math.abs(v - t) < Math.abs(v - best))) best = t;
+    return best;
+  };
+
+  const onDown = (e: any) => {
+    e.stopPropagation();
+    const st = useStore.getState();
+    st.setSelectedElementId(`part-${part.id}`);
+    if (st.viewMode === 'walking') return;
+    st.saveState();
+    setDragging(true);
+    st.setControlsEnabled(false);
+    try { e.target.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    grabRef.current = { dx: e.point.x - pX, dz: e.point.z - pZ };
+  };
+  const onUp = (e: any) => {
+    e.stopPropagation();
+    setDragging(false);
+    useStore.getState().setControlsEnabled(true);
+    try { e.target.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    grabRef.current = null;
+  };
+  const onMove = (e: any) => {
+    if (!dragging || !grabRef.current) return;
+    const hit = new THREE.Vector3();
+    if (!e.ray.intersectPlane(dragPlane, hit)) return;
+    const st = useStore.getState();
+    const cur = (st.scene.room.partitions || []).find((p: any) => p.id === part.id);
+    if (!cur) return;
+    let cx = (hit.x - grabRef.current.dx) * 1000;
+    let cz = (hit.z - grabRef.current.dz) * 1000;
+    const half = cur.lengthMm / 2;
+    const halfT = cur.thicknessMm / 2;
+    if (cur.rotation === 0) {
+      cz = snapNear(cz, others.filter((p: any) => p.rotation === 0).map((p: any) => p.zMm)) ?? Math.round(cz / 50) * 50;
+      cz = Math.min(innerZ - halfT, Math.max(-(innerZ - halfT), cz));
+      const endTargets = [-innerX, innerX, ...others.filter((p: any) => p.rotation === 90).map((p: any) => p.xMm)];
+      const leftSnap = snapNear(cx - half, endTargets);
+      const rightSnap = snapNear(cx + half, endTargets);
+      cx = leftSnap !== null ? leftSnap + half : rightSnap !== null ? rightSnap - half : Math.round(cx / 50) * 50;
+      cx = Math.min(innerX - half, Math.max(-innerX + half, cx));
+    } else {
+      cx = snapNear(cx, others.filter((p: any) => p.rotation === 90).map((p: any) => p.xMm)) ?? Math.round(cx / 50) * 50;
+      cx = Math.min(innerX - halfT, Math.max(-(innerX - halfT), cx));
+      const endTargets = [-innerZ, innerZ, ...others.filter((p: any) => p.rotation === 0).map((p: any) => p.zMm)];
+      const nearSnap = snapNear(cz - half, endTargets);
+      const farSnap = snapNear(cz + half, endTargets);
+      cz = nearSnap !== null ? nearSnap + half : farSnap !== null ? farSnap - half : Math.round(cz / 50) * 50;
+      cz = Math.min(innerZ - half, Math.max(-innerZ + half, cz));
+    }
+    st.updatePartition(part.id, { xMm: cx, zMm: cz });
+  };
+
+  /** Resize from one end; the MOVING end magnetises to the same targets. */
+  const resizeEnd = (movingPositive: boolean) => (delta: number) => {
+    const st = useStore.getState();
+    const cur = (st.scene.room.partitions || []).find((p: any) => p.id === part.id);
+    if (!cur) return;
+    const horiz = cur.rotation === 0;
+    // Local +X maps to world +X (rot 0) or world -Z (rot 90, per the group rotation).
+    const worldDelta = delta * 1000;
+    const centre = horiz ? cur.xMm : cur.zMm;
+    const half = cur.lengthMm / 2;
+    const fixedEnd = movingPositive ? centre - half : centre + half;
+    let movingEnd = (movingPositive ? centre + half : centre - half) + worldDelta;
+    const endTargets = horiz
+      ? [-innerX, innerX, ...others.filter((p: any) => p.rotation === 90).map((p: any) => p.xMm)]
+      : [-innerZ, innerZ, ...others.filter((p: any) => p.rotation === 0).map((p: any) => p.zMm)];
+    movingEnd = snapNear(movingEnd, endTargets) ?? Math.round(movingEnd / 100) * 100;
+    const newL = Math.max(300, Math.abs(movingEnd - fixedEnd));
+    const newCentre = (fixedEnd + (movingPositive ? fixedEnd + newL : fixedEnd - newL)) / 2;
+    // Keep doors inside the shortened wall.
+    const doors = (cur.doors || []).map((dr: any) => ({
+      ...dr,
+      offsetMm: Math.min(newL / 2 - dr.widthMm / 2 - 50, Math.max(-(newL / 2 - dr.widthMm / 2 - 50), dr.offsetMm)),
+    }));
+    st.updatePartition(part.id, horiz ? { lengthMm: newL, xMm: newCentre, doors } : { lengthMm: newL, zMm: newCentre, doors });
+  };
+
+  const doorHeight = (dr: any) => Math.min(dr.heightMm / 1000, hP - 0.05);
+
+  return (
+    <group
+      position={[pX, hP / 2, pZ]}
+      rotation={[0, rotAngle, 0]}
+      onPointerOver={(e: any) => { e.stopPropagation(); useStore.getState().setHoveredElementId(`part-${part.id}`); }}
+      onPointerOut={() => useStore.getState().setHoveredElementId(null)}
+    >
+      <mesh castShadow receiveShadow onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+        <Geometry>
+          <Base>
+            <boxGeometry args={[pL, hP, pT]} />
+          </Base>
+          {/* This wall's OWN doors, cut in local space - they move with it. */}
+          {(part.doors || []).map((dr: any) => (
+            <Subtraction key={dr.id} position={[dr.offsetMm / 1000, doorHeight(dr) / 2 - hP / 2, 0]}>
+              <boxGeometry args={[dr.widthMm / 1000, doorHeight(dr), 0.4]} />
+            </Subtraction>
+          ))}
+          {/* Legacy world-positioned interior doors from old saves. */}
+          {(room.interiorDoors || []).map((door: any) => {
+            const dW = door.widthMm / 1000;
+            const dH = door.heightMm / 1000;
+            const dx = door.xMm / 1000 - pX;
+            const dz = door.zMm / 1000 - pZ;
+            const dy = dH / 2 - hP / 2;
+            let localX = dx;
+            let localZ = dz;
+            if (part.rotation === 90) { localX = -dz; localZ = dx; }
+            const relRot = door.rotation === part.rotation ? 0 : Math.PI / 2;
+            return (
+              <Subtraction key={door.id} position={[localX, dy, localZ]} rotation={[0, relRot, 0]}>
+                <boxGeometry args={[dW, dH, 0.4]} />
+              </Subtraction>
+            );
+          })}
+        </Geometry>
+        <meshStandardMaterial
+          color={room.interiorColor || '#ffffff'}
+          roughness={0.9}
+          emissive={isSelected ? '#10b981' : '#000000'}
+          emissiveIntensity={isSelected ? 0.18 : 0}
+        />
+      </mesh>
+
+      {/* L-shape leg: a perpendicular run welded to one end of the main
+          wall, so a corner is ONE unit instead of two walls nudged together.
+          It shares the group, so body-drag, rotate and selection all treat
+          the L as a single wall. */}
+      {(part.legLengthMm || 0) > 100 && (() => {
+        const legL = part.legLengthMm / 1000;
+        const le = part.legEnd === -1 ? -1 : 1;
+        const ld = part.legDir === -1 ? -1 : 1;
+        return (
+          <mesh
+            position={[le * (pL / 2 - pT / 2), 0, ld * (legL / 2 + pT / 2)]}
+            castShadow receiveShadow
+            onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+          >
+            <boxGeometry args={[pT, hP, legL]} />
+            <meshStandardMaterial
+              color={room.interiorColor || '#ffffff'}
+              roughness={0.9}
+              emissive={isSelected ? '#10b981' : '#000000'}
+              emissiveIntensity={isSelected ? 0.18 : 0}
+            />
+          </mesh>
+        );
+      })()}
+
+      {/* Door frames for this wall's own doors. */}
+      {(part.doors || []).map((dr: any) => {
+        const dW = dr.widthMm / 1000;
+        const dH = doorHeight(dr);
+        const ox = dr.offsetMm / 1000;
+        const oy = dH / 2 - hP / 2;
+        return (
+          <group key={`frame-${dr.id}`} position={[ox, oy, 0]}>
+            <mesh position={[-dW / 2 + 0.015, 0, 0]} castShadow><boxGeometry args={[0.03, dH, pT + 0.02]} /><meshStandardMaterial color="#e8e2d8" roughness={0.7} /></mesh>
+            <mesh position={[dW / 2 - 0.015, 0, 0]} castShadow><boxGeometry args={[0.03, dH, pT + 0.02]} /><meshStandardMaterial color="#e8e2d8" roughness={0.7} /></mesh>
+            <mesh position={[0, dH / 2 - 0.015, 0]} castShadow><boxGeometry args={[dW, 0.03, pT + 0.02]} /><meshStandardMaterial color="#e8e2d8" roughness={0.7} /></mesh>
+          </group>
+        );
+      })}
+
+      {showDims && isSelected && (
+        <>
+          {/* End handles: red, on the wall's local X axis ends. Local +X is
+              world +X for rot 0 and world -Z for rot 90, so the drag axis and
+              delta sign map accordingly. */}
+          <DragHandle elementId={`part-${part.id}`} position={[pL / 2, 0, 0]} axis={part.rotation === 0 ? 'x' : 'z'} color="#ff0000" visualAxis="x" snapInterval={0.05}
+            onChange={(d) => resizeEnd(true)(part.rotation === 0 ? d : -d)} />
+          <DragHandle elementId={`part-${part.id}`} position={[-pL / 2, 0, 0]} axis={part.rotation === 0 ? 'x' : 'z'} color="#ff0000" visualAxis="x" snapInterval={0.05}
+            onChange={(d) => resizeEnd(false)(part.rotation === 0 ? d : -d)} />
+          {/* Leg tip handle: blue, resizes the L-shape leg. Local +Z maps to
+              world +Z (rot 0) or world +X (rot 90). */}
+          {(part.legLengthMm || 0) > 100 && (
+            <DragHandle elementId={`part-${part.id}`}
+              position={[(part.legEnd === -1 ? -1 : 1) * (pL / 2 - pT / 2), 0, (part.legDir === -1 ? -1 : 1) * (part.legLengthMm / 1000 + pT / 2)]}
+              axis={part.rotation === 0 ? 'z' : 'x'} color="#2563eb" visualAxis="z" snapInterval={0.05}
+              onChange={(d) => {
+                const st = useStore.getState();
+                const cur = (st.scene.room.partitions || []).find((p: any) => p.id === part.id);
+                if (!cur) return;
+                const localDz = cur.rotation === 0 ? d : d; // world z (rot 0) / world x (rot 90) both map to local +z
+                const dirSign = cur.legDir === -1 ? -1 : 1;
+                const next = Math.max(300, Math.round((cur.legLengthMm + dirSign * localDz * 1000) / 100) * 100);
+                st.updatePartition(part.id, { legLengthMm: next });
+              }} />
+          )}
+          {/* Door slide handles: green, above each opening. */}
+          {(part.doors || []).map((dr: any) => (
+            <DragHandle key={`slide-${dr.id}`} elementId={`part-${part.id}`} position={[dr.offsetMm / 1000, hP / 2 + 0.18, 0]} axis={part.rotation === 0 ? 'x' : 'z'} color="#10b981" visualAxis="x" snapInterval={0.05}
+              onChange={(d) => {
+                const st = useStore.getState();
+                const cur = (st.scene.room.partitions || []).find((p: any) => p.id === part.id);
+                if (!cur) return;
+                const curDr = (cur.doors || []).find((x: any) => x.id === dr.id);
+                if (!curDr) return;
+                const local = part.rotation === 0 ? d : -d;
+                const lim = cur.lengthMm / 2 - curDr.widthMm / 2 - 50;
+                const next = Math.min(lim, Math.max(-lim, Math.round((curDr.offsetMm + local * 1000) / 50) * 50));
+                st.updatePartitionDoor(part.id, dr.id, { offsetMm: next });
+              }} />
+          ))}
+        </>
+      )}
+    </group>
+  );
+}
+
 export function RoomGeometry() {
   const roomStore = useStore(s => s.scene.room);
   const viewModeStore = useStore(s => s.viewMode);
@@ -434,8 +693,14 @@ export function RoomGeometry() {
   // overhang at 0 the roof was never flush — overhang is now entirely the
   // user's Overhangs & Canopy setting.
   const roofFlatGeom = useMemo(() => createWorldScaleBoxGeometry(roofW, roofH, roofD, false, 0, 0, 0), [roofW, roofH, roofD]);
-  const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohLeft) / Math.cos(gablePitch), 0.1, roofD, false, 0, 0, 0), [w, ohLeft, gablePitch, roofD]);
-  const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohRight) / Math.cos(gablePitch), 0.1, roofD, false, 0, 0, 0), [w, ohRight, gablePitch, roofD]);
+  // The slab thickness IS the visible fascia (bargeboard) depth on a gable -
+  // user-adjustable, 100mm by default. Every roof edge overhangs 50mm: the
+  // slabs run 50mm past both gable ends and 50mm past the eaves, like a real
+  // roof line, instead of finishing dead flush with the cladding.
+  const gableFascia = Math.min(0.4, Math.max(0.05, (room.gableFasciaMm ?? 100) / 1000));
+  const ROOF_LIP = 0.05;
+  const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohLeft) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, roofD + ROOF_LIP * 2, false, 0, 0, 0), [w, ohLeft, gablePitch, roofD, gableFascia]);
+  const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohRight) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, roofD + ROOF_LIP * 2, false, 0, 0, 0), [w, ohRight, gablePitch, roofD, gableFascia]);
 
 
   const renderBaseMeshes = () => {
@@ -601,10 +866,11 @@ export function RoomGeometry() {
             {/* CornerCut Outer Cutout */}
             
 
-            {/* Gable Roof Cuts */}
-            {/* gable subtractions removed temporarily */}
-          
-            {isGable && (
+            {/* Gable end triangles. NEVER in plan view: a floor plan has no
+                gable ends, and their CSG faces sit coplanar with the interior
+                cutout boundary - the artifact faces that produced read as
+                external cladding covering the whole floor from above. */}
+            {isGable && !isPlanView && (
 
           
               <>
@@ -643,7 +909,7 @@ export function RoomGeometry() {
             {/* Main Interior Cutout (split into non-overlapping boxes to avoid nested Geometry issues) */}
             {(!isLShape && !isTShape && !isCornerCut) && (
               <Subtraction position={[0, h/2, 0]}>
-                <boxGeometry args={[w - wallThickness*2, h + 0.1, d - wallThickness*2]} />
+                <boxGeometry args={[w - wallThickness*2, h + 1, d - wallThickness*2]} />
                 <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
               </Subtraction>
             )}
@@ -652,12 +918,12 @@ export function RoomGeometry() {
               <>
                 {/* Left part of the L */}
                 <Subtraction position={[-cutW/2, h/2, 0]}>
-                  <boxGeometry args={[w - cutW - wallThickness*2, h + 0.1, d - wallThickness*2]} />
+                  <boxGeometry args={[w - cutW - wallThickness*2, h + 1, d - wallThickness*2]} />
                   <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
                 </Subtraction>
                 {/* Back-right part of the L */}
                 <Subtraction position={[w/2 - cutW/2 - wallThickness, h/2, -cutD/2]}>
-                  <boxGeometry args={[cutW + wallThickness*2, h + 0.1, d - cutD - wallThickness*2]} />
+                  <boxGeometry args={[cutW + wallThickness*2, h + 1, d - cutD - wallThickness*2]} />
                   <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
                 </Subtraction>
               </>
@@ -785,7 +1051,7 @@ export function RoomGeometry() {
         {!isPlanView && isGable && (
           <group position={[roofX, h, roofZ]}>
             {/* Left Roof Plane */}
-            <mesh position={[-w/4 - ohLeft/2, roofH/2 - ohLeft * Math.tan(gablePitch)/2, 0]} rotation={[0, 0, gablePitch]} castShadow receiveShadow>
+            <mesh position={[-w/4 - ohLeft/2 - (ROOF_LIP/2) * Math.cos(gablePitch), roofH/2 - ohLeft * Math.tan(gablePitch)/2 - (ROOF_LIP/2) * Math.sin(gablePitch), 0]} rotation={[0, 0, gablePitch]} castShadow receiveShadow>
                <primitive object={roofGableLeftGeom} attach="geometry" />
 
                {(() => {
@@ -820,7 +1086,7 @@ export function RoomGeometry() {
 
             </mesh>
             {/* Right Roof Plane */}
-            <mesh position={[w/4 + ohRight/2, roofH/2 - ohRight * Math.tan(gablePitch)/2, 0]} rotation={[0, 0, -gablePitch]} castShadow receiveShadow>
+            <mesh position={[w/4 + ohRight/2 + (ROOF_LIP/2) * Math.cos(gablePitch), roofH/2 - ohRight * Math.tan(gablePitch)/2 - (ROOF_LIP/2) * Math.sin(gablePitch), 0]} rotation={[0, 0, -gablePitch]} castShadow receiveShadow>
                <primitive object={roofGableRightGeom} attach="geometry" />
                
                {(() => {
@@ -866,6 +1132,20 @@ export function RoomGeometry() {
                 </mesh>
               </>
             )}
+
+            {/* Ridge cap: the two sloped slabs meet square-cut at the apex,
+                which left an open V gap along the ridge. A real roof closes
+                this with a ridge piece - so does this one. */}
+            <mesh position={[-roofX, roofH + gableFascia / (2 * Math.cos(gablePitch)), 0]} castShadow>
+              <boxGeometry args={[0.24 + gableFascia, 0.07, roofD + ROOF_LIP * 2 + 0.02]} />
+              <meshStandardMaterial color={roofColorHex} metalness={0.4} roughness={0.5} />
+            </mesh>
+
+            {/* NO separate gable-end meshes here. The wall mesh itself already
+                ADDS clad gable triangles (gableTriangleGeom) as part of the
+                same CSG piece, with UVs that continue the wall's boards. A
+                second overlapping triangle z-fought with it - the "glitching
+                like it's not the same piece" was two coplanar copies. */}
           </group>
         )}
         {!isPlanView && !isGable && (
@@ -884,10 +1164,15 @@ export function RoomGeometry() {
           </mesh>
         )}
 
-        {/* Roof Fascia & EPDM flat roof */}
-        {!isPlanView && (
-          <group 
-            position={[roofX, isGable ? h + roofH/2 : (frontH + backH)/2 + roofH/2, roofZ]} 
+        {/* Roof Fascia & EPDM flat roof.
+            NOT for gables: on a gable this prism's end faces painted a
+            fascia-coloured triangle over the entire gable end, its cut faces
+            z-fought with the sloped slabs, and the flat "flashing" sheet at
+            ridge height read as a giant dark plate floating on the roof. The
+            gable's ends, fascia and ridge are built explicitly below. */}
+        {!isPlanView && !isGable && (
+          <group
+            position={[roofX, (frontH + backH)/2 + roofH/2, roofZ]}
             rotation={[isPitched && !isGable ? roofPitch : 0, 0, 0]}
           >
             <mesh castShadow receiveShadow position={[0, 0, 0]}>
@@ -1068,7 +1353,7 @@ export function RoomGeometry() {
                 axis="x"
                 color="#00ff00"
                 onChange={(dx) => {
-                  useStore.getState().updateDoor(door.id, { offsetMm: door.offsetMm + dx * 1000 });
+                  useStore.getState().updateDoor(door.id, { offsetMm: Math.round((door.offsetMm + dx * 1000) / 50) * 50 });
                 }}
               />
               <DragHandle
@@ -1081,7 +1366,7 @@ export function RoomGeometry() {
                   const store = useStore.getState();
                   const targetDoor = store.scene.room.doors?.find(d => d.id === door.id);
                   if (targetDoor) {
-                    store.updateDoor(door.id, { widthMm: Math.max(10, targetDoor.widthMm - dx * 2000) });
+                    store.updateDoor(door.id, { widthMm: Math.max(100, Math.round((targetDoor.widthMm - dx * 2000) / 100) * 100) });
                   }
                 }}
               />
@@ -1095,7 +1380,7 @@ export function RoomGeometry() {
                   const store = useStore.getState();
                   const targetDoor = store.scene.room.doors?.find(d => d.id === door.id);
                   if (targetDoor) {
-                    store.updateDoor(door.id, { widthMm: Math.max(10, targetDoor.widthMm + dx * 2000) });
+                    store.updateDoor(door.id, { widthMm: Math.max(100, Math.round((targetDoor.widthMm + dx * 2000) / 100) * 100) });
                   }
                 }}
               />
@@ -1328,108 +1613,12 @@ export function RoomGeometry() {
         );
       })}
 
-      {/* Internal Partitions */}
-      {room.partitions?.map(part => {
-         const pL = part.lengthMm/1000;
-         const pT = part.thicknessMm/1000;
-         const pX = part.xMm/1000;
-         const pZ = part.zMm/1000;
-         const rotAngle = part.rotation === 90 ? Math.PI/2 : 0;
-         const isHovered = hoveredElementId === `part-${part.id}`;
-         const hP = isPitched && !isGable ? (frontH + backH)/2 : h;
-         
-         return (
-           <group 
-             key={part.id} 
-             position={[pX, hP/2, pZ]} 
-             rotation={[0, rotAngle, 0]}
-             onPointerOver={(e) => { e.stopPropagation(); useStore.getState().setHoveredElementId(`part-${part.id}`); }}
-             onPointerOut={() => useStore.getState().setHoveredElementId(null)}
-           >
-             <mesh castShadow receiveShadow>
-               <Geometry>
-                 <Base>
-                   <boxGeometry args={[pL, hP, pT]} />
-                 </Base>
-                 {(room.interiorDoors || []).map(door => {
-                   const dW = door.widthMm/1000;
-                   const dH = door.heightMm/1000;
-                   const dx = door.xMm/1000 - pX;
-                   const dz = door.zMm/1000 - pZ;
-                   const dy = dH/2 - hP/2;
-                   
-                   let localX = dx;
-                   let localZ = dz;
-                   if (part.rotation === 90) {
-                     localX = -dz;
-                     localZ = dx;
-                   }
-                   
-                   const relRot = door.rotation === part.rotation ? 0 : Math.PI/2;
-
-                   return (
-                     <Subtraction key={door.id} position={[localX, dy, localZ]} rotation={[0, relRot, 0]}>
-                       <boxGeometry args={[dW, dH, 0.4]} />
-                     </Subtraction>
-                   );
-                 })}
-               </Geometry>
-               <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
-             </mesh>
-             {room.showDimensions && isHovered && (
-               <>
-                 {part.rotation === 0 ? (
-                   <>
-                     {/* Right End Handle */}
-                     <DragHandle elementId={`part-${part.id}`} position={[pL/2, 0, 0]} axis="x" color="#ff0000" visualAxis="x" snapInterval={0.05} onChange={(dx) => {
-                       const current = useStore.getState().scene.room.partitions.find(p => p.id === part.id);
-                       if (!current) return;
-                       const newL = Math.max(100, current.lengthMm + dx * 1000);
-                       const diff = newL - current.lengthMm;
-                       useStore.getState().updatePartition(part.id, { lengthMm: newL, xMm: current.xMm + diff / 2 });
-                     }} />
-                     {/* Left End Handle */}
-                     <DragHandle elementId={`part-${part.id}`} position={[-pL/2, 0, 0]} axis="x" color="#ff0000" visualAxis="x" snapInterval={0.05} onChange={(dx) => {
-                       const current = useStore.getState().scene.room.partitions.find(p => p.id === part.id);
-                       if (!current) return;
-                       const newL = Math.max(100, current.lengthMm - dx * 1000);
-                       const diff = newL - current.lengthMm;
-                       useStore.getState().updatePartition(part.id, { lengthMm: newL, xMm: current.xMm + dx * 1000 + diff / 2 });
-                     }} />
-                     {/* Center Move Handle Z */}
-                     <DragHandle elementId={`part-${part.id}`} position={[0, 0, pT/2 + 0.2]} axis="z" visualAxis="z" color="#00ff00" snapInterval={0.05} onChange={(dz) => useStore.getState().updatePartition(part.id, { zMm: part.zMm + dz*1000 })} />
-                     {/* Center Move Handle X */}
-                     <DragHandle elementId={`part-${part.id}`} position={[0, hP/2 + 0.2, 0]} axis="x" visualAxis="x" color="#00ff00" snapInterval={0.05} onChange={(dx) => useStore.getState().updatePartition(part.id, { xMm: part.xMm + dx*1000 })} />
-                   </>
-                 ) : (
-                   <>
-                     {/* Top End Handle (Local +X, World -Z) */}
-                     <DragHandle elementId={`part-${part.id}`} position={[pL/2, 0, 0]} axis="z" color="#ff0000" visualAxis="x" snapInterval={0.05} onChange={(dz) => {
-                       const current = useStore.getState().scene.room.partitions.find(p => p.id === part.id);
-                       if (!current) return;
-                       const newL = Math.max(100, current.lengthMm - dz * 1000);
-                       const diff = newL - current.lengthMm;
-                       useStore.getState().updatePartition(part.id, { lengthMm: newL, zMm: current.zMm + dz * 1000 + diff / 2 });
-                     }} />
-                     {/* Bottom End Handle (Local -X, World +Z) */}
-                     <DragHandle elementId={`part-${part.id}`} position={[-pL/2, 0, 0]} axis="z" color="#ff0000" visualAxis="x" snapInterval={0.05} onChange={(dz) => {
-                       const current = useStore.getState().scene.room.partitions.find(p => p.id === part.id);
-                       if (!current) return;
-                       const newL = Math.max(100, current.lengthMm + dz * 1000);
-                       const diff = newL - current.lengthMm;
-                       useStore.getState().updatePartition(part.id, { lengthMm: newL, zMm: current.zMm + diff / 2 });
-                     }} />
-                     {/* Center Move Handle X */}
-                     <DragHandle elementId={`part-${part.id}`} position={[0, 0, -pT/2 - 0.2]} axis="x" visualAxis="z" color="#00ff00" snapInterval={0.05} onChange={(dx) => useStore.getState().updatePartition(part.id, { xMm: part.xMm + dx*1000 })} />
-                     {/* Center Move Handle Z */}
-                     <DragHandle elementId={`part-${part.id}`} position={[0, hP/2 + 0.2, 0]} axis="z" visualAxis="x" color="#00ff00" snapInterval={0.05} onChange={(dz) => useStore.getState().updatePartition(part.id, { zMm: part.zMm + dz*1000 })} />
-                   </>
-                 )}
-               </>
-             )}
-           </group>
-         )
-      })}
+      {/* Internal walls - one unified system. Each wall is selectable
+          (click), body-draggable with snapping to the room walls and other
+          internal walls, and owns its doors so they travel with it. */}
+      {room.partitions?.map(part => (
+        <PartitionUnit key={part.id} part={part} hP={isPitched && !isGable ? (frontH + backH)/2 : h} room={room} showDims={room.showDimensions} />
+      ))}
 
       {/* Interior Doors */}
       {(room.interiorDoors || []).map(door => {
@@ -1637,7 +1826,7 @@ export function RoomGeometry() {
                   label="Room Width"
                   onChange={(dx) => {
                     const store = useStore.getState();
-                    store.updateRoom({ widthMm: Math.max(10, Math.round(store.scene.room.widthMm + dx * 2000)) });
+                    store.updateRoom({ widthMm: Math.max(10, Math.round((store.scene.room.widthMm + dx * 2000) / 100) * 100) });
                   }} 
                 />
                 <DragHandle 
@@ -1646,7 +1835,7 @@ export function RoomGeometry() {
                   label="Room Width"
                   onChange={(dx) => {
                     const store = useStore.getState();
-                    store.updateRoom({ widthMm: Math.max(10, Math.round(store.scene.room.widthMm - dx * 2000)) });
+                    store.updateRoom({ widthMm: Math.max(10, Math.round((store.scene.room.widthMm - dx * 2000) / 100) * 100) });
                   }} 
                 />
               </>
@@ -1681,7 +1870,7 @@ export function RoomGeometry() {
                   onChange={(dz) => {
                     const store = useStore.getState();
                     // Z axis goes backwards!
-                    store.updateRoom({ depthMm: Math.max(10, Math.round(store.scene.room.depthMm + dz * 2000)) });
+                    store.updateRoom({ depthMm: Math.max(10, Math.round((store.scene.room.depthMm + dz * 2000) / 100) * 100) });
                   }} 
                 />
                 <DragHandle 
@@ -1690,7 +1879,7 @@ export function RoomGeometry() {
                   label="Room Depth"
                   onChange={(dz) => {
                     const store = useStore.getState();
-                    store.updateRoom({ depthMm: Math.max(10, Math.round(store.scene.room.depthMm - dz * 2000)) });
+                    store.updateRoom({ depthMm: Math.max(10, Math.round((store.scene.room.depthMm - dz * 2000) / 100) * 100) });
                   }} 
                 />
               </>
@@ -1729,7 +1918,7 @@ export function RoomGeometry() {
                 label={isGable || isPitched ? "Eaves Height" : "Front Height"}
                 onChange={(dy) => {
                   const store = useStore.getState();
-                  store.updateRoom({ heightMm: Math.max(10, Math.round(store.scene.room.heightMm + dy * 1000)) });
+                  store.updateRoom({ heightMm: Math.max(10, Math.round((store.scene.room.heightMm + dy * 1000) / 100) * 100) });
                 }} 
               />
             )}
@@ -1754,7 +1943,7 @@ export function RoomGeometry() {
                 color="#8a2be2"
                 onChange={(dy) => {
                   const store = useStore.getState();
-                  store.updateRoom({ roofHeightMm: Math.max(10, Math.round((store.scene.room.roofHeightMm || 200) + dy * 1000)) });
+                  store.updateRoom({ roofHeightMm: Math.max(10, Math.round(((store.scene.room.roofHeightMm || 200) + dy * 1000) / 100) * 100) });
                 }} 
               />
             </group>
@@ -1779,7 +1968,7 @@ export function RoomGeometry() {
                 onChange={(dx) => {
                    const store = useStore.getState();
                    const curW = store.scene.room.lShapeCutoutWidthMm ?? 2000;
-                   store.updateRoom({ lShapeCutoutWidthMm: Math.max(10, Math.round(curW - dx * 1000)) });
+                   store.updateRoom({ lShapeCutoutWidthMm: Math.max(10, Math.round((curW - dx * 1000) / 100) * 100) });
                 }}
               />
               <DimText 
@@ -1797,14 +1986,16 @@ export function RoomGeometry() {
                 onChange={(dz) => {
                    const store = useStore.getState();
                    const curD = store.scene.room.lShapeCutoutDepthMm ?? 1500;
-                   store.updateRoom({ lShapeCutoutDepthMm: Math.max(10, Math.round(curD - dz * 1000)) });
+                   store.updateRoom({ lShapeCutoutDepthMm: Math.max(10, Math.round((curD - dz * 1000) / 100) * 100) });
                 }}
               />
             </group>
           )}
 
-          {/* Back Height */}
-          {!isPlanView && (
+          {/* Back Height. Never on a gable - a gable is symmetric, its one
+              height story is eaves/ridge, and a separate back figure was how
+              stale nonsense numbers reached the 3D view and PDF. */}
+          {!isPlanView && !isGable && (
           <group position={[-w/2 - 0.5, (backH + baseH + roofH)/2, -d/2]}>
             <Line points={[[0, -(backH + baseH + roofH)/2, 0], [0, (backH + baseH + roofH)/2, 0]]} color="#000" lineWidth={1} />
             <Line points={[[-0.05, -(backH + baseH + roofH)/2 - 0.05, 0], [0.05, -(backH + baseH + roofH)/2 + 0.05, 0]]} color="#000" lineWidth={1} />
@@ -1829,7 +2020,7 @@ export function RoomGeometry() {
                 onChange={(dy) => {
                   const store = useStore.getState();
                   const curBackH = store.scene.room.backHeightMm ?? store.scene.room.heightMm;
-                  store.updateRoom({ backHeightMm: Math.max(10, Math.round(curBackH + dy * 1000)) });
+                  store.updateRoom({ backHeightMm: Math.max(10, Math.round((curBackH + dy * 1000) / 100) * 100) });
                 }} 
               />
             )}
@@ -1856,7 +2047,7 @@ export function RoomGeometry() {
                     color="#4a5568"
                     onChange={(dz) => {
                       const store = useStore.getState();
-                      const newSize = Math.max(0, Math.round((store.scene.room.canopySizeMm || 0) + dz * 1000));
+                      const newSize = Math.max(0, Math.round(((store.scene.room.canopySizeMm || 0) + dz * 1000) / 100) * 100);
                       store.updateRoom({ canopySizeMm: newSize });
                     }}
                   />
@@ -1877,7 +2068,7 @@ export function RoomGeometry() {
                 color="#4a5568"
                 onChange={(dz) => {
                   const store = useStore.getState();
-                  store.updateRoom({ overhangBackMm: Math.max(0, Math.round((store.scene.room.overhangBackMm || 0) - dz * 1000)) });
+                  store.updateRoom({ overhangBackMm: Math.max(0, Math.round(((store.scene.room.overhangBackMm || 0) - dz * 1000) / 100) * 100) });
                 }}
               />
 
@@ -1895,7 +2086,7 @@ export function RoomGeometry() {
                 color="#4a5568"
                 onChange={(dx) => {
                   const store = useStore.getState();
-                  store.updateRoom({ overhangLeftMm: Math.max(0, Math.round((store.scene.room.overhangLeftMm || 0) - dx * 1000)) });
+                  store.updateRoom({ overhangLeftMm: Math.max(0, Math.round(((store.scene.room.overhangLeftMm || 0) - dx * 1000) / 100) * 100) });
                 }}
               />
 
@@ -1913,7 +2104,7 @@ export function RoomGeometry() {
                 color="#4a5568"
                 onChange={(dx) => {
                   const store = useStore.getState();
-                  store.updateRoom({ overhangRightMm: Math.max(0, Math.round((store.scene.room.overhangRightMm || 0) + dx * 1000)) });
+                  store.updateRoom({ overhangRightMm: Math.max(0, Math.round(((store.scene.room.overhangRightMm || 0) + dx * 1000) / 100) * 100) });
                 }}
               />
             </group>
@@ -1939,7 +2130,7 @@ export function RoomGeometry() {
                     color="#8a6e4d"
                     onChange={(dz) => {
                       const store = useStore.getState();
-                      const newSize = Math.max(0, Math.round((store.scene.room.deckingSizeMm || 0) + dz * 1000));
+                      const newSize = Math.max(0, Math.round(((store.scene.room.deckingSizeMm || 0) + dz * 1000) / 100) * 100);
                       store.updateRoom({ deckingSizeMm: newSize });
                     }}
                   />
@@ -1968,8 +2159,8 @@ export function RoomGeometry() {
             )}
             {room.showDimensions && isPlanView && (
               <>
-                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(10, Math.round(useStore.getState().scene.room.widthMm + dx * 2000)) })} />}
-                <DragHandle elementId="room" position={[-w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(10, Math.round(useStore.getState().scene.room.widthMm - dx * 2000)) })} />
+                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(100, Math.round((useStore.getState().scene.room.widthMm + dx * 2000) / 100) * 100) })} />}
+                <DragHandle elementId="room" position={[-w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(100, Math.round((useStore.getState().scene.room.widthMm - dx * 2000) / 100) * 100) })} />
               </>
             )}
           </group>
@@ -1989,8 +2180,8 @@ export function RoomGeometry() {
             )}
             {room.showDimensions && isPlanView && (
               <>
-                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[0, 0, d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(10, Math.round(useStore.getState().scene.room.depthMm + dz * 2000)) })} />}
-                <DragHandle elementId="room" position={[0, 0, -d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(10, Math.round(useStore.getState().scene.room.depthMm - dz * 2000)) })} />
+                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[0, 0, d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(100, Math.round((useStore.getState().scene.room.depthMm + dz * 2000) / 100) * 100) })} />}
+                <DragHandle elementId="room" position={[0, 0, -d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(100, Math.round((useStore.getState().scene.room.depthMm - dz * 2000) / 100) * 100) })} />
               </>
             )}
           </group>
@@ -2010,8 +2201,8 @@ export function RoomGeometry() {
             )}
             {room.showDimensions && isPlanView && (
               <>
-                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(10, Math.round(useStore.getState().scene.room.widthMm + dx * 2000)) })} />}
-                <DragHandle elementId="room" position={[-w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(10, Math.round(useStore.getState().scene.room.widthMm - dx * 2000)) })} />
+                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(100, Math.round((useStore.getState().scene.room.widthMm + dx * 2000) / 100) * 100) })} />}
+                <DragHandle elementId="room" position={[-w/2, 0, 0]} axis="x" label="Width" onChange={(dx) => useStore.getState().updateRoom({ widthMm: Math.max(100, Math.round((useStore.getState().scene.room.widthMm - dx * 2000) / 100) * 100) })} />
               </>
             )}
           </group>
@@ -2031,8 +2222,8 @@ export function RoomGeometry() {
             )}
             {room.showDimensions && isPlanView && (
               <>
-                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[0, 0, d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(10, Math.round(useStore.getState().scene.room.depthMm + dz * 2000)) })} />}
-                <DragHandle elementId="room" position={[0, 0, -d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(10, Math.round(useStore.getState().scene.room.depthMm - dz * 2000)) })} />
+                {room.shape !== 'LShape' && <DragHandle elementId="room" position={[0, 0, d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(100, Math.round((useStore.getState().scene.room.depthMm + dz * 2000) / 100) * 100) })} />}
+                <DragHandle elementId="room" position={[0, 0, -d/2]} axis="z" label="Depth" onChange={(dz) => useStore.getState().updateRoom({ depthMm: Math.max(100, Math.round((useStore.getState().scene.room.depthMm - dz * 2000) / 100) * 100) })} />
               </>
             )}
           </group>
@@ -2053,7 +2244,7 @@ export function RoomGeometry() {
                 />
                 {room.showDimensions && (
                   <>
-                    <DragHandle position={[-cutW/2, 0, -0.3]} axis="x" label="Cutout" color="#ff8c00" onChange={(dx) => useStore.getState().updateRoom({ lShapeCutoutWidthMm: Math.max(10, Math.round((useStore.getState().scene.room.lShapeCutoutWidthMm ?? 2000) - dx * 1000)) })} />
+                    <DragHandle position={[-cutW/2, 0, -0.3]} axis="x" label="Cutout" color="#ff8c00" onChange={(dx) => useStore.getState().updateRoom({ lShapeCutoutWidthMm: Math.max(100, Math.round(((useStore.getState().scene.room.lShapeCutoutWidthMm ?? 2000) - dx * 1000) / 100) * 100) })} />
                   </>
                 )}
               </group>
@@ -2071,7 +2262,7 @@ export function RoomGeometry() {
                 />
                 {room.showDimensions && (
                   <>
-                    <DragHandle position={[-0.3, 0, -cutD/2]} axis="z" label="Cutout" color="#ff8c00" onChange={(dz) => useStore.getState().updateRoom({ lShapeCutoutDepthMm: Math.max(10, Math.round((useStore.getState().scene.room.lShapeCutoutDepthMm ?? 1500) - dz * 1000)) })} />
+                    <DragHandle position={[-0.3, 0, -cutD/2]} axis="z" label="Cutout" color="#ff8c00" onChange={(dz) => useStore.getState().updateRoom({ lShapeCutoutDepthMm: Math.max(100, Math.round(((useStore.getState().scene.room.lShapeCutoutDepthMm ?? 1500) - dz * 1000) / 100) * 100) })} />
                   </>
                 )}
               </group>

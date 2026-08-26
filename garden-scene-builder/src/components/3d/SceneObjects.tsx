@@ -2,10 +2,10 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { SceneObject } from '../../types';
 import * as THREE from 'three';
-import { useRef, useState, Suspense } from 'react';
+import { useRef, useState, useEffect, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from '@react-three/csg';
-import { useGLTF } from '@react-three/drei';
+import { useGLTF, Html } from '@react-three/drei';
 
 /**
  * Real bed model, replacing the previous box-built placeholder.
@@ -54,7 +54,41 @@ export function SceneObjects() {
     objects: s.scene.objects,
     isExporting: s.isExporting
   })));
-  
+
+  /**
+   * Keyboard control for the selected object - the fastest way to place
+   * furniture precisely once it is roughly in position:
+   *   arrows        nudge 5cm       shift+arrows  nudge 25cm
+   *   R             rotate 45deg    Delete        remove
+   *   Escape        deselect
+   * Ignored while typing in any input, so dimension fields keep their keys.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const st = useStore.getState();
+      const id = st.selectedObjectId;
+      if (!id) return;
+      const o = st.scene.objects.find(ob => ob.id === id);
+      if (!o) return;
+      const step = e.shiftKey ? 0.25 : 0.05;
+      let handled = true;
+      if (e.key === 'ArrowLeft')       { st.saveState(); st.updateObject(id, { x: o.x - step }); }
+      else if (e.key === 'ArrowRight') { st.saveState(); st.updateObject(id, { x: o.x + step }); }
+      else if (e.key === 'ArrowUp')    { st.saveState(); st.updateObject(id, { z: o.z - step }); }
+      else if (e.key === 'ArrowDown')  { st.saveState(); st.updateObject(id, { z: o.z + step }); }
+      else if (e.key === 'r' || e.key === 'R') { st.saveState(); st.updateObject(id, { rot: o.rot + Math.PI / 4 }); }
+      else if (e.key === 'Delete' || e.key === 'Backspace') { st.saveState(); st.removeObject(id); st.setSelectedObjectId(null); }
+      else if (e.key === 'Escape') { st.setSelectedObjectId(null); }
+      else handled = false;
+      if (handled) e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+
   return (
     <group>
       {objects.map(obj => {
@@ -87,13 +121,16 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   const handlePointerDown = (e: any) => {
     e.stopPropagation();
     if (viewMode === 'walking') return;
-    
+
     setSelectedObjectId(obj.id);
-    if (viewMode === 'plan') {
-       setIsDragging(true);
-       useStore.getState().setControlsEnabled(false);
-       e.target.setPointerCapture(e.pointerId);
-    }
+    // Draggable in EVERY editing view. Plan-only dragging was the single
+    // biggest interaction complaint: in the default 3D view objects selected
+    // but would not move, so placing furniture meant constantly flipping to
+    // plan. The ground-plane intersection works from any camera angle.
+    useStore.getState().saveState(); // one undo step per drag, throttled in the store
+    setIsDragging(true);
+    useStore.getState().setControlsEnabled(false);
+    e.target.setPointerCapture(e.pointerId);
   };
 
   const handlePointerUp = (e: any) => {
@@ -104,14 +141,25 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   };
 
   const handlePointerMove = (e: any) => {
-    if (isDragging && viewMode === 'plan') {
+    if (isDragging && viewMode !== 'walking') {
       const intersect = new THREE.Vector3();
       e.ray.intersectPlane(plane, intersect);
       if (intersect) {
         // Snap to 5cm grid to help "lock" items into place easily and align corners perfectly
-        const snap = 0.05; 
-        const nx = Math.round(intersect.x / snap) * snap;
-        const nz = Math.round(intersect.z / snap) * snap;
+        const snap = 0.05;
+        let nx = Math.round(intersect.x / snap) * snap;
+        let nz = Math.round(intersect.z / snap) * snap;
+        // Interior objects gently magnetise to the inside wall faces when
+        // within 12cm, so "push it against the wall" lands flush instead of
+        // hovering a grid-cell away.
+        if (isInterior) {
+          const wallT = 0.05;
+          const ix = room.widthMm / 2000 - wallT;
+          const iz = room.depthMm / 2000 - wallT;
+          const MAG = 0.12;
+          if (Math.abs(nx - -ix) < MAG) nx = -ix; else if (Math.abs(nx - ix) < MAG) nx = ix;
+          if (Math.abs(nz - -iz) < MAG) nz = -iz; else if (Math.abs(nz - iz) < MAG) nz = iz;
+        }
         updateObject(obj.id, { x: nx, z: nz });
       }
     }
@@ -645,11 +693,26 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
     >
       {meshContent}
       {isSelected && (
-        <mesh position={[0, 0.1, 0]} rotation={[-Math.PI/2, 0, 0]}>
-          <ringGeometry args={[2, 2.2, 32]} />
-          <meshBasicMaterial color="#10b981" side={THREE.DoubleSide} />
+        <mesh position={[0, 0.02, 0]} rotation={[-Math.PI/2, 0, 0]}>
+          {/* A tight ring reads as "this object", the old 2m halo read as
+              "somewhere around here" and overlapped every neighbour. */}
+          <ringGeometry args={[0.65, 0.75, 40]} />
+          <meshBasicMaterial color="#10b981" side={THREE.DoubleSide} transparent opacity={0.9} />
         </mesh>
       )}
+      {/* Live distances to the inside wall faces while dragging an interior
+          object - the numbers a real furniture plan is made of. */}
+      {isDragging && isInterior && (() => {
+        const w = room.widthMm / 1000, d = room.depthMm / 1000;
+        const f = (v: number) => `${Math.max(0, v).toFixed(2)}m`;
+        return (
+          <Html position={[0, 1.6, 0]} center style={{ pointerEvents: 'none' }} zIndexRange={[100, 0]}>
+            <div style={{ background: 'rgba(29,29,31,0.88)', color: '#fff', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', fontFamily: 'system-ui, sans-serif' }}>
+              &#8592; {f(obj.x + w / 2)} &nbsp;|&nbsp; {f(w / 2 - obj.x)} &#8594; &nbsp;&nbsp; &#8593; {f(obj.z + d / 2)} &nbsp;|&nbsp; {f(d / 2 - obj.z)} &#8595;
+            </div>
+          </Html>
+        );
+      })()}
     </group>
   );
 }

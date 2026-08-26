@@ -159,16 +159,23 @@ const UNLIMITED_PLANS = new Set(['business', 'master']);
 /**
  * Plans that include the Projects directory.
  *
- * Projects is a Business feature. It is not merely a screen: it stores client
- * names, addresses, quote values and uploaded files, all of which sit on our
- * Firestore and Storage bill for as long as the account exists — so it is not
+ * Projects is on every PAID plan, Standard included. It stores client names,
+ * addresses, quote values and uploaded files, all of which sit on our Firestore
+ * and Storage bill for as long as the account exists — so it is still not
  * something a free or trial account gets.
+ *
+ * Standard was moved in here deliberately. Holding it back made Standard a tier
+ * where nothing the customer produced was ever saved, which gave them no reason
+ * to stay past the month they stopped needing a render; the storage costs
+ * pennies and the retention is worth far more than the upsell it was protecting.
+ * Business is still distinguished by unlimited rendering, 4K, the configurator
+ * and Animation Studio.
  *
  * `master` is here because the owner must never be locked out of their own
  * application, and `tester` because the point of tester access is to evaluate
  * the product; a tester who cannot open Projects cannot report on it.
  */
-const PROJECT_PLANS = new Set(['business', 'master', 'tester', 'beta']);
+const PROJECT_PLANS = new Set(['standard', 'business', 'master', 'tester', 'beta']);
 
 /**
  * Plans that may generate animations.
@@ -1061,6 +1068,34 @@ const enforceMasterLock = (req, res, next) => {
  * Guidance page (the fetch 404ed and the catch swallowed it). It is a cheap
  * text-only call, hard-capped by the strict per-IP aiLimiter.
  */
+/**
+ * Traffic-light permitted-development verdict, computed by CODE.
+ *
+ * The light must never hallucinate, so the thresholds live here as plain
+ * maths (verified UK GPDO Class E, Aug 2026) and the model is only allowed
+ * to explain a verdict it is handed - never to decide one:
+ *   green - total height <= 2.5m: no 2m boundary set-off needed (the other
+ *           Class E conditions - behind the house, coverage, use - still apply)
+ *   amber - within the limits (gable: eaves <= 2.5m and ridge <= 4m;
+ *           flat: total <= 3m) BUT only when sited 2m+ from every boundary,
+ *           which the configurator cannot know - so: fine if positioned
+ *           right, confirm before building
+ *   red   - exceeds the Class E envelope; no siting rescues it
+ * Mirrored client-side in Sidebar.tsx for the live pill - keep in sync.
+ */
+const pdVerdict = (roomDetails) => {
+    const isGableRoof = String(roomDetails.shape) === 'Gable';
+    const total = Number(roomDetails.overallTotalHeightMm)
+        || Math.max(Number(roomDetails.overallTotalFrontHeightMm) || 0, Number(roomDetails.overallTotalBackHeightMm) || 0)
+        || Number(roomDetails.heightMm) || 0;
+    const eaves = Number(roomDetails.eavesHeightMm) || total;
+    let verdict;
+    if (total > 0 && total <= 2500) verdict = 'green';
+    else if (isGableRoof ? (eaves <= 2500 && total <= 4000) : total <= 3000) verdict = 'amber';
+    else verdict = 'red';
+    return { verdict, total, eaves, isGableRoof };
+};
+
 app.post('/api/planning-advice', aiLimiter, async (req, res) => {
     try {
         const { roomDetails } = req.body;
@@ -1068,28 +1103,151 @@ app.post('/api/planning-advice', aiLimiter, async (req, res) => {
             return res.status(400).json({ error: "Room details required" });
         }
 
-        const prompt = `You are a professional but very approachable planning consultant in the UK.
-Provide a simplified, easy-to-understand planning guide for a proposed garden room with the following specifications:
-${JSON.stringify(roomDetails, null, 2).slice(0, 4000)}
+        const { verdict, total, eaves, isGableRoof } = pdVerdict(roomDetails);
+        const VERDICT_HEADLINES = {
+            green: 'Likely Permitted Development',
+            amber: 'Permitted Development with conditions - get advice',
+            red: 'Planning permission likely required',
+        };
 
-CRITICAL NOTE FOR HEIGHTS:
-The overall total front height from ground to the very top is ${roomDetails.overallTotalFrontHeightMm || roomDetails.heightMm}mm.
-The overall total back height from ground to the very top is ${roomDetails.overallTotalBackHeightMm || roomDetails.backHeightMm}mm.
-Always use these numbers when assessing height for Permitted Development limits.
+        /**
+         * The PD CHECKLIST - each Class E criterion as pass / fail / unknown,
+         * all decided by code from the design's real numbers. 'unknown' means
+         * the configurator cannot know it (siting, land status, use) - those
+         * render amber and are exactly the questions NAPC answers.
+         */
+        const maxTotal = isGableRoof ? 4000 : 3000;
+        const checks = [
+            {
+                label: `Overall height within the ${isGableRoof ? '4.0m dual-pitch' : '3.0m'} limit`,
+                status: total <= maxTotal ? 'pass' : 'fail',
+                detail: `This design: ${(total / 1000).toFixed(2)}m`,
+            },
+            ...(isGableRoof ? [{
+                label: 'Eaves height within the 2.5m limit',
+                status: eaves <= 2500 ? 'pass' : 'fail',
+                detail: `This design: ${(eaves / 1000).toFixed(2)}m`,
+            }] : []),
+            {
+                label: 'Buildable within 2m of a boundary',
+                status: total <= 2500 ? 'pass' : (total <= maxTotal ? 'unknown' : 'fail'),
+                detail: total <= 2500
+                    ? 'Under 2.5m overall - no 2m boundary set-off needed'
+                    : (total <= maxTotal ? 'Over 2.5m - must sit 2m+ from every boundary' : 'Exceeds PD limits regardless of siting'),
+            },
+            {
+                label: 'Single storey',
+                status: 'pass',
+                detail: 'All configurator designs are single storey',
+            },
+            {
+                label: 'Behind the front of the house',
+                status: 'unknown',
+                detail: 'Depends on siting - not forward of the principal elevation',
+            },
+            {
+                label: 'Garden coverage under 50%',
+                status: 'unknown',
+                detail: 'Total of all outbuildings and extensions on the plot',
+            },
+            {
+                label: 'Incidental use (no sleeping accommodation)',
+                status: 'unknown',
+                detail: 'Office, gym or studio qualifies; an annexe does not',
+            },
+            {
+                label: 'Not listed / designated land restrictions',
+                status: 'unknown',
+                detail: 'Conservation areas, AONB and listed buildings carry extra rules',
+            },
+        ];
+        /**
+         * Indicative likelihood score. Deterministic and deliberately simple:
+         * anchored on the verdict, because the dims are the only part we can
+         * actually measure - the unknowns assume typical siting and use.
+         */
+        const score = verdict === 'green' ? 90 : verdict === 'amber' ? 65 : 15;
 
-Provide a simplified assessment covering:
-1. Do I need planning permission? (A simple summary of Permitted Development Rights based on dimensions and roof style, avoiding confusing jargon).
-2. Building Regulations (a simple summary based on size, boundary, and use).
-3. Recommendation: You must strongly recommend the National Annexe Planning Company (NAPC) and provide their website link: www.napc.uk. Explain why they are highly recommended (e.g., they are experts in securing planning permission and certificates of lawfulness for garden rooms, ensuring a stress-free and smooth process).
+        const prompt = `You are a professional but very approachable UK planning consultant explaining a
+PRE-COMPUTED permitted development verdict to a homeowner. You must NOT change the verdict - your job is
+to explain it clearly and helpfully.
 
-Write this as a helpful guide for a homeowner. Use plain text formatting. Do NOT use markdown symbols like asterisks (*) or hash (#). Use capitalized words for emphasis and numbering for lists. Keep it conversational but professional.`;
+THE BUILDING:
+${JSON.stringify(roomDetails, null, 2).slice(0, 3000)}
+
+THE COMPUTED FACTS (authoritative - use these numbers):
+- Roof: ${isGableRoof ? 'gable (dual pitched)' : 'flat / single pitch'}
+- Overall height (ground to highest point): ${total}mm
+- Eaves height: ${eaves}mm
+- VERDICT: ${verdict.toUpperCase()} - "${VERDICT_HEADLINES[verdict]}"
+
+VERDICT MEANINGS (Class E, GPDO 2015):
+- GREEN: total height <= 2.5m, so the 2m boundary set-off does NOT apply - it can sit right against a fence. Be clear the OTHER Class E conditions still apply: behind the front of the house, coverage, incidental use, and no side-of-house placement on designated land.
+- AMBER: within the height limits (${isGableRoof ? 'eaves <= 2.5m, ridge <= 4m for a dual-pitched roof' : 'overall <= 3m'}) BUT
+  this only applies when the building is sited 2m or more from EVERY boundary. The siting is not known,
+  so the owner must confirm it. ${!isGableRoof && total > 2500 ? 'Also caveat: some authorities apply the 2.5m eaves rule strictly to flat roofs - worth professional confirmation.' : ''}
+- RED: exceeds the permitted development envelope regardless of siting.${verdict === 'red' ? ` State the nearest compliant option plainly: ${isGableRoof ? `lower the ridge to 4000mm (and eaves to 2500mm or less)` : `lower the overall height to 3000mm`}, or apply for planning permission.` : ''}
+
+STANDARD CONDITIONS that always apply (mention briefly): property must be a house not a flat, building
+behind the front of the house, outbuildings covering under 50% of the garden, incidental use (no sleeping
+accommodation), stricter rules on conservation areas / listed buildings, and Building Regulations are a
+separate question (usually exempt under 15 sqm, or under 30 sqm if over 1m from boundaries or
+non-combustible).
+
+In napcNote, strongly recommend the National Annexe Planning Company (NAPC) at www.napc.uk${verdict !== 'green' ? ' - for this verdict especially, a Lawful Development Certificate or planning application handled by NAPC is the safe route' : ' for a Lawful Development Certificate giving formal proof this building is lawful'}.
+
+Plain English, no jargon, no markdown symbols.`;
 
         const response = await ai.models.generateContent({
             model: 'gemini-pro-latest',
-            contents: prompt
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        headline: { type: Type.STRING, description: "One-sentence plain-English summary of the verdict for THIS building" },
+                        reasons: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Why this verdict: the specific measurements vs the limits" },
+                        caveats: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Standard conditions and what could change the answer" },
+                        buildingRegs: { type: Type.STRING, description: "Two-sentence Building Regulations note" },
+                        napcNote: { type: Type.STRING, description: "The NAPC recommendation with www.napc.uk" },
+                    },
+                    required: ["headline", "reasons", "caveats", "buildingRegs", "napcNote"]
+                }
+            }
         });
 
-        res.json({ advice: response.text });
+        const parsed = JSON.parse(response.text);
+        // Legacy plain-text version, composed from the same parts, for any
+        // consumer still reading `advice` as a string.
+        const advice = [
+            `${VERDICT_HEADLINES[verdict].toUpperCase()}`,
+            parsed.headline,
+            '',
+            'WHY:',
+            ...parsed.reasons.map((r, i) => `${i + 1}. ${r}`),
+            '',
+            'WORTH KNOWING:',
+            ...parsed.caveats.map((c, i) => `${i + 1}. ${c}`),
+            '',
+            'BUILDING REGULATIONS: ' + parsed.buildingRegs,
+            '',
+            parsed.napcNote,
+        ].join('\n');
+
+        res.json({
+            verdict,
+            headline: parsed.headline,
+            reasons: parsed.reasons,
+            caveats: parsed.caveats,
+            buildingRegs: parsed.buildingRegs,
+            napcNote: parsed.napcNote,
+            totalHeightMm: total,
+            eavesHeightMm: eaves,
+            checks,
+            score,
+            advice,
+        });
     } catch (error) {
         console.error("Planning advice error:", error);
         res.status(500).json({ error: "Failed to generate planning advice" });
@@ -1147,6 +1305,108 @@ app.post('/api/beta/redeem', verifyFirebaseToken, betaLimiter, async (req, res) 
     } catch (e) {
         console.error('[BETA] Failed to grant access:', e);
         res.status(500).json({ error: 'Could not activate your account. Please try again.' });
+    }
+});
+
+/**
+ * Free public planning checker - a lead-gen tool, deliberately open to anyone.
+ *
+ * Registered BEFORE the master lock for the same reason as beta redemption:
+ * its whole point is that no account is needed. It spends real Gemini tokens
+ * with nobody to bill, so the per-IP daily cap is strict, and the refusal
+ * message itself sends people to NAPC - even the rate limit is marketing.
+ */
+const planningCheckLimiter = rateLimit({
+    windowMs: 24 * 60 * 60 * 1000,
+    max: 10,
+    keyGenerator: (req) => ipKeyGenerator(req.ip) || 'unknown',
+    message: { error: 'Daily limit reached for the free checker. For a full assessment, speak to the National Annexe Planning Company at www.napc.uk.' },
+    validate: { ip: false, xForwardedForHeader: false }
+});
+
+app.post('/api/public/planning-check', planningCheckLimiter, async (req, res) => {
+    try {
+        // Forgiving units: this trade thinks in millimetres, so "8000" in a
+        // metres box means 8m. Anything over 100 is unambiguously mm.
+        const num = (v, max) => {
+            let n = parseFloat(v);
+            if (!isFinite(n) || n <= 0) return null;
+            if (n > 100) n = n / 1000;
+            return n <= max ? Math.round(n * 100) / 100 : null;
+        };
+        const widthM     = num(req.body.widthM, 50);
+        const depthM     = num(req.body.depthM, 50);
+        const heightM    = num(req.body.heightM, 20);
+        const boundaryM  = num(req.body.boundaryM, 1000);
+        const description = sanitizeString(req.body.description, 600);
+        const isHouse       = sanitizeBool(req.body.isHouse);
+        const designatedLand = sanitizeBool(req.body.designatedLand);
+        const forwardOfHouse = sanitizeBool(req.body.forwardOfHouse);
+        const useRaw = sanitizeString(req.body.use, 20);
+        const useLabel = {
+            incidental: 'incidental use - office, gym, studio or hobby room',
+            garage: 'a garage or carport (incidental use; note any NEW driveway, access or dropped kerb is separate from Class E and may need its own consent)',
+            sleeping: 'guest room / occasional sleeping accommodation',
+            annexe: 'a self-contained annexe with kitchen/bathroom, lived in',
+            other: 'unspecified - judge from the description',
+        }[useRaw] || 'unspecified - judge from the description';
+        if (!widthM || !depthM || !heightM || boundaryM === null || !description.trim()) {
+            return res.status(400).json({ error: 'Please fill in the dimensions, boundary distance and a short description.' });
+        }
+
+        const prompt = `
+You are a UK planning guidance assistant assessing whether a proposed garden building is LIKELY to fall under Permitted Development (Class E, Part 1, Schedule 2 of the GPDO 2015 - outbuildings), or LIKELY to need planning permission.
+
+THE PROPOSAL:
+- Footprint: ${widthM}m wide x ${depthM}m deep
+- Maximum height: ${heightM}m
+- Distance to the nearest boundary: ${boundaryM}m
+- The property is ${isHouse ? 'a house' : 'NOT confirmed to be a house (may be a flat/maisonette - flats have NO permitted development rights for outbuildings)'}
+- On designated land (conservation area / AONB / National Park / World Heritage Site) or listed: ${designatedLand ? 'YES' : 'not stated - assume no but caveat it'}
+- Position relative to the house: ${forwardOfHouse ? 'IN FRONT of the principal elevation (between the house and the road) - this alone fails Class E' : 'behind or beside the house (not forward of the principal elevation)'}
+- Stated main use: ${useLabel}
+- The applicant describes it as: "${description}"
+
+APPLY THE CLASS E TESTS, including:
+- Within 2m of a boundary, TOTAL height must not exceed 2.5m.
+- Beyond 2m: max eaves 2.5m; max overall height 4m (dual-pitched roof) or 3m (any other roof).
+- Single storey only; no verandas, balconies or raised platforms over 300mm.
+- Not forward of the principal elevation.
+- Outbuildings + extensions must not cover more than 50% of the curtilage.
+- Use must be incidental to the enjoyment of the dwellinghouse (a garden office or gym usually qualifies; SLEEPING accommodation / self-contained annexe does NOT and typically needs permission).
+- Designated land and listed buildings carry extra restrictions: no outbuildings between a side elevation and the boundary on designated land; on National Parks / AONB / the Broads / World Heritage Sites, a building MORE THAN 20m from the house is limited to 10 square metres total; listed buildings have NO Class E rights at all.
+- Houses created by prior-approval conversions (Class Q barn conversions, Class M, MA, N, P, PA, G) have NO Class E rights - if the description hints the house is a conversion, caveat this.
+- Local authorities can remove PD rights via Article 4 directions or conditions on earlier permissions - always caveat that the applicant should confirm none apply.
+
+RULES FOR YOUR ANSWER:
+- Be honest about what you cannot know from this information; put those in caveats.
+- This is guidance, NOT legal advice or a formal determination - only a Lawful Development Certificate or planning decision settles it.
+- In napcNote, direct the user to the National Annexe Planning Company (NAPC) at www.napc.uk for a professional assessment, certificates of lawfulness and planning applications - especially if the verdict is not clearly permitted development.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-pro-latest',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        verdict: { type: Type.STRING, enum: ["likely_permitted_development", "likely_needs_permission", "unclear"] },
+                        headline: { type: Type.STRING, description: "One-sentence plain-English answer" },
+                        reasons: { type: Type.ARRAY, items: { type: Type.STRING }, description: "The specific Class E tests this proposal passes or fails" },
+                        caveats: { type: Type.ARRAY, items: { type: Type.STRING }, description: "What could change the answer" },
+                        napcNote: { type: Type.STRING, description: "Referral to NAPC (www.napc.uk)" },
+                    },
+                    required: ["verdict", "headline", "reasons", "caveats", "napcNote"]
+                }
+            }
+        });
+        const text = response.text;
+        if (!text) throw new Error('No answer returned');
+        res.json({ result: JSON.parse(text) });
+    } catch (e) {
+        console.error('planning-check error:', e);
+        res.status(500).json({ error: 'The checker could not run just now. Please try again in a moment.' });
     }
 });
 
@@ -2739,6 +2999,314 @@ app.get('/api/user/credits', async (req, res) => {
     } catch (error) {
         console.error("Error fetching user credits:", error);
         res.status(500).json({ error: "Could not fetch credits balance" });
+    }
+});
+
+/**
+ * CONTENT STUDIO
+ *
+ * Two endpoints, both behind the same auth and lock as everything else in /api.
+ */
+
+/** Aspect ratios the image model accepts, keyed by the studio's format ids. */
+const CONTENT_RATIOS = {
+    square: '1:1',
+    portrait: '4:5',
+    story: '9:16',
+    linkedin: '16:9',
+};
+
+/**
+ * AI Reframe - extend a render into a different aspect ratio.
+ *
+ * The difference between this and the browser-side compositor is the whole
+ * point of the feature. A canvas can letterbox a landscape render into a 9:16
+ * story, or blur the sides to fill it; only the model can invent the extra sky
+ * above and lawn below so the result looks like it was photographed that way.
+ *
+ * Costs a render, because it IS one - the model generates a new image. Priced
+ * at LOW_RES: the output is for a phone screen, so paying 4K rates for it would
+ * be daft.
+ */
+app.post('/api/content/reframe', userAiLimiter, async (req, res) => {
+    try {
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
+        const format = sanitizeString(req.body.format, 20);
+        const ratio = CONTENT_RATIOS[format];
+
+        if (!base64Image) return res.status(400).json({ error: 'A source image is required.' });
+        if (!ratio) return res.status(400).json({ error: 'Unknown format.' });
+
+        const access = await enforceRenderAccess(req, CREDIT_COSTS.LOW_RES);
+        if (!access.allowed) {
+            return res.status(access.status).json(access.body);
+        }
+
+        const prompt = `
+      TASK: Re-frame this architectural photograph to a ${ratio} aspect ratio by EXTENDING the scene.
+
+      THIS IS AN EXTENSION, NOT A CROP AND NOT A ZOOM:
+      - The building must stay COMPLETE and UNCHANGED. Do not cut any part of it
+        off, do not resize it relative to its surroundings, and do not alter its
+        materials, colours, proportions, windows or doors in any way.
+      - Generate NEW scenery to fill the space the new shape adds: more sky above,
+        more garden, lawn or paving below, more planting and fencing to the sides.
+      - Everything you add must be a plausible continuation of what is already
+        there - same time of day, same sun direction and shadow length, same
+        weather, same lens, same colour grade, same depth of field.
+      - Match grain and sharpness across the join. There must be no visible seam,
+        vignette or tonal step where the original image ends.
+
+      COMPOSITION:
+      - Place the building slightly below centre, leaving the upper third calmer,
+        so a caption or logo can sit over the image without covering the subject.
+      - Keep the horizon level and the verticals of the building perfectly upright.
+
+      OUTPUT: a single photorealistic image at ${ratio}, indistinguishable from a
+      real photograph taken in that format.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-image',
+            contents: {
+                parts: [
+                    { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+                    { text: prompt },
+                ],
+            },
+            config: {
+                outputMimeType: 'image/jpeg',
+                imageConfig: { aspectRatio: ratio, imageSize: '1K' },
+                // Low, because this is a faithfulness task rather than a creative
+                // one - the extension should be boring and seamless.
+                temperature: 0.15,
+            },
+        });
+
+        for (const part of response.candidates?.[0]?.content?.parts || []) {
+            if (part.inlineData) {
+                const d = part.inlineData.data;
+                const b64 = Buffer.isBuffer(d) ? d.toString('base64')
+                    : ((d instanceof Uint8Array || d instanceof ArrayBuffer) ? Buffer.from(d).toString('base64') : d);
+                return res.json({ result: b64 });
+            }
+        }
+        throw new Error('No reframed image was returned.');
+    } catch (error) {
+        console.error('[CONTENT] Reframe failed:', error);
+        res.status(500).json({ error: 'Could not reframe that image. Please try again.' });
+    }
+});
+
+/**
+ * Post copy written from the SPEC, not from the picture.
+ *
+ * A generic caption tool is looking at pixels and guessing. This one is handed
+ * the real dimensions and materials, which is why it can say "4.2m x 3m in
+ * Siberian larch" instead of "a beautiful modern garden building".
+ */
+/**
+ * Look at the render and suggest overlay copy.
+ *
+ * Different job from the caption endpoint. A caption is prose under the post;
+ * this is the handful of words that sit ON the image, where the constraint is
+ * severity - four words that fit a headline, not a paragraph. It reads the
+ * picture as well as the spec, so it can say "evening light" or "bifolds" when
+ * that is what is actually in shot.
+ *
+ * Free: it is a small text response, not an image generation.
+ */
+app.post('/api/content/suggest', userAiLimiter, async (req, res) => {
+    try {
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
+        if (!base64Image) return res.status(400).json({ error: 'An image is required.' });
+        const businessName = sanitizeString(req.body.businessName, 80);
+        const details = req.body.details && typeof req.body.details === 'object' ? req.body.details : {};
+
+        const prompt = `You are an art director writing the words that go ON a social post for a UK garden room company${businessName ? ` called ${businessName}` : ''}.
+
+Look at the image. Note the building's character, materials, glazing, planting, light and time of day.
+Known specification (use it, never contradict it, never invent beyond it):
+${JSON.stringify(details, null, 2).slice(0, 1200)}
+
+Give FOUR different options. Each has:
+- "headline": 2 to 5 words. This is set large over the photo, so it must be short, concrete and specific to THIS building. No slogans, no "transform your space", no exclamation marks.
+- "subline": 3 to 8 words of supporting detail - dimensions, material, or use. Sentence case.
+
+Vary the angle across the four: one factual, one about the feeling of the space, one about the material or craft, one about what it is used for.
+British English. No emoji, no hashtags, no markdown.
+
+Return STRICT JSON only, no code fence:
+{"options":[{"headline":"...","subline":"..."}],"altText":"one sentence describing the image for accessibility"}`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-pro-latest',
+            contents: {
+                parts: [
+                    { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+                    { text: prompt },
+                ],
+            },
+        });
+
+        const raw = String(response.text || '').replace(/```json|```/g, '').trim();
+        try {
+            const parsed = JSON.parse(raw);
+            const options = Array.isArray(parsed.options) ? parsed.options.slice(0, 6).map(o => ({
+                headline: String(o.headline || '').slice(0, 60),
+                subline: String(o.subline || '').slice(0, 90),
+            })).filter(o => o.headline) : [];
+            return res.json({ options, altText: String(parsed.altText || '') });
+        } catch {
+            console.warn('[CONTENT] Suggest returned unparseable JSON');
+            return res.json({ options: [], altText: '' });
+        }
+    } catch (error) {
+        console.error('[CONTENT] Suggest failed:', error);
+        res.status(500).json({ error: 'Could not read that image. Please try again.' });
+    }
+});
+
+/**
+ * Read a photo of a client's garden and describe it as a buildable brief.
+ *
+ * The goal is NOT to composite the building into the photograph. Asking an
+ * image model to place a render into a real scene means asking it to solve
+ * perspective, scale and sun direction at once, which it cannot do - it skews
+ * the building, guesses the size, and quietly redesigns it on the way through.
+ *
+ * So the photo is treated the way a visualiser treats site photos: as a brief.
+ * The garden gets rebuilt as CGI from this description, which is why the output
+ * has to be a list of renderable ELEMENTS - fence type and height, planting,
+ * paving material, levels - rather than atmosphere. The client recognises their
+ * garden because the parts match, not because any pixels survived.
+ *
+ * Free: a small text response, no image generation.
+ */
+app.post('/api/scene/describe', userAiLimiter, async (req, res) => {
+    try {
+        /**
+         * A photo, a written note, or both.
+         *
+         * Plenty of customers can simply say "north facing, close-board fence,
+         * lawn and a patio" without hunting for a photograph, and someone who
+         * has a photo often knows something it does not show - the shed that is
+         * out of shot, the fence they are about to replace. Where both arrive
+         * the note WINS, because it is the correction the person made after
+         * seeing what the photo produced.
+         */
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
+        const notes = sanitizeString(req.body.notes, 1500);
+        if (!base64Image && !notes) {
+            return res.status(400).json({ error: 'Add a photo or describe the garden.' });
+        }
+
+        const prompt = `You are a senior architectural visualiser writing a site brief for a client's garden. Another artist will rebuild this garden in 3D from your description alone - they will never see the source material.
+
+${base64Image ? 'Work from the photograph provided.' : 'Work from the written description below alone.'}
+${notes ? `\nThe client says:\n"""${notes}"""\n${base64Image ? 'Where this disagrees with the photo, BELIEVE THE CLIENT - they know their garden, and the photo may be old or out of shot.' : ''}` : ''}
+${!base64Image ? 'Fill in anything they have not mentioned with the most typical UK garden option, and keep it plain and unremarkable rather than inventing features.' : ''}
+
+Describe ONLY the setting. Ignore any existing building, shed or outbuilding: a new garden room will be placed here, and describing the old one would confuse the render.
+
+Be concrete and physical. "Close-board timber fence, about 1.8m, weathered grey-brown" is useful. "A charming, peaceful space" is not - it cannot be built.
+
+Where something is unclear in the photo, choose the most typical UK garden option rather than guessing wildly, and keep it plain.
+
+Return STRICT JSON only, no code fence, no markdown:
+{
+  "boundary": "fence or wall type, height, material, condition",
+  "levels": "flat, sloping, terraced, steps and their rough height",
+  "hardLandscaping": "patio, path and decking materials, colours, sizes",
+  "planting": "lawn condition, trees, shrubs, borders - species where obvious, character where not",
+  "context": "what is visible beyond the boundary - neighbouring rooflines, trees, open fields",
+  "aspect": "which way the garden appears to face and where the light comes from",
+  "character": "one short phrase - suburban, rural, courtyard, coastal",
+  "summary": "two sentences a visualiser could build from"
+}`;
+
+        const parts = [];
+        if (base64Image) parts.push({ inlineData: { mimeType: 'image/jpeg', data: base64Image } });
+        parts.push({ text: prompt });
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-pro-latest',
+            contents: { parts },
+        });
+
+        const raw = String(response.text || '').replace(/```json|```/g, '').trim();
+        try {
+            const p = JSON.parse(raw);
+            const pick = (v) => (typeof v === 'string' ? v.slice(0, 400) : '');
+            return res.json({
+                boundary: pick(p.boundary),
+                levels: pick(p.levels),
+                hardLandscaping: pick(p.hardLandscaping),
+                planting: pick(p.planting),
+                context: pick(p.context),
+                aspect: pick(p.aspect),
+                character: pick(p.character),
+                summary: pick(p.summary),
+            });
+        } catch {
+            console.warn('[SCENE] Describe returned unparseable JSON');
+            return res.status(502).json({ error: 'Could not read that photo. Please try another.' });
+        }
+    } catch (error) {
+        console.error('[SCENE] Describe failed:', error);
+        res.status(500).json({ error: 'Could not read that photo. Please try again.' });
+    }
+});
+
+app.post('/api/content/captions', userAiLimiter, async (req, res) => {
+    try {
+        const platform = sanitizeString(req.body.platform, 20) || 'instagram';
+        const tone = sanitizeString(req.body.tone, 30) || 'friendly';
+        const businessName = sanitizeString(req.body.businessName, 80);
+        const details = req.body.details && typeof req.body.details === 'object' ? req.body.details : {};
+
+        const house = platform === 'linkedin'
+            ? 'LinkedIn: professional and specific, first person plural, a short case-study note. No emoji. 3-4 short paragraphs at most.'
+            : 'Instagram: warm and direct, short lines, a hook in the first sentence because the rest is hidden behind "more". A few tasteful emoji are fine.';
+
+        const prompt = `You write social posts for a UK garden room and outbuilding company${businessName ? ` called ${businessName}` : ''}.
+
+Write a post about this finished project. These are the REAL specifications - use the actual numbers and materials, never invent any:
+${JSON.stringify(details, null, 2).slice(0, 2000)}
+
+Platform - ${house}
+Tone: ${tone}.
+
+RULES:
+- British English. Metres and millimetres, never feet.
+- Never invent a price, a lead time, a location or a client name that is not above.
+- No hard sell and no "DM us now" energy. One gentle closing line is enough.
+- Do not use markdown, asterisks or headings.
+
+Return STRICT JSON only, no code fence, in exactly this shape:
+{"caption":"the post text","hashtags":["#tag","#tag"],"altText":"one sentence describing the image for accessibility"}
+Between 8 and 12 hashtags, lowercase, a mix of broad and niche, relevant to UK garden rooms.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-pro-latest',
+            contents: prompt,
+        });
+
+        // The model is asked for bare JSON but will occasionally fence it anyway.
+        const raw = String(response.text || '').replace(/```json|```/g, '').trim();
+        try {
+            const parsed = JSON.parse(raw);
+            return res.json({
+                caption: String(parsed.caption || ''),
+                hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags.slice(0, 14).map(String) : [],
+                altText: String(parsed.altText || ''),
+            });
+        } catch {
+            // Better a caption with no hashtags than an error screen.
+            return res.json({ caption: raw, hashtags: [], altText: '' });
+        }
+    } catch (error) {
+        console.error('[CONTENT] Caption generation failed:', error);
+        res.status(500).json({ error: 'Could not write a caption. Please try again.' });
     }
 });
 

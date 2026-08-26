@@ -2,7 +2,7 @@ import React from 'react';
 import {
     Share2, Clock, PoundSterling, FileCheck, Users, Repeat,
     ArrowRight, Instagram, Camera, TrendingUp, Box, Sofa, Rotate3d,
-    Layers, Palette, FileText, FolderOpen, Film,
+    Layers, Palette, FileText, FolderOpen, Film, ClipboardCheck,
 } from 'lucide-react';
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
@@ -125,6 +125,11 @@ const USE_CASES: UseCase[] = [
 
 const PIPELINE = [
     {
+        icon: <ClipboardCheck size={20} />,
+        title: 'Check it',
+        body: 'Run the plot through the free Planning Checker and know whether it is permitted development before you quote.',
+    },
+    {
         icon: <Box size={20} />,
         title: 'Design it',
         body: 'Build the room to real dimensions in the 3D Configurator, with live costing as you go.',
@@ -147,7 +152,7 @@ const PIPELINE = [
     {
         icon: <FolderOpen size={20} />,
         title: 'Keep it',
-        body: 'Everything filed against the client and job in Projects, on any device you sign in from.',
+        body: 'Everything filed against the client and job in Projects, on any device you sign in from, and shareable with the client as a single read-only link.',
     },
 ];
 
@@ -163,14 +168,15 @@ const ROADMAP: RoadmapItem[] = [
     {
         icon: <Box size={22} />,
         title: '3D Configurator',
-        status: 'In development',
+        status: 'In beta now',
         body:
-            'Build a garden room to real dimensions in the browser, then send any view straight into the Render Engine. Because the geometry is real rather than generated, every elevation agrees with every other one.',
+            'Build a garden room to real dimensions in the browser, then send any view straight into the Render Engine. Because the geometry is real rather than generated, every elevation agrees with every other one. Usable today on the Business plan, and still gaining ground.',
         points: [
-            'Millimetre-accurate footprint, heights and roof form',
+            'Millimetre-accurate footprint, eaves and ridge heights, box or gable',
+            'Internal walls you select, drag and snap, with doors that travel with them',
             'Live cost estimate as the specification changes',
-            'Plan, elevation and walk-through views',
-            'Export a PDF pack with drawings and guidance',
+            'Plan, elevation and walk-through views, saved to your account',
+            'PDF pack with drawings, a permitted development checklist and a planning likelihood score',
         ],
     },
     {
@@ -269,7 +275,7 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                             </p>
                         </div>
 
-                        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {PIPELINE.map((step, i) => (
                                 <div key={step.title} className={`${CARD} p-6 space-y-3 relative`}>
                                     <div className="flex items-center gap-3">
@@ -349,7 +355,7 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                         <div className="grid lg:grid-cols-12 gap-10 items-end">
                             <div className="lg:col-span-7 space-y-5">
                                 <div className={TYPE.eyebrow}>What people use it for</div>
-                                <h2 className={TYPE.h2}>Six ways it pays for itself.</h2>
+                                <h2 className={TYPE.h2}>Seven ways it pays for itself.</h2>
                             </div>
                             <p className={`lg:col-span-5 ${TYPE.body}`}>
                                 From the first post on Instagram to the final planning submission.
@@ -441,11 +447,12 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                     <section className="space-y-10">
                         <div className="grid lg:grid-cols-12 gap-10 items-end">
                             <div className="lg:col-span-7 space-y-5">
-                                <div className={TYPE.eyebrow}>Coming soon</div>
-                                <h2 className={TYPE.h2}>What we are building next.</h2>
+                                <div className={TYPE.eyebrow}>Now and next</div>
+                                <h2 className={TYPE.h2}>What we are building.</h2>
                             </div>
                             <p className={`lg:col-span-5 ${TYPE.body}`}>
-                                Included as they ship, at no extra cost on an existing plan.
+                                One of these is already in your account. The rest are included as they
+                                ship, at no extra cost on an existing plan.
                             </p>
                         </div>
 

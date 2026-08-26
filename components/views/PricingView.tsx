@@ -58,6 +58,7 @@ const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: s
      */
     { label: 'Renders',            trial: '5 (24 hours)', standard: '100 per month', business: 'Unlimited' },
     { label: 'Output quality',     trial: '1080p Full HD', standard: '1080p Full HD', business: '4K Ultra HD' },
+    { label: 'Planning Checker',   trial: 'Free to all', standard: 'Free to all', business: 'Free to all' },
     { label: 'Render Engine',      trial: true,  standard: true,  business: true },
     { label: 'Line Converter',     trial: true,  standard: true,  business: true },
     { label: 'Weather Lab',        trial: true,  standard: true,  business: true },
@@ -65,7 +66,7 @@ const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: s
     { label: 'Content Studio',     trial: false, standard: false, business: true },
     { label: '3D Configurator',    trial: false, standard: false, business: true },
     { label: 'Animation Studio',   trial: false, standard: false, business: true },
-    { label: 'Projects & clients', trial: false, standard: false, business: true },
+    { label: 'Projects & clients', trial: false, standard: true,  business: true },
     { label: 'Commercial rights',  trial: false, standard: true,  business: true },
     { label: 'Priority queue',     trial: false, standard: false, business: true },
 ];

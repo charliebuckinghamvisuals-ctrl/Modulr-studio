@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SceneState, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, Door, InteriorDoorData } from './types';
+import { SceneState, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AppState {
@@ -61,6 +61,9 @@ interface AppState {
   addPartition: () => void;
   updatePartition: (id: string, updates: Partial<PartitionData>) => void;
   removePartition: (id: string) => void;
+  addPartitionDoor: (partitionId: string) => void;
+  updatePartitionDoor: (partitionId: string, doorId: string, updates: Partial<PartitionDoor>) => void;
+  removePartitionDoor: (partitionId: string, doorId: string) => void;
   
     addInteriorDoor: () => void;
   updateInteriorDoor: (id: string, updates: Partial<InteriorDoorData>) => void;
@@ -274,7 +277,17 @@ export const useStore = create<AppState>((set, get) => ({
     selectedElementId: null,
   })),
 
-  updateRoom: (updates) => set((state) => {
+  updateRoom: (updates) => {
+    /**
+     * Snapshot BEFORE every room change, at the store level. Individual UI
+     * paths (shape picker, typed dimensions, door edits) kept forgetting to
+     * call saveState, so Undo skipped their changes and jumped to whatever
+     * older snapshot existed. saveState's own 1-second collapse turns slider
+     * drags and per-frame updates into a single undo step, so calling it
+     * unconditionally here is safe.
+     */
+    get().saveState();
+    return set((state) => {
     let finalUpdates = { ...updates };
     const currentRoom = state.scene.room;
     
@@ -297,7 +310,8 @@ export const useStore = create<AppState>((set, get) => ({
     return {
       scene: { ...state.scene, room: { ...state.scene.room, ...finalUpdates } }
     };
-  }),
+  });
+  },
 
   updatePricing: (updates) => set((state) => ({
     scene: { ...state.scene, pricing: { ...state.scene.pricing, ...updates } }
@@ -467,7 +481,7 @@ export const useStore = create<AppState>((set, get) => ({
     }
   })),
 
-  addPartition: () => set((state) => ({
+  addPartition: () => { get().saveState(); return set((state) => ({
     scene: {
       ...state.scene,
       room: {
@@ -481,13 +495,14 @@ export const useStore = create<AppState>((set, get) => ({
             lengthMm: 2000,
             thicknessMm: 100,
             rotation: 0,
+            doors: [],
           }
         ]
       }
     }
-  })),
+  })); },
 
-  updatePartition: (id, updates) => set((state) => ({
+  updatePartition: (id, updates) => { get().saveState(); return set((state) => ({
     scene: {
       ...state.scene,
       room: {
@@ -495,7 +510,48 @@ export const useStore = create<AppState>((set, get) => ({
         partitions: (state.scene.room.partitions || []).map(p => p.id === id ? { ...p, ...updates } : p)
       }
     }
-  })),
+  })); },
+
+  /**
+   * Doors that BELONG to an internal wall. All three go through the same
+   * partitions array, so the door travels when the wall moves and undo
+   * captures each change like any other room edit.
+   */
+  addPartitionDoor: (partitionId) => { get().saveState(); return set((state) => ({
+    scene: {
+      ...state.scene,
+      room: {
+        ...state.scene.room,
+        partitions: (state.scene.room.partitions || []).map(p => p.id === partitionId
+          ? { ...p, doors: [...(p.doors || []), { id: uuidv4(), offsetMm: 0, widthMm: 800, heightMm: 2000 }] }
+          : p)
+      }
+    }
+  })); },
+
+  updatePartitionDoor: (partitionId, doorId, updates) => { get().saveState(); return set((state) => ({
+    scene: {
+      ...state.scene,
+      room: {
+        ...state.scene.room,
+        partitions: (state.scene.room.partitions || []).map(p => p.id === partitionId
+          ? { ...p, doors: (p.doors || []).map(dr => dr.id === doorId ? { ...dr, ...updates } : dr) }
+          : p)
+      }
+    }
+  })); },
+
+  removePartitionDoor: (partitionId, doorId) => { get().saveState(); return set((state) => ({
+    scene: {
+      ...state.scene,
+      room: {
+        ...state.scene.room,
+        partitions: (state.scene.room.partitions || []).map(p => p.id === partitionId
+          ? { ...p, doors: (p.doors || []).filter(dr => dr.id !== doorId) }
+          : p)
+      }
+    }
+  })); },
 
   removePartition: (id) => set((state) => ({
     scene: {
@@ -612,7 +668,8 @@ export const useStore = create<AppState>((set, get) => ({
 
     let partitionsPrice = 0;
     (room.partitions || []).forEach(part => {
-       const lengthM = part.lengthMm / 1000;
+       // An L-shaped wall is priced by its total run: main length plus leg.
+       const lengthM = (part.lengthMm + (part.legLengthMm || 0)) / 1000;
        partitionsPrice += lengthM * pricing.partitionLmPrice;
     });
 
@@ -621,3 +678,9 @@ export const useStore = create<AppState>((set, get) => ({
     return baseStructure + claddingPrice + floorPrice + roofPrice + doorPrice + windowsPrice + skylightsPrice + partitionsPrice + deckingPrice + pictureFramePrice;
   }
 }));
+
+// Debug handle for development tooling - lets DevTools inspect the undo
+// stack and scene without React DevTools. Harmless in production.
+if (typeof window !== 'undefined') {
+  (window as any).__modulrStore = useStore;
+}

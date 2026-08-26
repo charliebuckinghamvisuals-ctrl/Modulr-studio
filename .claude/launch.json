@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "garden-scene-builder", "run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "cost-controls-dev",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "C:/Users/CHARLI~1/DOWNLO~1/MODULR~1/dev.cmd"],
+      "port": 3000
     }
   ]
 }

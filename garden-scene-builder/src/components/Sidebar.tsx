@@ -54,6 +54,8 @@ function DeferredInput({ type, value, onChange, className, ...props }: any) {
 export function Sidebar() {
   const store = useStore.getState();
   const wrap = (fn: any) => (...args: any[]) => { store.saveState(); fn(...args); };
+  // Reactive read so the selected wall's card highlights as selection changes.
+  const selectedElementId = useStore(s => s.selectedElementId);
 
   const { room, env, viewMode, areDoorsOpen, toggleDoors } = useStore(useShallow(s => ({
     room: s.scene.room,
@@ -170,9 +172,91 @@ export function Sidebar() {
 
         {tab === 'building' && (
           <>
+            {/* Shape comes FIRST: it is the decision everything else depends
+                on. It used to live six sections down inside "Base Model &
+                Features", where even the owner could not find the Gable
+                option. */}
+            <CollapsibleSection title="Roof Shape" defaultOpen={true}>
+              <div className="grid grid-cols-2 gap-2">
+                {(['Box', 'Gable'] as const).map((shape) => (
+                  <div key={shape} onClick={() => {
+                    if (room.shape === shape) return;
+                    const baseH = room.baseHeightMm ?? 100;
+                    const roofH = room.roofHeightMm ?? 200;
+                    if (shape === 'Gable') {
+                      // Box stores WALL height; Gable stores total-to-ridge.
+                      // Convert so the eaves line stays exactly where the flat
+                      // roof's top was, and open with a real 1m pitch instead
+                      // of inheriting the 200-300mm fascia - which rendered as
+                      // a near-flat pancake that looked broken.
+                      const eavesTotal = (room.heightMm ?? 2350) + baseH + roofH;
+                      const rise = Math.max(roofH, 1000);
+                      // backHeightMm is a flat/pent concept a gable ignores -
+                      // but stale values leaked into the PDF ("2010mm at
+                      // back"), so it is normalised to the front wall height.
+                      updateRoom({ shape: 'Gable', heightMm: eavesTotal + rise, roofHeightMm: rise, backHeightMm: room.heightMm ?? 2350 });
+                    } else {
+                      const eavesTotal = (room.heightMm ?? 2350) - roofH;
+                      updateRoom({ shape: 'Box', heightMm: Math.max(10, eavesTotal - baseH - 200), roofHeightMm: 200 });
+                    }
+                  }} className={`p-3 rounded-xl text-center cursor-pointer transition-all ${room.shape === shape ? 'bg-[#3b4d4a] text-white shadow-md' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
+                    <span className="text-[11px] font-semibold tracking-wide">{shape === 'Box' ? 'Flat Roof' : 'Gable Roof'}</span>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
+
+            {/* Live permitted-development traffic light. Pure client-side
+                maths, MIRRORING pdVerdict in server.js (keep in sync):
+                green <= 2.5m total; amber within Class E limits but needs 2m+
+                boundary siting; red exceeds the PD envelope. Updates as the
+                user resizes, so planning becomes a design constraint they can
+                feel - drag the ridge past 4m and watch it go red. */}
+            {(() => {
+              const isG = room.shape === 'Gable';
+              const baseH = room.baseHeightMm ?? 100;
+              const roofH = room.roofHeightMm ?? 200;
+              const frontTotal = (room.heightMm ?? 2350) + (isG ? 0 : baseH + roofH);
+              const backTotal = isG ? frontTotal : (room.backHeightMm ?? room.heightMm ?? 2350) + baseH + roofH;
+              const total = Math.max(frontTotal, backTotal);
+              const eaves = isG ? (room.heightMm ?? 2350) - roofH : total;
+              const light = total <= 2500
+                ? { key: 'green', bg: 'bg-emerald-600', label: 'Likely Permitted Development', sub: 'Under 2.5m - no boundary set-off (still behind the house)' }
+                : (isG ? (eaves <= 2500 && total <= 4000) : total <= 3000)
+                  ? { key: 'amber', bg: 'bg-amber-500', label: 'PD with conditions', sub: 'Only if sited 2m+ from every boundary - get advice' }
+                  : { key: 'red', bg: 'bg-red-600', label: 'Permission likely required', sub: isG ? 'Lower the ridge to 4000mm to fit PD, or apply' : 'Lower the height to 3000mm to fit PD, or apply' };
+              return (
+                <div className={`${light.bg} text-white rounded-xl px-3 py-2.5 flex items-center gap-2.5`}>
+                  <span className="flex gap-1 shrink-0">
+                    {(['green', 'amber', 'red'] as const).map(k => (
+                      <span key={k} className={`w-2 h-2 rounded-full ${k === light.key ? 'bg-white' : 'bg-white/30'}`} />
+                    ))}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[11px] font-bold leading-tight">{light.label}</span>
+                    <span className="block text-[9px] opacity-85 leading-tight">{light.sub}</span>
+                  </span>
+                </div>
+              );
+            })()}
+
             <CollapsibleSection title="Dimensions" defaultOpen={true}>
               <div className="space-y-3">
-                {[
+                {/* A gable is specced the way surveyors and planners spec it:
+                    EAVES height and RIDGE height, both as totals from the
+                    ground. Internally heightMm stays "total to ridge" and
+                    roofHeightMm the rise - these two fields are just the
+                    honest projection of that model. Flat roofs keep the
+                    original front/back/fascia fields. */}
+                {(room.shape === 'Gable' ? [
+                  { label: 'Total Width', key: 'widthMm', hidden: viewMode !== 'plan' },
+                  { label: 'Total Depth', key: 'depthMm', hidden: viewMode !== 'plan' },
+                  { label: 'Eaves Height', key: '__eavesMm' },
+                  { label: 'Ridge Height', key: '__ridgeMm' },
+                  { label: 'Fascia Depth', key: 'gableFasciaMm' },
+                  { label: 'Base Height', key: 'baseHeightMm' },
+                  { label: 'Wall Thickness', key: 'wallThicknessMm' },
+                ] : [
                   { label: 'Total Width', key: 'widthMm', hidden: viewMode !== 'plan' },
                   { label: 'Total Depth', key: 'depthMm', hidden: viewMode !== 'plan' },
                   { label: 'Total Front Height', key: 'heightMm' },
@@ -180,7 +264,7 @@ export function Sidebar() {
                   { label: 'Base Height', key: 'baseHeightMm' },
                   { label: 'Fascia Height', key: 'roofHeightMm' },
                   { label: 'Wall Thickness', key: 'wallThicknessMm' },
-                ].filter(d => !d.hidden).map(dim => {
+                ]).filter(d => !d.hidden).map(dim => {
                   const baseH = room.baseHeightMm ?? 100;
                   const roofH = room.roofHeightMm ?? 200;
                   // For Gable, heightMm is ALREADY the total height (the 3D
@@ -188,10 +272,14 @@ export function Sidebar() {
                   // showed a total 450mm taller than the 3D label for the same
                   // building. Box stores wall height, so it still converts.
                   const heightIsTotal = room.shape === 'Gable';
+                  const ridgeTotal = room.heightMm ?? 2350;
                   let val = room[dim.key as keyof typeof room] as number;
                   if (dim.key === 'heightMm') val = (room.heightMm ?? 2350) + (heightIsTotal ? 0 : baseH + roofH);
                   if (dim.key === 'backHeightMm') val = (room.backHeightMm ?? room.heightMm ?? 2350) + (heightIsTotal ? 0 : baseH + roofH);
                   if (dim.key === 'wallThicknessMm') val = room.wallThicknessMm || 150;
+                  if (dim.key === '__ridgeMm') val = ridgeTotal;
+                  if (dim.key === '__eavesMm') val = ridgeTotal - roofH;
+                  if (dim.key === 'gableFasciaMm') val = room.gableFasciaMm ?? 100;
 
                   return (
                     <div key={dim.key} className="flex items-center gap-2">
@@ -200,6 +288,19 @@ export function Sidebar() {
                         value={val}
                         onChange={(e) => {
                           let newVal = parseInt(e.target.value) || 0;
+                          if (dim.key === '__ridgeMm') {
+                            // Ridge moves, eaves stay put: the rise absorbs it.
+                            const eaves = ridgeTotal - roofH;
+                            const ridge = Math.max(eaves + 100, newVal);
+                            updateRoom({ heightMm: ridge, roofHeightMm: ridge - eaves });
+                            return;
+                          }
+                          if (dim.key === '__eavesMm') {
+                            // Eaves move, ridge stays put: the rise absorbs it.
+                            const eaves = Math.min(ridgeTotal - 100, Math.max(1000, newVal));
+                            updateRoom({ roofHeightMm: ridgeTotal - eaves });
+                            return;
+                          }
                           if ((dim.key === 'heightMm' || dim.key === 'backHeightMm') && !heightIsTotal) {
                             newVal = newVal - baseH - roofH;
                           }
@@ -510,14 +611,7 @@ export function Sidebar() {
             </CollapsibleSection>
 
             <CollapsibleSection title="Base Model & Features" defaultOpen={true}>
-              <div className="grid grid-cols-2 gap-2">
-                {['Box', 'Gable'].map((shape) => (
-                  <div key={shape} onClick={() => updateRoom({ shape: shape as any })} className={`p-3 rounded-xl text-center cursor-pointer transition-all ${room.shape === shape ? 'bg-[#3b4d4a] text-white shadow-md' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
-                    <span className="text-[11px] font-semibold tracking-wide">{shape}</span>
-                  </div>
-                ))}
-              </div>
-              
+
               <div className="space-y-3">
                 {[
                   { label: 'Has Canopy', key: 'hasCanopy' as const },
@@ -658,23 +752,71 @@ export function Sidebar() {
             </CollapsibleSection>
 
             <CollapsibleSection title="Internal Walls">
-              <div className="flex gap-2 mb-4">
-                <button onClick={wrap(store.addPartition)} className="flex-1 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm">+ Wall</button>
-                <button onClick={wrap(store.addInteriorDoor)} className="flex-1 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm">+ Door</button>
-              </div>
+              {/* ONE system: walls own their doors. The old separate "+ Door"
+                  created world-positioned doors that stayed behind when their
+                  wall moved; new doors are added per-wall below. */}
+              <button onClick={wrap(store.addPartition)} className="w-full bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-2 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all shadow-sm mb-4">+ Add Internal Wall</button>
+              <p className="text-[10px] text-gray-400 mb-3 leading-snug">Click a wall in the 3D view to select it, then drag its body to move (it snaps to the room and other walls), red ends to resize, green handles to slide doors.</p>
               <div className="space-y-3">
                 {room.partitions?.map((part, i) => (
-                  <div key={part.id} className="p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-4 relative group">
-                    <button onClick={() => wrap(store.removePartition)(part.id)} className="absolute top-3 right-3 text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div key={part.id} onClick={() => store.setSelectedElementId(`part-${part.id}`)} className={`p-4 bg-white border rounded-xl shadow-sm space-y-3 relative group cursor-pointer transition-colors ${selectedElementId === `part-${part.id}` ? 'border-[#3b4d4a]' : 'border-black/5'}`}>
+                    <button onClick={(e) => { e.stopPropagation(); wrap(store.removePartition)(part.id); }} className="absolute top-3 right-3 text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Trash2 size={14} />
                     </button>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-gray-800">Wall #{i + 1}</span>
-                      <button onClick={(e) => wrap(store.updatePartition)(part.id, { rotation: part.rotation === 0 ? 90 : 0 })} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors bg-blue-50 px-2 py-1 rounded">
+                      <button onClick={(e) => { e.stopPropagation(); wrap(store.updatePartition)(part.id, { rotation: part.rotation === 0 ? 90 : 0 }); }} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors bg-blue-50 px-2 py-1 rounded">
                         Rotate 90°
                       </button>
+                      <span className="text-[10px] text-gray-400">{part.rotation === 0 ? 'runs left-right' : 'runs front-back'}</span>
                     </div>
-<DimensionSlider label="Length" min={400} max={6000} step={100} value={part.lengthMm} onChange={(v) => wrap(store.updatePartition)(part.id, { lengthMm: v })} />
+                    <DimensionSlider label="Length" min={400} max={6000} step={100} value={part.lengthMm} onChange={(v) => wrap(store.updatePartition)(part.id, { lengthMm: v })} />
+
+                    {/* L-shape: a corner as ONE wall - lining up two separate
+                        walls at a corner was needlessly fiddly. */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); wrap(store.updatePartition)(part.id, { legLengthMm: (part.legLengthMm || 0) > 100 ? 0 : 1500, legEnd: part.legEnd || 1, legDir: part.legDir || 1 }); }}
+                        className={`text-[10px] font-semibold px-2 py-1 rounded transition-colors ${(part.legLengthMm || 0) > 100 ? 'bg-[#3b4d4a] text-white' : 'bg-blue-50 text-[#3b4d4a] hover:text-blue-600'}`}
+                      >
+                        {(part.legLengthMm || 0) > 100 ? 'L-Shape ✓' : 'Make L-Shape'}
+                      </button>
+                      {(part.legLengthMm || 0) > 100 && (
+                        <>
+                          <button onClick={(e) => { e.stopPropagation(); wrap(store.updatePartition)(part.id, { legEnd: (part.legEnd === -1 ? 1 : -1) }); }} className="text-[10px] font-semibold text-[#3b4d4a] bg-blue-50 hover:text-blue-600 px-2 py-1 rounded" title="Move the corner to the other end of the wall">
+                            Swap end
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); wrap(store.updatePartition)(part.id, { legDir: (part.legDir === -1 ? 1 : -1) }); }} className="text-[10px] font-semibold text-[#3b4d4a] bg-blue-50 hover:text-blue-600 px-2 py-1 rounded" title="Turn the leg to the other side">
+                            Flip side
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    {(part.legLengthMm || 0) > 100 && (
+                      <DimensionSlider label="Leg Length" min={300} max={6000} step={100} value={part.legLengthMm || 1500} onChange={(v) => wrap(store.updatePartition)(part.id, { legLengthMm: v })} />
+                    )}
+
+                    <div className="border-t border-black/5 pt-3 space-y-2">
+                      {(part.doors || []).map((dr, di) => (
+                        <div key={dr.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-2.5 py-2">
+                          <span className="text-[10px] font-semibold text-gray-600 shrink-0">Door {di + 1}</span>
+                          <input type="number" step={50} value={dr.widthMm} title="Width (mm)"
+                            onChange={(e) => wrap(store.updatePartitionDoor)(part.id, dr.id, { widthMm: Math.max(400, Number(e.target.value) || 800) })}
+                            className="w-16 bg-white border border-gray-200 rounded px-1.5 py-1 text-[10px] text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#3b4d4a]" />
+                          <span className="text-[9px] text-gray-400">w</span>
+                          <input type="number" step={50} value={dr.heightMm} title="Height (mm)"
+                            onChange={(e) => wrap(store.updatePartitionDoor)(part.id, dr.id, { heightMm: Math.max(1600, Number(e.target.value) || 2000) })}
+                            className="w-16 bg-white border border-gray-200 rounded px-1.5 py-1 text-[10px] text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#3b4d4a]" />
+                          <span className="text-[9px] text-gray-400">h</span>
+                          <button onClick={(e) => { e.stopPropagation(); wrap(store.removePartitionDoor)(part.id, dr.id); }} className="ml-auto text-red-400 hover:text-red-500">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      ))}
+                      <button onClick={(e) => { e.stopPropagation(); wrap(store.addPartitionDoor)(part.id); store.setSelectedElementId(`part-${part.id}`); }} className="w-full text-[10px] font-semibold text-[#3b4d4a] bg-[#3b4d4a]/5 hover:bg-[#3b4d4a]/10 rounded-lg py-1.5 transition-colors">
+                        + Door in this wall
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {!room.partitions?.length && <p className="text-xs text-gray-400 text-center py-4">No internal walls</p>}

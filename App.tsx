@@ -27,11 +27,13 @@ import { GalleryView } from './components/views/GalleryView';
 import { AnimationsView } from './components/views/AnimationsView';
 import { ProjectsView } from './components/views/ProjectsView';
 import { AnimationStudioView } from './components/views/AnimationStudioView';
+import { ContentStudioView } from './components/views/ContentStudioView';
 import { WhyModulrView } from './components/views/WhyModulrView';
 import { AuthView } from './components/views/AuthView';
 import { AccountView } from './components/views/AccountView';
 import { DesignerView } from './components/views/DesignerView';
 import { ComingSoonView } from './components/views/ComingSoonView';
+import { PlanningCheckerView } from './components/views/PlanningCheckerView';
 import { UpdateNotice } from './components/UpdateNotice';
 import { FirstRunTour } from './components/FirstRunTour';
 import { ClientShareView } from './components/views/ClientShareView';
@@ -792,8 +794,16 @@ const App: React.FC = () => {
                 <ProjectsView onNavigate={engine.setActiveStage} />
             )}
 
+            {engine.activeStage === AppStage.PLANNING_CHECKER && (
+                <PlanningCheckerView />
+            )}
+
             {engine.activeStage === AppStage.ANIMATION_STUDIO && (
                 <AnimationStudioView onNavigate={engine.setActiveStage} />
+            )}
+
+            {engine.activeStage === AppStage.CONTENT_STUDIO && (
+                <ContentStudioView engine={engine} onNavigate={engine.setActiveStage} />
             )}
 
             {engine.activeStage === AppStage.WHY && (

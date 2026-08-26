@@ -62,6 +62,16 @@ export interface InteriorDoorData {
   heightMm: number;
 }
 
+/** A doorway belonging to an internal wall. Offset is measured along the
+ *  wall from its CENTRE, so doors travel with the wall when it moves -
+ *  the old world-positioned interior doors got left behind. */
+export interface PartitionDoor {
+  id: string;
+  offsetMm: number;
+  widthMm: number;
+  heightMm: number;
+}
+
 export interface PartitionData {
   id: string;
   xMm: number;
@@ -69,6 +79,14 @@ export interface PartitionData {
   lengthMm: number;
   thicknessMm: number;
   rotation: 0 | 90;
+  doors?: PartitionDoor[];
+  /** L-shape: a perpendicular leg welded to one end of the main run.
+   *  0/undefined = straight wall. */
+  legLengthMm?: number;
+  /** Which end of the main run the leg sits on (+1 = the local +X end). */
+  legEnd?: 1 | -1;
+  /** Which side the leg turns towards (+1 = local +Z). */
+  legDir?: 1 | -1;
 }
 
 export interface Room {
@@ -80,6 +98,9 @@ export interface Room {
   backHeightMm?: number;
   baseHeightMm: number;
   roofHeightMm: number;
+  /** Gable bargeboard/fascia depth in mm (the visible edge of the sloped roof
+   *  slabs). 100mm default; clamped 50-400 in the geometry. */
+  gableFasciaMm?: number;
   cladding: CladdingType;
   claddingFront?: CladdingType;
   claddingBack?: CladdingType;

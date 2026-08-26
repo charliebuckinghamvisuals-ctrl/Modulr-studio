@@ -124,21 +124,27 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       const backImg = await takeScreenshot('back', '3d', true);
       const perspectiveImg = await takeScreenshot('perspective', '3d', false);
 
-      // Fetch Planning Advice from API
+      // Fetch Planning Advice from API. The server computes the traffic-light
+      // verdict from the totals sent here, so the numbers must be the REAL
+      // ground-to-top figures for the roof shape.
       let planningAdvice = '';
+      let planning: any = null;
       try {
         // For Gable, heightMm is already the total height — adding base+roof
         // again overstated the building by ~450mm in the planning advice.
-        const heightExtra = scene.room.shape === 'Gable' ? 0 : (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
+        const isGablePdf = scene.room.shape === 'Gable';
+        const heightExtra = isGablePdf ? 0 : (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
         const totalFrontHeight = scene.room.heightMm + heightExtra;
-        const totalBackHeight = (scene.room.backHeightMm ?? scene.room.heightMm) + heightExtra;
-        
+        const totalBackHeight = isGablePdf ? totalFrontHeight : (scene.room.backHeightMm ?? scene.room.heightMm) + heightExtra;
+
         const augmentedRoomDetails = {
            ...scene.room,
            overallTotalFrontHeightMm: totalFrontHeight,
            overallTotalBackHeightMm: totalBackHeight,
-           heightMm: totalFrontHeight, 
-           backHeightMm: totalBackHeight 
+           overallTotalHeightMm: Math.max(totalFrontHeight, totalBackHeight),
+           eavesHeightMm: isGablePdf ? scene.room.heightMm - (scene.room.roofHeightMm || 200) : Math.max(totalFrontHeight, totalBackHeight),
+           heightMm: totalFrontHeight,
+           backHeightMm: totalBackHeight
         };
 
         const response = await fetch('/api/planning-advice', {
@@ -149,6 +155,7 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
         if (response.ok) {
           const data = await response.json();
           planningAdvice = data.advice;
+          if (data.verdict) planning = data;
         }
       } catch (e) {
         console.error("Failed to fetch planning advice", e);
@@ -379,12 +386,23 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       const colW = (CONTENT_W - colGap) / 2;
 
       let leftY = sectionTitle('Specification', y);
-      leftY = specRow('Shape', String(scene.room.shape), M, leftY, colW);
+      const isGableSpec = scene.room.shape === 'Gable';
+      leftY = specRow('Roof', isGableSpec ? 'Gable' : 'Flat', M, leftY, colW);
       leftY = specRow('Width', `${scene.room.widthMm} mm`, M, leftY, colW);
       leftY = specRow('Depth', `${scene.room.depthMm} mm`, M, leftY, colW);
-      leftY = specRow('Height (front)', `${totalHeightFront} mm`, M, leftY, colW);
-      if (totalHeightBack !== totalHeightFront) {
-        leftY = specRow('Height (back)', `${totalHeightBack} mm`, M, leftY, colW);
+      if (isGableSpec) {
+        // A gable has ONE height story: eaves and ridge. Front/back height is
+        // flat-roof vocabulary, and printing the stored backHeightMm here
+        // produced nonsense like "3500mm front, 2010mm back" from a stale
+        // pre-switch value.
+        leftY = specRow('Eaves height', `${scene.room.heightMm - (scene.room.roofHeightMm || 200)} mm`, M, leftY, colW);
+        leftY = specRow('Ridge height', `${scene.room.heightMm} mm`, M, leftY, colW);
+        leftY = specRow('Fascia depth', `${scene.room.gableFasciaMm ?? 100} mm`, M, leftY, colW);
+      } else {
+        leftY = specRow('Height (front)', `${totalHeightFront} mm`, M, leftY, colW);
+        if (totalHeightBack !== totalHeightFront) {
+          leftY = specRow('Height (back)', `${totalHeightBack} mm`, M, leftY, colW);
+        }
       }
       if (scene.room.lShapeCutoutWidthMm && !['Box', 'Quba', 'Gable'].includes(scene.room.shape as string)) {
         leftY = specRow('Cutout width', `${scene.room.lShapeCutoutWidthMm} mm`, M, leftY, colW);
@@ -543,7 +561,9 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.setTextColor(...MUTED);
-      const heightNote = totalHeightBack !== totalHeightFront
+      const heightNote = scene.room.shape === 'Gable'
+        ? `Eaves height ${scene.room.heightMm - (scene.room.roofHeightMm || 200)} mm, ridge height ${scene.room.heightMm} mm. All dimensions in millimetres.`
+        : totalHeightBack !== totalHeightFront
         ? `Overall height ${totalHeightFront} mm at the front, ${totalHeightBack} mm at the rear. All dimensions in millimetres.`
         : `Overall height ${totalHeightFront} mm. All dimensions in millimetres.`;
       pdf.text(heightNote, M, noteY);
@@ -559,14 +579,131 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
 
         let pgY = sectionTitle('Planning Guidance', HEADER_H + 16);
 
+        /**
+         * TRAFFIC LIGHT verdict banner. The colour comes from the server's
+         * CODE-computed Class E check (never from AI), so the light can be
+         * trusted: green = PD anywhere on the plot, amber = PD only when
+         * sited 2m+ from boundaries, red = outside the PD envelope.
+         */
+        if (planning?.verdict) {
+          const LIGHT: Record<string, { rgb: [number, number, number]; label: string }> = {
+            green: { rgb: [22, 130, 70], label: 'LIKELY PERMITTED DEVELOPMENT' },
+            amber: { rgb: [200, 130, 20], label: 'PD WITH CONDITIONS - GET ADVICE' },
+            red:   { rgb: [190, 50, 45], label: 'PLANNING PERMISSION LIKELY REQUIRED' },
+          };
+          const L = LIGHT[planning.verdict] || LIGHT.amber;
+          pdf.setFillColor(...L.rgb);
+          pdf.rect(M, pgY - 4, CONTENT_W, 16, 'F');
+          // The three dots make the traffic light legible even in greyscale print.
+          const dotY = pgY + 4;
+          (['green', 'amber', 'red'] as const).forEach((k, i) => {
+            const active = k === planning.verdict;
+            pdf.setFillColor(255, 255, 255);
+            if (active) pdf.circle(M + 6 + i * 7, dotY, 2.4, 'F');
+            else { pdf.setDrawColor(255, 255, 255); pdf.setLineWidth(0.4); pdf.circle(M + 6 + i * 7, dotY, 1.6, 'S'); }
+          });
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(11);
+          pdf.text(L.label, M + 28, pgY + 3);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(8);
+          pdf.text(`Overall ${planning.totalHeightMm} mm · eaves ${planning.eavesHeightMm} mm`, M + 28, pgY + 8);
+          pgY += 18;
+
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(9.5);
+          pdf.setTextColor(...INK);
+          const head = pdf.splitTextToSize(planning.headline || '', CONTENT_W);
+          pdf.text(head, M, pgY + 2);
+          pgY += head.length * 4.6 + 6;
+
+          /**
+           * THE CHECKLIST: every Class E criterion as a drawn tick / cross /
+           * query (glyphs are drawn with lines because the built-in PDF fonts
+           * have no checkmark character). Statuses come from the server's
+           * code-computed checks, never from AI.
+           */
+          if (Array.isArray(planning.checks) && planning.checks.length) {
+            const GREEN: [number, number, number] = [22, 130, 70];
+            const RED: [number, number, number] = [190, 50, 45];
+            const AMBERC: [number, number, number] = [200, 130, 20];
+            const drawStatusIcon = (status: string, cx: number, cy: number) => {
+              const r = 2.4;
+              const col = status === 'pass' ? GREEN : status === 'fail' ? RED : AMBERC;
+              pdf.setFillColor(...col);
+              pdf.circle(cx, cy, r, 'F');
+              pdf.setDrawColor(255, 255, 255);
+              pdf.setLineWidth(0.55);
+              if (status === 'pass') {
+                pdf.line(cx - 1.1, cy + 0.1, cx - 0.3, cy + 1.0);
+                pdf.line(cx - 0.3, cy + 1.0, cx + 1.2, cy - 0.9);
+              } else if (status === 'fail') {
+                pdf.line(cx - 0.9, cy - 0.9, cx + 0.9, cy + 0.9);
+                pdf.line(cx - 0.9, cy + 0.9, cx + 0.9, cy - 0.9);
+              } else {
+                pdf.setTextColor(255, 255, 255);
+                pdf.setFont('helvetica', 'bold');
+                pdf.setFontSize(8);
+                pdf.text('?', cx, cy + 1.4, { align: 'center' });
+              }
+            };
+
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(8);
+            pdf.setTextColor(...MUTED);
+            pdf.text('PERMITTED DEVELOPMENT CHECKLIST', M, pgY + 2);
+            pgY += 7;
+            for (const chk of planning.checks) {
+              drawStatusIcon(chk.status, M + 3, pgY);
+              pdf.setFont('helvetica', 'bold');
+              pdf.setFontSize(8.5);
+              pdf.setTextColor(...INK);
+              pdf.text(String(chk.label), M + 9, pgY + 1);
+              pdf.setFont('helvetica', 'normal');
+              pdf.setFontSize(7.5);
+              pdf.setTextColor(...MUTED);
+              pdf.text(String(chk.detail || ''), M + 9, pgY + 5);
+              pgY += 10;
+            }
+            pgY += 2;
+
+            // Indicative likelihood score with a bar the length of the page.
+            if (typeof planning.score === 'number') {
+              const barW = CONTENT_W - 58;
+              const col = planning.verdict === 'green' ? GREEN : planning.verdict === 'amber' ? AMBERC : RED;
+              pdf.setFont('helvetica', 'bold');
+              pdf.setFontSize(9);
+              pdf.setTextColor(...INK);
+              pdf.text(`PD likelihood: ${planning.score}%`, M, pgY + 3);
+              pdf.setFillColor(238, 238, 235);
+              pdf.roundedRect(M + 42, pgY, barW, 4, 2, 2, 'F');
+              pdf.setFillColor(...col);
+              pdf.roundedRect(M + 42, pgY, Math.max(6, barW * planning.score / 100), 4, 2, 2, 'F');
+              pgY += 8;
+              pdf.setFont('helvetica', 'normal');
+              pdf.setFontSize(7);
+              pdf.setTextColor(...MUTED);
+              pdf.text('Indicative only, based on the measurable design. Items marked "?" depend on siting, land status and use - assumed typical.', M, pgY + 1);
+              pgY += 7;
+            }
+          }
+        }
+
         // Disclaimer, boxed so it cannot be mistaken for the advice itself.
         // Previously this claimed the statement was "accurate", which is not a
         // claim to make about automatically generated planning guidance.
         pdf.setFillColor(248, 249, 250);
         pdf.setDrawColor(...HAIRLINE);
         pdf.setLineWidth(0.2);
+        // Confident but honest: the old wording ("should not be relied upon")
+        // read as "ignore this page". This assessment IS built on the real
+        // Class E rules and the design's exact measurements - what it cannot
+        // see is the site, so NAPC is framed as the confirmation step, not a
+        // health warning. No invented accuracy percentages: on planning
+        // guidance a number we cannot prove is a liability, not reassurance.
         const discl = pdf.splitTextToSize(
-          'Indicative guidance generated from your design. It is not planning advice and should not be relied upon. Confirm your proposal with NAPC (www.napc.uk) before proceeding.',
+          'This assessment is based on the current national Permitted Development rules (Class E) and the exact measurements of this design. Final confirmation depends on your specific site and local authority - please contact NAPC (www.napc.uk) before proceeding and they will confirm it formally.',
           CONTENT_W - 8
         );
         const disclH = discl.length * 4 + 7;
@@ -579,7 +716,21 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
 
         pdf.setFontSize(9);
         pdf.setTextColor(...INK);
-        const splitText = pdf.splitTextToSize(planningAdvice, CONTENT_W);
+        // Structured verdict: banner carries the headline, so the body is the
+        // reasons/caveats/NAPC only. Legacy string keeps working as fallback.
+        // The checklist above IS the "why", so the body carries only what the
+        // ticks cannot: caveats, Building Regs and the NAPC route.
+        const bodyText = planning?.verdict
+          ? [
+              'WORTH KNOWING:',
+              ...planning.caveats.map((c: string, i: number) => `${i + 1}. ${c}`),
+              '',
+              'BUILDING REGULATIONS: ' + planning.buildingRegs,
+              '',
+              planning.napcNote,
+            ].join('\n')
+          : planningAdvice;
+        const splitText = pdf.splitTextToSize(bodyText, CONTENT_W);
         for (let i = 0; i < splitText.length; i++) {
           if (pgY > FOOTER_Y - 12) {
             drawFooter(pageNo);

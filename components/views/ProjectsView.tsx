@@ -344,19 +344,20 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                     <Lock size={22} className="text-amber-600" />
                 </div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-600 mb-3">
-                    Business plan feature
+                    Included on every paid plan
                 </p>
                 <h1 className="text-2xl font-bold text-accent tracking-tight mb-3">
-                    Projects is part of Business
+                    Projects comes with a subscription
                 </h1>
                 <p className="text-sm text-slate-600 leading-relaxed mb-8">
                     Store clients, addresses, quote values, renders and documents against every
                     job, and track what you have quoted and won across the year. It is included
-                    with the Business plan and is not available on the standard plan.
+                    on Standard and Business, and the renders you save stay on your account
+                    rather than in the browser you made them in.
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
                     <Button onClick={() => onNavigate?.(AppStage.PRICING)}>
-                        See Business plan
+                        See plans
                     </Button>
                     <button
                         onClick={() => onNavigate?.(AppStage.HOME)}
