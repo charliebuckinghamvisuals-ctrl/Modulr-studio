@@ -120,15 +120,9 @@ const App: React.FC = () => {
         }
     };
 
-    const QualityToggle = () => (
-        <ToggleSwitch 
-            isOn={engine.isHighQuality} 
-            onToggle={() => engine.setIsHighQuality(!engine.isHighQuality)} 
-            label={engine.isHighQuality ? '4K Ultra HD' : 'Standard HD'}
-            icon={<Sparkles size={14} className={engine.isHighQuality ? 'text-accent' : 'text-slate-400'} />}
-            activeColor="bg-accent"
-        />
-    );
+    // The 4K/Standard quality toggle is gone on purpose: every tool generates
+    // at 2K (identical fidelity, half the cost), and 4K is now the metered
+    // "Export 4K" action on the finished image instead of a generation mode.
 
     const ProModelToggle = () => (
         <ToggleSwitch 
@@ -158,7 +152,6 @@ const App: React.FC = () => {
     const renderEngineControls = (
         <>
             <div className="flex flex-col gap-2 w-full">
-                <QualityToggle />
                 <ProModelToggle />
                 <CameraEffectsToggle />
                 <ToggleSwitch 
@@ -449,7 +442,6 @@ const App: React.FC = () => {
     const lineControls = (
         <div className="flex flex-col h-full space-y-5">
             <div className="flex flex-col gap-2 w-full">
-                <QualityToggle />
                 <ProModelToggle />
             </div>
 
@@ -730,7 +722,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="relative z-10">
                     <h3 className="text-accent font-bold text-lg mb-2">Pre-Added Materials (SketchUp)</h3>
-                    <p className="text-secondary text-sm leading-relaxed">Upload a basic 3D model. AI auto-detects your materials for a 4K render.</p>
+                    <p className="text-secondary text-sm leading-relaxed">Upload a basic 3D model. AI auto-detects your materials for a photoreal render.</p>
                 </div>
             </div>
 
@@ -861,6 +853,8 @@ const App: React.FC = () => {
                     placeholder="Ready to Render"
                     onDownload={engine.handleDownload}
                     onSaveToProject={(img) => setProjectSave({ image: img, kind: 'exterior_render', name: 'render-engine' })}
+                    onExport4K={engine.handleExport4K}
+                    isExporting4K={engine.isExporting4K}
                     verification={engine.renderVerification}
                     onRerender={(sameLook) => engine.handleRender({ reuseSeed: sameLook })}
                     onFormatChange={engine.setDownloadFormat}
@@ -908,6 +902,8 @@ const App: React.FC = () => {
                     placeholder="Upload a render to change its weather"
                     onDownload={engine.handleDownload}
                     onSaveToProject={(img) => setProjectSave({ image: img, kind: 'exterior_render', name: 'weather-lab' })}
+                    onExport4K={engine.handleExport4K}
+                    isExporting4K={engine.isExporting4K}
                     onFormatChange={engine.setDownloadFormat}
                     downloadFormat={engine.downloadFormat}
                     onInputClick={() => engine.fileInputRef.current?.click()}

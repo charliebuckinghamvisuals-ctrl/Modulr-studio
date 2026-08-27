@@ -104,7 +104,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                     <p className="text-slate-600 text-sm leading-relaxed">
                         {mode === 'change'
                             ? 'Swap the cladding, roof, glazing, doors and ground treatment on your building - the structure stays exactly as uploaded.'
-                            : 'Architectural material detail sheet generator. The engine compiles a 4K 2x2 presentation grid based on your specific material focal points.'}
+                            : 'Architectural material detail sheet generator. The engine compiles a high-resolution 2x2 presentation grid based on your specific material focal points.'}
                     </p>
                     {mode && originalImage && (
                         <button

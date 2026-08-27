@@ -24,7 +24,9 @@ const readError = async (response: Response, fallback: string) => {
 };
 
 export interface AnimationJob {
-    /** Google file handle, e.g. "files/abc123". Opaque to the UI. */
+    /** Opaque job handle from the server - currently a Veo long-running
+     *  operation name. Never parsed here; handed straight back to
+     *  /animation/status and /animation/video. */
     fileName: string;
     /** Animations left this month after this one. */
     remaining: number;
@@ -42,10 +44,10 @@ export interface StartAnimationInput {
 /**
  * Kick off a generation.
  *
- * Slow by nature - expect this to sit for the best part of a minute. It is also
- * the point at which one of the month's animations is spent, whether or not the
- * caller waits for the answer, because that is the moment the cost is committed
- * at Google's end.
+ * Returns quickly with a job handle - the rendering itself happens on Google's
+ * side and is watched by fetchAnimation. It is the point at which one of the
+ * month's animations is spent, whether or not the caller waits for the answer,
+ * because that is the moment the cost is committed at Google's end.
  */
 export const startAnimation = async (input: StartAnimationInput): Promise<AnimationJob> => {
     const response = await fetch(`${API_BASE_URL}/animation/start`, {
@@ -86,9 +88,12 @@ export const fetchAnimation = async (
     signal?: AbortSignal
 ): Promise<string> => {
     const started = Date.now();
-    // Generous ceiling. Measured completion is ~6s after the generate call
-    // returns; this only exists so a stuck file cannot poll forever.
-    const deadline = started + 5 * 60 * 1000;
+    // Generous ceiling, and deliberately generous: the clip is ALREADY PAID FOR
+    // by the time polling starts, so giving up early throws away real money as
+    // well as one of the month's ten. Veo renders the video after the start
+    // call returns, which takes minutes rather than the previous model's
+    // seconds. This exists only so a stuck job cannot poll forever.
+    const deadline = started + 10 * 60 * 1000;
 
     while (Date.now() < deadline) {
         if (signal?.aborted) throw new Error('Cancelled.');

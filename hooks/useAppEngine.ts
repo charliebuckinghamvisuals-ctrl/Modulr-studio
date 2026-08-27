@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { AppStage, MaterialConfig, WeatherConfig, ProcessingState, LibraryMaterialItem, MaterialLibrary } from '../types';
 import { PRESET_MATERIALS, WEATHER_CONDITIONS, SEASONS } from '../constants';
-import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor, setConfigSpec, describeGarden, getSceneContext, setSceneContext, getLastVerification, RenderVerification } from '../services/geminiService';
+import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor, setConfigSpec, describeGarden, getSceneContext, setSceneContext, getLastVerification, RenderVerification, export4K } from '../services/geminiService';
 import { saveToHistory } from '../services/historyService';
 import { trackFeatureUsage } from '../services/analytics';
 import { db, auth } from '../services/firebase';
@@ -89,6 +89,8 @@ export const useAppEngine = () => {
     const [editorAnalysis, setEditorAnalysis] = useState<any>(null);
     const [refinementPrompt, setRefinementPrompt] = useState('');
     const [downloadFormat, setDownloadFormat] = useState<'png' | 'jpg'>('png');
+    // A 4K export is in flight (they take a full model call, ~30s).
+    const [isExporting4K, setIsExporting4K] = useState(false);
     const [isSketchUpMode, setIsSketchUpMode] = useState(false);
     // Camera effects (depth of field, background bokeh) are OFF by default -
     // the base output is a deep-focus archviz frame; this opts into the DSLR look.
@@ -568,6 +570,54 @@ export const useAppEngine = () => {
         img.src = srcUrl;
     };
 
+    /** Coerce whatever a stage holds (raw base64, data:, blob:, http) into raw
+     *  base64 JPEG for the export endpoint. URL sources go through a canvas. */
+    const toRawBase64 = (imageData: string): Promise<string> => {
+        if (!imageData.startsWith('data:') && !imageData.startsWith('blob:') && !imageData.startsWith('http')) {
+            return Promise.resolve(imageData);
+        }
+        if (imageData.startsWith('data:')) {
+            return Promise.resolve(imageData.split(',')[1]);
+        }
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return reject(new Error('Canvas ctx failed'));
+                ctx.drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/jpeg', 0.95).split(',')[1]);
+            };
+            img.onerror = () => reject(new Error('Failed to load image for 4K export'));
+            img.src = imageData;
+        });
+    };
+
+    /**
+     * 4K export - the only route to 4K pixels. Generation is 2K everywhere;
+     * this sends the finished image to /api/export4k (metered server-side,
+     * 100/month on Business) and downloads the 4K result directly rather than
+     * replacing the 2K in the workspace.
+     */
+    const handleExport4K = async (imageData: string | null) => {
+        if (!imageData || isExporting4K) return;
+        setIsExporting4K(true);
+        const toastId = toast.loading('Exporting at 4K…');
+        try {
+            const base64 = await toRawBase64(imageData);
+            const result = await export4K(base64);
+            handleDownload(result, 'modulr-4k-export.jpg');
+            toast.success('4K export downloaded.', { id: toastId });
+        } catch (e: any) {
+            toast.error(e?.message || 'The 4K export could not be completed.', { id: toastId });
+        } finally {
+            setIsExporting4K(false);
+        }
+    };
+
     const handleRefineRender = async () => {
         if (!renderedImage) return;
         if (!refinementPrompt.trim()) {
@@ -978,6 +1028,7 @@ export const useAppEngine = () => {
         weather, setWeather,
         fileInputRef, materialInputRef,
         handleReset, clearWorkspace, handleImageUpload, handleBatchImageUpload, handleDownload,
+        handleExport4K, isExporting4K,
         refinementPrompt, setRefinementPrompt,
         downloadFormat, setDownloadFormat,
         isSketchUpMode, setIsSketchUpMode,

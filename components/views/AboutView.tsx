@@ -282,6 +282,48 @@ export const AboutView: React.FC = () => {
                         </p>
                     </section>
 
+                    {/* ── Contact ──
+                        Modulr Studio's own address, kept deliberately separate
+                        from the NAPC block below: this one is for the product -
+                        support, billing, feedback - while NAPC handles planning
+                        consultancy and remains the legal entity behind it. */}
+                    <section id="contact" className={`${SECTION} grid lg:grid-cols-12 gap-10 lg:gap-16`}>
+                        <div className="lg:col-span-5 space-y-5">
+                            <div className={TYPE.eyebrow}>Contact us</div>
+                            <h2 className={TYPE.h2}>Talk to a person.</h2>
+                        </div>
+                        <div className="lg:col-span-7 space-y-7">
+                            <p className={TYPE.body}>
+                                Questions about the tools, your subscription, a render that did not come out
+                                right, or a feature you wish existed - email the studio directly. Real replies
+                                from the people who built it.
+                            </p>
+
+                            <a
+                                href="mailto:info@modulrstudio.co.uk"
+                                className={`${CARD} flex items-center gap-5 p-6 md:p-7 hover:border-accent/50 transition-colors group`}
+                            >
+                                <span className="shrink-0 w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center">
+                                    <Mail size={22} className="text-accent" />
+                                </span>
+                                <span className="min-w-0">
+                                    <span className="block text-[11px] font-bold uppercase tracking-[0.2em] text-secondary">
+                                        Modulr Studio support
+                                    </span>
+                                    <span className="block text-lg md:text-xl font-bold text-primary group-hover:text-accent transition-colors break-all">
+                                        info@modulrstudio.co.uk
+                                    </span>
+                                </span>
+                                <ArrowRight size={20} className="ml-auto shrink-0 text-accent opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </a>
+
+                            <p className={TYPE.small}>
+                                For planning permission and permitted development advice, or to appoint a
+                                consultant on a live project, NAPC is the team below - they answer the phone.
+                            </p>
+                        </div>
+                    </section>
+
                     {/* ── NAPC ── */}
                     <section className={`${SECTION} grid lg:grid-cols-12 gap-10 lg:gap-16`}>
                         <div className="lg:col-span-5 space-y-5">
