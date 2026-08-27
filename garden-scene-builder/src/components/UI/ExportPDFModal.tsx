@@ -144,7 +144,19 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
            overallTotalHeightMm: Math.max(totalFrontHeight, totalBackHeight),
            eavesHeightMm: isGablePdf ? scene.room.heightMm - (scene.room.roofHeightMm || 200) : Math.max(totalFrontHeight, totalBackHeight),
            heightMm: totalFrontHeight,
-           backHeightMm: totalBackHeight
+           backHeightMm: totalBackHeight,
+           /*
+            * What is INSIDE the building, which decides the incidental-use
+            * test and until now was never sent. Class E only covers a building
+            * incidental to the enjoyment of the house; put a bed in it and it
+            * is sleeping accommodation, which is not incidental at any height.
+            * The checklist could only ever show "?" against that line because
+            * the server was being handed the shell and none of the contents.
+            *
+            * Types only - positions are irrelevant to the test and there is no
+            * reason to send the furniture layout off the machine.
+            */
+           contents: Array.from(new Set((scene.objects || []).map(o => o.type))),
         };
 
         const response = await fetch('/api/planning-advice', {

@@ -1270,17 +1270,60 @@ const enforceMasterLock = (req, res, next) => {
  *   red   - exceeds the Class E envelope; no siting rescues it
  * Mirrored client-side in Sidebar.tsx for the live pill - keep in sync.
  */
+/**
+ * Contents that take a building outside "incidental to the enjoyment of the
+ * dwellinghouse", which is the Class E use test.
+ *
+ * A bed is the decisive one: sleeping accommodation is not incidental at ANY
+ * height, so it fails Class E outright no matter how low the roof is. That is
+ * why this returns a hard fail rather than a caution - a design with a bed in
+ * it is an annexe and needs permission, and telling someone "amber, check your
+ * siting" about it would be wrong in a way that costs them money.
+ *
+ * A wardrobe alone is not decisive (a studio can have storage), but a shower
+ * and a toilet and a kitchen together describe somewhere you can live
+ * independently, which is the other way schemes fail this test.
+ */
+const assessIncidentalUse = (contents) => {
+    const has = (t) => Array.isArray(contents) && contents.includes(t);
+    if (has('bed')) {
+        return { incidental: false, reason: 'The design contains a bed. Sleeping accommodation is not incidental use, so this falls outside permitted development at any height.' };
+    }
+    const wet = (has('shower') ? 1 : 0) + (has('toilet') ? 1 : 0);
+    if (wet === 2 && has('kitchen_island')) {
+        return { incidental: false, reason: 'The design has a shower, a toilet and a kitchen. Together those describe self-contained living accommodation rather than incidental use.' };
+    }
+    if (wet === 2) {
+        return { incidental: 'unknown', reason: 'The design has both a shower and a toilet. A cloakroom is usually fine, but combined with sleeping or cooking space it reads as an annexe - worth confirming.' };
+    }
+    return { incidental: true, reason: 'Nothing in the design implies sleeping or self-contained living accommodation.' };
+};
+
 const pdVerdict = (roomDetails) => {
     const isGableRoof = String(roomDetails.shape) === 'Gable';
     const total = Number(roomDetails.overallTotalHeightMm)
         || Math.max(Number(roomDetails.overallTotalFrontHeightMm) || 0, Number(roomDetails.overallTotalBackHeightMm) || 0)
         || Number(roomDetails.heightMm) || 0;
     const eaves = Number(roomDetails.eavesHeightMm) || total;
+
+    const use = assessIncidentalUse(roomDetails.contents);
+
     let verdict;
     if (total > 0 && total <= 2500) verdict = 'green';
     else if (isGableRoof ? (eaves <= 2500 && total <= 4000) : total <= 3000) verdict = 'amber';
     else verdict = 'red';
-    return { verdict, total, eaves, isGableRoof };
+
+    /*
+     * The use test overrides the height test, never the other way round.
+     * Heights decide how a COMPLIANT building must be sited; the use test
+     * decides whether Class E applies at all. A 2.2m garden room with a bed in
+     * it is not a green light with a caveat - it is outside permitted
+     * development, and the traffic light has to say so.
+     */
+    if (use.incidental === false) verdict = 'red';
+    else if (use.incidental === 'unknown' && verdict === 'green') verdict = 'amber';
+
+    return { verdict, total, eaves, isGableRoof, use };
 };
 
 app.post('/api/planning-advice', aiLimiter, async (req, res) => {
@@ -1290,7 +1333,7 @@ app.post('/api/planning-advice', aiLimiter, async (req, res) => {
             return res.status(400).json({ error: "Room details required" });
         }
 
-        const { verdict, total, eaves, isGableRoof } = pdVerdict(roomDetails);
+        const { verdict, total, eaves, isGableRoof, use } = pdVerdict(roomDetails);
         const VERDICT_HEADLINES = {
             green: 'Likely Permitted Development',
             amber: 'Permitted Development with conditions - get advice',
@@ -1338,9 +1381,16 @@ app.post('/api/planning-advice', aiLimiter, async (req, res) => {
                 detail: 'Total of all outbuildings and extensions on the plot',
             },
             {
+                /*
+                 * The one unknown the configurator can actually answer. It
+                 * knows what was placed inside the building, so a design with a
+                 * bed in it gets a definite fail here rather than a shrug -
+                 * which is the difference between a checklist someone can act
+                 * on and one that hedges on every line.
+                 */
                 label: 'Incidental use (no sleeping accommodation)',
-                status: 'unknown',
-                detail: 'Office, gym or studio qualifies; an annexe does not',
+                status: use.incidental === false ? 'fail' : use.incidental === true ? 'pass' : 'unknown',
+                detail: use.reason,
             },
             {
                 label: 'Not listed / designated land restrictions',
@@ -1353,7 +1403,10 @@ app.post('/api/planning-advice', aiLimiter, async (req, res) => {
          * anchored on the verdict, because the dims are the only part we can
          * actually measure - the unknowns assume typical siting and use.
          */
-        const score = verdict === 'green' ? 90 : verdict === 'amber' ? 65 : 15;
+        // A use failure is not a "probably fine" - it is outside Class E, so the
+        // bar reads near-zero rather than the 15% a merely-too-tall building gets.
+        const score = use.incidental === false ? 5
+            : verdict === 'green' ? 90 : verdict === 'amber' ? 65 : 15;
 
         const prompt = `You are a professional but very approachable UK planning consultant explaining a
 PRE-COMPUTED permitted development verdict to a homeowner. You must NOT change the verdict - your job is
@@ -1367,6 +1420,15 @@ THE COMPUTED FACTS (authoritative - use these numbers):
 - Overall height (ground to highest point): ${total}mm
 - Eaves height: ${eaves}mm
 - VERDICT: ${verdict.toUpperCase()} - "${VERDICT_HEADLINES[verdict]}"
+- Contents placed inside: ${Array.isArray(roomDetails.contents) && roomDetails.contents.length ? roomDetails.contents.join(', ') : 'none recorded'}
+- Incidental use test: ${use.incidental === false ? 'FAILED' : use.incidental === true ? 'passed' : 'uncertain'} - ${use.reason}${use.incidental === false ? `
+
+THIS IS THE DECIDING FACT. Lead with it. The building fails the incidental-use test, so it is outside
+permitted development no matter what the heights are - do NOT tell them the height is fine and leave it
+there, and do NOT suggest lowering the roof as the fix, because the roof is not the problem. The honest
+options are: remove the sleeping accommodation and use it as an office, gym or studio, or apply for
+planning permission for an annexe. Say which. Be matter-of-fact rather than alarming - annexes are
+consented every day, it is just a different application.` : ''}
 
 VERDICT MEANINGS (Class E, GPDO 2015):
 - GREEN: total height <= 2.5m, so the 2m boundary set-off does NOT apply - it can sit right against a fence. Be clear the OTHER Class E conditions still apply: behind the front of the house, coverage, incidental use, and no side-of-house placement on designated land.
