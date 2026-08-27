@@ -23,6 +23,11 @@ interface CreditsData {
     canUseAnimation?: boolean;
     animationsLeft?: number;
     animationsLimit?: number;
+    /** Whether this account may export 4K images, and how many of the monthly
+     *  allowance are left. Generation is always 2K; 4K is a metered export. */
+    canExport4K?: boolean;
+    fourKLeft?: number;
+    fourKLimit?: number;
     // Free trial fields
     rendersLeft?: number;
     rendersPerDay?: number;
@@ -56,6 +61,9 @@ export function useCredits() {
     const [canUseAnimation, setCanUseAnimation] = useState<boolean | null>(null);
     const [animationsLeft, setAnimationsLeft] = useState<number | null>(null);
     const [animationsLimit, setAnimationsLimit] = useState<number | null>(null);
+    const [canExport4K, setCanExport4K] = useState<boolean | null>(null);
+    const [fourKLeft, setFourKLeft] = useState<number | null>(null);
+    const [fourKLimit, setFourKLimit] = useState<number | null>(null);
 
     const fetchCredits = async () => {
         if (!user) return;
@@ -95,6 +103,9 @@ export function useCredits() {
             setCanUseAnimation(data.canUseAnimation === true);
             setAnimationsLeft(data.animationsLeft ?? null);
             setAnimationsLimit(data.animationsLimit ?? null);
+            setCanExport4K(data.canExport4K === true);
+            setFourKLeft(data.fourKLeft ?? null);
+            setFourKLimit(data.fourKLimit ?? null);
             if (data.plan) trackUserPlan(data.plan);
             setRendersLeft(data.rendersLeft ?? null);
 
@@ -127,6 +138,9 @@ export function useCredits() {
             setCanUseAnimation(null);
             setAnimationsLeft(null);
             setAnimationsLimit(null);
+            setCanExport4K(null);
+            setFourKLeft(null);
+            setFourKLimit(null);
             setLoading(false);
         }
     }, [user]);
@@ -135,6 +149,7 @@ export function useCredits() {
         credits, plan, loading, refreshCredits: fetchCredits,
         rendersLeft, rendersPerDay, trialDaysLeft, trialBlocked, trialExpiresAt,
         hasApiAccess, canUseProjects,
-        canUseAnimation, animationsLeft, animationsLimit
+        canUseAnimation, animationsLeft, animationsLimit,
+        canExport4K, fourKLeft, fourKLimit
     };
 }

@@ -130,7 +130,9 @@ ${cameraEffects ? `      - CAMERA EFFECTS ON: shallow-to-moderate depth of field
       - A realistic UK domestic rear garden: mown lawn, timber fence panels with
         concrete posts, mature planting, neighbouring rooftops in the distance.
       - The building occupies the majority of the frame with comfortable breathing
-        space. Not a wide landscape shot.
+        space. Not a wide landscape shot. THIS NEVER JUSTIFIES MOVING THE CAMERA:
+        when the source image establishes a viewpoint, its exact framing wins -
+        render the scene as composed, never zoomed, cropped or re-angled.
       - Horizon level, verticals true, no wide-angle distortion or converging walls.
 
       FINISH:
@@ -191,18 +193,40 @@ const PROJECT_PLANS = new Set(['standard', 'business', 'master', 'tester', 'beta
 const ANIMATION_PLANS = new Set(['business', 'master']);
 
 /**
+ * Video generation settings.
+ *
+ * Veo 3.1 Fast at 1080p, chosen 26 Aug 2026 over the previous
+ * gemini-omni-flash-preview, which only ever returned 720p and looked soft.
+ *
+ * The tier matters financially. Published Gemini API rates:
+ *   Veo 3.1 Standard  $0.40/sec  -> an 8s clip is ~£2.53
+ *   Veo 3.1 Fast      $0.12/sec  -> an 8s clip is ~£0.76
+ * Fast at 1080p therefore costs about the same as the old 720p model (~£0.80 a
+ * clip) while doubling the resolution - a free quality upgrade. Standard is
+ * 3.3x the agreed animation budget, so it is a deliberate choice, not a
+ * default: switching ANIMATION_MODEL to 'veo-3.1-generate-preview' triples the
+ * worst-case bill for every Business subscriber. Multiply before changing it.
+ *
+ * Unlike the old model, Veo honours durationSeconds (the previous one always
+ * returned ~10s regardless) and supports negative prompts.
+ */
+const ANIMATION_MODEL = 'veo-3.1-fast-generate-preview';
+const ANIMATION_RESOLUTION = '1080p';
+const ANIMATION_SECONDS = 8;
+
+/**
  * Animations per calendar month, per account.
  *
- * This number is a BUDGET, not a product decision. Measured: the model returns
- * 10 seconds of 720p, billed at 5,792 tokens per second at $17.50/1M output
- * tokens - about $1.01 a clip. Fifteen of those is roughly £12 a month, which
- * is the ceiling agreed against a £189.99 subscription.
+ * This number is a BUDGET, not a product decision. At the settings above an 8s
+ * clip is roughly £0.76, so ten of those is about £7.60 a month - the ceiling
+ * agreed in the Aug 2026 launch plan (cut from 15 as a cost control; animation
+ * is still the largest single line item on a Business account).
  *
  * Business is otherwise an unlimited plan, so if you raise this you are raising
  * the worst-case bill for every subscriber simultaneously. Multiply before
  * changing it.
  */
-const ANIMATION_MONTHLY_LIMIT = 15;
+const ANIMATION_MONTHLY_LIMIT = 10;
 
 /** Calendar-month key, e.g. "2026-08". Comparing this to the stored key is what
  *  resets the allowance - cheaper and more reliable than a scheduled job. */
@@ -273,6 +297,61 @@ const releaseAnimation = async (uid) => {
 };
 
 /**
+ * Claim one 4K export from this month's allowance. Same transactional shape as
+ * claimAnimation, for the same reason: concurrent requests must not all pass
+ * the same read.
+ */
+const claimFourKExport = async (uid) => {
+    if (!db) return { allowed: true, remaining: FOUR_K_EXPORTS_PER_MONTH };
+
+    const userRef = db.collection('users').doc(uid);
+    try {
+        return await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(userRef);
+            const data = snap.exists ? snap.data() : {};
+            const period = currentPeriod();
+            const used = data.fourKPeriod === period ? (data.fourKUsed || 0) : 0;
+
+            if (used >= FOUR_K_EXPORTS_PER_MONTH) {
+                return {
+                    allowed: false,
+                    status: 402,
+                    error: `You have used all ${FOUR_K_EXPORTS_PER_MONTH} 4K exports for this month. Your allowance resets on the 1st. Renders continue at 2K as normal.`,
+                };
+            }
+
+            transaction.set(userRef, {
+                fourKPeriod: period,
+                fourKUsed: used + 1,
+            }, { merge: true });
+
+            return { allowed: true, remaining: FOUR_K_EXPORTS_PER_MONTH - (used + 1) };
+        });
+    } catch (e) {
+        console.error('[4K EXPORT] Quota check failed for uid:', uid, '|', e.message || e);
+        // Fail closed - a database blip must not become unmetered 4K generation.
+        return { allowed: false, status: 503, error: '4K export temporarily unavailable. Please try again shortly.' };
+    }
+};
+
+/** Hand back a 4K export that was claimed but never generated. */
+const releaseFourKExport = async (uid) => {
+    if (!db) return;
+    try {
+        const userRef = db.collection('users').doc(uid);
+        await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(userRef);
+            const data = snap.exists ? snap.data() : {};
+            if (data.fourKPeriod !== currentPeriod()) return;
+            const used = data.fourKUsed || 0;
+            if (used > 0) transaction.set(userRef, { fourKUsed: used - 1 }, { merge: true });
+        });
+    } catch (e) {
+        console.error('[4K EXPORT] Refund failed for uid:', uid, '|', e.message || e);
+    }
+};
+
+/**
  * Camera and atmosphere presets.
  *
  * Held server-side so the wording cannot be edited from the browser, and phrased
@@ -311,6 +390,24 @@ const ANIMATION_SCENE_LOCK_CLOSING =
     'From the first frame to the last, the scene itself stays identical to the source image; ' +
     'the camera move and the gentle natural motion described above are the only things that change. ' +
     'Pausing on any single frame shows the source image scene, unchanged, viewed from wherever the camera is at that moment.';
+
+/**
+ * What must never appear. Veo honours negative prompts; the previous model did
+ * not, which is why the locks above are phrased entirely positively. Keep both:
+ * the positive lock still does the heavy lifting, and this closes off the
+ * specific failures a generative video model reaches for - redesigning the
+ * building, growing the scene, or drifting into a different shot.
+ */
+const ANIMATION_NEGATIVE_PROMPT = [
+    'changing the building',
+    'new or altered windows, doors, cladding or roof',
+    'different building proportions',
+    'added or removed structures, furniture, planting or vehicles',
+    'the camera cutting to a different shot',
+    'text, captions, watermarks or logos',
+    'distorted or warping geometry',
+    'people walking through the building',
+].join(', ');
 
 /** Assemble the final prompt. Order matters: subject, then scene lock, then
  *  camera, then atmosphere, then the user's text, then the scene lock again so
@@ -379,6 +476,34 @@ const TESTER_RENDERS = 40;
 /** Standard plan: renders per calendar month. Matches the pricing page. */
 const STANDARD_RENDERS_PER_MONTH = 100;
 const TESTER_DAYS = 7;
+
+/**
+ * Business fair-use ceiling: renders per UTC day.
+ *
+ * "Unlimited" stays on the pricing page and stays true for real work - this
+ * exists so one account cannot script the render endpoint into an unbounded
+ * bill. At 25/day entirely on the expensive model the worst case is a known,
+ * survivable number, and the counter resets overnight so nobody is ever
+ * locked out for long. Master accounts are exempt.
+ */
+const BUSINESS_RENDERS_PER_DAY = 25;
+
+/**
+ * 4K exports per calendar month.
+ *
+ * Every tool GENERATES at 2K (same fidelity, half the price on the flagship
+ * model - 4K buys pixels, not quality). 4K exists only as this metered
+ * per-image export for the finals a client actually receives. 100 x 19p caps
+ * the plan's 4K exposure at ~£19/month permanently. Like the animation
+ * allowance this is a cost ceiling, not an entitlement, so it applies to
+ * master accounts too.
+ */
+const FOUR_K_EXPORTS_PER_MONTH = 100;
+
+/** Plans that may export 4K. Business feature; tester/beta included because
+ *  evaluating output quality is the point of tester access, and the monthly
+ *  counter bounds the spend either way. */
+const FOUR_K_PLANS = new Set(['business', 'master', 'tester', 'beta']);
 
 /**
  * Helper to check and deduct credits from a user's account
@@ -587,6 +712,36 @@ const checkStandardRender = async (user) => {
     }
 };
 
+/**
+ * Business fair-use: claim one render from today's allowance. Same transactional
+ * counter as checkStandardRender, keyed on the UTC day so it resets overnight
+ * rather than on the 1st. This is an abuse ceiling, not a meter - see
+ * BUSINESS_RENDERS_PER_DAY.
+ */
+const checkBusinessRender = async (user) => {
+    if (!db) return { allowed: true };
+    const userRef = db.collection('users').doc(user.uid);
+    const dayKey = new Date().toISOString().slice(0, 10); // e.g. "2026-08-26"
+    try {
+        return await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(userRef);
+            const data = snap.exists ? snap.data() : null;
+            const used = (data?.businessDay === dayKey ? data?.businessRendersUsed : 0) || 0;
+            if (used >= BUSINESS_RENDERS_PER_DAY) {
+                return { allowed: false, status: 402, error: `You've reached today's fair-use ceiling of ${BUSINESS_RENDERS_PER_DAY} renders. It resets at midnight - your plan stays unlimited for day-to-day work.` };
+            }
+            transaction.set(userRef, {
+                businessDay: dayKey,
+                businessRendersUsed: used + 1,
+            }, { merge: true });
+            return { allowed: true, rendersLeft: BUSINESS_RENDERS_PER_DAY - (used + 1) };
+        });
+    } catch (e) {
+        console.error('[BUSINESS] Fair-use check failed:', e.message || e);
+        return { allowed: false, status: 503, error: 'Render service temporarily unavailable. Please try again shortly.' };
+    }
+};
+
 const enforceRenderAccess = async (req, creditCost) => {
     // Master account — always allowed. Keyed on UID allowlist, never on the
     // email claim, and never on a Firestore field the user's document controls.
@@ -630,16 +785,28 @@ const enforceRenderAccess = async (req, creditCost) => {
         }
     }
 
-    // Unlimited plans render without metering.
+    // Unlimited plans render without metering - but 'business' carries the
+    // daily fair-use ceiling. Analysis rides free (every upload triggers one
+    // automatically, same reasoning as testers and Standard). A Firestore doc
+    // stamped plan:'master' stays truly unmetered, matching the UID allowlist
+    // path above.
     if (UNLIMITED_PLANS.has(userPlan)) {
+        if (userPlan === 'business' && creditCost !== CREDIT_COSTS.ANALYSIS) {
+            const fairUse = await checkBusinessRender(req.user);
+            if (!fairUse.allowed) {
+                return { allowed: false, status: fairUse.status || 402, body: { error: fairUse.error } };
+            }
+            return { allowed: true, unlimited: true, plan: userPlan, rendersLeft: fairUse.rendersLeft };
+        }
         return { allowed: true, unlimited: true, plan: userPlan };
     }
 
     /**
-     * Standard: monthly render counter, and the caller must clamp resolution -
-     * isHighQuality arrives from the client and cannot be trusted to respect
-     * the plan's 1080p ceiling. Analysis calls ride free, same reasoning as
-     * testers: every upload triggers one automatically.
+     * Standard: monthly render counter. Resolution needs no clamping any more -
+     * every endpoint generates at 2K regardless of plan, and 4K exists only as
+     * the /api/export4k action, which Standard is not entitled to. Analysis
+     * calls ride free, same reasoning as testers: every upload triggers one
+     * automatically.
      */
     if (userPlan === 'standard') {
         if (creditCost === CREDIT_COSTS.ANALYSIS) {
@@ -675,6 +842,26 @@ const enforceRenderAccess = async (req, creditCost) => {
         };
     }
     return { allowed: true, creditBalance: creditCheck.balance };
+};
+
+/**
+ * Cost log - one small fire-and-forget document per billable image call. A
+ * month of these answers the real cost-per-render question (Google billing /
+ * count by model+size) and shows whether any account's usage is out of line,
+ * without slowing the response down. EVERY endpoint that generates an image
+ * must call this - blended cost cannot be measured from the flagship model
+ * alone.
+ */
+const logRender = (req, endpoint, model, imageSize, extra = {}) => {
+    if (!db) return;
+    db.collection('renderLog').add({
+        uid: req.user?.uid || 'unknown',
+        endpoint,
+        model,
+        imageSize,
+        ...extra,
+        ts: admin.firestore.FieldValue.serverTimestamp(),
+    }).catch(e => console.warn('[COSTLOG] write failed:', e.message || e));
 };
 
 // API_PORT lets local dev pin the API to 3005 (where vite.config proxies /api)
@@ -1579,6 +1766,7 @@ app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
             if (part.inlineData) {
                 const rData = part.inlineData.data;
                 const b64Data = Buffer.isBuffer(rData) ? rData.toString("base64") : ((rData instanceof Uint8Array || rData instanceof ArrayBuffer) ? Buffer.from(rData).toString("base64") : rData);
+                logRender(req, 'generateLineDrawing', modelName, imageConfig.imageSize);
                 return res.json({ result: b64Data });
             }
         }
@@ -1664,7 +1852,6 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
     try {
         const base64Image      = sanitizeString(req.body.base64Image, 10_000_000);
         const additionalPrompt = sanitizeString(req.body.additionalPrompt, 2000);
-        let isHighQuality    = sanitizeBool(req.body.isHighQuality);
         const ratio            = sanitizeString(req.body.ratio, 10);
         const isProMode        = sanitizeBool(req.body.isProMode);
         const orientation      = sanitizeString(req.body.orientation, 50);
@@ -1684,15 +1871,14 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
             decking: sanitizeString(rawMats.decking, 200),
         };
 
-        // Enforce render access (trial for free users, credit deduction for paid)
-        const access = await enforceRenderAccess(req, isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES);
+        // Enforce render access (trial for free users, credit deduction for paid).
+        // Every plan GENERATES at 2K - identical fidelity to 4K on this model at
+        // half the price. 4K exists only as the metered /api/export4k action, so
+        // the client's old isHighQuality flag is ignored here entirely.
+        const access = await enforceRenderAccess(req, CREDIT_COSTS.STANDARD_RES);
         if (!access.allowed) {
             return res.status(access.status).json(access.body);
         }
-
-        // Standard plan is 1080p-class: the 4K flag from the client is
-        // overridden server-side, never trusted.
-        if (access.plan === 'standard') isHighQuality = false;
 
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
 
@@ -1900,7 +2086,11 @@ ${lines.join('\n')}
         it does not exist. A blank wall in the model stays a blank wall in the render.
       - NO HALLUCINATIONS: do NOT invent structures, decking, patios, porches or raised
         platforms that are not present in the source.
-      - PRESERVE THE COMPOSITION: keep the same camera angle and framing.
+      - PRESERVE THE COMPOSITION - THIS OVERRIDES THE HOUSE STYLE COMPOSITION
+        GUIDANCE BELOW: keep the same camera position, angle, framing and
+        distance as the source view. Do NOT zoom in, crop tighter, or orbit to
+        a different viewpoint. The house style governs lighting, focus,
+        materials and finish only - never the viewpoint.
       - IGNORE 3D GRID LINES: the source may show a floor grid on the ground. Never render
         these. Replace with natural, seamless ground or grass.
 
@@ -1931,7 +2121,8 @@ ${lines.join('\n')}
       V-Ray with professional post-production. Physically accurate light and materials,
       crisp true edges, immaculate presentation. It must NOT look like a raw game-engine
       screenshot, a flat CAD export, or an obviously AI-generated image.
-      CRITICAL: Output resolution 3840 x 2160 pixels (4K UHD).
+      CRITICAL: Output at 2K resolution (2048 pixels on the long edge). Do not
+      exceed this pixel count - it locks the pricing tier.
     `;
 
         const standardPrompt = `
@@ -1944,7 +2135,7 @@ ${lines.join('\n')}
       ${orientation ? `\nSPATIAL CONTEXT: You are rendering the [${orientation}] elevation. Apply materials to this specific facing side.` : ''}
 
       GEOMETRY & CONTEXT RULES — CRITICAL:
-      - STRICT GEOMETRY LOCK: Reproduce the EXACT structure shown. Do NOT add, remove, or modify any architectural elements. DO NOT change the roof pitch or shape.\n      - NO HALLUCINATIONS: Do NOT invent structures, decking, patios, porches, or raised platforms unless clearly visible in the source. Your assignment is surface-level materials only.\n      - PRESERVE THE ENVIRONMENT: Render surrounding landscape, fences, trees, and sky exactly as shown.
+      - STRICT GEOMETRY LOCK: Reproduce the EXACT structure shown. Do NOT add, remove, or modify any architectural elements. DO NOT change the roof pitch or shape.\n      - CAMERA LOCK - THIS OVERRIDES THE HOUSE STYLE COMPOSITION GUIDANCE BELOW: keep the source image's exact camera position, camera angle, framing and crop. Every building, wall, opening and object visible in the source stays visible in the render, at the same position and the same scale in frame. Do NOT zoom in, do NOT crop tighter, do NOT move closer to the building, do NOT orbit to a different viewpoint. The house style below governs lighting, focus, materials and finish ONLY - never the viewpoint or how much of the scene is in frame.\n      - NO HALLUCINATIONS: Do NOT invent structures, decking, patios, porches, or raised platforms unless clearly visible in the source. Your assignment is surface-level materials only.\n      - PRESERVE THE ENVIRONMENT: Render surrounding landscape, neighbouring buildings, fences, trees, and sky exactly as shown, exactly where shown.
 
       ${configSpecBlock}
 
@@ -1974,7 +2165,8 @@ ${lines.join('\n')}
       FINAL OUTPUT: The quality bar is a flagship offline archviz render - Blender Cycles /
       V-Ray with professional post-production. Physically accurate light and materials, crisp
       true edges, immaculate presentation - not an obviously AI-generated image.
-      CRITICAL: Output resolution 3840 x 2160 pixels (4K UHD).
+      CRITICAL: Output at 2K resolution (2048 pixels on the long edge). Do not
+      exceed this pixel count - it locks the pricing tier.
     `;
 
         const prompt = isSketchUpMode ? sketchUpPrompt : standardPrompt;
@@ -1998,8 +2190,10 @@ ${lines.join('\n')}
                         // CGI-model sources keep the source framing rather than being
                         // forced to 16:9, so the composition the user set up in the
                         // configurator survives. Fallback guards against an empty ratio.
-                        aspectRatio: (isHighQuality && !isSketchUpMode) ? "16:9" : (ratio || "16:9"),
-                        imageSize: isHighQuality ? "4K" : "2K",
+                        aspectRatio: isSketchUpMode ? (ratio || "16:9") : "16:9",
+                        // 2K always: same fidelity as 4K on this model, half the
+                        // cost. 4K is the metered /api/export4k action only.
+                        imageSize: "2K",
                         ...(seed !== undefined && !isNaN(seed) && { seed })
                     },
                     temperature: 0.2,
@@ -2028,8 +2222,15 @@ ${lines.join('\n')}
          *
          * Fails soft by design: if the inspector itself errors, the render is
          * treated as passing. A QA outage must never take rendering down.
+         *
+         * Every inspection is a real billable call, so they are counted and
+         * written to the cost log alongside the render - a cost-per-render
+         * figure that ignores its own QA is not the true cost.
          */
+        let qaCalls = 0;
+
         const inspectBuilding = async (b64) => {
+            qaCalls++;
             try {
                 const resp = await ai.models.generateContent({
                     model: 'gemini-3.5-flash-lite',
@@ -2064,6 +2265,48 @@ ${lines.join('\n')}
             return failures;
         };
 
+        /**
+         * CAMERA CHECK - counts alone cannot catch a reframe. A render can show
+         * the right number of doors and windows while having zoomed into one
+         * corner or orbited to a new angle (seen in the wild on a line-drawing
+         * source: the model obeyed the house style's "building fills the frame"
+         * over the source's framing). This compares source and render directly,
+         * judging the BUILDING's viewpoint only, so legitimately different
+         * surroundings (site context, weather, studio) don't false-positive.
+         * Fails soft like inspectBuilding.
+         */
+        const inspectFraming = async (srcB64, renderB64) => {
+            qaCalls++;
+            try {
+                const resp = await ai.models.generateContent({
+                    model: 'gemini-3.5-flash-lite',
+                    contents: {
+                        parts: [
+                            fileToGenerativePart(srcB64, "image/jpeg"),
+                            fileToGenerativePart(renderB64, "image/jpeg"),
+                            { text:
+                                'Image 1 is a source image; image 2 is a photorealistic render made from it. Judge ONLY the camera on the main garden building - materials, lighting, weather and surroundings are allowed to differ. The viewpoint is preserved when: the building is seen from the same angle and the same side as in the source; the building occupies a similar portion of the frame (not zoomed in or out dramatically); and no part of the building visible in the source has been cropped out of the render.' }
+                        ]
+                    },
+                    config: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: Type.OBJECT,
+                            properties: {
+                                sameViewpoint: { type: Type.BOOLEAN, description: "true only if the render keeps the source's camera angle and framing of the building" },
+                                problem: { type: Type.STRING, description: "One short sentence naming how the viewpoint changed; empty string if it did not" },
+                            },
+                            required: ["sameViewpoint"]
+                        }
+                    }
+                });
+                return JSON.parse(resp.text);
+            } catch (e) {
+                console.warn('[VERIFY] framing inspection errored:', e.message || e);
+                return null;
+            }
+        };
+
         let b64Data = await runRender(prompt);
         if (!b64Data) throw new Error("No render generated. Check server logs for response payload.");
 
@@ -2091,27 +2334,45 @@ ${lines.join('\n')}
                     truthWord = 'source image';
                 }
             }
-            if (expected && !(expected.doors === null && expected.windows === null && expected.roof === null)) {
-                const firstSeen = await inspectBuilding(b64Data);
-                if (firstSeen) {
-                    const failures = compareCounts(expected, firstSeen, truthWord);
-                    verification = { checked: true, passed: failures.length === 0, retried: false };
-                    if (failures.length) {
-                        console.warn('[VERIFY] render failed checks, retrying once:', failures.join('; '));
-                        const correction = `
+            const hasCounts = expected && !(expected.doors === null && expected.windows === null && expected.roof === null);
+            // Studio renders deliberately isolate the building on a backdrop,
+            // so the framing comparison would judge a scene that is meant to
+            // differ; every other source gets the camera check.
+            const checkFraming = !studioBackground;
+
+            /** Run every check against one attempt; failures are prompt-ready sentences. */
+            const gatherFailures = async (renderB64) => {
+                const failures = [];
+                if (hasCounts) {
+                    const seen = await inspectBuilding(renderB64);
+                    if (seen) failures.push(...compareCounts(expected, seen, truthWord));
+                }
+                if (checkFraming) {
+                    const framing = await inspectFraming(base64Image, renderB64);
+                    if (framing && framing.sameViewpoint === false) {
+                        failures.push(`the render changed the camera - ${framing.problem || 'the viewpoint or framing differs from the source'}. The source image's exact camera position, angle, framing and crop are MANDATORY: same side of the building, same distance, nothing the source shows cropped out`);
+                    }
+                }
+                return failures;
+            };
+
+            if (hasCounts || checkFraming) {
+                const failures = await gatherFailures(b64Data);
+                verification = { checked: true, passed: failures.length === 0, retried: false, failures };
+                if (failures.length) {
+                    console.warn('[VERIFY] render failed checks, retrying once:', failures.join('; '));
+                    const correction = `
 
       PREVIOUS ATTEMPT REJECTED - CORRECTIONS REQUIRED:
       A previous render of this exact scene was rejected by quality control because:
 ${failures.map(f => `      - ${f}`).join('\n')}
-      Fix these exactly. ${specForVerify ? 'The CONFIGURED DIMENSIONS AND COUNTS section is the absolute truth for what exists on this building.' : 'The SOURCE image is the absolute truth - reproduce exactly the doors, windows and roof it shows, nothing more and nothing less.'}`;
-                        const retryB64 = await runRender(prompt + correction);
-                        if (retryB64) {
-                            const secondSeen = await inspectBuilding(retryB64);
-                            const failures2 = secondSeen ? compareCounts(expected, secondSeen, truthWord) : [];
-                            verification = { checked: true, passed: failures2.length === 0, retried: true };
-                            if (failures2.length <= failures.length) b64Data = retryB64;
-                            if (failures2.length) console.warn('[VERIFY] retry still failing checks, returning best attempt:', failures2.join('; '));
-                        }
+      Fix these exactly. ${specForVerify ? 'The CONFIGURED DIMENSIONS AND COUNTS section is the absolute truth for what exists on this building.' : 'The SOURCE image is the absolute truth - reproduce exactly the doors, windows, roof and camera view it shows, nothing more and nothing less.'}`;
+                    const retryB64 = await runRender(prompt + correction);
+                    if (retryB64) {
+                        const failures2 = await gatherFailures(retryB64);
+                        verification = { checked: true, passed: failures2.length === 0, retried: true, failures: failures2 };
+                        if (failures2.length <= failures.length) b64Data = retryB64;
+                        if (failures2.length) console.warn('[VERIFY] retry still failing checks, returning best attempt:', failures2.join('; '));
                     }
                 }
             }
@@ -2119,24 +2380,19 @@ ${failures.map(f => `      - ${f}`).join('\n')}
             console.warn('[VERIFY] verification skipped:', e.message || e);
         }
 
-        /**
-         * Cost log - one small fire-and-forget document per render. A month of
-         * these answers the real cost-per-render question (Google billing /
-         * count by model+size) and shows whether any account's usage is out of
-         * line, without slowing the response down.
-         */
-        if (db) {
-            db.collection('renderLog').add({
-                uid: req.user?.uid || 'unknown',
-                endpoint: 'renderBuilding',
-                model: 'gemini-3-pro-image',
-                imageSize: isHighQuality ? '4K' : '2K',
-                sketchUpMode: isSketchUpMode,
-                verified: verification.checked ? verification.passed : null,
-                retried: !!verification.retried,
-                ts: admin.firestore.FieldValue.serverTimestamp(),
-            }).catch(e => console.warn('[COSTLOG] write failed:', e.message || e));
-        }
+        logRender(req, 'renderBuilding', 'gemini-3-pro-image', '2K', {
+            sketchUpMode: isSketchUpMode,
+            verified: verification.checked ? verification.passed : null,
+            retried: !!verification.retried,
+            // Billable calls this render actually made, so the log prices
+            // itself: image calls on the Pro model, plus the QA inspections.
+            imageCalls: verification.retried ? 2 : 1,
+            qaCalls,
+            qaModel: qaCalls ? 'gemini-3.5-flash-lite' : null,
+            // Why it failed, in the inspector's own words - truncated because
+            // this is a diagnostic breadcrumb, not a transcript.
+            failures: (verification.failures || []).map(f => String(f).slice(0, 300)),
+        });
 
         return res.json({ result: b64Data, verification });
     } catch (error) {
@@ -2151,20 +2407,15 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
         const base64Image   = sanitizeString(req.body.base64Image, 10_000_000);
         const maskImage     = sanitizeString(req.body.maskImage, 10_000_000);
         const editPrompt    = sanitizeString(req.body.editPrompt, 1000); // embedded directly in prompt — strict cap
-        let isHighQuality = sanitizeBool(req.body.isHighQuality);
         const ratio         = sanitizeString(req.body.ratio, 10);
         const isProMode     = sanitizeBool(req.body.isProMode);
 
-        // Phase 2: Credit-based deduction
-        // Enforce render access (trial for free users, credit deduction for paid)
-        const access = await enforceRenderAccess(req, isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES);
+        // Generation is 2K on every plan - 4K is the metered /api/export4k
+        // action only - so this always meters at the standard rate.
+        const access = await enforceRenderAccess(req, CREDIT_COSTS.STANDARD_RES);
         if (!access.allowed) {
             return res.status(access.status).json(access.body);
         }
-
-        // Standard plan is 1080p-class: the 4K flag from the client is
-        // overridden server-side, never trusted.
-        if (access.plan === 'standard') isHighQuality = false;
 
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
 
@@ -2191,8 +2442,10 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
         5. SEAMLESS BLENDING: The edited area must seamlessly blend into the original HD photo, matching the exact grain, lighting, and micro-textures.
 
         QUALITY:
-        - Output Resolution: ${isHighQuality ? '4K (3840x2160)' : 'High Definition'}.
-        - CRITICAL DIMENSIONS: ${isHighQuality ? 'Set the output resolution strictly to 3840 x 2160 pixels. This is a hard limit for 4K UHD at a 16:9 aspect ratio. Do not upscale, do not increase the pixel count beyond these dimensions, and do not use a 5K or 6K multiplier. Lock the render to these exact coordinates to ensure the 0.15p pricing tier. Maintain 100% of the original image resolution.' : 'Standard HD.'}
+        - Output Resolution: 2K High Definition.
+        - CRITICAL DIMENSIONS: Output at 2K (2048 pixels on the long edge). Do not
+          upscale and do not increase the pixel count beyond this - it locks the
+          pricing tier. Maintain 100% of the original image's sharpness.
       `;
 
         parts.push({ text: prompt });
@@ -2206,7 +2459,7 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
                 outputMimeType: "image/jpeg",
                 imageConfig: {
                     aspectRatio: ratio,
-                    imageSize: isHighQuality ? "4K" : "2K",
+                    imageSize: "2K",
                     editMode: "EDIT_MODE_DEFAULT"
                 },
                 temperature: 0.2
@@ -2215,6 +2468,7 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
 
         for (const part of response.candidates?.[0]?.content?.parts || []) {
             if (part.inlineData) {
+                logRender(req, 'editImage', 'gemini-3.1-flash-image', '2K');
                 return res.json({ result: part.inlineData.data });
             }
         }
@@ -2440,7 +2694,6 @@ app.post('/api/analyzeScene', userAiLimiter, async (req, res) => {
 app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
     try {
         const base64Image   = sanitizeString(req.body.base64Image, 10_000_000);
-        let isHighQuality = sanitizeBool(req.body.isHighQuality);
         const ratio         = sanitizeString(req.body.ratio, 10);
         const isProMode     = sanitizeBool(req.body.isProMode);
         const rawWeather    = req.body.weather || {};
@@ -2450,37 +2703,36 @@ app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
             timeOfDay: sanitizeString(rawWeather.timeOfDay, 50),
         };
 
-        // Phase 2: Credit-based deduction
-        // Enforce render access (trial for free users, credit deduction for paid)
-        const access = await enforceRenderAccess(req, isHighQuality ? CREDIT_COSTS.UHD_4K : CREDIT_COSTS.STANDARD_RES);
+        // Generation is 2K on every plan - 4K is the metered /api/export4k
+        // action only - so this always meters at the standard rate.
+        const access = await enforceRenderAccess(req, CREDIT_COSTS.STANDARD_RES);
         if (!access.allowed) {
             return res.status(access.status).json(access.body);
         }
-
-        // Standard plan is 1080p-class: the 4K flag from the client is
-        // overridden server-side, never trusted.
-        if (access.plan === 'standard') isHighQuality = false;
 
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
 
         const prompt = `
       RENDER ENGINE: Blender Cycles / Unreal Engine 5.
       TASK: Re-light and compose this scene based on the weather config.
-      
+
       SETTINGS:
       Condition: ${weather.condition}
       Season: ${weather.season}
       Time of Day: ${weather.timeOfDay}
-      
+
       QUALITY RULES:
-      - Maintain 4k RAW Photorealistic quality.
-      - CRITICAL DIMENSIONS: Set the output resolution strictly to 3840 x 2160 pixels. This is a hard limit for 4K UHD at a 16:9 aspect ratio. Do not upscale, do not increase the pixel count beyond these dimensions, and do not use a 5K or 6K multiplier. Lock the render to these exact coordinates to ensure the 0.15p pricing tier.
+      - Maintain RAW Photorealistic quality.
+      - CRITICAL DIMENSIONS: Output at 2K resolution (2048 pixels on the long edge). Do not upscale and do not increase the pixel count beyond this - it locks the pricing tier.
       - Physically correct lighting calculations (Ray Tracing).
       - Accurate reflections on glass and wet surfaces.
       - Volumetric lighting where appropriate (e.g. fog, golden hour).
       - NO loss of detail. NO cartoon filters. NO painterly brush strokes.
       - Maintain photographic grain and sharp micro-textures for close-ups.
       - Keep the building geometry 100% locked. Only change lighting and atmosphere.
+      - CAMERA LOCK: keep the source image's exact camera position, angle, framing
+        and crop. Do NOT zoom, re-crop or change viewpoint - every element stays
+        exactly where the source shows it.
     `;
 
         const response = await ai.models.generateContent({
@@ -2495,7 +2747,7 @@ app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
                 outputMimeType: "image/jpeg",
                 imageConfig: {
                     aspectRatio: ratio,
-                    imageSize: isHighQuality ? "4K" : "2K"
+                    imageSize: "2K"
                 },
                 temperature: 0.2
             }
@@ -2503,6 +2755,7 @@ app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
 
         for (const part of response.candidates?.[0]?.content?.parts || []) {
             if (part.inlineData) {
+                logRender(req, 'applyWeather', 'gemini-3.1-flash-image', '2K');
                 return res.json({ result: part.inlineData.data });
             }
         }
@@ -2591,9 +2844,10 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
         const rawPoints   = Array.isArray(req.body.focusPoints) ? req.body.focusPoints : [];
         const focusPoints = rawPoints.map(p => sanitizeString(p, 200));
         
-        // Phase 2: Credit-based deduction
-        // Enforce render access (trial for free users, credit deduction for paid)
-        const access = await enforceRenderAccess(req, CREDIT_COSTS.UHD_4K);
+        // Generation is 2K on every plan (the board was the last endpoint still
+        // paying the 4K tier - 12p -> 8p), so it meters at the standard rate
+        // like every other single-image call.
+        const access = await enforceRenderAccess(req, CREDIT_COSTS.STANDARD_RES);
         if (!access.allowed) {
             return res.status(access.status).json(access.body);
         }
@@ -2631,8 +2885,8 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
         - Macro Photography with Depth of Field (Bokeh).
         - 1:1 Aspect Ratio output (perfect square presentation).
         - Thin white separator lines between the 4 grid items.
-        - Maintain 4K RAW true-to-life photorealism. Ensure extreme micro-texture detail as this is a macro shot. DO NOT allow texture painting/smoothing.
-        - CRITICAL DIMENSIONS: Strictly lock the output resolution to exactly 2160 x 2160 pixels (4K Square limit). Do not exceed this pixel count to ensure pricing tier.
+        - Maintain RAW true-to-life photorealism. Ensure extreme micro-texture detail as this is a macro shot. DO NOT allow texture painting/smoothing.
+        - CRITICAL DIMENSIONS: Strictly lock the output resolution to exactly 2048 x 2048 pixels (2K Square limit). Do not exceed this pixel count to ensure pricing tier.
       `;
 
         const response = await ai.models.generateContent({
@@ -2647,7 +2901,7 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
                 outputMimeType: "image/jpeg",
                 imageConfig: {
                     aspectRatio: "1:1", // Force square for the grid
-                    imageSize: "4K"
+                    imageSize: "2K"
                 },
                 temperature: 0.2
             }
@@ -2655,6 +2909,7 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
 
         for (const part of response.candidates?.[0]?.content?.parts || []) {
             if (part.inlineData) {
+                logRender(req, 'generatePresentationBoard', 'gemini-3.1-flash-image', '2K');
                 return res.json({ result: part.inlineData.data });
             }
         }
@@ -2663,6 +2918,99 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
     } catch (error) {
         console.error("Scene Studio error:", error);
         res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
+    }
+});
+
+/**
+ * 4K EXPORT - the only place 4K pixels are generated.
+ *
+ * Every tool generates at 2K; this takes a finished 2K image and reproduces it
+ * at 4K on the flagship model for the finals a client actually receives.
+ * Metered at FOUR_K_EXPORTS_PER_MONTH per calendar month as a cost ceiling
+ * (~19p a call), master accounts included - same reasoning as the animation
+ * allowance.
+ *
+ * OPEN QUESTION (launch plan, "decide how 4K is produced"): a plain pixel
+ * upscale of the 2K may be visually identical and free, since 4K on this model
+ * buys pixels rather than fidelity. Compare one of these exports against a
+ * client-side upscale before billing goes live; if they match, this endpoint
+ * can become a free resize and the counter goes away.
+ */
+app.post('/api/export4k', userAiLimiter, async (req, res) => {
+    let claimed = false;
+    let uid = null;
+    try {
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
+        const ratio       = sanitizeString(req.body.ratio, 10);
+        if (!base64Image || base64Image.trim().length < 100) {
+            return res.status(400).json({ error: 'No image supplied for export.' });
+        }
+
+        const plan = req.user?.beta === true && !isTesterUser(req.user) ? 'beta' : await resolveEffectivePlan(req);
+        if (plan === null) {
+            return res.status(503).json({ error: '4K export temporarily unavailable. Please try again shortly.' });
+        }
+        if (!FOUR_K_PLANS.has(plan)) {
+            return res.status(403).json({ error: '4K export is a Business plan feature. Your renders are delivered at 2K.' });
+        }
+
+        uid = req.user.uid;
+        const claim = await claimFourKExport(uid);
+        if (!claim.allowed) {
+            return res.status(claim.status || 402).json({ error: claim.error });
+        }
+        claimed = true;
+
+        const prompt = `
+      TASK: Reproduce this exact image at 4K resolution.
+
+      This is a RESOLUTION EXPORT, not a re-imagining. The output must be the
+      SAME image: the same building with the same geometry, and every door,
+      window, material, colour, plant, fence, shadow and reflection in exactly
+      the same place. Only the pixel count increases, with correspondingly
+      crisper micro-detail - timber grain, board joints, glass reflections,
+      individual grass blades.
+
+      - Do NOT add, remove, move, resize or restyle anything.
+      - Do NOT change the crop, framing, lighting, weather or colour grade.
+      - Pausing this output next to the source must show the identical scene.
+
+      CRITICAL: Output resolution 4K UHD (3840 pixels on the long edge).
+    `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-image',
+            contents: {
+                parts: [fileToGenerativePart(base64Image, "image/jpeg"), { text: prompt }]
+            },
+            config: {
+                outputMimeType: "image/jpeg",
+                imageConfig: {
+                    // Match the source's framing - forcing 16:9 would crop a
+                    // square or portrait export. The client sends the ratio it
+                    // measured from the image itself.
+                    aspectRatio: ratio || "16:9",
+                    imageSize: "4K"
+                },
+                temperature: 0.1
+            }
+        });
+
+        for (const part of response.candidates?.[0]?.content?.parts || []) {
+            if (part.inlineData) {
+                const rData = part.inlineData.data;
+                const b64Data = Buffer.isBuffer(rData) ? rData.toString("base64") : ((rData instanceof Uint8Array || rData instanceof ArrayBuffer) ? Buffer.from(rData).toString("base64") : rData);
+                logRender(req, 'export4k', 'gemini-3-pro-image', '4K');
+                return res.json({ result: b64Data, fourKLeft: claim.remaining });
+            }
+        }
+        throw new Error("No 4K export generated");
+    } catch (error) {
+        // The claim is only spent on success - a failure at Google's end must
+        // not cost the user one of their hundred.
+        if (claimed && uid) await releaseFourKExport(uid);
+        console.error("4K export error:", error);
+        res.status(500).json({ error: 'The 4K export could not be completed. Your allowance was not used - please try again in a moment.' });
     }
 });
 
@@ -2730,49 +3078,63 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
         const prompt = buildAnimationPrompt(preset, modifiers, extra);
 
         /**
-         * One generation attempt. Normal completion is ~40-90s; the video
-         * backend occasionally hangs for many minutes before failing, which is
-         * exactly the "waited 300 seconds then it errored" experience. Each
-         * attempt is therefore capped, and a failed or timed-out first attempt
-         * gets ONE automatic retry - transient backend wobbles usually clear
-         * immediately.
+         * Kick off one generation. Veo is a long-running operation: this call
+         * returns in seconds with an operation handle, and the actual work
+         * happens server-side while /status polls. That is a better fit than
+         * the old model's single blocking call, which sat open for ~45s and
+         * occasionally hung for minutes.
+         *
+         * A failed create is retried once - transient backend wobbles usually
+         * clear immediately - and the attempt count is logged, because a
+         * retried attempt may also have billed.
          */
-        const generateOnce = async () => {
-            const interaction = await ai.interactions.create({
-                model: 'gemini-omni-flash-preview',
-                input: [
-                    { type: 'image', data: base64Image, mime_type: 'image/jpeg' },
-                    { type: 'text', text: prompt },
-                ],
-                // snake_case throughout. The published JS example shows
-                // generationConfig/videoConfig and the API rejects both.
-                generation_config: { video_config: { task: 'image_to_video' } },
-                // 'uri' not 'base64': output measured at 2.5 MB, and inline delivery
-                // is capped around 4 MB. A longer or busier clip would silently
-                // exceed it.
-                response_format: { type: 'video', aspect_ratio: aspectRatio, delivery: 'uri' },
+        let videoAttempts = 0;
+        const startOnce = async () => {
+            videoAttempts++;
+            const operation = await ai.models.generateVideos({
+                model: ANIMATION_MODEL,
+                prompt,
+                image: { imageBytes: base64Image, mimeType: 'image/jpeg' },
+                config: {
+                    aspectRatio,
+                    resolution: ANIMATION_RESOLUTION,
+                    durationSeconds: ANIMATION_SECONDS,
+                    numberOfVideos: 1,
+                    // Veo DOES honour negative prompts, unlike the previous
+                    // model - so the scene lock finally gets to say plainly
+                    // what must not happen, instead of only hinting positively.
+                    negativePrompt: ANIMATION_NEGATIVE_PROMPT,
+                },
             });
-            const uri = interaction?.output_video?.uri;
-            const match = uri && uri.match(/files\/([a-zA-Z0-9_-]+)/);
-            if (!match) throw new Error('The model did not return a video.');
-            return match[1];
+            if (!operation?.name) throw new Error('The model did not start a video job.');
+            return operation.name;
         };
-        const ATTEMPT_TIMEOUT_MS = 240_000;
-        const withTimeout = (p) => Promise.race([
-            p,
-            new Promise((_, rej) => setTimeout(() => rej(new Error('Generation timed out')), ATTEMPT_TIMEOUT_MS)),
-        ]);
 
-        let fileId;
+        let operationName;
         try {
-            fileId = await withTimeout(generateOnce());
+            operationName = await startOnce();
         } catch (firstErr) {
             console.warn('[ANIM] first attempt failed, retrying once:', firstErr.message || firstErr);
-            fileId = await withTimeout(generateOnce());
+            operationName = await startOnce();
         }
 
+        /**
+         * Cost log. Video is by far the most expensive call here (~76p a clip
+         * against ~10p for a render), and it was the ONE endpoint missing from
+         * the log - so "what does a project cost" could not be answered for any
+         * project containing an animation.
+         */
+        logRender(req, 'animation', ANIMATION_MODEL, ANIMATION_RESOLUTION, {
+            videoAttempts,
+            aspectRatio,
+            durationSeconds: ANIMATION_SECONDS,
+        });
+
+        // Named `fileName` for backwards compatibility: the client treats this
+        // as an opaque handle and hands it back to /status and /video, so the
+        // switch from file handles to operation names needs no client change.
         res.json({
-            fileName: `files/${fileId}`,
+            fileName: operationName,
             remaining: quota.remaining,
             limit: ANIMATION_MONTHLY_LIMIT,
         });
@@ -2786,15 +3148,40 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
     }
 });
 
+/**
+ * Operation names look like
+ * `models/veo-3.1-fast-generate-preview/operations/abc123`. Validated rather
+ * than trusted: the handle comes back from the browser, and it is used to make
+ * an authenticated call with our own API key attached.
+ */
+const OPERATION_NAME_RE = /^models\/[a-zA-Z0-9._-]{1,80}\/operations\/[a-zA-Z0-9_-]{1,80}$/;
+
+/** Resolve a finished video operation to its download URI, or null if it is
+ *  still running. Throws if the operation itself failed. */
+const resolveVideoUri = async (operationName) => {
+    const op = await ai.operations.getVideosOperation({ operation: { name: operationName } });
+    if (!op?.done) return { done: false };
+    if (op.error) {
+        const detail = op.error.message || JSON.stringify(op.error);
+        throw new Error(`Video generation failed: ${detail}`);
+    }
+    const uri = op.response?.generatedVideos?.[0]?.video?.uri;
+    if (!uri) {
+        // Done, no video: almost always a safety filter rather than a fault.
+        const filtered = op.response?.raiMediaFilteredReasons?.join('; ');
+        throw new Error(filtered ? `The clip was blocked: ${filtered}` : 'The model did not return a video.');
+    }
+    return { done: true, uri };
+};
+
 app.get('/api/animation/status', async (req, res) => {
     try {
-        const name = sanitizeString(req.query.file, 120);
-        if (!/^files\/[a-zA-Z0-9_-]+$/.test(name)) {
-            return res.status(400).json({ error: 'Invalid file reference.' });
+        const name = sanitizeString(req.query.file, 200);
+        if (!OPERATION_NAME_RE.test(name)) {
+            return res.status(400).json({ error: 'Invalid job reference.' });
         }
-        const info = await ai.files.get({ name });
-        const state = info?.state?.name || info?.state || 'PROCESSING';
-        res.json({ state, ready: state === 'ACTIVE' });
+        const result = await resolveVideoUri(name);
+        res.json({ state: result.done ? 'ACTIVE' : 'PROCESSING', ready: result.done });
     } catch (error) {
         console.error('Animation status error:', error);
         res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
@@ -2803,9 +3190,31 @@ app.get('/api/animation/status', async (req, res) => {
 
 app.get('/api/animation/video', async (req, res) => {
     try {
-        const name = sanitizeString(req.query.file, 120);
-        if (!/^files\/[a-zA-Z0-9_-]+$/.test(name)) {
-            return res.status(400).json({ error: 'Invalid file reference.' });
+        const name = sanitizeString(req.query.file, 200);
+        if (!OPERATION_NAME_RE.test(name)) {
+            return res.status(400).json({ error: 'Invalid job reference.' });
+        }
+
+        const result = await resolveVideoUri(name);
+        if (!result.done) {
+            return res.status(409).json({ error: 'The animation is still rendering.' });
+        }
+
+        /**
+         * SSRF guard. The URI is read from an API response and is then fetched
+         * WITH OUR API KEY ATTACHED, so it must be proven to be Google's own
+         * endpoint before that happens - never fetched just because the
+         * response supplied it.
+         */
+        let target;
+        try {
+            target = new URL(result.uri);
+        } catch {
+            return res.status(502).json({ error: 'Could not fetch the finished video.' });
+        }
+        if (target.protocol !== 'https:' || target.hostname !== 'generativelanguage.googleapis.com') {
+            console.error('Animation download refused, unexpected host:', target.hostname);
+            return res.status(502).json({ error: 'Could not fetch the finished video.' });
         }
 
         // Streamed through the server rather than redirected to: the download
@@ -2814,10 +3223,7 @@ app.get('/api/animation/video', async (req, res) => {
         // Use the shared apiKey (with its VITE_ fallback) — reading the env var
         // directly meant a deployment still on the deprecated name could
         // generate clips (paying for them) but never download them.
-        const upstream = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/${name}:download?alt=media`,
-            { headers: { 'x-goog-api-key': apiKey } }
-        );
+        const upstream = await fetch(target.href, { headers: { 'x-goog-api-key': apiKey } });
         if (!upstream.ok) {
             return res.status(upstream.status).json({ error: 'Could not fetch the finished video.' });
         }
@@ -2872,17 +3278,27 @@ const animationsLeftFor = (data) => {
     return Math.max(0, ANIMATION_MONTHLY_LIMIT - used);
 };
 
+/** 4K exports still available this month, same rollover rule. */
+const fourKLeftFor = (data) => {
+    const used = data?.fourKPeriod === currentPeriod() ? (data.fourKUsed || 0) : 0;
+    return Math.max(0, FOUR_K_EXPORTS_PER_MONTH - used);
+};
+
 /** Attach the feature flags the client gates its UI on. The client must never
  *  derive these from the plan string itself — that would mean maintaining the
  *  entitlement list in two places, free to drift apart. */
 const withEntitlements = (payload, data) => {
     const canUseAnimation = ANIMATION_PLANS.has(payload.plan);
+    const canExport4K = FOUR_K_PLANS.has(payload.plan);
     return {
         ...payload,
         canUseProjects: PROJECT_PLANS.has(payload.plan),
         canUseAnimation,
         animationsLimit: ANIMATION_MONTHLY_LIMIT,
         animationsLeft: canUseAnimation ? animationsLeftFor(data) : 0,
+        canExport4K,
+        fourKLimit: FOUR_K_EXPORTS_PER_MONTH,
+        fourKLeft: canExport4K ? fourKLeftFor(data) : 0,
     };
 };
 
@@ -2918,7 +3334,7 @@ app.get('/api/user/credits', async (req, res) => {
                 trialDaysLeft: Math.ceil(msLeft / 86400000),
                 trialExpiresAt: new Date(expiresAt).toISOString(),
                 trialBlocked: used >= TESTER_RENDERS || msLeft <= 0,
-            }));
+            }, data));
         }
 
         const userRef = db.collection('users').doc(req.user.uid);

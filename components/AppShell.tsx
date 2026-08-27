@@ -408,6 +408,14 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           <img src="/Logo.png" alt="Modulr Studio Logo" className="h-24 md:h-36 w-auto object-contain" />
         </div>
         <div className="flex-[1] flex flex-col items-center gap-3">
+          {/* Two addresses on purpose: the studio's own for anything about the
+              product, NAPC's for the company behind it. */}
+          <a
+            href="mailto:info@modulrstudio.co.uk"
+            className="text-[11px] font-semibold text-accent hover:underline underline-offset-2 tracking-wide text-center"
+          >
+            Contact us &nbsp;|&nbsp; info@modulrstudio.co.uk
+          </a>
           <p className="text-[10px] text-accent/60 tracking-wide text-center">Created by NAPC Ltd &nbsp;|&nbsp; 01285 283 200 &nbsp;|&nbsp; info@napc.uk</p>
           <img src="/napc-logo.png" alt="NAPC Logo" className="h-16 md:h-20 object-contain" />
         </div>

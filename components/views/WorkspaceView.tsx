@@ -1,5 +1,6 @@
 import React from 'react';
-import { Download, Upload, Loader2, RotateCcw, FolderOpen, ShieldCheck, ShieldAlert, RefreshCw, Lock } from 'lucide-react';
+import { Download, Upload, Loader2, RotateCcw, FolderOpen, ShieldCheck, ShieldAlert, RefreshCw, Lock, Sparkles } from 'lucide-react';
+import { useCredits } from '../../hooks/useCredits';
 import { Button } from '../Button';
 import { CompareSlider } from '../CompareSlider';
 import { SkeletonLoader } from '../SkeletonLoader';
@@ -19,6 +20,10 @@ interface WorkspaceViewProps {
     onDownload: (base64Data: string, filename: string) => void;
     /** Offer "Save to Project" on the finished image. */
     onSaveToProject?: (image: string) => void;
+    /** Offer a metered 4K export of the finished image. Only rendered for
+     *  accounts the server says may export 4K. */
+    onExport4K?: (image: string) => void;
+    isExporting4K?: boolean;
     /** The server's automatic quality check on the last render. */
     verification?: { checked: boolean; passed?: boolean; retried?: boolean } | null;
     /** Re-render: sameLook=true reuses the last seed, false rolls a new one. */
@@ -50,6 +55,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     loadingMessage,
     onDownload,
     onSaveToProject,
+    onExport4K,
+    isExporting4K,
     verification,
     onRerender,
     onInputClick,
@@ -66,6 +73,9 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     onBatchSelect,
     userPlan
 }) => {
+    // 4K export entitlement comes from the server via /api/user/credits -
+    // generation is 2K everywhere, 4K is a metered per-image export.
+    const { canExport4K, fourKLeft } = useCredits();
 
     const getImageUrl = (img: string | null) => {
         if (!img) return '';
@@ -289,6 +299,20 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                             <Button variant="secondary" size="sm" onClick={() => onDownload(primaryImg, 'modulr-export.jpg')} icon={<Download size={14} />}>
                                 Save Output
                             </Button>
+                            {onExport4K && canExport4K && (
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => onExport4K(primaryImg)}
+                                    disabled={isExporting4K || fourKLeft === 0}
+                                    icon={isExporting4K ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                    title={fourKLeft === 0
+                                        ? 'All 4K exports used this month - the allowance resets on the 1st.'
+                                        : `Export this image at 4K Ultra HD.${fourKLeft != null ? ` ${fourKLeft} of your monthly exports left.` : ''}`}
+                                >
+                                    {isExporting4K ? 'Exporting 4K…' : 'Export 4K'}
+                                </Button>
+                            )}
                         </div>
                     )}
                 </div>

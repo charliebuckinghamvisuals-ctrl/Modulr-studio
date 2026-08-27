@@ -289,6 +289,37 @@ export const renderBuilding = async (
 };
 
 /**
+ * 4K export: reproduce a finished 2K image at 4K on the server.
+ *
+ * The only route to 4K pixels - every tool generates at 2K. Metered
+ * server-side (100 per calendar month on Business), so callers should surface
+ * the error message verbatim when the allowance runs out.
+ */
+export const export4K = async (base64Image: string): Promise<string> => {
+  try {
+    const { ratio } = await getImageDimensions(base64Image);
+
+    const response = await fetch(`${API_BASE_URL}/export4k`, {
+      method: 'POST',
+      headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ base64Image, ratio })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(formatErrorMessage(errorData.error, response.status));
+    }
+
+    const data = await response.json();
+    return data.result;
+
+  } catch (error) {
+    console.error("4K export error:", error);
+    throw error;
+  }
+};
+
+/**
  * Edits the image to add elements or refine details.
  */
 export const editImage = async (
