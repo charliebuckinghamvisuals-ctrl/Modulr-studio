@@ -6,7 +6,7 @@ import { useRef, useState, useEffect, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
-import { MODEL_URLS, MODEL_SCALES } from '../../modelRegistry';
+import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, TINT_MATERIAL } from '../../modelRegistry';
 import { isInteriorType, clampToRoomInterior, roomLocal, FOOTPRINT_RADIUS } from '../../utils/placement';
 import { RotateCw, Copy, Trash2 } from 'lucide-react';
 
@@ -16,22 +16,47 @@ import { RotateCw, Copy, Trash2 } from 'lucide-react';
  * (served at the site root) and inside the /3d-config/ iframe, where an
  * absolute path would miss.
  */
-function GlbModel({ url }: { url: string }) {
+function GlbModel({ url, tintMaterial, color }: { url: string; tintMaterial?: string; color?: string }) {
     const { scene } = useGLTF(url);
 
     // Clone per instance. useGLTF caches one scene graph, so placing two of
     // the same object without cloning would move one shared graph twice.
     const model = useRef<THREE.Group>(null);
     const cloned = useRef<THREE.Object3D | null>(null);
+    // Cloning a scene SHARES its materials, so the body material is cloned
+    // too - otherwise recolouring one cabinet would recolour every unit in
+    // the room, and every future one.
+    const bodyMats = useRef<THREE.MeshStandardMaterial[]>([]);
+
     if (!cloned.current) {
         cloned.current = scene.clone(true);
         cloned.current.traverse(child => {
-            if ((child as THREE.Mesh).isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
+            const mesh = child as THREE.Mesh;
+            if (!mesh.isMesh) return;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            if (!tintMaterial) return;
+            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            const next = mats.map((m: any) => {
+                if (!m || m.name !== tintMaterial) return m;
+                const copy = m.clone();
+                // Exported at roughness 0, which reads as wet plastic.
+                copy.roughness = 0.62;
+                copy.metalness = 0;
+                if (copy.clearcoat !== undefined) copy.clearcoat = 0;
+                if (copy.specularIntensity !== undefined) copy.specularIntensity = 0.15;
+                bodyMats.current.push(copy);
+                return copy;
+            });
+            mesh.material = Array.isArray(mesh.material) ? next : next[0];
         });
     }
+
+    // Recolour on demand without rebuilding the model.
+    useEffect(() => {
+        if (!color) return;
+        bodyMats.current.forEach(m => { m.color.set(color); m.needsUpdate = true; });
+    }, [color]);
 
     return <primitive ref={model} object={cloned.current} />;
 }
@@ -178,10 +203,20 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
     // renders its real model even if a procedural builder exists below.
     const modelUrl = MODEL_URLS[obj.type];
     if (modelUrl) {
+      const base = MODEL_SCALES[obj.type] ?? [1, 1, 1];
+      // Width-adjustable objects (kitchen units) stretch on X only, so the
+      // carcass keeps its real depth and worktop height at any width.
+      const native = NATIVE_WIDTH_MM[obj.type];
+      const stretch = native && obj.widthMm ? obj.widthMm / native : 1;
       return (
         <Suspense fallback={<ModelFallback />}>
-          <group scale={MODEL_SCALES[obj.type] ?? [1, 1, 1]}>
-            <GlbModel url={modelUrl} />
+          <group scale={[base[0] * stretch, base[1], base[2]]}>
+            <GlbModel
+              key={obj.type}
+              url={modelUrl}
+              tintMaterial={TINT_MATERIAL[obj.type]}
+              color={obj.color}
+            />
           </group>
         </Suspense>
       );
@@ -772,21 +807,10 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
           </mesh>
         </>
       )}
-      {/* Mini toolbar above the selected object: the frequent actions live at
-          the object, not in a panel across the screen. */}
-      {isSelected && !isDragging && !isRotating && viewMode !== 'walking' && (
-        <Html position={[0, 2.1, 0]} center zIndexRange={[120, 0]}>
-          <div
-            style={{ pointerEvents: 'auto' }}
-            className="flex items-center gap-1 bg-white/95 backdrop-blur-md border border-black/10 rounded-full shadow-lg px-2 py-1.5"
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <button title="Rotate 45°" onClick={() => { const st = useStore.getState(); st.saveState(); st.updateObject(obj.id, { rot: obj.rot + Math.PI / 4 }); }} className="p-1.5 rounded-full hover:bg-black/5 text-[#3b4d4a]"><RotateCw size={14} /></button>
-            <button title="Duplicate (Ctrl+D)" onClick={() => { const st = useStore.getState(); st.saveState(); st.duplicateObject(obj.id); }} className="p-1.5 rounded-full hover:bg-black/5 text-[#3b4d4a]"><Copy size={14} /></button>
-            <button title="Delete" onClick={() => { const st = useStore.getState(); st.saveState(); st.removeObject(obj.id); st.setSelectedObjectId(null); }} className="p-1.5 rounded-full hover:bg-red-50 text-red-500"><Trash2 size={14} /></button>
-          </div>
-        </Html>
-      )}
+      {/* The rotate/duplicate/delete pill that used to float above the object
+          now lives in the docked panel at the bottom - one place for the
+          selection's controls instead of a pill covering the thing you are
+          trying to look at. */}
       {/* Live distances to the inside wall faces while dragging an interior
           object - the numbers a real furniture plan is made of. */}
       {isDragging && isInterior && (() => {

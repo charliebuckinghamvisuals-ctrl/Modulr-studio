@@ -67,7 +67,9 @@ function DimText({ value, onValueChange, position, rotation, children, isDraggab
         className={`${isPlanLabel
           // Plan view is a working drawing: bigger, dark-on-light labels that
           // stand clear of the dimension lines instead of tiny dark blobs.
-          ? 'bg-white border border-[#3b4d4a]/50 rounded-md font-mono text-[11px] font-bold tracking-wide whitespace-nowrap px-2 py-0.5 text-[#1d1d1f] shadow'
+          // Kept compact: at 11px with heavy padding these plates collided
+          // with each other all over a plan and hid the building.
+          ? 'bg-white/95 border border-[#3b4d4a]/40 rounded font-mono text-[9px] font-semibold tracking-tight whitespace-nowrap px-1 py-px text-[#1d1d1f] shadow-sm'
           : 'bg-[#3b4d4a] border border-[#3b4d4a] rounded-full font-mono text-[8px] tracking-wider whitespace-nowrap px-1.5 py-0.5 text-white opacity-90 shadow-md'} transition-all duration-200 ${onValueChange ? (isEditing ? 'cursor-auto ring-1 ring-[#2d3a38]' : 'cursor-pointer hover:scale-105') : 'pointer-events-none'}`}
         style={{ pointerEvents: (isEditing || onValueChange || isDraggable) ? 'auto' : 'none' }}
         onClick={(e) => {
@@ -185,7 +187,12 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
 
   const viewMode = useStore(s => s.viewMode);
   const isExporting = useStore(s => s.isExporting);
+  const hovered = useStore(s => s.hoveredElementId);
   if (viewMode === 'walking' || viewMode === 'capture' || viewMode === 'render' || isExporting) return null;
+  // Only while the pointer is over the building - four permanent + markers
+  // sat on the walls in every view and cluttered the model. The chip itself
+  // keeps them alive once opened.
+  const showAdders = hovered === 'room' || !!hit;
 
   const add = (kind: 'door' | 'window') => {
     if (!hit) return;
@@ -209,12 +216,15 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
 
   return (
     <>
-      {wallButtons.map(b => (
+      {showAdders && wallButtons.map(b => (
         <Html key={`wall-add-${b.wall}`} position={b.pos} center zIndexRange={[125, 0]}>
           <button
             title={`Add a window or door to the ${b.wall} wall`}
             style={{ pointerEvents: 'auto' }}
             onPointerDown={(e) => e.stopPropagation()}
+            // Moving onto the button leaves the 3D mesh, which would hide the
+            // buttons out from under the cursor - keep the hover alive.
+            onPointerEnter={() => useStore.getState().setHoveredElementId('room')}
             onClick={(e) => { e.stopPropagation(); setHit({ wall: b.wall, offsetMm: 0, pos: b.pos }); }}
             className="w-7 h-7 rounded-full bg-white/90 backdrop-blur-md border border-black/10 shadow-md text-[#3b4d4a] text-base font-bold leading-none hover:bg-[#3b4d4a] hover:text-white hover:scale-110 transition-all"
           >
@@ -228,6 +238,7 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
             style={{ pointerEvents: 'auto' }}
             className="flex items-center gap-1 bg-white/95 backdrop-blur-md border border-black/10 rounded-full shadow-xl px-2 py-1.5 whitespace-nowrap"
             onPointerDown={(e) => e.stopPropagation()}
+            onPointerEnter={() => useStore.getState().setHoveredElementId('room')}
           >
             <button onClick={() => add('window')} className="px-3 py-1.5 rounded-full text-[11px] font-bold text-white bg-[#3b4d4a] hover:bg-[#2d3a38] transition-colors">+ Window</button>
             <button onClick={() => add('door')} className="px-3 py-1.5 rounded-full text-[11px] font-bold text-[#3b4d4a] bg-black/5 hover:bg-black/10 transition-colors">+ Door</button>
@@ -2097,7 +2108,17 @@ export function RoomGeometry() {
               say WHERE the openings sit. Read-only labels; positions are edited
               on the openings themselves. LShape skipped: offsets there are not
               relative to a single straight wall. */}
-          {room.showDimensions && room.shape !== 'LShape' && (['front', 'back', 'left', 'right'] as const).map(side => {
+          {room.showDimensions && room.shape !== 'LShape' && (['front', 'back', 'left', 'right'] as const).filter(side => {
+            // Only chain the wall whose opening is selected. Drawing all four
+            // walls at once stacked dozens of labels on top of each other and
+            // buried the model - now you get the setting-out for the thing you
+            // are actually working on, and nothing else.
+            const sel = selectedElementId;
+            if (!sel) return false;
+            const d0 = (room.doors || []).find(dr => dr.id === sel);
+            const w0 = room.windows.find(wn => wn.id === sel);
+            return (d0?.wall ?? w0?.wall) === side;
+          }).map(side => {
             const horiz = side === 'front' || side === 'back';
             const L = horiz ? w : d;
             const openings = [
@@ -2133,7 +2154,9 @@ export function RoomGeometry() {
                 {pts.slice(0, -1).map((p, i) => {
                   const q = pts[i + 1];
                   const segMm = Math.round((q - p) * 1000);
-                  if (segMm < 1) return null;
+                  // Skip slivers: they produced unreadable "0 mm" tags stacked
+                  // on the neighbouring label.
+                  if (segMm < 50) return null;
                   const mid = (p + q) / 2;
                   return (
                     <DimText

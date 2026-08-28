@@ -1,15 +1,34 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, createContext, useContext } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Settings, Plus, Box, Tent, Trees, Map, Settings2, Trash2, DoorOpen, DoorClosed, ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react';
+import { Settings, Plus, Box, Tent, Map, Settings2, Trash2, DoorOpen, DoorClosed, ChevronDown, ChevronRight } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Link } from 'react-router-dom';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS } from '../modelRegistry';
+import { ObjectTile } from './UI/ObjectTile';
+import { TemplatesSection } from './UI/TemplatesSection';
 
-function CollapsibleSection({ title, children, defaultOpen = false }: { title: string, children: React.ReactNode, defaultOpen?: boolean }) {
+/**
+ * Which design step the sidebar is showing. Sections declare the step they
+ * belong to and hide themselves outside it, so the twelve-section scroll
+ * becomes five short, ordered stages without having to reorder the JSX.
+ */
+const StepContext = createContext<string | null>(null);
+
+export const BUILDING_STEPS = [
+  { id: 'size', label: 'Size' },
+  { id: 'cladding', label: 'Finish' },
+  { id: 'openings', label: 'Openings' },
+  { id: 'extras', label: 'Extras' },
+  { id: 'interior', label: 'Interior' },
+] as const;
+
+function CollapsibleSection({ title, children, defaultOpen = false, step }: { title: string, children: React.ReactNode, defaultOpen?: boolean, step?: string }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const activeStep = useContext(StepContext);
+  if (step && activeStep && step !== activeStep) return null;
   return (
     <div className="border-b border-black/5 last:border-0 pb-4 mb-4">
       <button 
@@ -74,6 +93,7 @@ export function Sidebar() {
   const toggleTime = wrap(store.toggleTime);
   
   const [tab, setTab] = useState('building');
+  const [step, setStep] = useState<string>('size');
 
   return (
     <div className="flex flex-col h-full bg-transparent text-[#1d1d1f]">
@@ -85,7 +105,7 @@ export function Sidebar() {
         <div className="flex-1">
           <h1 className="text-xl font-semibold tracking-tight text-[#1d1d1f]">Modulr <span className="font-light">3D</span></h1>
           <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1 font-medium">
-            Configurator <span className="normal-case tracking-normal text-gray-300">· build {typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev'}</span>
+            Configurator <span className="normal-case tracking-normal text-gray-300">Â· build {typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev'}</span>
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
@@ -175,12 +195,39 @@ export function Sidebar() {
         )}
 
         {tab === 'building' && (
-          <>
+          <StepContext.Provider value={step}>
+            {/* Step rail. Twelve stacked sections meant scrolling to find
+                anything; these are the five stages of actually designing one
+                of these buildings, in order. */}
+            <div className="sticky top-0 z-10 -mx-6 px-6 pt-1 pb-3 mb-4 bg-[#FAFAF8]/95 backdrop-blur border-b border-black/5">
+              <div className="flex gap-1">
+                {BUILDING_STEPS.map((s, i) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setStep(s.id)}
+                    className={`flex-1 flex flex-col items-center gap-1 py-1.5 rounded-lg transition-colors ${
+                      step === s.id ? 'bg-[#3b4d4a] text-white shadow-sm' : 'text-gray-500 hover:bg-black/5'
+                    }`}
+                  >
+                    <span className={`text-[10px] font-bold leading-none ${step === s.id ? 'opacity-70' : 'opacity-40'}`}>{i + 1}</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-wide leading-none">{s.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Templates first: starting from a building close to the one the
+                customer wants beats building the same obvious things from an
+                empty box every time. */}
+            <CollapsibleSection title="My Templates" defaultOpen={false} step="size">
+              <TemplatesSection />
+            </CollapsibleSection>
+
             {/* Shape comes FIRST: it is the decision everything else depends
                 on. It used to live six sections down inside "Base Model &
                 Features", where even the owner could not find the Gable
                 option. */}
-            <CollapsibleSection title="Roof Shape" defaultOpen={true}>
+            <CollapsibleSection title="Roof Shape" defaultOpen={true} step="size">
               <div className="grid grid-cols-2 gap-2">
                 {(['Box', 'Gable'] as const).map((shape) => (
                   <div key={shape} onClick={() => {
@@ -283,7 +330,7 @@ export function Sidebar() {
               );
             })()}
 
-            <CollapsibleSection title="Dimensions" defaultOpen={true}>
+            <CollapsibleSection title="Dimensions" defaultOpen={true} step="size">
               <div className="space-y-3">
                 {/* A gable is specced the way surveyors and planners spec it:
                     EAVES height and RIDGE height, both as totals from the
@@ -311,7 +358,7 @@ export function Sidebar() {
                   const baseH = room.baseHeightMm ?? 100;
                   const roofH = room.roofHeightMm ?? 200;
                   // For Gable, heightMm is ALREADY the total height (the 3D
-                  // maths subtracts base+roof from it) — adding base+roof here
+                  // maths subtracts base+roof from it) â€” adding base+roof here
                   // showed a total 450mm taller than the 3D label for the same
                   // building. Box stores wall height, so it still converts.
                   const heightIsTotal = room.shape === 'Gable';
@@ -359,7 +406,7 @@ export function Sidebar() {
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection title="Cladding" defaultOpen={true}>
+            <CollapsibleSection title="Cladding" defaultOpen={true} step="cladding">
               <div className="space-y-6">
                 <div>
                   <label className="text-[10px] font-medium text-gray-500 mb-2 block">Wall Cladding Orientation</label>
@@ -429,7 +476,7 @@ export function Sidebar() {
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection title="Doors" defaultOpen={true}>
+            <CollapsibleSection title="Doors" defaultOpen={true} step="openings">
               <button onClick={wrap(store.addDoor)} className="w-full mb-4 bg-white border border-[#3b4d4a] text-[#3b4d4a] py-2 px-4 rounded-lg text-xs font-semibold hover:bg-[#3b4d4a] hover:text-white transition-all flex items-center justify-center shadow-sm">+ Add Door</button>
               <div className="space-y-4">
                 {(room.doors || []).map((door, idx) => (
@@ -481,7 +528,7 @@ export function Sidebar() {
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection title="Windows" defaultOpen={true}>
+            <CollapsibleSection title="Windows" defaultOpen={true} step="openings">
               <div className="flex justify-end mb-4">
                 <button onClick={addWindow} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors">+ Add New</button>
               </div>
@@ -538,7 +585,7 @@ export function Sidebar() {
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection title="Colours & Materials" defaultOpen={true}>
+            <CollapsibleSection title="Colours & Materials" defaultOpen={true} step="cladding">
               <div>
                 <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Door/Window Frames</label>
                 <div className="flex gap-2">
@@ -660,7 +707,7 @@ export function Sidebar() {
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection title="Base Model & Features" defaultOpen={true}>
+            <CollapsibleSection title="Base Model & Features" defaultOpen={true} step="extras">
 
               <div className="space-y-3">
                 {[
@@ -717,7 +764,7 @@ export function Sidebar() {
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection title="Overhangs & Canopy">
+            <CollapsibleSection title="Overhangs & Canopy" step="extras">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <span className="text-[10px] font-medium text-gray-500 mb-1 block">Front (Canopy)</span>
@@ -767,7 +814,7 @@ export function Sidebar() {
                       // Clamp below the total height: a roof taller than the
                       // building makes the wall height negative and the walls
                       // invert into a broken mess (three.js tolerates it, so
-                      // there's no error — just a mangled model).
+                      // there's no error â€” just a mangled model).
                       const maxRoof = (room.heightMm ?? 2350) - (room.baseHeightMm ?? 100) - 100;
                       updateRoom({ roofHeightMm: Math.min(Math.max(0, parseInt(e.target.value) || 0), Math.max(100, maxRoof)) });
                     }} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
@@ -776,7 +823,7 @@ export function Sidebar() {
               )}
             </CollapsibleSection>
 
-            <CollapsibleSection title="Skylights">
+            <CollapsibleSection title="Skylights" step="openings">
               <div className="flex justify-end mb-4">
                 <button onClick={wrap(store.addSkylight)} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors">+ Add New</button>
               </div>
@@ -798,7 +845,7 @@ export function Sidebar() {
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection title="Internal Walls">
+            <CollapsibleSection title="Internal Walls" step="interior">
               {/* ONE system: walls own their doors. The old separate "+ Door"
                   created world-positioned doors that stayed behind when their
                   wall moved; new doors are added per-wall below. */}
@@ -813,7 +860,7 @@ export function Sidebar() {
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-gray-800">Wall #{i + 1}</span>
                       <button onClick={(e) => { e.stopPropagation(); wrap(store.updatePartition)(part.id, { rotation: part.rotation === 0 ? 90 : 0 }); }} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors bg-blue-50 px-2 py-1 rounded">
-                        Rotate 90°
+                        Rotate 90Â°
                       </button>
                       <span className="text-[10px] text-gray-400">{part.rotation === 0 ? 'runs left-right' : 'runs front-back'}</span>
                     </div>
@@ -826,7 +873,7 @@ export function Sidebar() {
                         onClick={(e) => { e.stopPropagation(); wrap(store.updatePartition)(part.id, { legLengthMm: (part.legLengthMm || 0) > 100 ? 0 : 1500, legEnd: part.legEnd || 1, legDir: part.legDir || 1 }); }}
                         className={`text-[10px] font-semibold px-2 py-1 rounded transition-colors ${(part.legLengthMm || 0) > 100 ? 'bg-[#3b4d4a] text-white' : 'bg-blue-50 text-[#3b4d4a] hover:text-blue-600'}`}
                       >
-                        {(part.legLengthMm || 0) > 100 ? 'L-Shape ✓' : 'Make L-Shape'}
+                        {(part.legLengthMm || 0) > 100 ? 'L-Shape âœ“' : 'Make L-Shape'}
                       </button>
                       {(part.legLengthMm || 0) > 100 && (
                         <>
@@ -880,7 +927,7 @@ export function Sidebar() {
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold text-gray-800">Interior Door #{i + 1}</span>
                         <button onClick={(e) => wrap(store.updateInteriorDoor)(door.id, { rotation: door.rotation === 0 ? 90 : 0 })} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors bg-blue-50 px-2 py-1 rounded">
-                          Rotate 90°
+                          Rotate 90Â°
                         </button>
                       </div>
                       
@@ -911,7 +958,7 @@ export function Sidebar() {
               )}
             </CollapsibleSection>
 
-            <CollapsibleSection title="Interior Finishes">
+            <CollapsibleSection title="Interior Finishes" step="interior">
               <div className="space-y-6">
                 <div>
                   <label className="text-[10px] font-medium text-gray-500 mb-2 block">Interior Wall Color</label>
@@ -939,48 +986,62 @@ export function Sidebar() {
               </div>
             </CollapsibleSection>
 
-          </>
+          </StepContext.Provider>
         )}
 
         {tab === 'objects' && (
-          <div className="space-y-8">
+          <div className="space-y-7">
+            <p className="text-[10px] text-gray-500 -mb-2">Click an item, then click in the scene to place it. <span className="text-gray-400">R rotates, Esc cancels.</span></p>
+
             <section>
-              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-4 block">Garden Objects</label>
-              <p className="text-[10px] text-gray-500 mb-4">Drag and drop into the scene (plan view recommended).</p>
-              <div className="grid grid-cols-2 gap-3">
-                {['tree', 'conifer', 'planter', 'bench'].map(type => (
-                   <div draggable key={type} onClick={() => useStore.getState().setActivePlacementType(type as any)} onDragStart={(e) => e.dataTransfer.setData('type', type)} className="p-4 border border-gray-200 rounded-xl bg-[#F5F5F0] flex flex-col items-center gap-3 cursor-pointer active:cursor-grabbing hover:border-[#5A5A40] hover:shadow-sm transition-all group">
-                      <Trees size={32} strokeWidth={1.5} className="text-[#5A5A40] group-hover:scale-110 transition-transform" />
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A5A40]">{type}</span>
-                   </div>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Seating</label>
+              <div className="grid grid-cols-2 gap-2.5">
+                {(['sofa', 'sofa_l', 'armchair', 'footstool'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
             </section>
-            
+
             <section>
-              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-4 block">Interior Objects</label>
-              {/* Registry-driven: only real GLB furniture models are offered.
-                  The old procedural furniture was retired from the picker
-                  (saved designs containing it still render). */}
-              <div className="grid grid-cols-2 gap-3">
-                {GLB_OBJECT_TYPES.map(type => (
-                   <div draggable key={type} onClick={() => useStore.getState().setActivePlacementType(type as any)} onDragStart={(e) => e.dataTransfer.setData('type', type)} className="p-4 border border-gray-200 rounded-xl bg-[#F5F5F0] flex flex-col items-center gap-3 cursor-pointer active:cursor-grabbing hover:border-[#5A5A40] hover:shadow-sm transition-all group">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A5A40] text-center">{GLB_OBJECT_LABELS[type]}</span>
-                   </div>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Tables & Storage</label>
+              <div className="grid grid-cols-2 gap-2.5">
+                {(['coffee_table', 'coffee_table_black', 'desk', 'wardrobe', 'bedside_table'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
             </section>
-            
+
             <section>
-              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-4 block">Lighting</label>
-              <div className="grid grid-cols-2 gap-3">
-                {['exterior_wall_light', 'drop_light'].map(type => (
-                   <div draggable key={type} onClick={() => useStore.getState().setActivePlacementType(type as any)} onDragStart={(e) => e.dataTransfer.setData('type', type)} className="p-4 border border-gray-200 rounded-xl bg-[#F5F5F0] flex flex-col items-center gap-3 cursor-pointer active:cursor-grabbing hover:border-[#5A5A40] hover:shadow-sm transition-all group">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A5A40]">{type.replace('_', ' ')}</span>
-                   </div>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Bedroom</label>
+              <div className="grid grid-cols-2 gap-2.5">
+                {(['bed'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
             </section>
+
+            <section>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Kitchen</label>
+              <div className="grid grid-cols-2 gap-2.5">
+                {(['kitchen_unit_600', 'kitchen_unit_1200', 'kitchen_sink_1200'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-2">Each unit's width is adjustable once placed.</p>
+            </section>
+
+            <section>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Bathroom</label>
+              <div className="grid grid-cols-2 gap-2.5">
+                {(['toilet', 'vanity', 'shower', 'shower_corner', 'shower_small'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
+                ))}
+              </div>
+            </section>
+
+            {/* Garden objects and the procedural light fittings were retired
+                from the picker: everything offered here is now a real model.
+                Saved designs containing the old items still render. */}
           </div>
         )}
       </div>

@@ -49,6 +49,9 @@ interface AppState {
   /** Replace the room with a saved design, merged over defaults so scenes
    *  saved before a field existed still load cleanly. */
   loadRoom: (room: Partial<SceneState['room']>) => void;
+  /** Apply a starting template: merges its room over the current one and
+   *  replaces the placed objects. Undoable like any other edit. */
+  applyPreset: (room: Partial<SceneState['room']>, objects: Array<Omit<SceneState['objects'][0], 'id'>>) => void;
   updateRoom: (updates: Partial<SceneState['room']>) => void;
   updatePricing: (updates: Partial<SceneState['pricing']>) => void;
   addDoor: () => void;
@@ -235,8 +238,36 @@ const initialState: SceneState = {
   },
 };
 
+/**
+ * Crash/navigation recovery.
+ *
+ * The configurator holds a lot of work in memory and nothing on the server
+ * until "Save Design" is pressed. Anything that unloads the page - a stray
+ * click that navigates, a refresh, a tab crash - used to lose the lot. The
+ * scene is now mirrored to localStorage a second after each change and
+ * restored on load, so the worst case is losing the last second of work
+ * instead of the session.
+ *
+ * A design pushed in by the host app (LOAD_3D_DESIGN) arrives after mount and
+ * simply overwrites the restored scene, which is the right precedence.
+ */
+const AUTOSAVE_KEY = 'modulr_scene_autosave_v1';
+
+function loadAutosave(): SceneState | null {
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Only accept something that actually looks like a scene.
+    if (!parsed?.room || typeof parsed.room.widthMm !== 'number' || !Array.isArray(parsed.objects)) return null;
+    return { ...initialState, ...parsed, room: { ...initialState.room, ...parsed.room } };
+  } catch {
+    return null;
+  }
+}
+
 export const useStore = create<AppState>((set, get) => ({
-  scene: initialState,
+  scene: loadAutosave() ?? initialState,
   pastScenes: [],
   futureScenes: [],
   viewMode: '3d',
@@ -325,6 +356,29 @@ export const useStore = create<AppState>((set, get) => ({
       room: { ...initialState.room, ...room },
     },
     selectedElementId: null,
+  })),
+
+  applyPreset: (room, objects) => set((state) => ({
+    pastScenes: [...state.pastScenes, JSON.parse(JSON.stringify(state.scene))],
+    futureScenes: [],
+    scene: {
+      ...state.scene,
+      // Start from defaults so a template never inherits stray openings or
+      // partitions from whatever was on screen, but keep the user's finish
+      // choices, which are a matter of taste rather than layout.
+      room: {
+        ...initialState.room,
+        cladding: state.scene.room.cladding,
+        claddingOrientation: state.scene.room.claddingOrientation,
+        frameColor: state.scene.room.frameColor,
+        frameStyle: state.scene.room.frameStyle,
+        roofMaterial: state.scene.room.roofMaterial,
+        ...room,
+      },
+      objects: objects.map(o => ({ ...o, id: uuidv4() })),
+    },
+    selectedElementId: null,
+    selectedObjectId: null,
   })),
 
   updateRoom: (updates) => {
@@ -825,5 +879,24 @@ export const useStore = create<AppState>((set, get) => ({
 // stack and scene without React DevTools. Harmless in production.
 if (typeof window !== 'undefined') {
   (window as any).__modulrStore = useStore;
+
+  // Mirror the scene to storage shortly after it settles. Debounced so a
+  // drag writes once at the end rather than on every pointer step.
+  let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+  useStore.subscribe((state, prev) => {
+    if (state.scene === prev.scene) return;
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(useStore.getState().scene));
+      } catch { /* quota or private mode - recovery is best-effort */ }
+    }, 1000);
+  });
+
+  // A page being closed or navigated away from is exactly the case this
+  // exists for, so flush immediately rather than waiting for the debounce.
+  window.addEventListener('pagehide', () => {
+    try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(useStore.getState().scene)); } catch { /* ignore */ }
+  });
 }
 

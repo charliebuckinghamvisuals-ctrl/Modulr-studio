@@ -150,18 +150,34 @@ export function MainScene() {
         controlsRef.current.maxPolarAngle = 0;
         controlsRef.current.minAzimuthAngle = 0;
         controlsRef.current.maxAzimuthAngle = 0;
-        // Left-drag DISABLED in plan view: it was bound to camera panning, so
-        // any drag that missed an object slid the whole map - the single most
-        // annoying interaction while placing furniture. The wheel still zooms
-        // and right-drag still pans for deliberate navigation.
-        controlsRef.current.mouseButtons.left = 0; // NONE
+        // Every input that could rotate or drag the view is switched off.
+        // Left-drag was panning the map whenever it missed an object, and
+        // touch/middle drags could still orbit out of plan entirely.
+        // Remaining: wheel zoom, and right-drag to pan deliberately.
+        const mb = controlsRef.current.mouseButtons;
+        mb.left = 0;    // NONE
+        mb.middle = 0;  // NONE
+        mb.wheel = 8;   // ZOOM
+        mb.right = 2;   // TRUCK (deliberate pan)
+        const t = controlsRef.current.touches;
+        t.one = 0;      // NONE - one finger must never move the camera
+        t.two = 64;     // TOUCH_ZOOM_TRUCK
+        t.three = 0;    // NONE
       } else {
         controlsRef.current.setLookAt(10, 10, 15, 0, 0, 0, true);
         controlsRef.current.minPolarAngle = 0;
         controlsRef.current.maxPolarAngle = Math.PI / 2 - 0.02;
         controlsRef.current.minAzimuthAngle = -Infinity;
         controlsRef.current.maxAzimuthAngle = Infinity;
-        controlsRef.current.mouseButtons.left = 1; // ORBIT
+        const mb = controlsRef.current.mouseButtons;
+        mb.left = 1;    // ORBIT
+        mb.middle = 4;  // DOLLY
+        mb.right = 2;   // TRUCK
+        mb.wheel = 8;   // ZOOM
+        const t = controlsRef.current.touches;
+        t.one = 32;     // TOUCH_ROTATE
+        t.two = 64;     // TOUCH_ZOOM_TRUCK
+        t.three = 128;  // TOUCH_TRUCK
       }
     }
   }, [isPlanView]);
@@ -262,6 +278,17 @@ export function MainScene() {
   useFrame((_, delta) => {
     if (isSpinning && controlsRef.current) {
       controlsRef.current.azimuthAngle += delta * 0.3;
+    }
+
+    // Hard guarantee for plan view: whatever anything else does - a stray
+    // input, a re-render restoring props, a view preset - the camera is
+    // snapped back to straight-down every frame. Panning and zoom still work
+    // because only the ANGLES are corrected, never the position.
+    if (isPlanView && controlsRef.current) {
+      const c = controlsRef.current;
+      if (Math.abs(c.polarAngle) > 1e-4 || Math.abs(c.azimuthAngle) > 1e-4) {
+        c.rotateTo(0, 0, false);
+      }
     }
   });
 
@@ -411,13 +438,21 @@ export function MainScene() {
       {viewMode === 'walking' ? (
         <WalkingControls controlsEnabled={controlsEnabled} />
       ) : (
-        <CameraControls 
+        <CameraControls
           ref={controlsRef}
           enabled={controlsEnabled}
-          makeDefault 
-          minDistance={5} 
-          maxDistance={60} 
-          maxPolarAngle={Math.PI / 2 - 0.02}
+          makeDefault
+          minDistance={5}
+          maxDistance={60}
+          // These MUST be reactive. They were fixed props, and drei re-applies
+          // props on every render - so each render silently restored the orbit
+          // range and undid the plan-view lock set imperatively in the effect
+          // below. That is why plan view kept tilting back to a 3/4 view while
+          // arranging furniture.
+          minPolarAngle={0}
+          maxPolarAngle={isPlanView ? 0 : Math.PI / 2 - 0.02}
+          minAzimuthAngle={isPlanView ? 0 : -Infinity}
+          maxAzimuthAngle={isPlanView ? 0 : Infinity}
         />
       )}
     </>

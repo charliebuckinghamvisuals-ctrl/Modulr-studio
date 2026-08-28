@@ -9,6 +9,7 @@ export const INTERIOR_TYPES: ObjectType[] = [
   'coffee_table', 'coffee_table_black', 'rug', 'tv', 'bed',
   'bedside_table', 'bookshelf', 'dressing_table', 'wardrobe',
   'kitchen_island', 'indoor_plant',
+  'kitchen_unit_600', 'kitchen_unit_1200', 'kitchen_sink_1200',
 ];
 
 export const isInteriorType = (type: ObjectType) => INTERIOR_TYPES.includes(type);
