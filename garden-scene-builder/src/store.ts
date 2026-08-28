@@ -357,25 +357,48 @@ export const useStore = create<AppState>((set, get) => ({
     }
   })),
 
-  addWindow: () => set((state) => ({
-    scene: {
-      ...state.scene,
-      room: {
-        ...state.scene.room,
-        windows: [
-          ...state.scene.room.windows,
-          {
-            id: uuidv4(),
-            wall: 'front',
-            offsetMm: 0,
-            widthMm: 600,
-            heightMm: 1000,
-            sillMm: 800,
-          }
-        ]
-      }
+  addWindow: () => set((state) => {
+    const room = state.scene.room;
+    // New windows start at the left end of the front wall and slide right to
+    // the first clear spot, so they never land on top of the (centred) door
+    // or stack on an earlier window.
+    const winW = 600;
+    const margin = 300;
+    const half = room.widthMm / 2;
+    const occupied = [
+      ...(room.doors || []).filter(d => d.wall === 'front').map(d => ({ c: d.offsetMm, hw: d.widthMm / 2 })),
+      ...room.windows.filter(w => w.wall === 'front').map(w => ({ c: w.offsetMm ?? 0, hw: w.widthMm / 2 })),
+    ];
+    const leftmost = -half + margin + winW / 2;
+    const rightmost = half - margin - winW / 2;
+    let offsetMm = leftmost;
+    while (
+      offsetMm <= rightmost &&
+      occupied.some(o => Math.abs(offsetMm - o.c) < o.hw + winW / 2 + 100)
+    ) {
+      offsetMm += 200;
     }
-  })),
+    if (offsetMm > rightmost) offsetMm = leftmost; // wall is full - fall back to the left end
+    return {
+      scene: {
+        ...state.scene,
+        room: {
+          ...room,
+          windows: [
+            ...room.windows,
+            {
+              id: uuidv4(),
+              wall: 'front',
+              offsetMm,
+              widthMm: winW,
+              heightMm: 1000,
+              sillMm: 800,
+            }
+          ]
+        }
+      }
+    };
+  }),
 
   updateWindow: (id, updates) => set((state) => ({
     scene: {

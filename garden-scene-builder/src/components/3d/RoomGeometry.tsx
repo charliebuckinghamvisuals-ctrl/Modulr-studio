@@ -1511,8 +1511,10 @@ export function RoomGeometry() {
              <mesh position={[-winW/2+winFrameT/2, 0, 0]} castShadow><boxGeometry args={[winFrameT, winH - winFrameT*2, frameDepth]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
              <mesh position={[winW/2-winFrameT/2, 0, 0]} castShadow><boxGeometry args={[winFrameT, winH - winFrameT*2, frameDepth]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
              
-             {/* Protruding Sill */}
-             <mesh position={[0, -winH/2-0.01, frameDepth/2 + 0.02]} rotation={[0.08, 0, 0]} castShadow><boxGeometry args={[winW + 0.1, 0.04, 0.10]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
+             {/* Protruding Sill - only on raised windows; full-height glazing meets the floor */}
+             {!win.fullHeight && (win.sillMm ?? 0) > 0 && (
+               <mesh position={[0, -winH/2-0.01, frameDepth/2 + 0.02]} rotation={[0.08, 0, 0]} castShadow><boxGeometry args={[winW + 0.1, 0.04, 0.10]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
+             )}
              
              {/* Sash Details & Glass panes */}
              {Array.from({ length: win.leaves || 1 }).map((_, i) => {
@@ -1540,13 +1542,6 @@ export function RoomGeometry() {
                      />
                    )}
 
-                   {/* Window Handle */}
-                   {room.hasDoorHandles && (
-                     <group position={[i === 0 ? paneW/2 - winSashT/2 - 0.02 : -paneW/2 + winSashT/2 + 0.02, -0.1, frameDepth*0.15 + 0.005]}>
-                       <mesh position={[0, 0, 0]}><boxGeometry args={[0.02, 0.12, 0.01]} /><meshStandardMaterial color="#333" metalness={0.8} roughness={0.2} /></mesh>
-                       <mesh position={[i === 0 ? -0.03 : 0.03, -0.04, 0.02]}><boxGeometry args={[0.08, 0.015, 0.015]} /><meshStandardMaterial color="#333" metalness={0.8} roughness={0.2} /></mesh>
-                     </group>
-                   )}
                  </group>
                );
              })}
