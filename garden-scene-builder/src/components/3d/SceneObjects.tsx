@@ -6,21 +6,21 @@ import { useRef, useState, useEffect, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from '@react-three/csg';
 import { useGLTF, Html } from '@react-three/drei';
+import { MODEL_URLS, MODEL_SCALES } from '../../modelRegistry';
+import { isInteriorType, clampToRoomInterior, roomLocal, FOOTPRINT_RADIUS } from '../../utils/placement';
+import { RotateCw, Copy, Trash2 } from 'lucide-react';
 
 /**
- * Real bed model, replacing the previous box-built placeholder.
- *
- * Path is relative so it resolves correctly both in standalone dev (served at
- * the site root) and when this app runs inside the /3d-config/ iframe, where an
+ * Generic GLB object - any type registered in modelRegistry renders through
+ * this. Paths are relative so they resolve correctly both in standalone dev
+ * (served at the site root) and inside the /3d-config/ iframe, where an
  * absolute path would miss.
  */
-const BED_MODEL_URL = 'models/bed.glb';
+function GlbModel({ url }: { url: string }) {
+    const { scene } = useGLTF(url);
 
-function BedModel() {
-    const { scene } = useGLTF(BED_MODEL_URL);
-
-    // Clone per instance. useGLTF caches one scene graph, so placing two beds
-    // without cloning would move the same object twice rather than showing two.
+    // Clone per instance. useGLTF caches one scene graph, so placing two of
+    // the same object without cloning would move one shared graph twice.
     const model = useRef<THREE.Group>(null);
     const cloned = useRef<THREE.Object3D | null>(null);
     if (!cloned.current) {
@@ -36,11 +36,11 @@ function BedModel() {
     return <primitive ref={model} object={cloned.current} />;
 }
 
-// Warm the cache so the first bed placed does not stall the scene.
-useGLTF.preload(BED_MODEL_URL);
+// Warm the cache so the first placement of each model does not stall the scene.
+Object.values(MODEL_URLS).forEach(url => { if (url) useGLTF.preload(url); });
 
-/** Simple stand-in shown while the model streams in. */
-function BedFallback() {
+/** Simple stand-in shown while a model streams in. */
+function ModelFallback() {
     return (
         <mesh position={[0, 0.3, 0]}>
             <boxGeometry args={[1.6, 0.6, 2.0]} />
@@ -79,6 +79,7 @@ export function SceneObjects() {
       else if (e.key === 'ArrowUp')    { st.saveState(); st.updateObject(id, { z: o.z - step }); }
       else if (e.key === 'ArrowDown')  { st.saveState(); st.updateObject(id, { z: o.z + step }); }
       else if (e.key === 'r' || e.key === 'R') { st.saveState(); st.updateObject(id, { rot: o.rot + Math.PI / 4 }); }
+      else if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) { st.saveState(); st.duplicateObject(id); }
       else if (e.key === 'Delete' || e.key === 'Backspace') { st.saveState(); st.removeObject(id); st.setSelectedObjectId(null); }
       else if (e.key === 'Escape') { st.setSelectedObjectId(null); }
       else handled = false;
@@ -111,10 +112,14 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   })));
   const isSelected = selectedObjectId === obj.id;
   const [isDragging, setIsDragging] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
   const { raycaster, camera } = useThree();
   const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   
-  const isInterior = ['toilet', 'sink', 'shower', 'interior_wall', 'interior_door'].includes(obj.type);
+  // Interior objects stand on the FINISHED floor (top of the base plinth),
+  // not on the outside ground - without the lift they sink baseH into the
+  // floor.
+  const isInterior = isInteriorType(obj.type);
   const baseH = isInterior ? ((room.baseHeightMm ?? 100) / 1000) + 0.005 : 0;
   const pos: [number, number, number] = [obj.x, baseH, obj.z];
 
@@ -159,6 +164,9 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
           const MAG = 0.12;
           if (Math.abs(nx - -ix) < MAG) nx = -ix; else if (Math.abs(nx - ix) < MAG) nx = ix;
           if (Math.abs(nz - -iz) < MAG) nz = -iz; else if (Math.abs(nz - iz) < MAG) nz = iz;
+          // Never draggable out through a wall
+          const c = clampToRoomInterior(room, nx, nz);
+          nx = c.x; nz = c.z;
         }
         updateObject(obj.id, { x: nx, z: nz });
       }
@@ -166,6 +174,18 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   };
 
   const meshContent = (() => {
+    // GLB-backed objects take priority: a type registered in modelRegistry
+    // renders its real model even if a procedural builder exists below.
+    const modelUrl = MODEL_URLS[obj.type];
+    if (modelUrl) {
+      return (
+        <Suspense fallback={<ModelFallback />}>
+          <group scale={MODEL_SCALES[obj.type] ?? [1, 1, 1]}>
+            <GlbModel url={modelUrl} />
+          </group>
+        </Suspense>
+      );
+    }
     if (obj.type === 'tree') {
       return (
         <>
@@ -681,15 +701,46 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
     return null;
   })();
 
+  const handleRadius = (FOOTPRINT_RADIUS[obj.type] ?? 0.8) + 0.25;
+
+  const rotDown = (e: any) => {
+    e.stopPropagation();
+    setSelectedObjectId(obj.id);
+    useStore.getState().saveState();
+    setIsRotating(true);
+    useStore.getState().setControlsEnabled(false);
+    e.target.setPointerCapture(e.pointerId);
+  };
+  const rotMove = (e: any) => {
+    if (!isRotating) return;
+    const p = new THREE.Vector3();
+    e.ray.intersectPlane(plane, p);
+    if (!p) return;
+    // Angle from the object centre to the pointer; 15° snap unless Shift.
+    let ang = Math.atan2(p.x - obj.x, p.z - obj.z);
+    if (!e.shiftKey) ang = Math.round(ang / (Math.PI / 12)) * (Math.PI / 12);
+    updateObject(obj.id, { rot: ang });
+  };
+  const rotUp = (e: any) => {
+    e.stopPropagation();
+    setIsRotating(false);
+    useStore.getState().setControlsEnabled(true);
+    e.target.releasePointerCapture(e.pointerId);
+  };
+
   return (
-    <group 
-      position={pos} 
-      rotation={[0, obj.rot, 0]} 
+    <group
+      position={pos}
+      rotation={[0, obj.rot, 0]}
       scale={obj.scale}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerMove={handlePointerMove}
       onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        window.dispatchEvent(new CustomEvent('focus-object', { detail: { x: obj.x, z: obj.z } }));
+      }}
     >
       {meshContent}
       {isSelected && (
@@ -699,6 +750,42 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
           <ringGeometry args={[0.65, 0.75, 40]} />
           <meshBasicMaterial color="#10b981" side={THREE.DoubleSide} transparent opacity={0.9} />
         </mesh>
+      )}
+      {/* Rotation handle: a knob on a faint guide ring just outside the
+          object. Drag it to rotate with a 15° snap (Shift = free). */}
+      {isSelected && !isDragging && viewMode !== 'walking' && (
+        <>
+          <mesh position={[0, 0.03, 0]} rotation={[-Math.PI/2, 0, 0]}>
+            <ringGeometry args={[handleRadius - 0.012, handleRadius + 0.012, 48]} />
+            <meshBasicMaterial color="#10b981" side={THREE.DoubleSide} transparent opacity={isRotating ? 0.8 : 0.3} depthWrite={false} />
+          </mesh>
+          <mesh
+            position={[0, 0.08, handleRadius]}
+            onPointerDown={rotDown}
+            onPointerMove={rotMove}
+            onPointerUp={rotUp}
+            onPointerOver={() => { document.body.style.cursor = 'grab'; }}
+            onPointerOut={() => { document.body.style.cursor = 'default'; }}
+          >
+            <sphereGeometry args={[0.09, 16, 16]} />
+            <meshBasicMaterial color="#10b981" />
+          </mesh>
+        </>
+      )}
+      {/* Mini toolbar above the selected object: the frequent actions live at
+          the object, not in a panel across the screen. */}
+      {isSelected && !isDragging && !isRotating && viewMode !== 'walking' && (
+        <Html position={[0, 2.1, 0]} center zIndexRange={[120, 0]}>
+          <div
+            style={{ pointerEvents: 'auto' }}
+            className="flex items-center gap-1 bg-white/95 backdrop-blur-md border border-black/10 rounded-full shadow-lg px-2 py-1.5"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <button title="Rotate 45°" onClick={() => { const st = useStore.getState(); st.saveState(); st.updateObject(obj.id, { rot: obj.rot + Math.PI / 4 }); }} className="p-1.5 rounded-full hover:bg-black/5 text-[#3b4d4a]"><RotateCw size={14} /></button>
+            <button title="Duplicate (Ctrl+D)" onClick={() => { const st = useStore.getState(); st.saveState(); st.duplicateObject(obj.id); }} className="p-1.5 rounded-full hover:bg-black/5 text-[#3b4d4a]"><Copy size={14} /></button>
+            <button title="Delete" onClick={() => { const st = useStore.getState(); st.saveState(); st.removeObject(obj.id); st.setSelectedObjectId(null); }} className="p-1.5 rounded-full hover:bg-red-50 text-red-500"><Trash2 size={14} /></button>
+          </div>
+        </Html>
       )}
       {/* Live distances to the inside wall faces while dragging an interior
           object - the numbers a real furniture plan is made of. */}

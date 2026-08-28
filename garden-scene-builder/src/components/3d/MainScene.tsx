@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { RoomGeometry } from './RoomGeometry';
 import { SceneObjects } from './SceneObjects';
+import { PlacementGhost } from './PlacementGhost';
 import { ObjectType } from '../../types';
 
 
@@ -123,17 +124,18 @@ function ScreenshotHelper() {
 }
 
 export function MainScene() {
-  const { viewMode, addObject, setSelectedObjectId, setSelectedElementId, controlsEnabled, renderTransform, isExporting } = useStore(useShallow(s => ({
+  const { viewMode, addObject, setSelectedObjectId, setSelectedElementId, controlsEnabled, renderTransform, isExporting, cameraFov } = useStore(useShallow(s => ({
     viewMode: s.viewMode,
     addObject: s.addObject,
     setSelectedObjectId: s.setSelectedObjectId,
     setSelectedElementId: s.setSelectedElementId,
     controlsEnabled: s.controlsEnabled,
     renderTransform: s.renderTransform,
-    isExporting: s.isExporting
+    isExporting: s.isExporting,
+    cameraFov: s.cameraFov
   })));
   const controlsRef = useRef<any>(null);
-  const { camera, raycaster, pointer } = useThree();
+  const { camera, raycaster, pointer, gl } = useThree();
   const [isOrthographic, setIsOrthographic] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
 
@@ -148,7 +150,11 @@ export function MainScene() {
         controlsRef.current.maxPolarAngle = 0;
         controlsRef.current.minAzimuthAngle = 0;
         controlsRef.current.maxAzimuthAngle = 0;
-        controlsRef.current.mouseButtons.left = 2; // TRUCK
+        // Left-drag DISABLED in plan view: it was bound to camera panning, so
+        // any drag that missed an object slid the whole map - the single most
+        // annoying interaction while placing furniture. The wheel still zooms
+        // and right-drag still pans for deliberate navigation.
+        controlsRef.current.mouseButtons.left = 0; // NONE
       } else {
         controlsRef.current.setLookAt(10, 10, 15, 0, 0, 0, true);
         controlsRef.current.minPolarAngle = 0;
@@ -208,6 +214,42 @@ export function MainScene() {
     return () => window.removeEventListener('reset-plan-view', handleReset);
   }, [isPlanView]);
 
+  // Legacy sidebar drag-drop lands through a REAL raycast now. The old drop
+  // handler mapped screen position with a crude x10 formula that ignored the
+  // camera entirely, which is why drops landed outside the room.
+  useEffect(() => {
+    const onPlaceAt = (e: any) => {
+      const { type, ndcX, ndcY } = e.detail;
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+      const pt = new THREE.Vector3();
+      if (ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), pt)) {
+        const st = useStore.getState();
+        st.saveState();
+        st.addObject(type, pt.x, pt.z);
+      }
+    };
+    window.addEventListener('place-object-at', onPlaceAt);
+    return () => window.removeEventListener('place-object-at', onPlaceAt);
+  }, [camera]);
+
+  // Freeze shadow-map updates while an object drag is in flight - shadow
+  // re-renders every frame were the main source of drag lag in full scenes.
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = controlsEnabled;
+    if (controlsEnabled) gl.shadowMap.needsUpdate = true;
+  }, [controlsEnabled, gl]);
+
+  // Double-clicking an object frames the camera on it.
+  useEffect(() => {
+    const onFocus = (e: any) => {
+      const { x, z } = e.detail;
+      controlsRef.current?.setLookAt(x + 3.5, 2.6, z + 3.5, x, 0.8, z, true);
+    };
+    window.addEventListener('focus-object', onFocus);
+    return () => window.removeEventListener('focus-object', onFocus);
+  }, []);
+
   const isNight = false;
   
   
@@ -225,12 +267,13 @@ export function MainScene() {
   return (
     <>
       <ScreenshotHelper />
+      <PlacementGhost />
       {isPlanView ? (
         <OrthographicCamera makeDefault position={[0, 40, 0]} zoom={60} near={0.1} far={1000} />
       ) : isOrthographic ? (
         <OrthographicCamera makeDefault position={[10, 10, 15]} zoom={80} near={0.1} far={1000} />
       ) : (
-        <PerspectiveCamera makeDefault position={[10, 10, 15]} fov={50} near={0.1} far={1000} />
+        <PerspectiveCamera makeDefault position={[10, 10, 15]} fov={cameraFov} near={0.1} far={1000} />
       )}
 
       {/* Lighting and Environment */}

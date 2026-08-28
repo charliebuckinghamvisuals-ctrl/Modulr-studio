@@ -256,11 +256,18 @@ function AnimatedDoorLeaves({ door, frameColorHex, frameThickness, sashThickness
                </Html>
             )}
 
-            {/* Glass */}
-            <mesh>
-              <boxGeometry args={[leafW - sashThickness*2, door.heightMm/1000 - frameThickness*2 - sashThickness*2, 0.02]} />
-              <meshPhysicalMaterial color="#aabed1" transmission={0.9} ior={1.5} thickness={0.05} roughness={0.1} clearcoat={1} envMapIntensity={3} />
-            </mesh>
+            {/* Panel: glass, or a solid slab for the entrance-door style */}
+            {door.style === 'solid' ? (
+              <mesh castShadow>
+                <boxGeometry args={[leafW - sashThickness*2, door.heightMm/1000 - frameThickness*2 - sashThickness*2, 0.045]} />
+                <meshStandardMaterial color={frameColorHex} metalness={0.35} roughness={0.55} />
+              </mesh>
+            ) : (
+              <mesh>
+                <boxGeometry args={[leafW - sashThickness*2, door.heightMm/1000 - frameThickness*2 - sashThickness*2, 0.02]} />
+                <meshPhysicalMaterial color="#aabed1" transmission={0.9} ior={1.5} thickness={0.05} roughness={0.1} clearcoat={1} envMapIntensity={3} />
+              </mesh>
+            )}
             {door.style === 'crittall' && (
               <CrittallBars
                 glassW={leafW - sashThickness*2}
@@ -601,7 +608,16 @@ export function RoomGeometry() {
   const isPitched = Math.abs(frontH - backH) > 0.001;
   const roofPitch = isPitched ? Math.atan2(backH - frontH, d) : 0;
   const maxH = Math.max(frontH, backH);
-  const gablePitch = isGable ? Math.atan2(roofHRaw, w/2) : 0;
+  // Side-orientation gable: ridge runs left-to-right, apex triangles on the
+  // side walls (the annexe look). The slope then spans the DEPTH, so every
+  // "across the slope" dimension switches from w/ohLeft/ohRight to
+  // d/ohFront/ohBack, and the run along the ridge from roofD to roofW.
+  const isSideGable = isGable && room.gableOrientation === 'side';
+  const gSpan = isSideGable ? d : w;
+  const gOhLow1 = isSideGable ? ohFront : ohLeft;
+  const gOhLow2 = isSideGable ? ohBack : ohRight;
+  const gRunLen = isSideGable ? roofW : roofD;
+  const gablePitch = isGable ? Math.atan2(roofHRaw, gSpan/2) : 0;
 
   
   const hoveredElementId = useStore((s) => s.hoveredElementId);
@@ -687,7 +703,7 @@ export function RoomGeometry() {
   const pfTopGeom = useMemo(() => createWorldScaleBoxGeometry(w + 0.002, 0.3 + 0.002, ohFront + 0.01, false, 0, pfHeight - 0.3, d/2 + ohFront/2 - 0.005, isVertical), [w, ohFront, pfHeight, d, isVertical]);
 
   const claddingBoxGeom = useMemo(() => createWorldScaleBoxGeometry(w, h + 0.05, d, true, 0, 0, 0, isVertical), [w, h, d, isVertical]);
-  const gableTriangleGeom = useMemo(() => createWorldScaleGableGeometry(w, roofH, wallThickness, 0, h + 0.05, 0, isVertical), [w, roofH, wallThickness, h, isVertical]);
+  const gableTriangleGeom = useMemo(() => createWorldScaleGableGeometry(gSpan, roofH, wallThickness, 0, h + 0.05, 0, isVertical), [gSpan, roofH, wallThickness, h, isVertical]);
   const lShapeCutOuterGeom = useMemo(() => createWorldScaleBoxGeometry(cutW + 0.2, h + 1, cutD + 0.2, false, 0, 0, 0, isVertical), [cutW, cutD, h, roofH, isGable, isVertical]);
   // Roof plan size is exactly roofW x roofD (wall footprint + user overhangs).
   // A 100mm lip was previously baked in here (+0.2), so even with every
@@ -700,8 +716,8 @@ export function RoomGeometry() {
   // roof line, instead of finishing dead flush with the cladding.
   const gableFascia = Math.min(0.4, Math.max(0.05, (room.gableFasciaMm ?? 100) / 1000));
   const ROOF_LIP = 0.05;
-  const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohLeft) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, roofD + ROOF_LIP * 2, false, 0, 0, 0), [w, ohLeft, gablePitch, roofD, gableFascia]);
-  const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((w/2 + ohRight) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, roofD + ROOF_LIP * 2, false, 0, 0, 0), [w, ohRight, gablePitch, roofD, gableFascia]);
+  const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((gSpan/2 + gOhLow1) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, gRunLen + ROOF_LIP * 2, false, 0, 0, 0), [gSpan, gOhLow1, gablePitch, gRunLen, gableFascia]);
+  const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((gSpan/2 + gOhLow2) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, gRunLen + ROOF_LIP * 2, false, 0, 0, 0), [gSpan, gOhLow2, gablePitch, gRunLen, gableFascia]);
 
 
   const renderBaseMeshes = () => {
@@ -876,29 +892,40 @@ export function RoomGeometry() {
           
               <>
 
-          
-                <Addition position={[0, h + 0.025, d/2 - wallThickness/2]}>
 
-          
-                  <primitive object={gableTriangleGeom} attach="geometry" />
-
-          
-                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
-
-          
-                </Addition>
-
-          
-                <Addition position={[0, h + 0.025, -d/2 + wallThickness/2]}>
-
-          
-                  <primitive object={gableTriangleGeom} attach="geometry" />
-
-          
-                  <meshStandardMaterial color="#ffffff" {...texBack}  metalness={0.1}  bumpScale={0.1} />
-
-          
-                </Addition>
+                {/* Apex triangles: front/back walls for the 'front' ridge
+                    orientation, side walls (rotated 90°) for 'side'. The
+                    front triangle is skipped when the apex is glazed - the
+                    glazing unit rendered separately fills the opening. */}
+                {isSideGable ? (
+                  <>
+                    {!room.hasApexGlazing && (
+                    <>
+                    <Addition position={[w/2 - wallThickness/2, h + 0.025, 0]} rotation={[0, Math.PI/2, 0]}>
+                      <primitive object={gableTriangleGeom} attach="geometry" />
+                      <meshStandardMaterial color="#ffffff" {...texRight}  metalness={0.1}  bumpScale={0.1} />
+                    </Addition>
+                    <Addition position={[-w/2 + wallThickness/2, h + 0.025, 0]} rotation={[0, Math.PI/2, 0]}>
+                      <primitive object={gableTriangleGeom} attach="geometry" />
+                      <meshStandardMaterial color="#ffffff" {...texLeft}  metalness={0.1}  bumpScale={0.1} />
+                    </Addition>
+                    </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {!room.hasApexGlazing && (
+                    <Addition position={[0, h + 0.025, d/2 - wallThickness/2]}>
+                      <primitive object={gableTriangleGeom} attach="geometry" />
+                      <meshStandardMaterial color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
+                    </Addition>
+                    )}
+                    <Addition position={[0, h + 0.025, -d/2 + wallThickness/2]}>
+                      <primitive object={gableTriangleGeom} attach="geometry" />
+                      <meshStandardMaterial color="#ffffff" {...texBack}  metalness={0.1}  bumpScale={0.1} />
+                    </Addition>
+                  </>
+                )}
 
           
               </>
@@ -1024,7 +1051,7 @@ export function RoomGeometry() {
           claddingBoxGeom, pfLeftGeom, pfRightGeom, pfTopGeom, lShapeCutOuterGeom, gableTriangleGeom,
           texFront.map, texBack.map, texLeft.map, texRight.map,
           texFront.color, texBack.color, texLeft.color, texRight.color, texFront.roughness,
-          room.hasPictureFrame, room.interiorColor,
+          room.hasPictureFrame, room.interiorColor, room.hasApexGlazing, isSideGable,
           w, d, h, wallThickness, roofH, pfHeight, ohFront,
           isLShape, isTShape, isCornerCut, isGable, isPitched,
           cutW, cutD, frontH, backH, roofPitch,
@@ -1049,10 +1076,14 @@ export function RoomGeometry() {
         </mesh>
 
         {/* Internal Ceiling */}
+        {/* For the side orientation the whole assembly (built along X) is
+            rotated 90° about Y: local X maps to world -Z (the slope spans the
+            depth) and local Z to world +X (the ridge runs left-to-right).
+            gSpan/gOhLow1/gOhLow2/gRunLen carry the swapped dimensions. */}
         {!isPlanView && isGable && (
-          <group position={[roofX, h, roofZ]}>
+          <group position={[roofX, h, roofZ]} rotation={[0, isSideGable ? Math.PI/2 : 0, 0]}>
             {/* Left Roof Plane */}
-            <mesh position={[-w/4 - ohLeft/2 - (ROOF_LIP/2) * Math.cos(gablePitch), roofH/2 - ohLeft * Math.tan(gablePitch)/2 - (ROOF_LIP/2) * Math.sin(gablePitch), 0]} rotation={[0, 0, gablePitch]} castShadow receiveShadow>
+            <mesh position={[-gSpan/4 - gOhLow1/2 - (ROOF_LIP/2) * Math.cos(gablePitch), roofH/2 - gOhLow1 * Math.tan(gablePitch)/2 - (ROOF_LIP/2) * Math.sin(gablePitch), 0]} rotation={[0, 0, gablePitch]} castShadow receiveShadow>
                <primitive object={roofGableLeftGeom} attach="geometry" />
 
                {(() => {
@@ -1087,7 +1118,7 @@ export function RoomGeometry() {
 
             </mesh>
             {/* Right Roof Plane */}
-            <mesh position={[w/4 + ohRight/2 + (ROOF_LIP/2) * Math.cos(gablePitch), roofH/2 - ohRight * Math.tan(gablePitch)/2 - (ROOF_LIP/2) * Math.sin(gablePitch), 0]} rotation={[0, 0, -gablePitch]} castShadow receiveShadow>
+            <mesh position={[gSpan/4 + gOhLow2/2 + (ROOF_LIP/2) * Math.cos(gablePitch), roofH/2 - gOhLow2 * Math.tan(gablePitch)/2 - (ROOF_LIP/2) * Math.sin(gablePitch), 0]} rotation={[0, 0, -gablePitch]} castShadow receiveShadow>
                <primitive object={roofGableRightGeom} attach="geometry" />
                
                {(() => {
@@ -1123,12 +1154,12 @@ export function RoomGeometry() {
             </mesh>
             {room.roofMaterial === 'sedum' && (
               <>
-                <mesh position={[-w/4 - ohLeft/2 - 0.06 * Math.sin(gablePitch), roofH/2 - ohLeft * Math.tan(gablePitch)/2 + 0.06 * Math.cos(gablePitch), 0]} rotation={[0, 0, gablePitch]} castShadow receiveShadow>
-                   <boxGeometry args={[(w/2 + ohLeft) / Math.cos(gablePitch), 0.02, roofD - 0.02]} />
+                <mesh position={[-gSpan/4 - gOhLow1/2 - 0.06 * Math.sin(gablePitch), roofH/2 - gOhLow1 * Math.tan(gablePitch)/2 + 0.06 * Math.cos(gablePitch), 0]} rotation={[0, 0, gablePitch]} castShadow receiveShadow>
+                   <boxGeometry args={[(gSpan/2 + gOhLow1) / Math.cos(gablePitch), 0.02, gRunLen - 0.02]} />
                    <meshStandardMaterial color="#ffffff" {...texRoof}  bumpScale={0.1} roughness={0.9} />
                 </mesh>
-                <mesh position={[w/4 + ohRight/2 + 0.06 * Math.sin(gablePitch), roofH/2 - ohRight * Math.tan(gablePitch)/2 + 0.06 * Math.cos(gablePitch), 0]} rotation={[0, 0, -gablePitch]} castShadow receiveShadow>
-                   <boxGeometry args={[(w/2 + ohRight) / Math.cos(gablePitch), 0.02, roofD - 0.02]} />
+                <mesh position={[gSpan/4 + gOhLow2/2 + 0.06 * Math.sin(gablePitch), roofH/2 - gOhLow2 * Math.tan(gablePitch)/2 + 0.06 * Math.cos(gablePitch), 0]} rotation={[0, 0, -gablePitch]} castShadow receiveShadow>
+                   <boxGeometry args={[(gSpan/2 + gOhLow2) / Math.cos(gablePitch), 0.02, gRunLen - 0.02]} />
                    <meshStandardMaterial color="#ffffff" {...texRoof}  bumpScale={0.1} roughness={0.9} />
                 </mesh>
               </>
@@ -1137,8 +1168,8 @@ export function RoomGeometry() {
             {/* Ridge cap: the two sloped slabs meet square-cut at the apex,
                 which left an open V gap along the ridge. A real roof closes
                 this with a ridge piece - so does this one. */}
-            <mesh position={[-roofX, roofH + gableFascia / (2 * Math.cos(gablePitch)), 0]} castShadow>
-              <boxGeometry args={[0.24 + gableFascia, 0.07, roofD + ROOF_LIP * 2 + 0.02]} />
+            <mesh position={[isSideGable ? roofZ : -roofX, roofH + gableFascia / (2 * Math.cos(gablePitch)), 0]} castShadow>
+              <boxGeometry args={[0.24 + gableFascia, 0.07, gRunLen + ROOF_LIP * 2 + 0.02]} />
               <meshStandardMaterial color={roofColorHex} metalness={0.4} roughness={0.5} />
             </mesh>
 
@@ -1310,6 +1341,169 @@ export function RoomGeometry() {
       */}
       <pointLight position={[0, h - 0.5, 0]} intensity={3} color="#ffe5b4" distance={10} castShadow={false} />
 
+      {/* Guttering & downpipe. Pent/flat: one half-round run along the low
+          edge with its rim flush with the fascia top. Gable: a run along each
+          eave. Downpipe drops against the wall face nearest the gutter.
+          The trough is an open half-cylinder (theta sweep) - real gutters are
+          half-moons, not pipes - so the material must be double-sided or the
+          inside face disappears when seen from above. */}
+      {!isPlanView && room.hasGuttering && (() => {
+        const gutterR = 0.055;
+        const pipeR = 0.032;
+        const gutterMat = <meshStandardMaterial color="#1f2224" metalness={0.5} roughness={0.4} side={THREE.DoubleSide} />;
+        if (isGable) {
+          const rimY = h + gableFascia;           // rim flush with the eave fascia top
+          const cY = rimY - gutterR;
+          const pipeTop = rimY - gutterR * 2;
+          if (isSideGable) {
+            // Eaves face front and back; gutters run along X.
+            return (
+              <group>
+                <mesh position={[0, cY, (d/2 + ohFront) + gutterR]} rotation={[0, 0, Math.PI/2]}>
+                  <cylinderGeometry args={[gutterR, gutterR, roofW + 0.1, 16, 1, false, Math.PI, Math.PI]} />
+                  {gutterMat}
+                </mesh>
+                <mesh position={[0, cY, -(d/2 + ohBack) - gutterR]} rotation={[0, 0, Math.PI/2]}>
+                  <cylinderGeometry args={[gutterR, gutterR, roofW + 0.1, 16, 1, false, Math.PI, Math.PI]} />
+                  {gutterMat}
+                </mesh>
+                <mesh position={[w/2 - 0.2, (pipeTop - baseH)/2, -d/2 - pipeR - 0.01]}>
+                  <cylinderGeometry args={[pipeR, pipeR, pipeTop + baseH, 12]} />
+                  {gutterMat}
+                </mesh>
+              </group>
+            );
+          }
+          return (
+            <group>
+              {/* axis along Z; theta picks the local half that faces world -Y, so the trough opens upward */}
+              <mesh position={[-(w/2 + ohLeft) - gutterR, cY, 0]} rotation={[Math.PI/2, 0, 0]}>
+                <cylinderGeometry args={[gutterR, gutterR, roofD + 0.1, 16, 1, false, -Math.PI/2, Math.PI]} />
+                {gutterMat}
+              </mesh>
+              <mesh position={[(w/2 + ohRight) + gutterR, cY, 0]} rotation={[Math.PI/2, 0, 0]}>
+                <cylinderGeometry args={[gutterR, gutterR, roofD + 0.1, 16, 1, false, -Math.PI/2, Math.PI]} />
+                {gutterMat}
+              </mesh>
+              <mesh position={[w/2 + pipeR + 0.01, (pipeTop - baseH)/2, -d/2 + 0.2]}>
+                <cylinderGeometry args={[pipeR, pipeR, pipeTop + baseH, 12]} />
+                {gutterMat}
+              </mesh>
+            </group>
+          );
+        }
+        const gutterAtBack = backH <= frontH;
+        const edgeH = Math.min(frontH, backH);
+        const rimY = edgeH + roofH;               // rim flush with the fascia top
+        const cY = rimY - gutterR;
+        const pipeTop = rimY - gutterR * 2;
+        const zGutter = gutterAtBack ? -d/2 - ohBack - gutterR : d/2 + ohFront + gutterR;
+        const zPipe = gutterAtBack ? -d/2 - pipeR - 0.01 : d/2 + pipeR + 0.01;
+        return (
+          <group>
+            {/* axis along X; theta picks the local half that faces world -Y, so the trough opens upward */}
+            <mesh position={[roofX, cY, zGutter]} rotation={[0, 0, Math.PI/2]}>
+              <cylinderGeometry args={[gutterR, gutterR, roofW + 0.05, 16, 1, false, Math.PI, Math.PI]} />
+              {gutterMat}
+            </mesh>
+            <mesh position={[w/2 - 0.2, (pipeTop - baseH)/2, zPipe]}>
+              <cylinderGeometry args={[pipeR, pipeR, pipeTop + baseH, 12]} />
+              {gutterMat}
+            </mesh>
+          </group>
+        );
+      })()}
+
+      {/* Canopy support posts - added automatically once the canopy projects
+          far enough that a real one would need them. Picture-frame surrounds
+          carry their own sides, and the L-shape's cut front edge has no
+          consistent corner to land a post on. */}
+      {!isPlanView && room.hasCanopy && !room.hasPictureFrame && !isLShape && ohFront >= 0.9 && (
+        <group>
+          {[-(w/2 - 0.055), w/2 - 0.055].map((x, i) => (
+            <mesh key={`canopy-post-${i}`} position={[x, (frontH - baseH)/2, d/2 + ohFront - 0.055]} castShadow>
+              <boxGeometry args={[0.07, frontH + baseH, 0.07]} />
+              <meshStandardMaterial color={frameColorHex} metalness={0.4} roughness={0.4} />
+            </mesh>
+          ))}
+        </group>
+      )}
+
+      {/* Apex glazing - glass triangle with slim mullions filling the gable
+          peak (the clad triangle is skipped in the CSG when this is on).
+          Front orientation glazes the front apex; side orientation glazes
+          BOTH side apexes. Mullion heights follow the rake so each bar meets
+          the slope. */}
+      {!isPlanView && isGable && room.hasApexGlazing && (() => {
+        // The whole unit is inset from the true gable triangle so the rake
+        // rails stay clear of the sloped roof slabs' underside - centred rails
+        // on the raw rake line poked through the roof edge.
+        const inset = 0.08;
+        const apexBase = h + 0.03;
+        const apexH = (h + 0.025 + roofH - 0.12) - apexBase;
+        if (apexH <= 0.05) return null;
+        const span = gSpan;
+        const halfW = span/2 - inset;
+        const isPlain = room.apexGlazingStyle === 'plain';
+        const rakeAngle = Math.atan2(apexH, halfW);
+        const rakeLen = Math.sqrt(halfW*halfW + apexH*apexH) + 0.04;
+        const nGaps = Math.max(2, Math.round(span / 0.8));
+        const glassShape = new THREE.Shape();
+        glassShape.moveTo(-halfW, 0);
+        glassShape.lineTo(halfW, 0);
+        glassShape.lineTo(0, apexH);
+        glassShape.closePath();
+        const frameMat = <meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} />;
+        const unit = (
+          <>
+            {/* Glass */}
+            <mesh>
+              <shapeGeometry args={[glassShape]} />
+              <meshPhysicalMaterial color="#aabed1" transmission={0.9} ior={1.5} thickness={0.05} roughness={0.1} clearcoat={1} envMapIntensity={3} side={THREE.DoubleSide} />
+            </mesh>
+            {/* Bottom rail - kept in both styles so the glass never floats on the wall top */}
+            <mesh position={[0, 0.005, 0]} castShadow>
+              <boxGeometry args={[span - inset, isPlain ? 0.03 : 0.06, 0.05]} />
+              {frameMat}
+            </mesh>
+            {!isPlain && (
+              <>
+                {/* Rake rails - centred on the inset edges, well below the roof underside */}
+                <mesh position={[-halfW/2, apexH/2, 0]} rotation={[0, 0, rakeAngle]} castShadow>
+                  <boxGeometry args={[rakeLen, 0.055, 0.05]} />
+                  {frameMat}
+                </mesh>
+                <mesh position={[halfW/2, apexH/2, 0]} rotation={[0, 0, -rakeAngle]} castShadow>
+                  <boxGeometry args={[rakeLen, 0.055, 0.05]} />
+                  {frameMat}
+                </mesh>
+                {/* Mullions - height follows the rake at each position */}
+                {Array.from({ length: nGaps - 1 }).map((_, i) => {
+                  const x = -halfW + (2 * halfW * (i + 1)) / nGaps;
+                  const hAt = apexH * (1 - Math.abs(x) / halfW) - 0.05;
+                  if (hAt <= 0.05) return null;
+                  return (
+                    <mesh key={`apex-mullion-${i}`} position={[x, hAt/2 + 0.02, 0]}>
+                      <boxGeometry args={[0.05, hAt, 0.05]} />
+                      {frameMat}
+                    </mesh>
+                  );
+                })}
+              </>
+            )}
+          </>
+        );
+        if (isSideGable) {
+          return (
+            <>
+              <group position={[w/2 - 0.035, apexBase, 0]} rotation={[0, Math.PI/2, 0]}>{unit}</group>
+              <group position={[-w/2 + 0.035, apexBase, 0]} rotation={[0, -Math.PI/2, 0]}>{unit}</group>
+            </>
+          );
+        }
+        return <group position={[0, apexBase, d/2 - 0.035]}>{unit}</group>;
+      })()}
+
       {/* Render Door frames and glass */}
       {(room.doors || []).map((door) => {
         const doorH = door.heightMm / 1000;
@@ -1405,6 +1599,27 @@ export function RoomGeometry() {
              <mesh position={[-door.widthMm/2000 + doorFrameT/2, 0, 0]} castShadow><boxGeometry args={[doorFrameT, door.heightMm/1000, frameDepth]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
              <mesh position={[door.widthMm/2000 - doorFrameT/2, 0, 0]} castShadow><boxGeometry args={[doorFrameT, door.heightMm/1000, frameDepth]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
           </group>
+          {/* Entrance steps down to the garden - solid blocks in even ~170mm
+              rises, each tread reaching 300mm further out. Skipped on the
+              front wall when decking already provides the platform. */}
+          {room.hasDoorSteps && baseH > 0.03 && !(isDecking && door.wall === 'front') && (() => {
+            const rises = Math.max(2, Math.ceil(baseH / 0.17));
+            const treadD = 0.3;
+            return (
+              <group>
+                {Array.from({ length: rises - 1 }).map((_, s) => {
+                  const topY = -doorH/2 - baseH * (s + 1) / rises;
+                  const hgt = baseH * (rises - 1 - s) / rises;
+                  return (
+                    <mesh key={`step-${s}`} position={[0, topY - hgt/2, frameDepth/2 + treadD*(s+1) - treadD/2 + 0.01]} castShadow receiveShadow>
+                      <boxGeometry args={[door.widthMm/1000 + 0.15, hgt, treadD]} />
+                      <meshStandardMaterial color={baseColorHex} roughness={0.85} />
+                    </mesh>
+                  );
+                })}
+              </group>
+            );
+          })()}
           {/* Leaves */}
           <AnimatedDoorLeaves door={door} room={room} frameColorHex={frameColorHex} frameThickness={doorFrameT} sashThickness={doorSashT} depth={frameDepth} />
         </group>
@@ -1571,19 +1786,9 @@ export function RoomGeometry() {
                <meshStandardMaterial color="#333333" />
             </mesh>
 
-            {sky.type === 'lantern' ? (
-              <group position={[0, 0, 0]} rotation={[0, Math.PI/4, 0]}>
-                {/* Lantern shape (pyramid-ish) */}
-                <mesh position={[0, 0.2, 0]}>
-                   <coneGeometry args={[Math.max(skyW, skyL)/2, 0.4, 4]} />
-                   <meshPhysicalMaterial color="#aabed1" transmission={0.9} opacity={1} ior={1.5} thickness={0.05} roughness={0.1} transparent />
-                </mesh>
-                <mesh position={[0, 0.2, 0]}>
-                   <coneGeometry args={[Math.max(skyW, skyL)/2 + 0.02, 0.42, 4]} />
-                   <meshStandardMaterial color={frameColorHex} wireframe wireframeLinewidth={3} />
-                </mesh>
-              </group>
-            ) : (
+            {/* Lantern option removed - the pyramid never looked like a real
+                lantern. Any saved 'lantern' skylights render flat too. */}
+            {(
               <group position={[0, 0, 0]}>
                 {/* Flat skylight glass */}
                 <mesh position={[0, 0.02, 0]}>

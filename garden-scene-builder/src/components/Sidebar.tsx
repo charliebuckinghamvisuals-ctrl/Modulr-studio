@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Link } from 'react-router-dom';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
+import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS } from '../modelRegistry';
 
 function CollapsibleSection({ title, children, defaultOpen = false }: { title: string, children: React.ReactNode, defaultOpen?: boolean }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -203,6 +204,45 @@ export function Sidebar() {
                     <span className="text-[11px] font-semibold tracking-wide">{shape === 'Box' ? 'Flat Roof' : 'Gable Roof'}</span>
                   </div>
                 ))}
+              </div>
+              {room.shape === 'Gable' && (
+                <div className="mt-3">
+                  <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Ridge Direction</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => updateRoom({ gableOrientation: 'front' })} className={`px-3 py-2 text-[10px] font-semibold rounded-lg uppercase transition-colors ${(room.gableOrientation || 'front') === 'front' ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
+                      Apex at Front
+                    </button>
+                    <button onClick={() => updateRoom({ gableOrientation: 'side' })} className={`px-3 py-2 text-[10px] font-semibold rounded-lg uppercase transition-colors ${room.gableOrientation === 'side' ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
+                      Apex at Sides
+                    </button>
+                  </div>
+                </div>
+              )}
+              {room.shape === 'Gable' && (
+                <div className="mt-3 p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-700">Apex Glazing</span>
+                    <button onClick={() => updateRoom({ hasApexGlazing: !room.hasApexGlazing })} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${room.hasApexGlazing ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300/60'}`}>
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${room.hasApexGlazing ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
+                    </button>
+                  </div>
+                  {room.hasApexGlazing && (
+                    <div className="flex gap-2">
+                      <button onClick={() => updateRoom({ apexGlazingStyle: 'framed' })} className={`flex-1 px-3 py-1.5 text-[10px] font-semibold rounded-lg uppercase transition-colors ${(room.apexGlazingStyle || 'framed') === 'framed' ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
+                        Framed
+                      </button>
+                      <button onClick={() => updateRoom({ apexGlazingStyle: 'plain' })} className={`flex-1 px-3 py-1.5 text-[10px] font-semibold rounded-lg uppercase transition-colors ${room.apexGlazingStyle === 'plain' ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
+                        Plain Glass
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="mt-3 flex items-center justify-between p-4 bg-white border border-black/5 rounded-xl shadow-sm">
+                <span className="text-xs font-medium text-gray-700">Guttering & Downpipe</span>
+                <button onClick={() => updateRoom({ hasGuttering: !room.hasGuttering })} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${room.hasGuttering ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300/60'}`}>
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${room.hasGuttering ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
+                </button>
               </div>
             </CollapsibleSection>
 
@@ -415,6 +455,7 @@ export function Sidebar() {
                       <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={door.style || 'standard'} onChange={e => wrap(store.updateDoor)(door.id, { style: e.target.value as any })}>
                         <option value="standard">Standard</option>
                         <option value="crittall">Crittall</option>
+                        <option value="solid">Solid (Entrance)</option>
                       </select>
                     </div>
 <DimensionSlider label="Width" min={800} max={6000} step={100} value={door.widthMm} onChange={(v) => wrap(store.updateDoor)(door.id, { widthMm: v })} />
@@ -427,6 +468,12 @@ export function Sidebar() {
                 <span className="text-xs font-medium text-gray-700">Door Handles</span>
                 <button onClick={() => updateRoom({ hasDoorHandles: !room.hasDoorHandles })} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${room.hasDoorHandles ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300/60'}`}>
                   <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${room.hasDoorHandles ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
+                </button>
+              </div>
+              <div className="mt-2 flex items-center justify-between p-4 bg-white border border-black/5 rounded-xl shadow-sm">
+                <span className="text-xs font-medium text-gray-700">Entrance Steps</span>
+                <button onClick={() => updateRoom({ hasDoorSteps: !room.hasDoorSteps })} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${room.hasDoorSteps ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300/60'}`}>
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${room.hasDoorSteps ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
                 </button>
               </div>
             </CollapsibleSection>
@@ -726,7 +773,7 @@ export function Sidebar() {
               )}
             </CollapsibleSection>
 
-            <CollapsibleSection title="Skylights & Lanterns">
+            <CollapsibleSection title="Skylights">
               <div className="flex justify-end mb-4">
                 <button onClick={wrap(store.addSkylight)} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors">+ Add New</button>
               </div>
@@ -738,10 +785,7 @@ export function Sidebar() {
                     </button>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-gray-800">#{i + 1}</span>
-                      <select value={sky.type} onChange={(e) => wrap(store.updateSkylight)(sky.id, { type: e.target.value as any })} className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a] text-xs">
-                        <option value="lantern">Roof Lantern</option>
-                        <option value="flat">Flat Skylight</option>
-                      </select>
+                      <span className="text-xs font-semibold text-[#3b4d4a]">Flat Skylight</span>
                     </div>
 <DimensionSlider label="Width" min={400} max={3000} step={100} value={sky.widthMm} onChange={(v) => wrap(store.updateSkylight)(sky.id, { widthMm: v })} />
 <DimensionSlider label="Length" min={400} max={3000} step={100} value={sky.lengthMm} onChange={(v) => wrap(store.updateSkylight)(sky.id, { lengthMm: v })} />
@@ -902,7 +946,7 @@ export function Sidebar() {
               <p className="text-[10px] text-gray-500 mb-4">Drag and drop into the scene (plan view recommended).</p>
               <div className="grid grid-cols-2 gap-3">
                 {['tree', 'conifer', 'planter', 'bench'].map(type => (
-                   <div draggable key={type} onDragStart={(e) => e.dataTransfer.setData('type', type)} className="p-4 border border-gray-200 rounded-xl bg-[#F5F5F0] flex flex-col items-center gap-3 cursor-grab active:cursor-grabbing hover:border-[#5A5A40] hover:shadow-sm transition-all group">
+                   <div draggable key={type} onClick={() => useStore.getState().setActivePlacementType(type as any)} onDragStart={(e) => e.dataTransfer.setData('type', type)} className="p-4 border border-gray-200 rounded-xl bg-[#F5F5F0] flex flex-col items-center gap-3 cursor-pointer active:cursor-grabbing hover:border-[#5A5A40] hover:shadow-sm transition-all group">
                       <Trees size={32} strokeWidth={1.5} className="text-[#5A5A40] group-hover:scale-110 transition-transform" />
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A5A40]">{type}</span>
                    </div>
@@ -912,10 +956,13 @@ export function Sidebar() {
             
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-4 block">Interior Objects</label>
+              {/* Registry-driven: only real GLB furniture models are offered.
+                  The old procedural furniture was retired from the picker
+                  (saved designs containing it still render). */}
               <div className="grid grid-cols-2 gap-3">
-                {['toilet', 'sink', 'shower', 'desk', 'sofa', 'armchair', 'dining_table', 'coffee_table', 'kitchen_island', 'rug', 'tv', 'bed', 'bookshelf', 'dressing_table', 'wardrobe', 'indoor_plant'].map(type => (
-                   <div draggable key={type} onDragStart={(e) => e.dataTransfer.setData('type', type)} className="p-4 border border-gray-200 rounded-xl bg-[#F5F5F0] flex flex-col items-center gap-3 cursor-grab active:cursor-grabbing hover:border-[#5A5A40] hover:shadow-sm transition-all group">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A5A40]">{type.replace('_', ' ')}</span>
+                {GLB_OBJECT_TYPES.map(type => (
+                   <div draggable key={type} onClick={() => useStore.getState().setActivePlacementType(type as any)} onDragStart={(e) => e.dataTransfer.setData('type', type)} className="p-4 border border-gray-200 rounded-xl bg-[#F5F5F0] flex flex-col items-center gap-3 cursor-pointer active:cursor-grabbing hover:border-[#5A5A40] hover:shadow-sm transition-all group">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A5A40] text-center">{GLB_OBJECT_LABELS[type]}</span>
                    </div>
                 ))}
               </div>
@@ -925,7 +972,7 @@ export function Sidebar() {
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-4 block">Lighting</label>
               <div className="grid grid-cols-2 gap-3">
                 {['exterior_wall_light', 'drop_light'].map(type => (
-                   <div draggable key={type} onDragStart={(e) => e.dataTransfer.setData('type', type)} className="p-4 border border-gray-200 rounded-xl bg-[#F5F5F0] flex flex-col items-center gap-3 cursor-grab active:cursor-grabbing hover:border-[#5A5A40] hover:shadow-sm transition-all group">
+                   <div draggable key={type} onClick={() => useStore.getState().setActivePlacementType(type as any)} onDragStart={(e) => e.dataTransfer.setData('type', type)} className="p-4 border border-gray-200 rounded-xl bg-[#F5F5F0] flex flex-col items-center gap-3 cursor-pointer active:cursor-grabbing hover:border-[#5A5A40] hover:shadow-sm transition-all group">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A5A40]">{type.replace('_', ' ')}</span>
                    </div>
                 ))}

@@ -14,9 +14,10 @@ export type BaseMaterialType = 'concrete' | 'timber_decking' | 'composite_deckin
 export type DeckingMaterialType = 'timber' | 'composite_grey' | 'composite_oak' | 'composite_cedar' | 'composite_brown' | 'composite_black';
 export type RoofMaterialType = 'epdm' | 'sedum' | 'upvc' | 'metal';
 export type FrameColorType = 'anthracite' | 'black' | 'white' | 'silver';
-export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 'planter' | 'bench' | 'slab' | 'patio' | 'toilet' | 'sink' | 'shower' | 'interior_wall' | 'interior_door' | 'desk' | 'sofa' | 'armchair' | 'dining_table' | 'rug' | 'tv' | 'bed' | 'bookshelf' | 'dressing_table' | 'wardrobe' | 'exterior_wall_light' | 'drop_light' | 'coffee_table' | 'indoor_plant' | 'kitchen_island';
+export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 'planter' | 'bench' | 'slab' | 'patio' | 'toilet' | 'sink' | 'shower' | 'shower_corner' | 'shower_small' | 'vanity' | 'interior_wall' | 'interior_door' | 'desk' | 'sofa' | 'sofa_2seater' | 'sofa_l' | 'footstool' | 'armchair' | 'dining_table' | 'rug' | 'tv' | 'bed' | 'bedside_table' | 'bookshelf' | 'dressing_table' | 'wardrobe' | 'exterior_wall_light' | 'drop_light' | 'coffee_table' | 'coffee_table_black' | 'indoor_plant' | 'kitchen_island';
 
-export type GlazingStyle = 'standard' | 'crittall';
+/** 'solid' is doors-only (entrance door); the window UI never offers it. */
+export type GlazingStyle = 'standard' | 'crittall' | 'solid';
 
 export interface Door {
   id: string;
@@ -101,6 +102,15 @@ export interface Room {
   /** Gable bargeboard/fascia depth in mm (the visible edge of the sloped roof
    *  slabs). 100mm default; clamped 50-400 in the geometry. */
   gableFasciaMm?: number;
+  /** Gable ridge direction. 'front' (default): ridge runs front-to-back,
+   *  apex triangles on the front/back walls. 'side': ridge runs left-to-right,
+   *  apex triangles on the side walls - the annexe look, eaves facing front. */
+  gableOrientation?: 'front' | 'side';
+  /** Gable only: glaze the front apex triangle instead of cladding it.
+   *  Front-orientation gables only. */
+  hasApexGlazing?: boolean;
+  /** 'framed' (default): rake rails + mullions. 'plain': frameless glass. */
+  apexGlazingStyle?: 'framed' | 'plain';
   cladding: CladdingType;
   claddingFront?: CladdingType;
   claddingBack?: CladdingType;
@@ -123,6 +133,8 @@ export interface Room {
   rot: number;
   doors: Door[];
   hasDoorHandles?: boolean;
+  hasDoorSteps?: boolean;
+  hasGuttering?: boolean;
   windows: WindowData[];
   skylights: SkylightData[];
   partitions: PartitionData[];

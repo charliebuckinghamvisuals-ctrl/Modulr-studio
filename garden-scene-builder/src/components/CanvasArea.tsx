@@ -81,7 +81,7 @@ function LoadingScreen() {
 }
 
 export function CanvasArea() {
-  const { viewMode, addObject, uploadedBgImage } = useStore();
+  const { viewMode, uploadedBgImage, activePlacementType } = useStore();
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const handleDrop = (e: React.DragEvent) => {
@@ -89,11 +89,13 @@ export function CanvasArea() {
     const type = e.dataTransfer.getData('type');
     if (!type || !wrapperRef.current) return;
 
+    // Hand off to the scene, which raycasts the drop point onto the ground
+    // through the real camera (the old x10 NDC guess dropped objects outside
+    // the room). Interior objects are clamped inside the walls by addObject.
     const rect = wrapperRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    
-    addObject(type as any, x * 10, -y * 10);
+    const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    window.dispatchEvent(new CustomEvent('place-object-at', { detail: { type, ndcX, ndcY } }));
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -131,6 +133,12 @@ export function CanvasArea() {
           <MainScene />
         </Canvas>
       </div>
+      {activePlacementType && (
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 bg-[#3b4d4a] text-white px-5 py-2.5 rounded-full shadow-xl text-xs font-semibold flex items-center gap-3 pointer-events-none">
+          <span>Click in the scene to place</span>
+          <span className="opacity-60">R rotate · Esc cancel</span>
+        </div>
+      )}
       <ViewModeToggle />
       <CameraWidget />
       <HistoryButtons />

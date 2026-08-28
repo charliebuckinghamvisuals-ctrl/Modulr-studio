@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { SceneState, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
 import { v4 as uuidv4 } from 'uuid';
+import { isInteriorType, clampToRoomInterior } from './utils/placement';
 
 interface AppState {
   scene: SceneState;
@@ -74,9 +75,14 @@ interface AppState {
   toggleTime: () => void;
   areDoorsOpen: boolean;
   toggleDoors: () => void;
+  /** Perspective camera field of view (degrees) - lets the user frame the
+   *  shot they send to the render engine with a wide or tight lens. */
+  cameraFov: number;
+  setCameraFov: (fov: number) => void;
   
   // Object Actions
-  addObject: (type: ObjectType, x: number, z: number) => void;
+  addObject: (type: ObjectType, x: number, z: number, rot?: number) => void;
+  duplicateObject: (id: string) => void;
   updateObject: (id: string, updates: Partial<SceneState['objects'][0]>) => void;
   removeObject: (id: string) => void;
 
@@ -107,7 +113,11 @@ const initialState: SceneState = {
     overhangBackMm: 0,
     cladding: 'cedar_composite',
     claddingOrientation: 'horizontal',
-    baseMaterial: 'concrete',
+    // Default base matches the walls: with no explicit deckingMaterial the
+    // base texture resolves from the cladding (resolveDeckingKey), so it
+    // follows whatever cladding the user picks. Concrete is still available
+    // in the Base/Decking picker for anyone who wants it.
+    baseMaterial: 'composite_decking',
     roofMaterial: 'epdm',
     frameColor: 'anthracite',
     interiorColor: '#ffffff',
@@ -596,15 +606,40 @@ export const useStore = create<AppState>((set, get) => ({
   areDoorsOpen: false,
   toggleDoors: () => set((state) => ({ areDoorsOpen: !state.areDoorsOpen })),
 
-  addObject: (type, x, z) => set((state) => ({
-    scene: {
-      ...state.scene,
-      objects: [
-        ...state.scene.objects,
-        { id: uuidv4(), type, x, z, rot: 0, scale: 1 }
-      ]
+  cameraFov: 50,
+  setCameraFov: (fov) => set({ cameraFov: Math.min(100, Math.max(20, fov)) }),
+
+  addObject: (type, x, z, rot = 0) => set((state) => {
+    // Interior objects can never land outside the building - drops used to
+    // fall wherever the cursor ray hit the ground, walls or not.
+    if (isInteriorType(type)) {
+      const c = clampToRoomInterior(state.scene.room, x, z);
+      x = c.x; z = c.z;
     }
-  })),
+    return {
+      scene: {
+        ...state.scene,
+        objects: [
+          ...state.scene.objects,
+          { id: uuidv4(), type, x, z, rot, scale: 1 }
+        ]
+      }
+    };
+  }),
+
+  duplicateObject: (id) => set((state) => {
+    const src = state.scene.objects.find(o => o.id === id);
+    if (!src) return {};
+    const copy = { ...src, id: uuidv4(), x: src.x + 0.4, z: src.z + 0.4 };
+    if (isInteriorType(copy.type)) {
+      const c = clampToRoomInterior(state.scene.room, copy.x, copy.z);
+      copy.x = c.x; copy.z = c.z;
+    }
+    return {
+      scene: { ...state.scene, objects: [...state.scene.objects, copy] },
+      selectedObjectId: copy.id,
+    };
+  }),
 
   updateObject: (id, updates) => set((state) => ({
     scene: {

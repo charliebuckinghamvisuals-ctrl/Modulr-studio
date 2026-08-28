@@ -1,5 +1,5 @@
 import { useStore } from '../../store';
-import { Trash2, RotateCw } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { DimensionSlider } from '../DimensionSlider';
 
 export function ObjectEditorPanel() {
@@ -9,29 +9,30 @@ export function ObjectEditorPanel() {
   if (!obj || viewMode === 'capture' || viewMode === 'render') return null;
 
   return (
-    <div className="absolute top-24 right-8 bg-white/80 backdrop-blur-2xl border border-black/5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] rounded-2xl p-4 z-20 w-64 text-[#3b4d4a]">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{obj.type} details</h3>
-        <button 
+    // Docked bottom-centre so it never covers the object being edited - the
+    // old floating top-right card sat over the scene. Frequent actions
+    // (rotate / duplicate / delete) live in the mini toolbar at the object.
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-2xl border border-black/5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] rounded-2xl px-5 py-3 z-20 w-80 text-[#3b4d4a]">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{obj.type.replace(/_/g, ' ')}</h3>
+        <button
           onClick={() => removeObject(obj.id)}
           className="text-gray-400 hover:text-red-500 transition-colors"
         >
-          <Trash2 size={16} />
+          <Trash2 size={14} />
         </button>
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <div className="flex justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-700">Scale</span>
-            <span className="text-xs font-mono text-gray-500">{obj.scale.toFixed(1)}x</span>
-          </div>
-          <input 
-            type="range" min="0.5" max="2.0" step="0.1" 
-            value={obj.scale} 
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold text-gray-700 shrink-0">Scale</span>
+          <input
+            type="range" min="0.5" max="2.0" step="0.1"
+            value={obj.scale}
             onChange={(e) => updateObject(obj.id, { scale: parseFloat(e.target.value) })}
             className="w-full apple-slider"
           />
+          <span className="text-xs font-mono text-gray-500 shrink-0">{obj.scale.toFixed(1)}x</span>
         </div>
 
         {(obj.type === 'interior_wall' || obj.type === 'interior_door') && (
@@ -76,14 +77,6 @@ export function ObjectEditorPanel() {
             </div>
           </>
         )}
-        
-        <button 
-          onClick={() => updateObject(obj.id, { rot: obj.rot + Math.PI / 4 })}
-          className="w-full flex items-center justify-center gap-2 bg-black/5 hover:bg-black/10 transition-colors rounded-xl p-3 text-xs font-semibold text-gray-700"
-        >
-          <RotateCw size={14} />
-          Rotate 45°
-        </button>
       </div>
     </div>
   );

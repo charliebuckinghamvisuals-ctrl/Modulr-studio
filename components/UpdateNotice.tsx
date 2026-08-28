@@ -7,24 +7,28 @@ import { useAuth } from '../hooks/useAuth';
  * release. Keyed by UPDATE_ID + uid in localStorage, so each account sees a
  * given announcement once per browser and new releases just change the id.
  */
-const UPDATE_ID = '2026-08-render-accuracy';
+const UPDATE_ID = '2026-08-28-3d-config-upgrade';
 
 const IMPROVEMENTS = [
     {
-        title: 'Render accuracy',
-        detail: 'We spotted a few anomalies where renders could show windows or doors that weren’t in your design, especially from the 3D Configurator. That’s fixed, and every configurator render is now automatically checked against your exact configuration before you see it.',
+        title: 'Real furniture & bathroom models',
+        detail: 'The 3D Configurator now places true-to-scale 3D models instead of block placeholders: sofas (including L-shape), armchair, bed, wardrobe, desk, coffee tables, and a full bathroom set with three shower sizes, toilet and vanity unit.',
     },
     {
-        title: 'Sharper, cleaner renders',
-        detail: 'Renders are now pin-sharp front to back by default, with a new Camera Effects toggle if you want the photographic depth-of-field look. Every plan now renders on our best engine.',
+        title: 'Much easier placing & moving',
+        detail: 'Click an object and a live preview follows your cursor - click to drop, R to rotate, Esc to cancel. Objects can no longer land outside the room or sink into the floor, every object gets a rotate handle and quick toolbar, and dragging is smoother. The plan view camera no longer moves while you arrange furniture.',
     },
     {
-        title: 'Save to Projects from every tool',
-        detail: 'Renders, weather shots, line drawings and 3D designs can now be saved straight into a project folder, existing or new, and reopened later.',
+        title: 'New building options',
+        detail: 'Apex glazing for gable roofs (framed or frameless glass), gables with the ridge running front-to-back or side-to-side for annexe-style buildings, solid entrance doors, guttering & downpipes, canopy support posts, and entrance steps.',
     },
     {
-        title: 'Better PDF proposals',
-        detail: 'Fixed garbled headings, cleaner floor-plan dimensions, your own price (or no price) on proposals, and a choice of PDF designs in Account → Company Branding.',
+        title: 'Glazing polish',
+        detail: 'Crittall style now has larger panes with fewer, slimmer bars and an automatic slim frame. Full-height windows lose the sill, new windows appear in sensible positions, and window handles are gone from exteriors.',
+    },
+    {
+        title: 'Camera lens control',
+        detail: 'A new Lens slider lets you go wide-angle for dramatic hero shots or telephoto for true-proportion elevations before sending a view to the render engine.',
     },
 ];
 
