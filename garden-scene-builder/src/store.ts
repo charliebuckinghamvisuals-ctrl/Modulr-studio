@@ -3,6 +3,10 @@ import { SceneState, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, Wi
 import { v4 as uuidv4 } from 'uuid';
 import { isInteriorType, clampToRoomInterior } from './utils/placement';
 
+// Debug/E2E hook: lets automated tests drive the store directly (drag
+// simulation, perf probes). Harmless in production - nothing reads it.
+declare global { interface Window { __modulrStore?: unknown } }
+
 interface AppState {
   scene: SceneState;
   viewMode: ViewMode;
@@ -48,9 +52,14 @@ interface AppState {
   updateRoom: (updates: Partial<SceneState['room']>) => void;
   updatePricing: (updates: Partial<SceneState['pricing']>) => void;
   addDoor: () => void;
+  /** Click-to-add: create a door on a specific wall at a specific offset
+   *  (clamped so it fits), and select it. */
+  addDoorAt: (wall: Door['wall'], offsetMm: number) => void;
   updateDoor: (id: string, updates: Partial<Door>) => void;
   removeDoor: (id: string) => void;
   addWindow: () => void;
+  /** Click-to-add equivalent for windows. */
+  addWindowAt: (wall: WindowData['wall'], offsetMm: number) => void;
   updateWindow: (id: string, updates: Partial<WindowData>) => void;
   removeWindow: (id: string) => void;
   
@@ -92,6 +101,37 @@ interface AppState {
 
 /** Timestamp of the last undo snapshot — see saveState for why. */
 let lastSaveStateAt = 0;
+
+/** Minimum wall left standing at each end of an opening, in mm. */
+const MIN_PIER_MM = 100;
+
+/**
+ * Keep a door/window opening inside its wall, always leaving a pier of wall
+ * at each end.
+ *
+ * The wall is carved by a CSG subtraction whose box is exactly the opening's
+ * width. Nothing used to bound that: dragging a width handle past the
+ * building's length made the cut swallow the whole wall, so the boolean
+ * legitimately returned EMPTY geometry and every wall vanished - and right at
+ * the threshold it flipped in and out on each drag step, which is the
+ * "flashing / building disappears" bug. Coplanar side faces at exactly
+ * full width are unstable for the same reason, so the pier also keeps the
+ * cut clear of the wall's end faces.
+ *
+ * Applied inside the store so EVERY path is covered - 3D drag handles,
+ * sidebar sliders and the typed numeric panel alike.
+ */
+function clampOpening<T extends { wall: string; widthMm: number; offsetMm: number }>(
+  room: SceneState['room'],
+  el: T,
+): T {
+  const wallLen = (el.wall === 'front' || el.wall === 'back') ? room.widthMm : room.depthMm;
+  const maxWidth = Math.max(300, wallLen - MIN_PIER_MM * 2);
+  const widthMm = Math.min(Math.max(300, el.widthMm), maxWidth);
+  const maxOffset = Math.max(0, wallLen / 2 - widthMm / 2 - MIN_PIER_MM);
+  const offsetMm = Math.min(Math.max(el.offsetMm ?? 0, -maxOffset), maxOffset);
+  return { ...el, widthMm, offsetMm };
+}
 
 const initialState: SceneState = {
   room: {
@@ -347,12 +387,34 @@ export const useStore = create<AppState>((set, get) => ({
     }
   })),
 
+  addDoorAt: (wall, offsetMm) => set((state) => {
+    const room = state.scene.room;
+    const widthMm = 1800;
+    const wallLen = (wall === 'front' || wall === 'back') ? room.widthMm : room.depthMm;
+    const maxOff = Math.max(0, wallLen / 2 - widthMm / 2 - 200);
+    const id = uuidv4();
+    return {
+      selectedElementId: id,
+      selectedObjectId: null,
+      scene: {
+        ...state.scene,
+        room: {
+          ...room,
+          doors: [
+            ...(room.doors || []),
+            { id, wall, offsetMm: Math.max(-maxOff, Math.min(maxOff, Math.round(offsetMm / 50) * 50)), widthMm, heightMm: 2100, leaves: 2 }
+          ]
+        }
+      }
+    };
+  }),
+
   updateDoor: (id, updates) => set((state) => ({
     scene: {
       ...state.scene,
       room: {
         ...state.scene.room,
-        doors: (state.scene.room.doors || []).map(d => d.id === id ? { ...d, ...updates } : d)
+        doors: (state.scene.room.doors || []).map(d => d.id === id ? clampOpening(state.scene.room, { ...d, ...updates }) : d)
       }
     }
   })),
@@ -410,12 +472,34 @@ export const useStore = create<AppState>((set, get) => ({
     };
   }),
 
+  addWindowAt: (wall, offsetMm) => set((state) => {
+    const room = state.scene.room;
+    const widthMm = 1000;
+    const wallLen = (wall === 'front' || wall === 'back') ? room.widthMm : room.depthMm;
+    const maxOff = Math.max(0, wallLen / 2 - widthMm / 2 - 200);
+    const id = uuidv4();
+    return {
+      selectedElementId: id,
+      selectedObjectId: null,
+      scene: {
+        ...state.scene,
+        room: {
+          ...room,
+          windows: [
+            ...room.windows,
+            { id, wall, offsetMm: Math.max(-maxOff, Math.min(maxOff, Math.round(offsetMm / 50) * 50)), widthMm, heightMm: 1000, sillMm: 900 }
+          ]
+        }
+      }
+    };
+  }),
+
   updateWindow: (id, updates) => set((state) => ({
     scene: {
       ...state.scene,
       room: {
         ...state.scene.room,
-        windows: state.scene.room.windows.map(w => w.id === id ? { ...w, ...updates } : w)
+        windows: state.scene.room.windows.map(w => w.id === id ? clampOpening(state.scene.room, { ...w, ...updates }) : w)
       }
     }
   })),
@@ -742,3 +826,4 @@ export const useStore = create<AppState>((set, get) => ({
 if (typeof window !== 'undefined') {
   (window as any).__modulrStore = useStore;
 }
+

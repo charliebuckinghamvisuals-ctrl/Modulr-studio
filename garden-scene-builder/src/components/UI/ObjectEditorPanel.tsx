@@ -12,7 +12,7 @@ export function ObjectEditorPanel() {
     // Docked bottom-centre so it never covers the object being edited - the
     // old floating top-right card sat over the scene. Frequent actions
     // (rotate / duplicate / delete) live in the mini toolbar at the object.
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-2xl border border-black/5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] rounded-2xl px-5 py-3 z-20 w-80 text-[#3b4d4a]">
+    <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-2xl border border-black/5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] rounded-2xl px-5 py-3 z-20 w-80 text-[#3b4d4a]">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{obj.type.replace(/_/g, ' ')}</h3>
         <button

@@ -240,6 +240,12 @@ export function MainScene() {
     if (controlsEnabled) gl.shadowMap.needsUpdate = true;
   }, [controlsEnabled, gl]);
 
+  // Debug handle: exposes the live three.js scene so tooling can inspect
+  // real geometry state (e.g. whether the wall mesh ever empties mid-drag).
+  // Mirrors the existing __modulrStore handle; nothing reads it in the app.
+  const { scene: threeScene } = useThree();
+  useEffect(() => { (window as any).__modulrScene = threeScene; }, [threeScene]);
+
   // Double-clicking an object frames the camera on it.
   useEffect(() => {
     const onFocus = (e: any) => {

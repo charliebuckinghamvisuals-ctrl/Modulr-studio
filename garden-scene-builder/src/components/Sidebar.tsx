@@ -78,12 +78,15 @@ export function Sidebar() {
   return (
     <div className="flex flex-col h-full bg-transparent text-[#1d1d1f]">
       <div className="p-6 border-b border-black/5 flex items-center gap-4">
-        <Link to="/" className="w-8 h-8 flex items-center justify-center rounded-full bg-black/5 hover:bg-black/10 text-gray-700 transition-colors shrink-0">
-          <ArrowLeft size={16} />
-        </Link>
+        {/* The round back-arrow LINK that lived here sat exactly where users
+            expect undo and silently navigated to the app's landing route
+            ("undo kicked me to the homepage") - removed. Undo/redo live in
+            the pill at the top-left of the canvas. */}
         <div className="flex-1">
           <h1 className="text-xl font-semibold tracking-tight text-[#1d1d1f]">Modulr <span className="font-light">3D</span></h1>
-          <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1 font-medium">Configurator</p>
+          <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1 font-medium">
+            Configurator <span className="normal-case tracking-normal text-gray-300">· build {typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev'}</span>
+          </p>
         </div>
         <div className="flex gap-2 shrink-0">
           {room.doors.length > 0 && (

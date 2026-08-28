@@ -6,6 +6,14 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     base: './',
+    // Stamped into the bundle at build time and shown in the sidebar, so it
+    // is always obvious which build a page is actually running - a stale
+    // cached page is otherwise indistinguishable from a broken fix.
+    define: {
+      __BUILD_ID__: JSON.stringify(
+        new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+      ),
+    },
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

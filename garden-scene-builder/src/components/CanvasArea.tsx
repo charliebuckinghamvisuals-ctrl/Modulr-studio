@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { ViewModeToggle } from './UI/ViewModeToggle';
 import { PricePill } from './UI/PricePill';
 import { ObjectEditorPanel } from './UI/ObjectEditorPanel';
+import { ElementEditorPanel } from './UI/ElementEditorPanel';
 import { HistoryButtons } from './UI/HistoryButtons';
 import { ActionButtons } from './UI/ActionButtons';
 import { CameraWidget } from './UI/CameraWidget';
@@ -144,6 +145,7 @@ export function CanvasArea() {
       <HistoryButtons />
       <PricePill />
       <ObjectEditorPanel />
+      <ElementEditorPanel />
       <ActionButtons />
       <LoadingScreen />
     </div>

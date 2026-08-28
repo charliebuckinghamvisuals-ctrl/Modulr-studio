@@ -2,7 +2,9 @@ import React from 'react';
 import { useMemo, useState, useRef, useEffect, useDeferredValue } from 'react';
 import { Room } from '../../types';
 import { useFrame } from '@react-three/fiber';
-import { Geometry, Base, Subtraction, Addition } from '@react-three/csg';
+// SafeCsg = fork of @react-three/csg whose failed boolean evaluations keep
+// the previous geometry instead of blanking the mesh (see SafeCsg.tsx).
+import { Geometry, Base, Subtraction, Addition } from './SafeCsg';
 import * as THREE from 'three';
 import { Text, Line, Html, Edges, Billboard } from '@react-three/drei';
 import { useRealMaterial, resolveDeckingKey } from '../../utils/materials';
@@ -140,6 +142,100 @@ function CrittallBars({ glassW, glassH, depth, color }: { glassW: number, glassH
         </mesh>
       ))}
     </group>
+  );
+}
+
+/**
+ * Click-to-add chip: click a bare wall and choose "+ Window" or "+ Door" at
+ * that exact spot - no more spawning centred and dragging across the wall.
+ * Works in room-local space so it lands correctly on moved/rotated rooms.
+ */
+function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number }) {
+  const [hit, setHit] = useState<{ wall: 'front' | 'back' | 'left' | 'right', offsetMm: number, pos: [number, number, number] } | null>(null);
+
+  useEffect(() => {
+    const onWallClick = (e: any) => {
+      const st = useStore.getState();
+      if (st.viewMode === 'walking' || st.toolMode === 'place') return;
+      const { x, y, z } = e.detail;
+      const rx = (room.x ?? 0) / 1000, rz = (room.z ?? 0) / 1000, rot = room.rot ?? 0;
+      const cos = Math.cos(-rot), sin = Math.sin(-rot);
+      const lx = (x - rx) * cos - (z - rz) * sin;
+      const lz = (x - rx) * sin + (z - rz) * cos;
+      const w = room.widthMm / 1000, d = room.depthMm / 1000;
+      const band = ((room.wallThicknessMm ?? 150) / 1000) + 0.06;
+      if (y < baseH + 0.15 || y > baseH + h + 0.1) { setHit(null); return; }
+      let wall: 'front' | 'back' | 'left' | 'right' | null = null;
+      let offsetMm = 0;
+      if (Math.abs(Math.abs(lz) - d / 2) < band && Math.abs(lx) < w / 2 - 0.05) {
+        wall = lz > 0 ? 'front' : 'back';
+        offsetMm = Math.round(lx * 1000);
+      } else if (Math.abs(Math.abs(lx) - w / 2) < band && Math.abs(lz) < d / 2 - 0.05) {
+        wall = lx > 0 ? 'right' : 'left';
+        offsetMm = Math.round(lz * 1000);
+      }
+      if (!wall) { setHit(null); return; }
+      setHit({ wall, offsetMm, pos: [lx, Math.min(Math.max(y, baseH + 0.8), baseH + h - 0.2), lz] });
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setHit(null); };
+    window.addEventListener('wall-clicked', onWallClick);
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('wall-clicked', onWallClick); window.removeEventListener('keydown', onKey); };
+  }, [room.x, room.z, room.rot, room.widthMm, room.depthMm, room.wallThicknessMm, h, baseH]);
+
+  const viewMode = useStore(s => s.viewMode);
+  const isExporting = useStore(s => s.isExporting);
+  if (viewMode === 'walking' || viewMode === 'capture' || viewMode === 'render' || isExporting) return null;
+
+  const add = (kind: 'door' | 'window') => {
+    if (!hit) return;
+    const st = useStore.getState();
+    st.saveState();
+    if (kind === 'door') st.addDoorAt(hit.wall, hit.offsetMm);
+    else st.addWindowAt(hit.wall, hit.offsetMm);
+    setHit(null);
+  };
+
+  // A permanent + button on the middle of each wall, plus the popup chip at
+  // whatever point was chosen (via a + button or a direct wall click).
+  const w = room.widthMm / 1000, d = room.depthMm / 1000;
+  const midY = baseH + h * 0.55;
+  const wallButtons: { wall: 'front' | 'back' | 'left' | 'right'; pos: [number, number, number] }[] = [
+    { wall: 'front', pos: [0, midY, d / 2 + 0.12] },
+    { wall: 'back', pos: [0, midY, -d / 2 - 0.12] },
+    { wall: 'left', pos: [-w / 2 - 0.12, midY, 0] },
+    { wall: 'right', pos: [w / 2 + 0.12, midY, 0] },
+  ];
+
+  return (
+    <>
+      {wallButtons.map(b => (
+        <Html key={`wall-add-${b.wall}`} position={b.pos} center zIndexRange={[125, 0]}>
+          <button
+            title={`Add a window or door to the ${b.wall} wall`}
+            style={{ pointerEvents: 'auto' }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); setHit({ wall: b.wall, offsetMm: 0, pos: b.pos }); }}
+            className="w-7 h-7 rounded-full bg-white/90 backdrop-blur-md border border-black/10 shadow-md text-[#3b4d4a] text-base font-bold leading-none hover:bg-[#3b4d4a] hover:text-white hover:scale-110 transition-all"
+          >
+            +
+          </button>
+        </Html>
+      ))}
+      {hit && (
+        <Html position={hit.pos} center zIndexRange={[130, 0]}>
+          <div
+            style={{ pointerEvents: 'auto' }}
+            className="flex items-center gap-1 bg-white/95 backdrop-blur-md border border-black/10 rounded-full shadow-xl px-2 py-1.5 whitespace-nowrap"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <button onClick={() => add('window')} className="px-3 py-1.5 rounded-full text-[11px] font-bold text-white bg-[#3b4d4a] hover:bg-[#2d3a38] transition-colors">+ Window</button>
+            <button onClick={() => add('door')} className="px-3 py-1.5 rounded-full text-[11px] font-bold text-[#3b4d4a] bg-black/5 hover:bg-black/10 transition-colors">+ Door</button>
+            <button onClick={() => setHit(null)} className="px-2 py-1.5 rounded-full text-[11px] font-bold text-gray-400 hover:text-gray-600">✕</button>
+          </div>
+        </Html>
+      )}
+    </>
   );
 }
 
@@ -807,12 +903,45 @@ export function RoomGeometry() {
     );
   };
 
-  // Deferred copies drive only the CSG wall cutouts. While a door/window is
-  // being dragged the frames track the pointer at full rate, but the expensive
-  // boolean rebuild of the wall mesh runs at deferred priority, so it coalesces
-  // instead of blocking every pointer step — that lag was the whole drag feel.
-  const deferredDoors = useDeferredValue(room.doors);
-  const deferredWindows = useDeferredValue(room.windows);
+  // FROZEN + DEBOUNCED copies drive the CSG wall cutouts. The boolean
+  // rebuild of the wall solid is expensive and visibly blanks the walls, so
+  // it must never run while values are still moving:
+  //  - 3D handle drags set controlsEnabled=false, so nothing updates until
+  //    release;
+  //  - sidebar sliders and other continuous inputs DON'T touch
+  //    controlsEnabled, so a 300ms settle debounce catches those - the
+  //    rebuild fires once when the user pauses, not on every tick.
+  // While values move, the frames + dark overlay planes track at full rate.
+  const [csgDoors, setCsgDoors] = useState(room.doors);
+  const [csgWindows, setCsgWindows] = useState(room.windows);
+  // No rebuild while ANY pointer is held down. Sidebar sliders never touch
+  // controlsEnabled, so the settle-debounce alone still fired during slow
+  // slider drags (every >300ms hesitation = one wall rebuild under the
+  // user's finger). A held mouse button anywhere now blocks the commit; the
+  // release re-arms the debounce and the rebuild lands 150ms later.
+  const [pointerHeld, setPointerHeld] = useState(false);
+  useEffect(() => {
+    const dn = () => setPointerHeld(true);
+    const up = () => setPointerHeld(false);
+    window.addEventListener('pointerdown', dn, true);
+    window.addEventListener('pointerup', up, true);
+    window.addEventListener('pointercancel', up, true);
+    return () => {
+      window.removeEventListener('pointerdown', dn, true);
+      window.removeEventListener('pointerup', up, true);
+      window.removeEventListener('pointercancel', up, true);
+    };
+  }, []);
+  useEffect(() => {
+    if (!controlsEnabled || pointerHeld) return; // frozen while interacting
+    const t = setTimeout(() => {
+      setCsgDoors(room.doors);
+      setCsgWindows(room.windows);
+    }, 150);
+    return () => clearTimeout(t);
+  }, [room.doors, room.windows, controlsEnabled, pointerHeld]);
+  const deferredDoors = csgDoors;
+  const deferredWindows = csgWindows;
 
   return (
     <group position={[room.x / 1000, 0, room.z / 1000]} rotation={[0, room.rot, 0]}>
@@ -821,6 +950,9 @@ export function RoomGeometry() {
 
       {/* Base Plinth / Decking Area */}
       {renderBaseMeshes()}
+
+      {/* Click-to-add chip for walls */}
+      {!isPlanView && <WallAddChip room={room} h={h} baseH={baseH} />}
 
       {/* Main Elevated Structure */}
       <group position={[0, baseH, 0]}>
@@ -834,6 +966,13 @@ export function RoomGeometry() {
           receiveShadow
           onPointerOver={(e) => { e.stopPropagation(); useStore.getState().setHoveredElementId('room'); }}
           onPointerOut={() => useStore.getState().setHoveredElementId(null)}
+          onClick={(e) => {
+            // Click-to-add: hand the wall click point to the add-chip.
+            // Closure-free (event dispatch only) so the CSG memo needs no
+            // extra deps. The chip decides which wall face was hit.
+            e.stopPropagation();
+            window.dispatchEvent(new CustomEvent('wall-clicked', { detail: { x: e.point.x, y: e.point.y, z: e.point.z } }));
+          }}
         >
           <Geometry useGroups>
             {/* Main block */}
@@ -1533,10 +1672,15 @@ export function RoomGeometry() {
             if (viewMode !== 'walking') setSelectedElementId(door.id); 
           }}
         >
+          {/* Drag highlight over the opening. This was an OPAQUE black plane
+              sized to the opening: dragging a door/window wider grew a solid
+              black rectangle across the whole building, which read as "the
+              walls vanish and flash back" for the duration of the drag. Now
+              a faint tint that never hides what is behind it. */}
           {isDraggingThis && (
             <mesh position={[0, 0, frameDepth/2 - 0.005]}>
               <planeGeometry args={[door.widthMm/1000, doorH]} />
-              <meshBasicMaterial color="#111111" />
+              <meshBasicMaterial color="#10b981" transparent opacity={0.18} depthWrite={false} />
             </mesh>
           )}
           {selectedElementId === door.id && (
@@ -1659,10 +1803,12 @@ export function RoomGeometry() {
               if (viewMode !== 'walking') setSelectedElementId(win.id); 
             }}
           >
+            {/* Faint drag highlight - see the door note above; this was an
+                opaque black plane that blacked out the building on resize. */}
             {isDraggingThis && (
             <mesh position={[0, 0, frameDepth/2 - 0.005]}>
               <planeGeometry args={[winW, winH]} />
-              <meshBasicMaterial color="#111111" />
+              <meshBasicMaterial color="#10b981" transparent opacity={0.18} depthWrite={false} />
             </mesh>
           )}
           {selectedElementId === win.id && (

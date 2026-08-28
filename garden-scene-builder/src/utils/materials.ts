@@ -220,12 +220,25 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
         setupMap(maps.aoMap, false);
 
         return maps;
-    }, [textures, widthMeters, heightMeters, rotation, def, claddingWidthMm, claddingOrientation, maxAnisotropy]);
+        // Depend on the individual TEXTURE INSTANCES, not on the object
+        // useTexture returns. drei rebuilds that wrapper object on every
+        // render, so depending on it re-ran this memo every render: it
+        // re-cloned every map and handed back brand-new texture instances
+        // each time. Those instances are dependencies of the wall's CSG
+        // memo, so the whole boolean wall rebuild fired on EVERY render -
+        // which is what made dragging a door/window lag and made the walls
+        // blink out mid-drag while the geometry and its material groups were
+        // reassigned. The underlying instances from useLoader are cached and
+        // stable, so keying on them makes this memo behave.
+    }, [textures.map, textures.normalMap, textures.roughnessMap, textures.aoMap,
+        widthMeters, heightMeters, rotation, def, claddingWidthMm, claddingOrientation, maxAnisotropy]);
 
-    return { 
-        ...cloned, 
-        color: def.color, 
+    // Memoised for the same reason: this object feeds material props and
+    // memo dependency lists further up.
+    return useMemo(() => ({
+        ...cloned,
+        color: def.color,
         roughness: def.roughness,
         normalScale: new THREE.Vector2(0.5, 0.5) // Step 3: start normalScale at 0.5
-    };
+    }), [cloned, def]);
 }

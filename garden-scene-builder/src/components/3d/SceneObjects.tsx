@@ -4,7 +4,7 @@ import { SceneObject } from '../../types';
 import * as THREE from 'three';
 import { useRef, useState, useEffect, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
-import { Geometry, Base, Subtraction } from '@react-three/csg';
+import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
 import { MODEL_URLS, MODEL_SCALES } from '../../modelRegistry';
 import { isInteriorType, clampToRoomInterior, roomLocal, FOOTPRINT_RADIUS } from '../../utils/placement';
