@@ -967,20 +967,60 @@ export function Sidebar() {
 
                 <div>
                   <label className="text-[10px] font-medium text-gray-500 mb-2 block">Interior Floor Type</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: 'oak', name: 'Oak' },
-                      { id: 'pine', name: 'Pine' },
-                      { id: 'walnut', name: 'Walnut' },
-                      { id: 'cherry', name: 'Cherry' },
-                      { id: 'tiles', name: 'Tiles' },
-                      { id: 'carpet', name: 'Carpet' },
-                      { id: 'concrete', name: 'Concrete' }
-                    ].map(floor => (
-                      <button key={floor.id} onClick={() => updateRoom({ interiorFloorType: floor.id as any })} className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg uppercase transition-colors ${room.interiorFloorType === floor.id ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
-                        {floor.name}
-                      </button>
-                    ))}
+                  {/* Picture tiles, like the Objects picker: each floor shows
+                      the texture it actually renders with. Tinted floors
+                      (oak, pine...) blend their tint over the shared plank
+                      map - the same multiply the 3D material does - so the
+                      swatch is an honest preview, not an approximation. */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      { id: 'oak_plank', name: 'Oak Plank', img: 'textures/oak_plank_color.jpg' },
+                      { id: 'light_oak', name: 'Light Oak', img: 'textures/light_oak_color.jpg' },
+                      { id: 'rustic_pine', name: 'Rustic Pine', img: 'textures/rustic_pine_color.jpg' },
+                      { id: 'smoked_oak', name: 'Smoked Oak', img: 'textures/smoked_oak_color.jpg' },
+                      { id: 'oak_herringbone', name: 'Oak Herringbone', img: 'textures/oak_herringbone_color.jpg' },
+                      { id: 'walnut_parquet', name: 'Walnut Parquet', img: 'textures/walnut_parquet_color.jpg' },
+                    ] as { id: string; name: string; img?: string; tint?: string }[]).map(floor => {
+                      const active = room.interiorFloorType === floor.id;
+                      return (
+                        <button
+                          key={floor.id}
+                          onClick={() => updateRoom({ interiorFloorType: floor.id as any })}
+                          title={floor.name}
+                          className={`group rounded-xl border overflow-hidden bg-white transition-all ${
+                            active ? 'border-[#3b4d4a] ring-2 ring-[#3b4d4a]/25 shadow-md' : 'border-black/5 hover:border-[#3b4d4a]/40 hover:shadow-sm'
+                          }`}
+                        >
+                          <div
+                            className="aspect-square w-full"
+                            style={{
+                              backgroundColor: floor.tint || '#ffffff',
+                              backgroundImage: floor.img ? `url(${floor.img})` : undefined,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                              backgroundBlendMode: floor.img && floor.tint ? 'multiply' : undefined,
+                            }}
+                          />
+                          <span className="block px-1 py-1 text-[9px] font-semibold text-[#3b4d4a] text-center leading-tight truncate border-t border-black/5">
+                            {floor.name}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Plank size lives with the floor it scales. Each texture is
+                      mapped at its real-world size, so this is a straight
+                      multiplier: 100% is the true plank width, 200% lays them
+                      twice as wide. */}
+                  <div className="mt-4">
+                    <DimensionSlider
+                      label="Plank Size %"
+                      min={50}
+                      max={250}
+                      step={5}
+                      value={Math.round((room.floorScale ?? 1) * 100)}
+                      onChange={(v) => updateRoom({ floorScale: v / 100 })}
+                    />
                   </div>
                 </div>
               </div>
@@ -1025,6 +1065,8 @@ export function Sidebar() {
               <div className="grid grid-cols-2 gap-2.5">
                 {([
                   'kitchen_unit_600', 'kitchen_unit_1200', 'kitchen_sink_1200',
+                  'kitchen_drawer_2', 'kitchen_drawer_3', 'kitchen_tall_larder',
+                  'kitchen_hob_gas', 'kitchen_hob_induction', 'kitchen_extractor',
                   'kitchen_tall_fridge', 'kitchen_tall_oven_single', 'kitchen_tall_oven_double',
                   'kitchen_tap_straight', 'kitchen_tap_curved',
                 ] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (

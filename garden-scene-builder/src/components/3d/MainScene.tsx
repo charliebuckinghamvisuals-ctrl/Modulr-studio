@@ -8,97 +8,232 @@ import { RoomGeometry } from './RoomGeometry';
 import { SceneObjects } from './SceneObjects';
 import { PlacementGhost } from './PlacementGhost';
 import { ObjectType } from '../../types';
+import { clampToRoomInterior } from '../../utils/placement';
 
 
+/**
+ * First-person walkthrough, built the way a game does it.
+ *
+ * The old version was drei's CameraControls with minDistance ===
+ * maxDistance, i.e. an ORBIT controller pinned at zero radius pretending to
+ * be a head. That is why it felt wrong: you had to press and drag to turn,
+ * turning swung you around a pivot instead of rotating your head, and there
+ * was nothing stopping you walking out through a wall.
+ *
+ * This is a real FPS rig:
+ *   - click to capture the pointer; mouse then turns the head directly,
+ *     yaw/pitch accumulated in radians with pitch clamped just short of
+ *     straight up/down so the view can never roll over
+ *   - WASD relative to where you are looking, Shift to jog
+ *   - acceleration and damping, so starting and stopping ease instead of
+ *     snapping between full speed and dead stop
+ *   - eye height fixed at 1.6m above the finished floor, and the walker is
+ *     clamped inside the room so you cannot drift through the cladding
+ *   - Esc releases the pointer (the browser does this for us) and the
+ *     cursor comes back for the sidebar and the finish swatches
+ */
 function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
-  const { camera } = useThree();
-  const keys = useRef<{ [key: string]: boolean }>({});
-  const controlsRef = useRef<any>(null);
+  const { camera, gl, scene } = useThree();
+  const room = useStore(s => s.scene.room);
+  const keys = useRef<Record<string, boolean>>({});
+  const yaw = useRef(0);
+  const pitch = useRef(0);
+  const velocity = useRef(new THREE.Vector3());
+  const position = useRef(new THREE.Vector3());
 
-  // set initial position when starting walking mode
-  // only run once when component mounts
+  // Eye height above the FINISHED floor. 1.6m puts the camera behind the
+  // eyes of a 1.87m person, which is why the first version felt like
+  // looking down on the room; 1.5m is eye level for someone around 1.62m
+  // and matches how the space actually reads standing in it.
+  const eyeY = ((room.baseHeightMm ?? 100) / 1000) + 1.5;
+
+  // Enter the room looking at it, rather than wherever the orbit camera was.
   useEffect(() => {
-    if (controlsRef.current) {
-        controlsRef.current.setLookAt(0, 1.6, 5, 0, 1.6, 0, false);
-    }
+    const startZ = Math.max(1.2, room.depthMm / 2000 - 1.0);
+    position.current.set(0, eyeY, startZ);
+    // A camera with rotation.y = 0 looks down -Z, which is the back of the
+    // room; PI would spawn you facing out through the front doors.
+    yaw.current = 0;
+    pitch.current = 0;
+    camera.position.copy(position.current);
+    camera.rotation.set(0, 0, 0);
+    camera.rotation.order = 'YXZ';
+    camera.rotation.y = yaw.current;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!controlsEnabled) return;
-    const handleKeyDown = (e: KeyboardEvent) => { keys.current[e.key.toLowerCase()] = true; };
-    const handleKeyUp = (e: KeyboardEvent) => { keys.current[e.key.toLowerCase()] = false; };
-    const handleBlur = () => { keys.current = {}; };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    window.addEventListener('blur', handleBlur);
+    const canvas = gl.domElement;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      keys.current[e.code] = true;
+      // The page must not scroll under the walker.
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+    };
+    const onKeyUp = (e: KeyboardEvent) => { keys.current[e.code] = false; };
+    const onBlur = () => { keys.current = {}; };
+
+    /**
+     * One click captures the mouse. Once captured, a click is a CROSSHAIR
+     * PICK: whatever is under the centre dot gets selected and the pointer is
+     * released, so the finish swatches are immediately clickable without ever
+     * pressing Esc. Clicking the scene again re-captures and you walk on.
+     */
+    const picker = new THREE.Raycaster();
+    const onCanvasDown = (e: PointerEvent) => {
+      const locked = document.pointerLockElement === canvas;
+      // Locked, the crosshair IS the pointer. Unlocked - which is how you are
+      // left right after picking something - aim from the real cursor, so
+      // moving from one item to the next is ONE click each. The old
+      // behaviour spent the first click just re-capturing the mouse, which
+      // meant every colour change cost an extra click.
+      let ndc = new THREE.Vector2(0, 0);
+      if (!locked) {
+        const r = canvas.getBoundingClientRect();
+        ndc = new THREE.Vector2(
+          ((e.clientX - r.left) / r.width) * 2 - 1,
+          -((e.clientY - r.top) / r.height) * 2 + 1,
+        );
+      }
+      picker.setFromCamera(ndc, camera);
+      const hits = picker.intersectObjects(scene.children, true);
+      let handled = false;
+      for (const hit of hits) {
+        // Ignore the invisible helpers and the placement catcher plane.
+        if (!hit.object.visible) continue;
+        let node: THREE.Object3D | null = hit.object;
+        while (node) {
+          if (node.userData?.objectId) {
+            const st = useStore.getState();
+            st.setWalkFloorOpen(false);
+            st.setSelectedObjectId(node.userData.objectId as string);
+            if (locked) document.exitPointerLock();
+            handled = true;
+            break;
+          }
+          if (node.userData?.isFloor) {
+            const st = useStore.getState();
+            st.setSelectedObjectId(null);
+            st.setWalkFloorOpen(true);
+            if (locked) document.exitPointerLock();
+            handled = true;
+            break;
+          }
+          node = node.parent;
+        }
+        if (handled) break;
+      }
+      // Clicked past everything selectable while the cursor was out - that
+      // means carry on walking.
+      if (!handled && !locked) canvas.requestPointerLock();
+    };
+    const onMouseMove = (e: MouseEvent) => {
+      if (document.pointerLockElement !== canvas) return;
+      const sens = 0.0022;
+      yaw.current -= e.movementX * sens;
+      // Stop just short of vertical - at exactly +/-90 degrees the view
+      // gimbals and the horizon spins.
+      const limit = Math.PI / 2 - 0.05;
+      pitch.current = Math.max(-limit, Math.min(limit, pitch.current - e.movementY * sens));
+    };
+    const onLockChange = () => {
+      const locked = document.pointerLockElement === canvas;
+      const st = useStore.getState();
+      st.setWalkPointerLocked(locked);
+      if (locked) {
+        // Walking again - put the finish panels away rather than leaving them
+        // parked over the bottom of the room.
+        st.setSelectedObjectId(null);
+        st.setWalkFloorOpen(false);
+      } else {
+        keys.current = {};
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    canvas.addEventListener('pointerdown', onCanvasDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('pointerlockchange', onLockChange);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+      canvas.removeEventListener('pointerdown', onCanvasDown);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('pointerlockchange', onLockChange);
+      if (document.pointerLockElement === canvas) document.exitPointerLock();
+      useStore.getState().setWalkPointerLocked(false);
       keys.current = {};
     };
-  }, [controlsEnabled]);
+  }, [controlsEnabled, gl]);
 
-  useFrame((_, delta) => {
-    if (!controlsRef.current || !controlsEnabled) return;
-    const speed = 1.8 * delta; // Slower walking speed
-    
-    // Get forward vector from camera direction
-    const forward = new THREE.Vector3();
-    camera.getWorldDirection(forward);
-    forward.y = 0;
-    forward.normalize();
-    
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+  useFrame((_, rawDelta) => {
+    if (!controlsEnabled) return;
+    // A tab that has been in the background hands back a huge delta, which
+    // would teleport the walker across the room on the first frame.
+    const delta = Math.min(rawDelta, 0.1);
 
-    const move = new THREE.Vector3();
-    if (keys.current['w']) move.add(forward);
-    if (keys.current['s']) move.sub(forward);
-    if (keys.current['a']) move.sub(right);
-    if (keys.current['d']) move.add(right);
+    const k = keys.current;
+    const fwd = (k['KeyW'] || k['ArrowUp'] ? 1 : 0) - (k['KeyS'] || k['ArrowDown'] ? 1 : 0);
+    const strafe = (k['KeyD'] || k['ArrowRight'] ? 1 : 0) - (k['KeyA'] || k['ArrowLeft'] ? 1 : 0);
+    const sprint = k['ShiftLeft'] || k['ShiftRight'];
 
-    if (move.lengthSq() > 0) {
-      move.normalize().multiplyScalar(speed);
-      
-      const currentPos = new THREE.Vector3();
-      controlsRef.current.getPosition(currentPos);
-      const currentTarget = new THREE.Vector3();
-      controlsRef.current.getTarget(currentTarget);
-
-      currentPos.add(move);
-      currentTarget.add(move);
-      
-      controlsRef.current.setLookAt(
-        currentPos.x, currentPos.y, currentPos.z,
-        currentTarget.x, currentTarget.y, currentTarget.z,
-        false
-      );
+    // Walking pace, not a stroll: 1.5 m/s, 3.0 with Shift.
+    const target = new THREE.Vector3();
+    if (fwd || strafe) {
+      const sin = Math.sin(yaw.current), cos = Math.cos(yaw.current);
+      // Forward is -Z rotated by yaw, which is what the camera looks down.
+      target.set(-sin * fwd + cos * strafe, 0, -cos * fwd - sin * strafe);
+      target.normalize().multiplyScalar(sprint ? 3.0 : 1.5);
     }
+
+    // Ease toward the target speed instead of snapping to it - this is what
+    // makes the movement feel like a person rather than a slide projector.
+    const accel = 1 - Math.exp(-12 * delta);
+    velocity.current.lerp(target, accel);
+    if (velocity.current.lengthSq() < 1e-6) velocity.current.set(0, 0, 0);
+
+    position.current.addScaledVector(velocity.current, delta);
+
+    // Stay inside the building. The margin keeps the near clip plane off the
+    // wall face, so you never see through the cladding.
+    const clamped = clampToRoomInterior(room, position.current.x, position.current.z, 0.35);
+    if (clamped.x !== position.current.x || clamped.z !== position.current.z) {
+      position.current.x = clamped.x;
+      position.current.z = clamped.z;
+      velocity.current.multiplyScalar(0.5); // scrub speed on contact
+    }
+    position.current.y = eyeY;
+
+    camera.position.copy(position.current);
+    camera.rotation.order = 'YXZ';
+    camera.rotation.y = yaw.current;
+    camera.rotation.x = pitch.current;
+    camera.rotation.z = 0;
   });
 
-  return (
-    <CameraControls 
-      ref={controlsRef} 
-      enabled={controlsEnabled}
-      makeDefault
-      minDistance={0.1}
-      maxDistance={0.1} // keeping it close constrains orbit to act like look-around
-      azimuthRotateSpeed={0.6} // standard turning
-      polarRotateSpeed={0.6}
-      truckSpeed={0} 
-    />
-  );
+  return null;
 }
 
 function ScreenshotHelper() {
-  const { gl, scene, camera } = useThree();
+  const { gl, scene, camera, advance } = useThree();
 
-  // Debug handle alongside __modulrStore: lets DevTools raycast the live
-  // scene to identify meshes. Harmless in production.
+  // Debug handles alongside __modulrStore: let DevTools raycast the live
+  // scene, and let a headless check STEP THE FRAME LOOP. The second one
+  // matters because a browser tab that is not being displayed throttles
+  // requestAnimationFrame to nothing, so useFrame work - the walkthrough
+  // camera above, most obviously - never runs and cannot be verified.
+  // Harmless in production; nothing in the app reads either.
   useEffect(() => {
     (window as any).__modulrScene = scene;
-  }, [scene]);
+    (window as any).__modulrCamera = camera;
+    (window as any).__modulrAdvance = advance;
+  }, [scene, camera, advance]);
 
   useEffect(() => {
     const handleCapture = () => {

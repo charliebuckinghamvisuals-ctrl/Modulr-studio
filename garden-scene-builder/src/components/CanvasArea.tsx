@@ -8,6 +8,8 @@ import { ElementEditorPanel } from './UI/ElementEditorPanel';
 import { HistoryButtons } from './UI/HistoryButtons';
 import { ActionButtons } from './UI/ActionButtons';
 import { CameraWidget } from './UI/CameraWidget';
+import { WalkHud } from './UI/WalkHud';
+import { WalkFloorPanel } from './UI/WalkFloorPanel';
 import { useRef, useState, useEffect } from 'react';
 import { useProgress } from '@react-three/drei';
 import * as THREE from 'three';
@@ -149,6 +151,8 @@ export function CanvasArea() {
       <CameraWidget />
       <HistoryButtons />
       <PricePill />
+      <WalkHud />
+      <WalkFloorPanel />
       <ObjectEditorPanel />
       <ElementEditorPanel />
       <ActionButtons />

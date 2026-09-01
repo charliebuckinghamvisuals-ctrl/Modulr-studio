@@ -34,6 +34,14 @@ interface AppState {
   setSelectedElementId: (id: string | null) => void;
   setHoveredElementId: (id: string | null) => void;
   setControlsEnabled: (enabled: boolean) => void;
+  /** True while the walkthrough has captured the mouse pointer. Drives the
+   *  on-screen prompt: locked = crosshair + key hints, unlocked = "click to
+   *  look around". */
+  walkPointerLocked: boolean;
+  setWalkPointerLocked: (locked: boolean) => void;
+  /** True when the walkthrough floor-finish panel is open. */
+  walkFloorOpen: boolean;
+  setWalkFloorOpen: (open: boolean) => void;
   setIsExporting: (exporting: boolean) => void;
   setCapturedImage: (image: string | null) => void;
   setUploadedBgImage: (image: string | null) => void;
@@ -164,7 +172,9 @@ const initialState: SceneState = {
     roofMaterial: 'epdm',
     frameColor: 'anthracite',
     interiorColor: '#ffffff',
-    interiorFloorType: 'oak',
+    interiorFloorType: 'oak_plank',
+    floorScale: 1,
+    worktopMaterial: 'carrara',
     x: 0,
     z: 0,
     rot: 0,
@@ -303,6 +313,10 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   setControlsEnabled: (enabled) => set({ controlsEnabled: enabled }),
+  walkPointerLocked: false,
+  setWalkPointerLocked: (locked) => set({ walkPointerLocked: locked }),
+  walkFloorOpen: false,
+  setWalkFloorOpen: (open) => set({ walkFloorOpen: open }),
   setIsExporting: (exporting) => set({ isExporting: exporting }),
   setCapturedImage: (image) => set({ capturedImage: image }),
   setUploadedBgImage: (image) => set({ uploadedBgImage: image }),

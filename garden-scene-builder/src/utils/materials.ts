@@ -22,6 +22,20 @@ export const MATERIAL_DEF = {
   pine: { prefix: 'planks_clean', tileSize: 6.0, roughness: 0.6, color: '#e8d3ac', isFloor: true },
   walnut: { prefix: 'planks_clean', tileSize: 6.0, roughness: 0.5, color: '#8a6242', isFloor: true },
   cherry: { prefix: 'planks_clean', tileSize: 6.0, roughness: 0.5, color: '#b07a55', isFloor: true },
+  // ambientCG CC0 wood floors (WoodFloor051 / 053 / 008). Full PBR sets, so
+  // colour stays white - the photograph IS the colour - and the normal and
+  // roughness maps give real board relief and sheen. tileSize is the physical
+  // size the source tile represents.
+  // tileSize is the real-world size of the source tile, from ambientCG's own
+  // dimension data where they publish it (reported in cm), so board widths
+  // come out life-size instead of guessed.
+  oak_plank: { prefix: 'oak_plank', tileSize: 1.8, roughness: 0.5, color: '#ffffff', isFloor: true },
+  light_oak: { prefix: 'light_oak', tileSize: 2.0, roughness: 0.48, color: '#ffffff', isFloor: true, noAo: true },
+  rustic_pine: { prefix: 'rustic_pine', tileSize: 1.9, roughness: 0.6, color: '#ffffff', isFloor: true },
+  smoked_oak: { prefix: 'smoked_oak', tileSize: 2.0, roughness: 0.55, color: '#ffffff', isFloor: true, noAo: true },
+  oak_herringbone: { prefix: 'oak_herringbone', tileSize: 1.8, roughness: 0.5, color: '#ffffff', isFloor: true },
+  walnut_parquet: { prefix: 'walnut_parquet', tileSize: 2.0, roughness: 0.45, color: '#ffffff', isFloor: true },
+
   charcoal: { prefix: 'weathered_larch', tileSize: 2.0, roughness: 1.0, color: '#555555' },
   weathered_larch: { prefix: 'weathered_larch', tileSize: 2.0, roughness: 1.0, color: '#ffffff' },
   // ── Decking range ─────────────────────────────────────────────────────────
@@ -106,9 +120,42 @@ export const resolveDeckingKey = (deckingMaterial?: string, cladding?: string): 
   return 'timber_decking';
 };
 
+/**
+ * Floors that were retired when the photographic PBR range came in.
+ *
+ * The old interior floors were a single plank texture with a colour tint,
+ * and 'tiles' / 'carpet' never had a texture at all - they fell through to
+ * exterior cladding. They are gone from the picker, but designs saved
+ * before the change still carry these values, so each one resolves to its
+ * closest replacement rather than rendering as weathered larch.
+ *
+ * The KEYS here are also cladding and base-material names ('oak' is a
+ * cladding, 'concrete' is a base), so their MATERIAL_DEF entries stay put -
+ * only the FLOOR meaning is remapped.
+ */
+const LEGACY_FLOORS: Record<string, string> = {
+  oak: 'oak_plank',
+  pine: 'rustic_pine',
+  walnut: 'smoked_oak',
+  cherry: 'smoked_oak',
+  tiles: 'light_oak',
+  carpet: 'light_oak',
+  concrete: 'light_oak',
+  // The supplied-image herringbone was withdrawn in favour of the
+  // photographic PBR range; its nearest match is the oak one.
+  parquet: 'oak_herringbone',
+};
+
+/** The floor material to actually render for a stored floor value. */
+export const resolveFloorKey = (key: string | undefined) =>
+  (key && LEGACY_FLOORS[key]) || key || 'oak_plank';
+
 export function useRealMaterial(materialKey: string, widthMeters: number, heightMeters: number, rotation: number = 0) {
   const claddingWidthMm = useStore(state => state.scene.room.claddingWidthMm) || 100;
   const claddingOrientation = useStore(state => state.scene.room.claddingOrientation);
+  // Board size for interior floors, as a multiplier on the material's real
+  // tile size: 2 lays planks twice as wide, 0.5 half as wide.
+  const floorScale = useStore(state => state.scene.room.floorScale) || 1;
   // Hardware max, usually 16. Read from the renderer rather than hardcoded so a
   // device that supports less is not asked for something it cannot do.
   const maxAnisotropy = useThree(state => state.gl.capabilities.getMaxAnisotropy());
@@ -129,7 +176,7 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
         texturePaths.map = `./textures/${def.prefix}_color.${(def as any).ext || 'jpg'}`;
         texturePaths.normalMap = `./textures/${def.prefix}_normal.${(def as any).ext || 'jpg'}`;
         texturePaths.roughnessMap = `./textures/${def.prefix}_roughness.${(def as any).ext || 'jpg'}`;
-        if (def.prefix !== 'synthetic_wood') {
+        if (def.prefix !== 'synthetic_wood' && !(def as any).noAo) {
             texturePaths.aoMap = `./textures/${def.prefix}_ao.${(def as any).ext || 'jpg'}`;
         }
     }
@@ -178,7 +225,8 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
             if ((def as any).isFloor) {
                 const floorW = widthMeters > 0 ? widthMeters : 4;
                 const floorD = heightMeters > 0 ? heightMeters : 4;
-                m.repeat.set(floorW / def.tileSize, floorD / def.tileSize);
+                const tile = def.tileSize * floorScale;
+                m.repeat.set(floorW / tile, floorD / tile);
                 m.center.set(0.5, 0.5);
                 m.rotation = rotation;
                 m.needsUpdate = true;
@@ -231,7 +279,7 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
         // reassigned. The underlying instances from useLoader are cached and
         // stable, so keying on them makes this memo behave.
     }, [textures.map, textures.normalMap, textures.roughnessMap, textures.aoMap,
-        widthMeters, heightMeters, rotation, def, claddingWidthMm, claddingOrientation, maxAnisotropy]);
+        widthMeters, heightMeters, rotation, def, claddingWidthMm, claddingOrientation, floorScale, maxAnisotropy]);
 
     // Memoised for the same reason: this object feeds material props and
     // memo dependency lists further up.

@@ -101,7 +101,7 @@ async function render(url: string, scale?: [number, number, number], type?: Obje
   const model = gltf.scene;
   // Same finish corrections as the placed object, so a tap thumbnails as
   // chrome rather than the exporter's white plastic.
-  if (type) applyModelMaterials(type, model);
+  if (type) applyModelMaterials(type, model, undefined, undefined, false);
   if (scale) model.scale.set(scale[0], scale[1], scale[2]);
 
   const scene = new THREE.Scene();

@@ -6,10 +6,11 @@ import { useRef, useState, useEffect, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
-import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, mountHeight } from '../../modelRegistry';
-import { applyModelMaterials, retintModel } from '../../utils/materialFixes';
+import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H } from '../../modelRegistry';
+import { applyModelMaterials, retintModel, resurfaceWorktop } from '../../utils/materialFixes';
 import { isInteriorType, clampToRoomInterior, roomLocal, FOOTPRINT_RADIUS } from '../../utils/placement';
 import { RotateCw, Copy, Trash2 } from 'lucide-react';
+import { WorktopRuns } from './WorktopRuns';
 
 /**
  * Generic GLB object - any type registered in modelRegistry renders through
@@ -17,7 +18,7 @@ import { RotateCw, Copy, Trash2 } from 'lucide-react';
  * (served at the site root) and inside the /3d-config/ iframe, where an
  * absolute path would miss.
  */
-function GlbModel({ url, type, color }: { url: string; type: SceneObject['type']; color?: string }) {
+function GlbModel({ url, type, color, worktop }: { url: string; type: SceneObject['type']; color?: string; worktop?: string }) {
     const { scene } = useGLTF(url);
 
     // Clone per instance. useGLTF caches one scene graph, so placing two of
@@ -30,7 +31,7 @@ function GlbModel({ url, type, color }: { url: string; type: SceneObject['type']
 
     if (!cloned.current) {
         cloned.current = scene.clone(true);
-        matHandles.current = applyModelMaterials(type, cloned.current, color);
+        matHandles.current = applyModelMaterials(type, cloned.current, color, worktop, true);
     }
 
     // Recolour on demand without rebuilding the model.
@@ -38,6 +39,12 @@ function GlbModel({ url, type, color }: { url: string; type: SceneObject['type']
         if (!color || !matHandles.current) return;
         retintModel(type, matHandles.current, color);
     }, [color, type]);
+
+    // Re-surface the worktop when the room's choice changes.
+    useEffect(() => {
+        if (!matHandles.current) return;
+        resurfaceWorktop(matHandles.current, worktop);
+    }, [worktop]);
 
     return <primitive ref={model} object={cloned.current} />;
 }
@@ -127,6 +134,8 @@ export function SceneObjects() {
         }
         return <ObjectMesh key={obj.id} obj={obj} />;
       })}
+      {/* One slab per run of cabinets, laid over the hidden per-unit tops. */}
+      <WorktopRuns />
     </group>
   );
 }
@@ -156,9 +165,12 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
 
   const handlePointerDown = (e: any) => {
     e.stopPropagation();
+    setSelectedObjectId(obj.id);
+    // In the walkthrough an item can be SELECTED - so a client can change its
+    // colour or finish - but never moved. The layout is the designer's; the
+    // finishes are the client's.
     if (viewMode === 'walking') return;
 
-    setSelectedObjectId(obj.id);
     // Draggable in EVERY editing view. Plan-only dragging was the single
     // biggest interaction complaint: in the default 3D view objects selected
     // but would not move, so placing furniture meant constantly flipping to
@@ -222,7 +234,26 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
               url={modelUrl}
               type={obj.type}
               color={obj.color}
+              worktop={room.worktopMaterial}
             />
+            {/* The extractor's flue is its own model, stretched on Y so its
+                top always lands on the ceiling. A duct that stops short
+                looks broken, and the room height is a customer choice - so
+                the flue is sized from it rather than shipped at one length.
+                Scaling is about the canopy top, and the duct is a straight
+                extrusion, so stretching it introduces no distortion. */}
+            {obj.type === 'kitchen_extractor' && (() => {
+              const ceiling = (room.heightMm ?? 2050) / 1000;
+              const needed = ceiling - mountHeight(obj.type) - EXTRACTOR_CANOPY_H;
+              const s = Math.max(0.02, needed / EXTRACTOR_FLUE_H);
+              return (
+                <group position={[0, EXTRACTOR_CANOPY_H, 0]} scale={[1, s, 1]}>
+                  <group position={[0, -EXTRACTOR_CANOPY_H, 0]}>
+                    <GlbModel key="flue" url={EXTRACTOR_FLUE_URL} type={obj.type} />
+                  </group>
+                </group>
+              );
+            })()}
           </group>
         </Suspense>
       );
@@ -771,6 +802,8 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
 
   return (
     <group
+      // Lets the walkthrough crosshair resolve a hit mesh back to its object.
+      userData={{ objectId: obj.id }}
       position={pos}
       rotation={[0, obj.rot, 0]}
       scale={obj.scale}

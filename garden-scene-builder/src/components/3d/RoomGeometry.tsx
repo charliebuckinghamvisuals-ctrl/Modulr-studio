@@ -7,10 +7,11 @@ import { useFrame } from '@react-three/fiber';
 import { Geometry, Base, Subtraction, Addition } from './SafeCsg';
 import * as THREE from 'three';
 import { Text, Line, Html, Edges, Billboard } from '@react-three/drei';
-import { useRealMaterial, resolveDeckingKey } from '../../utils/materials';
+import { useRealMaterial, resolveDeckingKey, resolveFloorKey } from '../../utils/materials';
 import { Suspense } from 'react';
 import { createWorldScaleBoxGeometry, createWorldScaleGableGeometry } from '../../utils/geometry';
 import { createCladdingGeometry, createDeckingGeometry } from '../../utils/geometryUtils';
+import { wallpaperProps } from '../../utils/wallpaper';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { DragHandle } from './DragHandles';
@@ -753,7 +754,7 @@ export function RoomGeometry() {
   // itself - see resolveDeckingKey. Reusing the cladding key laid the vertical
   // slat texture across the deck instead of decking boards.
   const texDecking = useRealMaterial(resolveDeckingKey(room.deckingMaterial, room.cladding), baseW, deckFront, 0);
-  const texFloor = useRealMaterial(room.interiorFloorType || 'oak', w, d, 0);
+  const texFloor = useRealMaterial(resolveFloorKey(room.interiorFloorType), w, d, 0);
 
   const isVert = room.claddingOrientation !== 'vertical';
   const geomFrontWall = useMemo(() => createCladdingGeometry(w, frontH, isVert), [w, frontH, isVert]);
@@ -761,6 +762,15 @@ export function RoomGeometry() {
   const geomLeftWall = useMemo(() => createCladdingGeometry(d, maxH, isVert), [d, maxH, isVert]);
   const geomRightWall = useMemo(() => createCladdingGeometry(d, maxH, isVert), [d, maxH, isVert]);
   const geomDecking = useMemo(() => createDeckingGeometry(baseW, deckFront), [baseW, deckFront]);
+
+  // The inside faces come from this brush, so it is what has to carry the
+  // wallpaper - and it needs world-scale UVs, or one tile would stretch across
+  // a whole wall and the paper would be a different size on every elevation.
+  const interiorCutGeom = useMemo(
+    () => createWorldScaleBoxGeometry(w - wallThickness * 2, h + 1, d - wallThickness * 2, false, 0, 0, 0),
+    [w, d, h, wallThickness],
+  );
+  const paper = wallpaperProps();
 
 
 
@@ -1087,8 +1097,8 @@ export function RoomGeometry() {
             {/* Main Interior Cutout (split into non-overlapping boxes to avoid nested Geometry issues) */}
             {(!isLShape && !isTShape && !isCornerCut) && (
               <Subtraction position={[0, h/2, 0]}>
-                <boxGeometry args={[w - wallThickness*2, h + 1, d - wallThickness*2]} />
-                <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
+                <primitive object={interiorCutGeom} attach="geometry" />
+                <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
               </Subtraction>
             )}
 
@@ -1199,6 +1209,7 @@ export function RoomGeometry() {
         </mesh>
         ), [
           claddingBoxGeom, pfLeftGeom, pfRightGeom, pfTopGeom, lShapeCutOuterGeom, gableTriangleGeom,
+          interiorCutGeom, paper.map,
           texFront.map, texBack.map, texLeft.map, texRight.map,
           texFront.color, texBack.color, texLeft.color, texRight.color, texFront.roughness,
           room.hasPictureFrame, room.interiorColor, room.hasApexGlazing, isSideGable,
@@ -1209,7 +1220,7 @@ export function RoomGeometry() {
         ])}
 
         {/* Internal Floor */}
-        <mesh position={[0, 0.005, 0]} receiveShadow>
+        <mesh position={[0, 0.005, 0]} receiveShadow userData={{ isFloor: true }}>
           <meshStandardMaterial {...texFloor}  bumpScale={0.05} roughness={0.7} />
           <Geometry>
              <Base>

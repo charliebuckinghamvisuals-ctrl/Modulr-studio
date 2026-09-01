@@ -37,6 +37,12 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   kitchen_tall_oven_double: 'models/kitchen_tall_oven_double.glb',
   kitchen_tap_straight: 'models/kitchen_tap_straight.glb',
   kitchen_tap_curved: 'models/kitchen_tap_curved.glb',
+  kitchen_drawer_2: 'models/kitchen_drawer_2.glb',
+  kitchen_drawer_3: 'models/kitchen_drawer_3.glb',
+  kitchen_tall_larder: 'models/kitchen_tall_larder.glb',
+  kitchen_hob_gas: 'models/kitchen_hob_gas.glb',
+  kitchen_hob_induction: 'models/kitchen_hob_induction.glb',
+  kitchen_extractor: 'models/kitchen_extractor.glb',
 };
 
 /**
@@ -51,11 +57,15 @@ export const NATIVE_WIDTH_MM: Partial<Record<ObjectType, number>> = {
   kitchen_unit_600: 600,
   kitchen_unit_1200: 1203,
   kitchen_sink_1200: 1203,
+  kitchen_drawer_2: 600,
+  kitchen_drawer_3: 600,
 };
 
 /** Allowed width range per type, in mm. */
 export const WIDTH_RANGE_MM: Partial<Record<ObjectType, [number, number]>> = {
   kitchen_unit_600: [400, 900],
+  kitchen_drawer_2: [400, 900],
+  kitchen_drawer_3: [400, 900],
   kitchen_unit_1200: [900, 1800],
   kitchen_sink_1200: [900, 1800],
 };
@@ -79,6 +89,9 @@ export const TINT_MATERIAL: Partial<Record<ObjectType, string>> = {
   kitchen_tall_fridge: 'M03_Pewter_Shine',
   kitchen_tall_oven_single: 'M03_Pewter_Shine',
   kitchen_tall_oven_double: 'M03_Pewter_Shine',
+  kitchen_drawer_2: 'M03_Pewter_Shine',
+  kitchen_drawer_3: 'M03_Pewter_Shine',
+  kitchen_tall_larder: 'M03_Pewter_Shine',
 };
 
 /**
@@ -93,7 +106,18 @@ export const TINT_MATERIAL: Partial<Record<ObjectType, string>> = {
 export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   kitchen_tap_straight: 900,
   kitchen_tap_curved: 900,
+  // Hobs drop into the worktop, so they sit on its 900mm surface.
+  kitchen_hob_gas: 900,
+  kitchen_hob_induction: 900,
+  // 600mm clearance over the hob is the standard extraction height.
+  kitchen_extractor: 1500,
 };
+
+/** The extractor's flue is a separate model so it can be stretched to meet
+ *  the ceiling whatever the room height - see SceneObjects. */
+export const EXTRACTOR_FLUE_URL = 'models/kitchen_extractor_flue.glb';
+export const EXTRACTOR_CANOPY_H = 0.07;   // canopy thickness, m
+export const EXTRACTOR_FLUE_H = 0.955;    // native flue height, m
 
 /** Height (m) an object sits at above the finished floor - 0 for anything
  *  that stands on it. */
@@ -141,6 +165,83 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
   kitchen_tap_curved: ['<auto>', '<auto>1'],
 };
 
+/**
+ * Upholstery: which material inside each soft-furniture model is the fabric,
+ * and how much to repeat the weave over it.
+ *
+ * Each repeat is MEASURED from the model, not guessed: total UV area over
+ * total world area gives the exporter's UV-units-per-metre, and
+ * repeat = 1 / (0.4m * uvPerMetre) makes one tile of the 40cm source fabric
+ * cover exactly 40cm of upholstery. Eyeballing this put the weave ~35x
+ * oversized - the raw UV min/max is misleading because a handful of stray
+ * outlier UVs stretch the range far beyond where the actual surface sits.
+ */
+export const FABRIC_MATERIAL = 'Material~1';
+
+export const FABRIC_REPEAT: Partial<Record<ObjectType, number>> = {
+  sofa: 1.3,
+  sofa_l: 1.23,
+  armchair: 1.21,
+  footstool: 1.24,
+};
+
+export const hasFabric = (type: ObjectType) => FABRIC_REPEAT[type] !== undefined;
+
+/**
+ * Upholstery colours.
+ *
+ * The weave photograph is a light natural grey, and a colour MULTIPLIES
+ * through it - which keeps the woven detail visible instead of flooding it
+ * with flat paint. That also means these can only go darker than the cloth,
+ * so the range is mid-to-deep tones an upholsterer would actually offer
+ * rather than pastels that would come out muddy.
+ */
+/**
+ * Worktop surfaces. Every kitchen model carries one material for its top -
+ * 'Marble_20_1K' from the original SketchUp export - so swapping that
+ * material's maps re-surfaces every unit at once.
+ *
+ * tileMetres is how much real worktop one tile of the photograph covers.
+ * Stone is cut from a slab, so a big tile keeps the veining broad rather
+ * than repeating into wallpaper; the timber tile is smaller because board
+ * widths need to read at the right size.
+ */
+export const WORKTOP_MATERIAL = 'Marble_20_1K';
+
+export type WorktopDef = { id: string; name: string; prefix: string; tileMetres: number; roughness: number };
+
+export const WORKTOPS: WorktopDef[] = [
+  { id: 'carrara', name: 'Carrara Marble', prefix: 'wt_carrara', tileMetres: 2.4, roughness: 0.22 },
+  { id: 'onyx', name: 'White Onyx', prefix: 'wt_onyx', tileMetres: 2.4, roughness: 0.2 },
+  { id: 'cream', name: 'Cream Marble', prefix: 'wt_cream', tileMetres: 2.4, roughness: 0.2 },
+  { id: 'travertine', name: 'Travertine', prefix: 'wt_travertine', tileMetres: 2.4, roughness: 0.26 },
+  { id: 'umber', name: 'Umber Marble', prefix: 'wt_umber', tileMetres: 2.4, roughness: 0.24 },
+  { id: 'nero', name: 'Nero Marble', prefix: 'wt_nero', tileMetres: 2.4, roughness: 0.24 },
+  { id: 'oak', name: 'Oak Timber', prefix: 'wt_oak', tileMetres: 1.6, roughness: 0.45 },
+];
+
+export const DEFAULT_WORKTOP = 'carrara';
+
+export const worktopById = (id: string | undefined) =>
+  WORKTOPS.find(w => w.id === id) ?? WORKTOPS[0];
+
+/** True for anything that has a worktop to re-surface. */
+export const hasWorktop = (type: ObjectType) =>
+  type.startsWith('kitchen_unit') || type.startsWith('kitchen_sink') || type.startsWith('kitchen_drawer');
+
+export const FABRIC_COLOURS: { name: string; hex: string }[] = [
+  { name: 'Natural', hex: '#ffffff' },
+  { name: 'Oatmeal', hex: '#e0d5c2' },
+  { name: 'Pebble', hex: '#c2bdb5' },
+  { name: 'Dove Grey', hex: '#9aa0a3' },
+  { name: 'Sage', hex: '#8e9c88' },
+  { name: 'Teal', hex: '#5c8790' },
+  { name: 'Navy', hex: '#3d4d69' },
+  { name: 'Rust', hex: '#a9603f' },
+  { name: 'Mustard', hex: '#c19a4b' },
+  { name: 'Charcoal', hex: '#54565a' },
+];
+
 export const METAL_FINISHES: { name: string; hex: string; roughness: number }[] = [
   { name: 'Chrome', hex: '#e6e7e9', roughness: 0.05 },
   { name: 'Stainless Steel', hex: '#c8c9c7', roughness: 0.3 },
@@ -183,6 +284,7 @@ export const MODEL_SCALES: Partial<Record<ObjectType, [number, number, number]>>
   kitchen_tall_fridge: [1, 2.0 / 2.208, 1],
   kitchen_tall_oven_single: [1, 2.0 / 2.208, 1],
   kitchen_tall_oven_double: [1, 2.0 / 2.208, 1],
+  kitchen_tall_larder: [1, 2.0 / 2.208, 1],
 };
 
 /** Picker labels for GLB-backed objects, in display order. */
@@ -205,6 +307,12 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   kitchen_tall_oven_double: 'Tall Double Oven',
   kitchen_tap_straight: 'Kitchen Tap',
   kitchen_tap_curved: 'Curved Kitchen Tap',
+  kitchen_drawer_2: 'Double Drawer Unit',
+  kitchen_drawer_3: 'Three Drawer Unit',
+  kitchen_tall_larder: 'Tall Larder Unit',
+  kitchen_hob_gas: 'Gas Hob',
+  kitchen_hob_induction: 'Induction Hob',
+  kitchen_extractor: 'Extractor Hood',
   toilet: 'Toilet',
   vanity: 'Vanity Unit',
   shower: 'Shower (Large)',
