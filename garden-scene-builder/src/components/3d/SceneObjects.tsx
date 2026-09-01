@@ -6,7 +6,8 @@ import { useRef, useState, useEffect, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
-import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, TINT_MATERIAL } from '../../modelRegistry';
+import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, mountHeight } from '../../modelRegistry';
+import { applyModelMaterials, retintModel } from '../../utils/materialFixes';
 import { isInteriorType, clampToRoomInterior, roomLocal, FOOTPRINT_RADIUS } from '../../utils/placement';
 import { RotateCw, Copy, Trash2 } from 'lucide-react';
 
@@ -16,53 +17,56 @@ import { RotateCw, Copy, Trash2 } from 'lucide-react';
  * (served at the site root) and inside the /3d-config/ iframe, where an
  * absolute path would miss.
  */
-function GlbModel({ url, tintMaterial, color }: { url: string; tintMaterial?: string; color?: string }) {
+function GlbModel({ url, type, color }: { url: string; type: SceneObject['type']; color?: string }) {
     const { scene } = useGLTF(url);
 
     // Clone per instance. useGLTF caches one scene graph, so placing two of
     // the same object without cloning would move one shared graph twice.
+    // Material corrections (paint, metal finishes, appliance glass) live in
+    // utils/materialFixes so the thumbnail renderer applies the same look.
     const model = useRef<THREE.Group>(null);
     const cloned = useRef<THREE.Object3D | null>(null);
-    // Cloning a scene SHARES its materials, so the body material is cloned
-    // too - otherwise recolouring one cabinet would recolour every unit in
-    // the room, and every future one.
-    const bodyMats = useRef<THREE.MeshStandardMaterial[]>([]);
+    const matHandles = useRef<ReturnType<typeof applyModelMaterials> | null>(null);
 
     if (!cloned.current) {
         cloned.current = scene.clone(true);
-        cloned.current.traverse(child => {
-            const mesh = child as THREE.Mesh;
-            if (!mesh.isMesh) return;
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            if (!tintMaterial) return;
-            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-            const next = mats.map((m: any) => {
-                if (!m || m.name !== tintMaterial) return m;
-                const copy = m.clone();
-                // Exported at roughness 0, which reads as wet plastic.
-                copy.roughness = 0.62;
-                copy.metalness = 0;
-                if (copy.clearcoat !== undefined) copy.clearcoat = 0;
-                if (copy.specularIntensity !== undefined) copy.specularIntensity = 0.15;
-                bodyMats.current.push(copy);
-                return copy;
-            });
-            mesh.material = Array.isArray(mesh.material) ? next : next[0];
-        });
+        matHandles.current = applyModelMaterials(type, cloned.current, color);
     }
 
     // Recolour on demand without rebuilding the model.
     useEffect(() => {
-        if (!color) return;
-        bodyMats.current.forEach(m => { m.color.set(color); m.needsUpdate = true; });
-    }, [color]);
+        if (!color || !matHandles.current) return;
+        retintModel(type, matHandles.current, color);
+    }, [color, type]);
 
     return <primitive ref={model} object={cloned.current} />;
 }
 
-// Warm the cache so the first placement of each model does not stall the scene.
-Object.values(MODEL_URLS).forEach(url => { if (url) useGLTF.preload(url); });
+/**
+ * Warm the model cache in the BACKGROUND, once the app is already usable.
+ *
+ * These preloads used to run at module load, which put all 18 models -
+ * 12.7MB - in front of the loading screen: nothing could be done with the
+ * configurator until every sofa and shower had arrived, which on a normal
+ * connection is a very long wait for models most designs never use. They are
+ * now fetched one at a time after first paint, and any model placed before
+ * its turn simply loads on demand through Suspense.
+ */
+if (typeof window !== 'undefined') {
+  const warmCache = () => {
+    const urls = Object.values(MODEL_URLS).filter(Boolean) as string[];
+    let i = 0;
+    const next = () => {
+      if (i >= urls.length) return;
+      try { useGLTF.preload(urls[i++]); } catch { /* a bad url must not stop the rest */ }
+      setTimeout(next, 500);
+    };
+    next();
+  };
+  const idle = (window as any).requestIdleCallback;
+  if (idle) idle(warmCache, { timeout: 10000 });
+  else setTimeout(warmCache, 6000);
+}
 
 /** Simple stand-in shown while a model streams in. */
 function ModelFallback() {
@@ -146,7 +150,9 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   // floor.
   const isInterior = isInteriorType(obj.type);
   const baseH = isInterior ? ((room.baseHeightMm ?? 100) / 1000) + 0.005 : 0;
-  const pos: [number, number, number] = [obj.x, baseH, obj.z];
+  // Worktop-mounted objects (taps) sit on the 900mm sink unit rather than on
+  // the floor, so they are lifted by their mount height as well.
+  const pos: [number, number, number] = [obj.x, baseH + mountHeight(obj.type), obj.z];
 
   const handlePointerDown = (e: any) => {
     e.stopPropagation();
@@ -214,7 +220,7 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
             <GlbModel
               key={obj.type}
               url={modelUrl}
-              tintMaterial={TINT_MATERIAL[obj.type]}
+              type={obj.type}
               color={obj.color}
             />
           </group>

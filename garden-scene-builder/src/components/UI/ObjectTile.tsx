@@ -17,7 +17,7 @@ export function ObjectTile({ type, label, icon }: { type: ObjectType; label: str
   useEffect(() => {
     if (!url) return;
     let alive = true;
-    getThumbnail(url, MODEL_SCALES[type]).then(src => { if (alive) setThumb(src); });
+    getThumbnail(url, MODEL_SCALES[type], type).then(src => { if (alive) setThumb(src); });
     return () => { alive = false; };
   }, [url, type]);
 

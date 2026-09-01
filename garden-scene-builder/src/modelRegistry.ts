@@ -32,6 +32,11 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   kitchen_unit_600: 'models/kitchen_unit_600.glb',
   kitchen_unit_1200: 'models/kitchen_unit_1200.glb',
   kitchen_sink_1200: 'models/kitchen_sink_1200.glb',
+  kitchen_tall_fridge: 'models/kitchen_tall_fridge.glb',
+  kitchen_tall_oven_single: 'models/kitchen_tall_oven_single.glb',
+  kitchen_tall_oven_double: 'models/kitchen_tall_oven_double.glb',
+  kitchen_tap_straight: 'models/kitchen_tap_straight.glb',
+  kitchen_tap_curved: 'models/kitchen_tap_curved.glb',
 };
 
 /**
@@ -69,7 +74,89 @@ export const TINT_MATERIAL: Partial<Record<ObjectType, string>> = {
   kitchen_unit_600: 'M03_Pewter_Shine',
   kitchen_unit_1200: 'M03_Pewter_Shine',
   kitchen_sink_1200: 'M03_Pewter_Shine',
+  // Tall units share the base units' body material, so a run of cabinets
+  // recolours as one - the appliance fascias keep their own finish.
+  kitchen_tall_fridge: 'M03_Pewter_Shine',
+  kitchen_tall_oven_single: 'M03_Pewter_Shine',
+  kitchen_tall_oven_double: 'M03_Pewter_Shine',
 };
+
+/**
+ * Objects that mount on top of a worktop rather than standing on the floor,
+ * with the height (mm above the finished floor) they sit at. Taps are the
+ * only ones today: they belong on the 900mm sink unit, and placed on the
+ * floor they read as a garden standpipe.
+ *
+ * Applied in SceneObjects (the placed object) and PlacementGhost (the
+ * preview), so a tap is already at worktop height while you are aiming it.
+ */
+export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
+  kitchen_tap_straight: 900,
+  kitchen_tap_curved: 900,
+};
+
+/** Height (m) an object sits at above the finished floor - 0 for anything
+ *  that stands on it. */
+export const mountHeight = (type: ObjectType) => (MOUNT_HEIGHT_MM[type] ?? 0) / 1000;
+
+/**
+ * Per-model material corrections, applied when the GLB is instanced.
+ *
+ * The SketchUp exporter writes nearly every material as roughness 0.5 /
+ * metalness 0.5 - halfway between everything, so steel reads as white
+ * plastic and the oven door 'glass' as a washed-out grey texture. Each entry
+ * here overrides one named material with real PBR values; 'dropMap' also
+ * discards the baked texture where it is the thing making the surface muddy.
+ */
+export type MaterialTweak = {
+  color?: string;
+  roughness?: number;
+  metalness?: number;
+  dropMap?: boolean;
+  envMapIntensity?: number;
+};
+
+const OVEN_TWEAKS: Record<string, MaterialTweak> = {
+  // The door front: gloss black glass like the appliance brochures - the
+  // baked dot texture is what made it look lilac.
+  'PDM Black glass03 Miele_series': { color: '#0a0a0c', roughness: 0.06, metalness: 0.85, dropMap: true, envMapIntensity: 1.3 },
+  'PDM Black02 Miele_series': { color: '#111113', roughness: 0.2, metalness: 0.4, dropMap: true },
+  // Handles and trim.
+  'PDM Stainless steel': { roughness: 0.28, metalness: 1.0, envMapIntensity: 1.1 },
+  'PDM Charcoal Miele_series': { roughness: 0.45, metalness: 0.1 },
+};
+
+export const MATERIAL_TWEAKS: Partial<Record<ObjectType, Record<string, MaterialTweak>>> = {
+  kitchen_tall_oven_single: OVEN_TWEAKS,
+  kitchen_tall_oven_double: OVEN_TWEAKS,
+};
+
+/**
+ * Materials that represent the tap's metalwork, per tap model. These get a
+ * user-selectable finish (chrome, stainless, brass...) instead of a paint
+ * colour - metalness 1 plus the scene HDR is what makes them read as metal.
+ */
+export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
+  kitchen_tap_straight: ['[Mirror 01]1'],
+  kitchen_tap_curved: ['<auto>', '<auto>1'],
+};
+
+export const METAL_FINISHES: { name: string; hex: string; roughness: number }[] = [
+  { name: 'Chrome', hex: '#e6e7e9', roughness: 0.05 },
+  { name: 'Stainless Steel', hex: '#c8c9c7', roughness: 0.3 },
+  { name: 'Brushed Brass', hex: '#c8a35f', roughness: 0.32 },
+  { name: 'Polished Brass', hex: '#d9b44a', roughness: 0.1 },
+  { name: 'Matte Black', hex: '#26262a', roughness: 0.55 },
+];
+
+/** Finish used before the customer picks one - the curved tap was modelled
+ *  as a gold design, so it starts on brass. */
+export const DEFAULT_FINISH: Partial<Record<ObjectType, string>> = {
+  kitchen_tap_straight: '#e6e7e9',
+  kitchen_tap_curved: '#c8a35f',
+};
+
+export const hasMetalFinish = (type: ObjectType) => METAL_MATERIALS[type] !== undefined;
 
 export const UNIT_COLOURS: { name: string; hex: string }[] = [
   { name: 'Light Grey', hex: '#d4d4d4' },
@@ -90,6 +177,12 @@ export const MODEL_SCALES: Partial<Record<ObjectType, [number, number, number]>>
   // Shower enclosures modelled taller than a standard room - capped to 2.0m.
   shower: [1, 2.0 / 2.515, 1],
   shower_small: [1, 2.0 / 2.335, 1],
+  // Tall kitchen units were modelled 2.208m; the default room is 2.05m
+  // internally, so they are squashed on Y only - uniform scaling would
+  // narrow them off the 600mm module the base units line up on.
+  kitchen_tall_fridge: [1, 2.0 / 2.208, 1],
+  kitchen_tall_oven_single: [1, 2.0 / 2.208, 1],
+  kitchen_tall_oven_double: [1, 2.0 / 2.208, 1],
 };
 
 /** Picker labels for GLB-backed objects, in display order. */
@@ -107,6 +200,11 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   kitchen_unit_600: 'Single Door Unit',
   kitchen_unit_1200: 'Double Door Unit',
   kitchen_sink_1200: 'Sink Unit',
+  kitchen_tall_fridge: 'Tall Fridge Unit',
+  kitchen_tall_oven_single: 'Tall Single Oven',
+  kitchen_tall_oven_double: 'Tall Double Oven',
+  kitchen_tap_straight: 'Kitchen Tap',
+  kitchen_tap_curved: 'Curved Kitchen Tap',
   toilet: 'Toilet',
   vanity: 'Vanity Unit',
   shower: 'Shower (Large)',

@@ -1023,11 +1023,15 @@ export function Sidebar() {
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Kitchen</label>
               <div className="grid grid-cols-2 gap-2.5">
-                {(['kitchen_unit_600', 'kitchen_unit_1200', 'kitchen_sink_1200'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {([
+                  'kitchen_unit_600', 'kitchen_unit_1200', 'kitchen_sink_1200',
+                  'kitchen_tall_fridge', 'kitchen_tall_oven_single', 'kitchen_tall_oven_double',
+                  'kitchen_tap_straight', 'kitchen_tap_curved',
+                ] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
-              <p className="text-[10px] text-gray-400 mt-2">Each unit's width is adjustable once placed.</p>
+              <p className="text-[10px] text-gray-400 mt-2">Base unit widths are adjustable once placed. Taps drop straight onto the worktop at 900mm.</p>
             </section>
 
             <section>

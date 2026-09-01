@@ -10,6 +10,8 @@ export const INTERIOR_TYPES: ObjectType[] = [
   'bedside_table', 'bookshelf', 'dressing_table', 'wardrobe',
   'kitchen_island', 'indoor_plant',
   'kitchen_unit_600', 'kitchen_unit_1200', 'kitchen_sink_1200',
+  'kitchen_tall_fridge', 'kitchen_tall_oven_single', 'kitchen_tall_oven_double',
+  'kitchen_tap_straight', 'kitchen_tap_curved',
 ];
 
 export const isInteriorType = (type: ObjectType) => INTERIOR_TYPES.includes(type);
@@ -21,6 +23,9 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
   wardrobe: 1.1, desk: 1.0, bedside_table: 0.5,
   coffee_table: 0.7, coffee_table_black: 0.7,
   toilet: 0.5, vanity: 0.6, shower: 1.2, shower_corner: 0.8, shower_small: 0.9,
+  kitchen_tall_fridge: 0.6, kitchen_tall_oven_single: 0.6, kitchen_tall_oven_double: 0.6,
+  // Taps are tiny - a default-sized ring would swallow the sink unit.
+  kitchen_tap_straight: 0.28, kitchen_tap_curved: 0.28,
 };
 
 /**

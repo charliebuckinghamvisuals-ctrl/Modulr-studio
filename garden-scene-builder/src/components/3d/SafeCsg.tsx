@@ -68,15 +68,23 @@ export type SafeGeometryProps = {
 
 /** Cheap fingerprint of the boolean inputs: operator, geometry identity/params
  *  and world transform of every brush. If this is unchanged there is nothing
- *  to recompute. */
+ *  to recompute.
+ *
+ *  The uuid is ALWAYS part of the print, not just for parameter-less
+ *  geometries. The clad walls are BoxGeometries whose UVs are rewritten in
+ *  place (world-scale mapping, cladding orientation), so two geometries with
+ *  identical box parameters can render completely differently - keying on
+ *  parameters alone made the vertical/horizontal cladding toggle a no-op.
+ *  Geometries are memoized upstream, so the uuid is stable between renders
+ *  and only changes when a genuinely new geometry is supplied. */
 function signature(ops: Brush[]): string {
   return ops
     .map((o) => {
       o.updateMatrixWorld()
       const g: any = o.geometry
-      const params = g?.parameters ? Object.values(g.parameters).join(',') : g?.uuid || ''
+      const params = g?.parameters ? Object.values(g.parameters).join(',') : ''
       const m = o.matrixWorld.elements.map((n) => Math.round(n * 1e4)).join(',')
-      return `${o.operator}|${params}|${m}`
+      return `${o.operator}|${params}|${g?.uuid || ''}|${m}`
     })
     .join(';')
 }
@@ -85,6 +93,10 @@ export const Geometry = React.forwardRef<any, SafeGeometryProps>(({ children, co
   const geo = React.useRef<THREE.BufferGeometry>(null!)
   const operations = React.useRef<THREE.Group>(null!)
   const lastSig = React.useRef<string>('')
+  // Self-retry bookkeeping: which inputs the last attempt was for, and how
+  // many times they have failed in a row.
+  const lastAttempt = React.useRef<string>('')
+  const failRetries = React.useRef(0)
   const ev = React.useMemo(() => Object.assign(new Evaluator(), { useGroups, consolidateGroups: false }), [useGroups])
 
   const update = React.useCallback(() => {
@@ -98,6 +110,7 @@ export const Geometry = React.forwardRef<any, SafeGeometryProps>(({ children, co
     const sig = signature(ops)
     if (sig === lastSig.current) return
     lastSig.current = sig
+    if (sig !== lastAttempt.current) { lastAttempt.current = sig; failRetries.current = 0 }
 
     // Debug counter: boolean rebuilds are the expensive operation in this
     // scene, so being able to count them is how we tell a real fix from a
@@ -106,24 +119,43 @@ export const Geometry = React.forwardRef<any, SafeGeometryProps>(({ children, co
     try {
       operations.current.matrixWorld.identity()
       let root = resolve(ops.shift()!)
-      if (root) {
-        while (ops.length) {
-          const op = resolve(ops.shift()!)
-          if (op) root = ev.evaluate(root, op, TYPES[op.operator] ?? ADDITION) as Brush
-        }
-        // Success: NOW dispose the old and swap the new in - never before.
-        dispose(geo.current)
-        ;(geo.current as any).boundsTree = (root.geometry as any).boundsTree
-        geo.current.index = root.geometry.index
-        geo.current.attributes = root.geometry.attributes
-        geo.current.groups = root.geometry.groups
-        geo.current.drawRange = root.geometry.drawRange
-        if (ev.useGroups && (geo.current as any)?.__r3f?.parent?.object?.material)
-          (geo.current as any).__r3f.parent.object.material = root.material
-        if (computeVertexNormals) geo.current.computeVertexNormals()
+      if (!root) throw new Error('no base brush resolved')
+      while (ops.length) {
+        const op = resolve(ops.shift()!)
+        if (op) root = ev.evaluate(root, op, TYPES[op.operator] ?? ADDITION) as Brush
       }
+      // three-bvh-csg can also fail SILENTLY: a degenerate input mid-drag
+      // returns an empty geometry with no throw. Swapping that in is how
+      // the walls vanished while resizing the building - so an empty result
+      // is treated exactly like a throw.
+      const pos = root.geometry?.attributes?.position
+      if (!pos || pos.count === 0) throw new Error('boolean produced empty geometry')
+      // Success: NOW dispose the old and swap the new in - never before.
+      dispose(geo.current)
+      ;(geo.current as any).boundsTree = (root.geometry as any).boundsTree
+      geo.current.index = root.geometry.index
+      geo.current.attributes = root.geometry.attributes
+      geo.current.groups = root.geometry.groups
+      geo.current.drawRange = root.geometry.drawRange
+      if (ev.useGroups && (geo.current as any)?.__r3f?.parent?.object?.material)
+        (geo.current as any).__r3f.parent.object.material = root.material
+      if (computeVertexNormals) geo.current.computeVertexNormals()
+      failRetries.current = 0
     } catch (e) {
-      // Keep the previous geometry on screen - a stale opening beats no walls.
+      // Keep the previous geometry on screen - a stale opening beats no
+      // walls - and FORGET the signature. It was recorded before the
+      // evaluate, so leaving it latched marked the failed state as "done":
+      // the walls then stayed missing (or stale - the vertical-cladding
+      // toggle doing nothing) until some unrelated input changed. Clearing
+      // it makes the very next update retry the same inputs, and the rAF
+      // below covers the case where that failure was the LAST update of a
+      // gesture, with no further render to trigger the retry. Bounded so a
+      // genuinely impossible boolean cannot spin forever.
+      lastSig.current = ''
+      if (failRetries.current < 3) {
+        failRetries.current++
+        requestAnimationFrame(() => update())
+      }
       console.warn('[SafeCsg] boolean evaluate failed; keeping previous geometry', e)
     }
   }, [computeVertexNormals, ev])

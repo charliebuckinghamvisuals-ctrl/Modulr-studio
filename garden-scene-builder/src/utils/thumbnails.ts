@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { ObjectType } from '../types';
+import { applyModelMaterials } from './materialFixes';
 
 /**
  * Product thumbnails for the object picker, rendered from the real GLB models
@@ -17,7 +19,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const SIZE = 256;
 // Bump when the render/framing changes so cached images are regenerated.
-const STORAGE_PREFIX = 'modulr_thumb_v2:';
+const STORAGE_PREFIX = 'modulr_thumb_v3:';
 
 const memory = new Map<string, string>();
 const pending = new Map<string, Promise<string | null>>();
@@ -90,13 +92,16 @@ function frame(object: THREE.Object3D, camera: THREE.PerspectiveCamera) {
   if (extent > 0.001) place(dist * (extent / 0.88));
 }
 
-async function render(url: string, scale?: [number, number, number]): Promise<string | null> {
+async function render(url: string, scale?: [number, number, number], type?: ObjectType): Promise<string | null> {
   const gl = getRenderer();
   if (!gl) return null;
   if (!loader) loader = new GLTFLoader();
 
   const gltf = await loader.loadAsync(url);
   const model = gltf.scene;
+  // Same finish corrections as the placed object, so a tap thumbnails as
+  // chrome rather than the exporter's white plastic.
+  if (type) applyModelMaterials(type, model);
   if (scale) model.scale.set(scale[0], scale[1], scale[2]);
 
   const scene = new THREE.Scene();
@@ -136,7 +141,7 @@ async function render(url: string, scale?: [number, number, number]): Promise<st
  * Thumbnail for a model URL, or null if one cannot be produced. Safe to call
  * repeatedly - concurrent calls for the same model share one render.
  */
-export function getThumbnail(url: string, scale?: [number, number, number]): Promise<string | null> {
+export function getThumbnail(url: string, scale?: [number, number, number], type?: ObjectType): Promise<string | null> {
   const cached = memory.get(url);
   if (cached) return Promise.resolve(cached);
 
@@ -151,7 +156,7 @@ export function getThumbnail(url: string, scale?: [number, number, number]): Pro
   const inflight = pending.get(url);
   if (inflight) return inflight;
 
-  const job = render(url, scale)
+  const job = render(url, scale, type)
     .then((dataUrl) => {
       if (dataUrl) {
         memory.set(url, dataUrl);

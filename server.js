@@ -1970,13 +1970,17 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                 if (wStr && dStr) lines.push(`- Building footprint: ${wStr} wide x ${dStr} deep.`);
                 if (spec.shape) lines.push(`- Roof form: ${spec.shape === 'Gable' ? 'gable (dual pitched)' : 'flat roof'}.`);
                 const doors = Array.isArray(spec.doors) ? spec.doors.slice(0, 12) : [];
-                lines.push(`- Door sets: EXACTLY ${doors.length}.${doors.length ? '' : ' Render no exterior door sets beyond what the source shows.'}`);
+                lines.push(doors.length
+                    ? `- Door sets across the whole building, all elevations: ${doors.length}, listed below. Only the ones the source image shows are in frame.`
+                    : `- Door sets: NONE anywhere on this building. Render no exterior door sets.`);
                 doors.forEach((dr, i) => {
                     const style = dr.style === 'crittall' ? 'black steel Crittall-style with a grid of slim glazing bars' : 'standard glazed';
                     lines.push(`  - Door ${i + 1}: ${Math.max(1, parseInt(dr.leaves) || 1)} leaf, ${mm(dr.widthMm) || 'unspecified width'} x ${mm(dr.heightMm) || 'unspecified height'}, ${style}, on the ${sanitizeString(String(dr.wall || ''), 10) || 'front'} elevation.`);
                 });
                 const windows = Array.isArray(spec.windows) ? spec.windows.slice(0, 12) : [];
-                lines.push(`- Windows: EXACTLY ${windows.length}.${windows.length ? '' : ` This building has NO windows. Do not add any window openings on any elevation.${doors.length ? ' The only glazing is in the door sets listed above.' : ''}`}`);
+                lines.push(windows.length
+                    ? `- Windows across the whole building, all elevations: ${windows.length}, listed below. Only the ones the source image shows are in frame.`
+                    : `- Windows: NONE anywhere on this building. Do not add any window openings on any elevation.${doors.length ? ' The only glazing is in the door sets listed above.' : ''}`);
                 windows.forEach((wn, i) => {
                     const style = wn.style === 'crittall' ? 'Crittall-style glazing bar grid' : 'standard';
                     lines.push(`  - Window ${i + 1}: ${mm(wn.widthMm) || '?'} x ${mm(wn.heightMm) || '?'}, ${style}, ${sanitizeString(String(wn.wall || ''), 10) || 'front'} elevation.`);
@@ -1999,15 +2003,23 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                  */
                 if (spec.claddingOrientation) lines.push(`- Cladding board direction: ${spec.claddingOrientation === 'vertical' ? 'vertical' : 'horizontal'} (direction only - take the material and colour from the image).`);
                 const sky = Array.isArray(spec.skylights) ? spec.skylights.length : 0;
-                if (sky > 0) lines.push(`- Skylights: EXACTLY ${sky}.`);
+                if (sky > 0) lines.push(`- Skylights across the whole roof: ${sky}. Only the ones the source image shows are in frame.`);
                 if (!lines.length) return '';
                 return `
-      CONFIGURED DIMENSIONS AND COUNTS - use these to be exact about SIZE, COUNT
-      and POSITION. They say nothing about materials, colour or finish: take all
-      of those from the image and the MATERIAL ASSIGNMENTS section.
-      The client configured this exact building. The render MUST show precisely:
+      CONFIGURED BUILDING SPECIFICATION - the client configured this exact
+      building. Use this list to be exact about the SIZE, STYLE and POSITION of
+      what the source image shows. It says nothing about materials, colour or
+      finish: take those from the image and the MATERIAL ASSIGNMENTS section.
+      The list covers the WHOLE building - all four elevations - while the
+      source image's camera sees only some of them. THE SOURCE IMAGE DECIDES
+      WHAT IS IN FRAME: render an opening only where the source shows one.
+      NEVER add, duplicate or move an opening onto a visible wall because it
+      appears in this list, and NEVER change the camera to bring a hidden
+      elevation into view. Listed items on elevations the camera cannot see
+      simply stay out of frame.
 ${lines.map(l => '      ' + l).join('\n')}
-      Do not add or remove any of the elements listed above.`;
+      Do not invent any opening beyond this list, and do not render any listed
+      opening that the source image does not show.`;
             } catch (e) {
                 console.warn('configSpec block skipped:', e.message || e);
                 return '';
@@ -2275,12 +2287,12 @@ ${lines.join('\n')}
         /**
          * VERIFICATION PASS - the render is inspected before the customer sees it.
          *
-         * A cheap vision call counts what is actually IN the finished image and
-         * compares it against ground truth. Ground truth comes from the
-         * configurator spec when there is one; for photo and SketchUp uploads
-         * the SOURCE image supplies it instead - the geometry lock says the
-         * output must show exactly the openings the source shows, so the
-         * source's own counts are the truth to hold the render to.
+         * A cheap vision call compares the finished image against the SOURCE
+         * image side by side - openings, roof form and camera. The source is
+         * ALWAYS the ground truth, spec or no spec: the spec lists the whole
+         * building across all four elevations, so its totals can never all be
+         * visible in one view, and holding the render to them forced hidden
+         * openings into shot. What must match is what the two cameras see.
          *
          * Fails soft by design: if the inspector itself errors, the render is
          * treated as passing. A QA outage must never take rendering down.
@@ -2291,53 +2303,22 @@ ${lines.join('\n')}
          */
         let qaCalls = 0;
 
-        const inspectBuilding = async (b64) => {
-            qaCalls++;
-            try {
-                const resp = await ai.models.generateContent({
-                    model: 'gemini-3.5-flash-lite',
-                    contents: {
-                        parts: [fileToGenerativePart(b64, "image/jpeg"), { text:
-                            'This is an image of a single garden building. Count only what is clearly visible on the BUILDING itself; ignore fences, other structures and background. Glazed doors are doors, not windows - do not count door glazing as windows.' }]
-                    },
-                    config: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: Type.OBJECT,
-                            properties: {
-                                doorSets: { type: Type.INTEGER, description: "Number of exterior door sets on the building" },
-                                windows: { type: Type.INTEGER, description: "Number of windows, excluding glazing that is part of a door" },
-                                roofForm: { type: Type.STRING, enum: ["flat", "gable", "other"] },
-                            },
-                            required: ["doorSets", "windows", "roofForm"]
-                        }
-                    }
-                });
-                return JSON.parse(resp.text);
-            } catch (e) {
-                console.warn('[VERIFY] inspection errored:', e.message || e);
-                return null;
-            }
-        };
-        const compareCounts = (expected, seen, truthWord) => {
-            const failures = [];
-            if (expected.doors !== null && seen.doorSets !== expected.doors) failures.push(`the render shows ${seen.doorSets} exterior door set(s) but the ${truthWord} has EXACTLY ${expected.doors}`);
-            if (expected.windows !== null && seen.windows !== expected.windows) failures.push(`the render shows ${seen.windows} window(s) but the ${truthWord} has EXACTLY ${expected.windows}`);
-            if (expected.roof && seen.roofForm !== 'other' && seen.roofForm !== expected.roof) failures.push(`the render shows a ${seen.roofForm} roof but the ${truthWord} has a ${expected.roof} roof`);
-            return failures;
-        };
-
         /**
-         * CAMERA CHECK - counts alone cannot catch a reframe. A render can show
-         * the right number of doors and windows while having zoomed into one
-         * corner or orbited to a new angle (seen in the wild on a line-drawing
-         * source: the model obeyed the house style's "building fills the frame"
-         * over the source's framing). This compares source and render directly,
-         * judging the BUILDING's viewpoint only, so legitimately different
-         * surroundings (site context, weather, studio) don't false-positive.
-         * Fails soft like inspectBuilding.
+         * One QA call comparing the SOURCE and the RENDER side by side.
+         *
+         * This used to be absolute counts: total the openings in the spec
+         * (all four elevations) and count the openings visible in the render.
+         * Those can never agree unless every opening happens to face the
+         * camera, so a CORRECT render of a building with rear windows
+         * "failed" - and the corrective retry then told the model to fix it,
+         * which it did by painting the hidden windows onto visible walls or
+         * orbiting the camera until they were in shot. QA was manufacturing
+         * the exact defects it existed to catch. Comparing the two images
+         * directly judges only what both cameras can see, so "matches the
+         * source" is always achievable - and the source is geometry-exact for
+         * a configurator screenshot.
          */
-        const inspectFraming = async (srcB64, renderB64) => {
+        const inspectRenderFidelity = async (srcB64, renderB64) => {
             qaCalls++;
             try {
                 const resp = await ai.models.generateContent({
@@ -2347,7 +2328,7 @@ ${lines.join('\n')}
                             fileToGenerativePart(srcB64, "image/jpeg"),
                             fileToGenerativePart(renderB64, "image/jpeg"),
                             { text:
-                                'Image 1 is a source image; image 2 is a photorealistic render made from it. Judge ONLY the camera on the main garden building - materials, lighting, weather and surroundings are allowed to differ. The viewpoint is preserved when: the building is seen from the same angle and the same side as in the source; the building occupies a similar portion of the frame (not zoomed in or out dramatically); and no part of the building visible in the source has been cropped out of the render.' }
+                                'Image 1 is a source image of a single garden building; image 2 is a photorealistic render made from it. Materials, colours, lighting, weather and surroundings are allowed to differ - judge ONLY the building geometry and the camera. Glazing that is part of a door belongs to the door and is never a window. Report: sameViewpoint - true only if the render keeps the source camera angle, side and framing of the building, with nothing the source shows cropped out; doorsMatch - true only if the render shows exactly the exterior door sets the source shows, same count on the same walls, none added, removed or moved; windowsMatch - true only if the render shows exactly the window openings the source shows - adding any window the source does not show, or losing one it does, is false, and a blank wall in the source must stay blank; roofMatch - true only if the roof form is unchanged (flat stays flat, pitched stays pitched).' }
                         ]
                     },
                     config: {
@@ -2356,15 +2337,18 @@ ${lines.join('\n')}
                             type: Type.OBJECT,
                             properties: {
                                 sameViewpoint: { type: Type.BOOLEAN, description: "true only if the render keeps the source's camera angle and framing of the building" },
-                                problem: { type: Type.STRING, description: "One short sentence naming how the viewpoint changed; empty string if it did not" },
+                                doorsMatch: { type: Type.BOOLEAN, description: "true only if the render shows exactly the door sets the source shows" },
+                                windowsMatch: { type: Type.BOOLEAN, description: "true only if the render shows exactly the windows the source shows" },
+                                roofMatch: { type: Type.BOOLEAN, description: "true only if the roof form is unchanged" },
+                                problem: { type: Type.STRING, description: "One short sentence naming the worst difference; empty string if none" },
                             },
-                            required: ["sameViewpoint"]
+                            required: ["sameViewpoint", "doorsMatch", "windowsMatch", "roofMatch"]
                         }
                     }
                 });
                 return JSON.parse(resp.text);
             } catch (e) {
-                console.warn('[VERIFY] framing inspection errored:', e.message || e);
+                console.warn('[VERIFY] inspection errored:', e.message || e);
                 return null;
             }
         };
@@ -2380,62 +2364,45 @@ ${lines.join('\n')}
          */
         let verification = { checked: false };
         try {
-            const specForVerify = req.body.configSpec;
-            let expected = null;
-            let truthWord = 'configured building';
-            if (specForVerify && typeof specForVerify === 'object') {
-                expected = {
-                    doors: Array.isArray(specForVerify.doors) ? Math.min(specForVerify.doors.length, 12) : null,
-                    windows: Array.isArray(specForVerify.windows) ? Math.min(specForVerify.windows.length, 12) : null,
-                    roof: specForVerify.shape ? (specForVerify.shape === 'Gable' ? 'gable' : 'flat') : null,
-                };
-            } else if (!studioBackground) {
-                const src = await inspectBuilding(base64Image);
-                if (src) {
-                    expected = { doors: src.doorSets, windows: src.windows, roof: src.roofForm !== 'other' ? src.roofForm : null };
-                    truthWord = 'source image';
-                }
-            }
-            const hasCounts = expected && !(expected.doors === null && expected.windows === null && expected.roof === null);
             // Studio renders deliberately isolate the building on a backdrop,
             // so the framing comparison would judge a scene that is meant to
-            // differ; every other source gets the camera check.
+            // differ. The openings and roof checks still apply - the studio
+            // changes the setting, never the building.
             const checkFraming = !studioBackground;
 
             /** Run every check against one attempt; failures are prompt-ready sentences. */
             const gatherFailures = async (renderB64) => {
                 const failures = [];
-                if (hasCounts) {
-                    const seen = await inspectBuilding(renderB64);
-                    if (seen) failures.push(...compareCounts(expected, seen, truthWord));
-                }
-                if (checkFraming) {
-                    const framing = await inspectFraming(base64Image, renderB64);
-                    if (framing && framing.sameViewpoint === false) {
-                        failures.push(`the render changed the camera - ${framing.problem || 'the viewpoint or framing differs from the source'}. The source image's exact camera position, angle, framing and crop are MANDATORY: same side of the building, same distance, nothing the source shows cropped out`);
-                    }
+                const seen = await inspectRenderFidelity(base64Image, renderB64);
+                if (!seen) return failures;
+                const why = seen.problem ? ` (${sanitizeString(String(seen.problem), 160)})` : '';
+                if (seen.doorsMatch === false) failures.push(`the render does not show the same exterior door sets as the source image${why}. Render EXACTLY the door sets the source shows - same count, same walls, same positions; none added, none removed, none moved`);
+                if (seen.windowsMatch === false) failures.push(`the render does not show the same windows as the source image${why}. Do NOT add any window opening the source does not show, and do not remove any it does - a blank wall in the source stays a blank wall`);
+                if (seen.roofMatch === false) failures.push(`the render changed the roof form${why}. Keep the source image's exact roof form - flat stays flat, pitched stays pitched`);
+                if (checkFraming && seen.sameViewpoint === false) {
+                    failures.push(`the render changed the camera${why}. The source image's exact camera position, angle, framing and crop are MANDATORY: same side of the building, same distance, nothing the source shows cropped out`);
                 }
                 return failures;
             };
 
-            if (hasCounts || checkFraming) {
-                const failures = await gatherFailures(b64Data);
-                verification = { checked: true, passed: failures.length === 0, retried: false, failures };
-                if (failures.length) {
-                    console.warn('[VERIFY] render failed checks, retrying once:', failures.join('; '));
-                    const correction = `
+            const failures = await gatherFailures(b64Data);
+            verification = { checked: true, passed: failures.length === 0, retried: false, failures };
+            if (failures.length) {
+                console.warn('[VERIFY] render failed checks, retrying once:', failures.join('; '));
+                const correction = `
 
       PREVIOUS ATTEMPT REJECTED - CORRECTIONS REQUIRED:
       A previous render of this exact scene was rejected by quality control because:
 ${failures.map(f => `      - ${f}`).join('\n')}
-      Fix these exactly. ${specForVerify ? 'The CONFIGURED DIMENSIONS AND COUNTS section is the absolute truth for what exists on this building.' : 'The SOURCE image is the absolute truth - reproduce exactly the doors, windows, roof and camera view it shows, nothing more and nothing less.'}`;
-                    const retryB64 = await runRender(prompt + correction);
-                    if (retryB64) {
-                        const failures2 = await gatherFailures(retryB64);
-                        verification = { checked: true, passed: failures2.length === 0, retried: true, failures: failures2 };
-                        if (failures2.length <= failures.length) b64Data = retryB64;
-                        if (failures2.length) console.warn('[VERIFY] retry still failing checks, returning best attempt:', failures2.join('; '));
-                    }
+      Fix these exactly. The SOURCE image is the absolute truth for geometry,
+      openings and camera - reproduce exactly the doors, windows, roof and
+      viewpoint it shows, nothing more and nothing less.${req.body.configSpec ? ' The CONFIGURED BUILDING SPECIFICATION only sizes and styles what the source already shows - it never adds anything.' : ''}`;
+                const retryB64 = await runRender(prompt + correction);
+                if (retryB64) {
+                    const failures2 = await gatherFailures(retryB64);
+                    verification = { checked: true, passed: failures2.length === 0, retried: true, failures: failures2 };
+                    if (failures2.length <= failures.length) b64Data = retryB64;
+                    if (failures2.length) console.warn('[VERIFY] retry still failing checks, returning best attempt:', failures2.join('; '));
                 }
             }
         } catch (e) {

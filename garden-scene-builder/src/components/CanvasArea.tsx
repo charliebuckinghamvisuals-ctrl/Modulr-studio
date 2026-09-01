@@ -29,13 +29,18 @@ function LoadingScreen() {
 
   const isComplete = !active && (progress === 100 || progress === 0) && minTimeElapsed;
 
+  // Once dismissed the loader must never come back. Models are now warmed in
+  // the background after startup, and each on-demand placement loads through
+  // Suspense - both make useProgress go active again, which would otherwise
+  // throw the full-screen loader back over a scene the user is working in.
+  const dismissed = useRef(false);
   useEffect(() => {
+    if (dismissed.current) return;
     if (isComplete) {
-      const timeout = setTimeout(() => setShow(false), 800);
+      const timeout = setTimeout(() => { dismissed.current = true; setShow(false); }, 800);
       return () => clearTimeout(timeout);
-    } else {
-      setShow(true);
     }
+    setShow(true);
   }, [isComplete]);
 
   useEffect(() => {

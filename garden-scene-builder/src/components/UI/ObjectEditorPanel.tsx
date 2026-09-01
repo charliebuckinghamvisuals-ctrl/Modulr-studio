@@ -1,6 +1,6 @@
 import { useStore } from '../../store';
 import { Trash2, RotateCw, Copy } from 'lucide-react';
-import { isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS } from '../../modelRegistry';
+import { isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH } from '../../modelRegistry';
 import { DimensionSlider } from '../DimensionSlider';
 
 export function ObjectEditorPanel() {
@@ -54,6 +54,30 @@ export function ObjectEditorPanel() {
                     title={c.name}
                     onClick={() => updateObject(obj.id, { color: c.hex })}
                     style={{ background: c.hex }}
+                    className={`w-6 h-6 rounded-full border transition-all ${
+                      active ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20 scale-110' : 'border-black/15 hover:scale-110'
+                    }`}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Metal finish, for taps. Same slot as the paint swatches - a tap
+            has no paintable body, so the two never appear together. */}
+        {hasMetalFinish(obj.type) && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold text-gray-700 shrink-0">Finish</span>
+            <div className="flex gap-1.5 flex-wrap">
+              {METAL_FINISHES.map(f => {
+                const active = (obj.color ?? DEFAULT_FINISH[obj.type] ?? METAL_FINISHES[0].hex).toLowerCase() === f.hex.toLowerCase();
+                return (
+                  <button
+                    key={f.hex}
+                    title={f.name}
+                    onClick={() => updateObject(obj.id, { color: f.hex })}
+                    style={{ background: `linear-gradient(135deg, ${f.hex} 30%, #ffffff88 48%, ${f.hex} 62%)`, backgroundColor: f.hex }}
                     className={`w-6 h-6 rounded-full border transition-all ${
                       active ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20 scale-110' : 'border-black/15 hover:scale-110'
                     }`}

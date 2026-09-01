@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, Suspense } from 'react';
 import * as THREE from 'three';
 import { useGLTF } from '@react-three/drei';
 import { useStore } from '../../store';
-import { MODEL_URLS, MODEL_SCALES } from '../../modelRegistry';
+import { MODEL_URLS, MODEL_SCALES, mountHeight } from '../../modelRegistry';
 import { isInteriorType, clampToRoomInterior } from '../../utils/placement';
 
 /** Semi-transparent clone of a GLB model, used as the placement preview. */
@@ -56,7 +56,9 @@ export function PlacementGhost() {
 
   const interior = isInteriorType(type);
   const modelUrl = MODEL_URLS[type];
-  const y = interior ? baseH + 0.005 : 0;
+  // Matches the placed object exactly, so a tap previews at worktop
+  // height instead of jumping up 900mm the moment it is dropped.
+  const y = (interior ? baseH + 0.005 : 0) + mountHeight(type);
 
   const moveGhost = (e: any) => {
     let x = e.point.x, z = e.point.z;
