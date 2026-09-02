@@ -102,7 +102,7 @@ export function WorktopRuns() {
       (byAngle.get(key) ?? byAngle.set(key, []).get(key)!).push(o);
     });
 
-    const out: { pos: [number, number, number]; rot: number; length: number; segs: Seg[]; upstand: boolean }[] = [];
+    const out: { pos: [number, number, number]; rot: number; length: number; segs: Seg[]; upstand: boolean; ownerId: string }[] = [];
     const Y = new THREE.Vector3(0, 1, 0);
 
     byAngle.forEach(group => {
@@ -148,7 +148,10 @@ export function WorktopRuns() {
             (rl.hx - Math.abs(rl.lx)) < WALL_REACH ||
             (rl.hz - Math.abs(rl.lz)) < WALL_REACH;
 
-          out.push({ pos: [centre.x, 0, centre.z], rot, length, segs: segmentsFor(length, holes), upstand });
+          // The run answers to one of its own units, so clicking the worktop
+          // in the walkthrough opens that unit's finishes rather than falling
+          // through to whatever is behind it.
+          out.push({ pos: [centre.x, 0, centre.z], rot, length, segs: segmentsFor(length, holes), upstand, ownerId: current[0].o.id });
           current = [];
         };
         line.forEach(p => {
@@ -170,7 +173,7 @@ export function WorktopRuns() {
   return (
     <group>
       {runs.map((run, i) => (
-        <group key={i} position={[run.pos[0], baseH, run.pos[2]]} rotation={[0, run.rot, 0]}>
+        <group key={i} userData={{ objectId: run.ownerId }} position={[run.pos[0], baseH, run.pos[2]]} rotation={[0, run.rot, 0]}>
           {run.segs.map((seg, j) => (
             <SlabPiece key={j} seg={seg} material={material} y={TOP_Y + THICKNESS / 2} />
           ))}

@@ -532,38 +532,53 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
   const ridgeY = hP + gRoofH;
   const roofYAt = (u: number) => hP + gRoofH * (1 - Math.min(1, Math.abs(u) / halfSpan));
 
-  // The height the BOX is built at. Along the ridge it is simply the roof
-  // height above that line; across it, the full ridge, then cut back.
-  const boxH = !isGableRoom ? hP : (acrossSlope ? ridgeY : Math.max(hP, roofYAt(ridgeOffset)));
-
-  /** Where the ridge falls along the wall's OWN x axis. */
-  const apexLocalX = sideGable ? -pZ : -pX;
-  const theta = Math.atan2(gRoofH, halfSpan);
-  const BIG = Math.max(roomW, roomD) * 2 + 4;
-
   /**
-   * One roof plane, as a box big enough to swallow everything above it.
+   * The wall body stays exactly as it was; the gap is filled by a CAP on top.
    *
-   * Anchored on the ridge - local (apexLocalX, ridgeY - boxH/2) - then pushed
-   * half its length DOWN the slope and half its height along the slope's
-   * normal, so its lower face lies exactly on the roof line and it covers
-   * only its own side of the ridge. side +1 is the slope falling towards +x.
+   * The first attempt raised the wall to the ridge and tried to cut the two
+   * roof planes off it with rotated boxes. Getting that transform wrong does
+   * not fail safely - the cut simply misses and the wall stands at full ridge
+   * height, straight through the roof, which is what happened.
+   *
+   * This computes the roof profile directly instead. Along the wall's own x
+   * axis the underside of the roof is a known height at every point, so the
+   * cap is just that outline extruded through the wall's thickness: no
+   * booleans, no rotations, nothing to get subtly wrong. Where the wall runs
+   * along the ridge the profile is flat and the same code yields a plain
+   * rectangle.
    */
-  const slopeCut = (side: 1 | -1) => {
-    const c = Math.cos(theta), s = Math.sin(theta);
-    const anchorY = ridgeY - boxH / 2;
-    // Along the slope, and the slope's outward normal.
-    const dirX = side * c, dirY = -s;
-    const upX = side * s, upY = c;
-    return {
-      position: [
-        apexLocalX + dirX * (BIG / 2) + upX * (BIG / 2),
-        anchorY + dirY * (BIG / 2) + upY * (BIG / 2),
-        0,
-      ] as [number, number, number],
-      rotation: [0, 0, -side * theta] as [number, number, number],
-    };
-  };
+  const boxH = hP;
+
+  /** World gradient coordinate at a point along the wall. The roof falls away
+   *  from the ridge in one axis only; which axis depends on the ridge, and
+   *  whether it varies along THIS wall depends on how the wall lies. */
+  const uBase = sideGable ? pZ : pX;
+  const uAt = (localX: number) => uBase + (acrossSlope ? localX : 0);
+  /** Height of the roof above the top of the wall, at a point along it. */
+  const capAt = (localX: number) =>
+    Math.max(0, roofYAt(uAt(localX)) - hP);
+
+  const capGeom = useMemo(() => {
+    if (!isGableRoom) return null;
+    const halfL = pL / 2;
+    const yL = capAt(-halfL), yR = capAt(halfL);
+    if (yL <= 0.001 && yR <= 0.001) return null;
+
+    const shape = new THREE.Shape();
+    shape.moveTo(-halfL, 0);
+    shape.lineTo(halfL, 0);
+    shape.lineTo(halfL, yR);
+    // The ridge only needs a point of its own if it actually crosses this wall.
+    const apexX = -uBase;
+    if (acrossSlope && apexX > -halfL && apexX < halfL) shape.lineTo(apexX, gRoofH);
+    shape.lineTo(-halfL, yL);
+    shape.closePath();
+
+    const g = new THREE.ExtrudeGeometry(shape, { depth: pT, bevelEnabled: false });
+    g.translate(0, 0, -pT / 2);
+    return g;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGableRoom, acrossSlope, sideGable, pL, pT, pX, pZ, hP, gRoofH, halfSpan]);
 
   const doorHeight = (dr: any) => Math.min(dr.heightMm / 1000, hP - 0.05);
 
@@ -579,16 +594,6 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
           <Base>
             <boxGeometry args={[pL, boxH, pT]} />
           </Base>
-          {/* Cut the roof off a wall that runs across the slope, so its top
-              follows the pitch instead of stopping square below it. */}
-          {acrossSlope && ([1, -1] as const).map(side => {
-            const cut = slopeCut(side);
-            return (
-              <Subtraction key={`slope${side}`} position={cut.position} rotation={cut.rotation}>
-                <boxGeometry args={[BIG, BIG, pT + 0.5]} />
-              </Subtraction>
-            );
-          })}
           {/* This wall's OWN doors, cut in local space - they move with it. */}
           {(part.doors || []).map((dr: any) => (
             <Subtraction key={dr.id} position={[dr.offsetMm / 1000, doorHeight(dr) / 2 - boxH / 2, 0]}>
@@ -620,6 +625,21 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
           emissiveIntensity={isSelected ? 0.18 : 0}
         />
       </mesh>
+
+      {/* Fills the triangle between the top of the wall and the underside of
+          the roof, so you cannot see over an internal wall into the next room.
+          Sits on top of the wall body, in the same finish. */}
+      {capGeom && (
+        <mesh position={[0, boxH / 2, 0]} castShadow receiveShadow>
+          <primitive object={capGeom} attach="geometry" />
+          <meshStandardMaterial
+            color={room.interiorColor || '#ffffff'}
+            roughness={0.9}
+            emissive={isSelected ? '#10b981' : '#000000'}
+            emissiveIntensity={isSelected ? 0.18 : 0}
+          />
+        </mesh>
+      )}
 
       {/* L-shape leg: a perpendicular run welded to one end of the main
           wall, so a corner is ONE unit instead of two walls nudged together.

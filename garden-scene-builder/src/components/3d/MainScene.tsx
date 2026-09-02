@@ -95,6 +95,18 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
       picker.setFromCamera(ndc, camera);
       for (const hit of picker.intersectObjects(scene.children, true)) {
         if (!hit.object.visible) continue;
+
+        /**
+         * The FIRST thing you can see decides it, full stop.
+         *
+         * This used to skip a hit it did not recognise and carry on down the
+         * ray, so any unmarked surface became a window onto whatever stood
+         * behind it - the worktop has no marker of its own, so aiming at a run
+         * of units resolved to the wall beyond and the badge read "change wall
+         * colour" while pointing at a cabinet. Returning null instead means
+         * the worst case is no badge and a click that does nothing, never a
+         * click that quietly edits something else.
+         */
         let node: THREE.Object3D | null = hit.object;
         while (node) {
           if (node.userData?.objectId) return { kind: 'object', id: node.userData.objectId as string };
@@ -102,6 +114,7 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
           if (node.userData?.isShell) return { kind: 'wall' };
           node = node.parent;
         }
+        return null;
       }
       return null;
     };
@@ -424,6 +437,14 @@ export function MainScene() {
     gl.shadowMap.autoUpdate = controlsEnabled;
     if (controlsEnabled) gl.shadowMap.needsUpdate = true;
   }, [controlsEnabled, gl]);
+
+  // Debug/E2E hook, matching __modulrStore: lets a test resolve what the
+  // walkthrough crosshair is actually pointing at. Nothing reads it in normal
+  // use.
+  useEffect(() => {
+    (window as any).__modulrScene = scene;
+    (window as any).__modulrCam = camera;
+  }, [scene, camera]);
 
   // Debug handle: exposes the live three.js scene so tooling can inspect
   // real geometry state (e.g. whether the wall mesh ever empties mid-drag).
