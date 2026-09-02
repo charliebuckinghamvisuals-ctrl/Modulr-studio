@@ -10,6 +10,7 @@ import { ActionButtons } from './UI/ActionButtons';
 import { CameraWidget } from './UI/CameraWidget';
 import { WalkHud } from './UI/WalkHud';
 import { WalkFloorPanel } from './UI/WalkFloorPanel';
+import { WalkWallPanel } from './UI/WalkWallPanel';
 import { useRef, useState, useEffect } from 'react';
 import { useProgress } from '@react-three/drei';
 import * as THREE from 'three';
@@ -23,9 +24,22 @@ function LoadingScreen() {
   const startTimeRef = useRef(Date.now());
 
   useEffect(() => {
+    /**
+     * A floor, not a countdown - and a SHORT one, because this loader is the
+     * second in a queue.
+     *
+     * The configurator runs in an iframe inside the app, and the app already
+     * holds its own branded splash for 4 seconds. Padding this one to 4.2s on
+     * top meant roughly nine seconds from click to a usable scene, most of it
+     * invented: the bar sat at 99% waiting out a timer with nothing left to
+     * load. That is the "black screen / keeps flashing then eventually works".
+     *
+     * 1.2s still covers the real work - the loader also waits on useProgress,
+     * so a genuinely slow model load holds it open for as long as it takes.
+     */
     const minTimer = setTimeout(() => {
       setMinTimeElapsed(true);
-    }, 4200); // wait at least ~4.2s + 0.8s fade = 5s total
+    }, 1200);
     return () => clearTimeout(minTimer);
   }, []);
 
@@ -49,7 +63,7 @@ function LoadingScreen() {
     let frame: number;
     const update = () => {
       const elapsed = Date.now() - startTimeRef.current;
-      const fakeTarget = Math.min(99, (elapsed / 4200) * 100);
+      const fakeTarget = Math.min(99, (elapsed / 1200) * 100);
       const realTarget = (!minTimeElapsed && progress === 100) ? 99 : progress;
       const target = Math.max(fakeTarget, realTarget);
       
@@ -153,6 +167,7 @@ export function CanvasArea() {
       <PricePill />
       <WalkHud />
       <WalkFloorPanel />
+      <WalkWallPanel />
       <ObjectEditorPanel />
       <ElementEditorPanel />
       <ActionButtons />

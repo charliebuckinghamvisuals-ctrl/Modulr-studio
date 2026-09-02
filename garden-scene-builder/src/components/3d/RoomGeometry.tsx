@@ -965,7 +965,20 @@ export function RoomGeometry() {
   const deferredWindows = csgWindows;
 
   return (
-    <group position={[room.x / 1000, 0, room.z / 1000]} rotation={[0, room.rot, 0]}>
+    /**
+     * isShell marks everything that IS the building - walls, gable ends,
+     * ceiling, cladding, partitions - as opposed to the furniture standing in
+     * it or the floor underfoot.
+     *
+     * The walkthrough crosshair used to recognise only objects and the floor.
+     * A wall carried no marker at all, so a click on one found nothing, fell
+     * through to the NEXT surface along the ray, and opened whatever was
+     * behind it - which is why clicking a wall brought up the floor. Marking
+     * the shell means a wall click resolves to the wall it hit, and stops
+     * there. The floor mesh sets its own isFloor deeper in and wins, because
+     * the crosshair takes the nearest marker it finds.
+     */
+    <group userData={{ isShell: true }} position={[room.x / 1000, 0, room.z / 1000]} rotation={[0, room.rot, 0]}>
       {/* Interior light to prevent partitions from being too dark */}
       <pointLight position={[0, h - 0.5, 0]} intensity={1.5} distance={15} decay={2} castShadow={false} />
 

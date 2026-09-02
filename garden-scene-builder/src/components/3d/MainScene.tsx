@@ -104,27 +104,51 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
       for (const hit of hits) {
         // Ignore the invisible helpers and the placement catcher plane.
         if (!hit.object.visible) continue;
+
+        /**
+         * Take the NEAREST marker on this hit and act on it - never search
+         * past a surface you actually hit.
+         *
+         * The old loop only knew about objects and the floor. A wall matched
+         * neither, so it fell through to the next intersection along the ray
+         * and opened whatever stood behind it: aim at a wall, get the floor;
+         * aim at the floor across a cabinet, get the cabinet. Walls now carry
+         * isShell (see RoomGeometry), so every surface in the room resolves to
+         * exactly one panel - the one you were looking at.
+         *
+         * Order matters within a single hit: an object sitting against a wall
+         * is a child of neither, but the floor mesh is a descendant of the
+         * shell group, so isFloor must be checked before isShell or every
+         * floor click would open the wall panel.
+         */
         let node: THREE.Object3D | null = hit.object;
+        let target: 'object' | 'floor' | 'shell' | null = null;
+        let objectId: string | null = null;
         while (node) {
-          if (node.userData?.objectId) {
-            const st = useStore.getState();
-            st.setWalkFloorOpen(false);
-            st.setSelectedObjectId(node.userData.objectId as string);
-            if (locked) document.exitPointerLock();
-            handled = true;
-            break;
-          }
-          if (node.userData?.isFloor) {
-            const st = useStore.getState();
-            st.setSelectedObjectId(null);
-            st.setWalkFloorOpen(true);
-            if (locked) document.exitPointerLock();
-            handled = true;
-            break;
-          }
+          if (node.userData?.objectId) { target = 'object'; objectId = node.userData.objectId as string; break; }
+          if (node.userData?.isFloor) { target = 'floor'; break; }
+          if (node.userData?.isShell) { target = 'shell'; break; }
           node = node.parent;
         }
-        if (handled) break;
+        if (!target) continue; // genuinely nothing of ours - keep looking
+
+        const st = useStore.getState();
+        if (target === 'object') {
+          st.setWalkFloorOpen(false);
+          st.setWalkWallOpen(false);
+          st.setSelectedObjectId(objectId);
+        } else if (target === 'floor') {
+          st.setSelectedObjectId(null);
+          st.setWalkWallOpen(false);
+          st.setWalkFloorOpen(true);
+        } else {
+          st.setSelectedObjectId(null);
+          st.setWalkFloorOpen(false);
+          st.setWalkWallOpen(true);
+        }
+        if (locked) document.exitPointerLock();
+        handled = true;
+        break;
       }
       // Clicked past everything selectable while the cursor was out - that
       // means carry on walking.
@@ -148,6 +172,7 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
         // parked over the bottom of the room.
         st.setSelectedObjectId(null);
         st.setWalkFloorOpen(false);
+        st.setWalkWallOpen(false);
       } else {
         keys.current = {};
       }

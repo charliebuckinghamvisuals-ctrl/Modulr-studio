@@ -94,6 +94,8 @@ export function Sidebar() {
   const removeWindow = wrap(store.removeWindow);
   const toggleTime = wrap(store.toggleTime);
   
+  // "New" asks in place rather than through a browser modal - see the button.
+  const [confirmNew, setConfirmNew] = useState(false);
   const [tab, setTab] = useState('building');
   const [step, setStep] = useState<string>('size');
 
@@ -137,19 +139,43 @@ export function Sidebar() {
         looking for it. The sidebar is on screen in every view.
       */}
       <div className="px-6 pt-4 flex gap-2">
-        <button
-          onClick={() => {
-            const hasWork = scene.objects.length > 0 || room.doors.length > 0 || room.windows.length > 0;
-            // Only nag when there is something to lose. Confirming an empty
-            // scene is pure friction.
-            if (hasWork && !window.confirm('Start a new design? Anything not saved to your projects will be lost.')) return;
-            newDesign();
-          }}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-black/10 text-[11px] font-semibold text-gray-600 hover:bg-black/5 hover:text-gray-900 transition-colors"
-          title="Clear the canvas and start again"
-        >
-          <FilePlus size={13} /> New
-        </button>
+        {/*
+          Inline confirmation, NOT window.confirm.
+          The configurator runs inside an iframe in the app, and a browser
+          modal raised from there is suppressed in some setups - confirm()
+          then returns false, the handler returns early, and the button looks
+          dead. That is exactly what "I press New and nothing happens" was.
+          Asking in the button itself works in every embedding.
+        */}
+        {confirmNew ? (
+          <div className="flex-1 flex gap-1">
+            <button
+              onClick={() => { newDesign(); setConfirmNew(false); }}
+              className="flex-1 px-2 py-2 rounded-lg bg-[#3b4d4a] text-white text-[11px] font-semibold hover:bg-[#2d3a38] transition-colors"
+              title="Discard this design and start again"
+            >
+              Discard
+            </button>
+            <button
+              onClick={() => setConfirmNew(false)}
+              className="px-2 py-2 rounded-lg border border-black/10 text-[11px] font-semibold text-gray-600 hover:bg-black/5 transition-colors"
+            >
+              Keep
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => {
+              // Only ask when there is something to lose.
+              const hasWork = scene.objects.length > 0 || room.doors.length > 0 || room.windows.length > 0;
+              if (hasWork) setConfirmNew(true); else newDesign();
+            }}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-black/10 text-[11px] font-semibold text-gray-600 hover:bg-black/5 hover:text-gray-900 transition-colors"
+            title="Clear the canvas and start again"
+          >
+            <FilePlus size={13} /> New
+          </button>
+        )}
         <button
           onClick={() => {
             window.parent.postMessage({

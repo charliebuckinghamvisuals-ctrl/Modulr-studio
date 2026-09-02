@@ -42,6 +42,11 @@ interface AppState {
   /** True when the walkthrough floor-finish panel is open. */
   walkFloorOpen: boolean;
   setWalkFloorOpen: (open: boolean) => void;
+  /** True when the walkthrough WALL-colour panel is open. Clicking a wall in
+   *  the walkthrough used to open the floor panel, because walls were not
+   *  pickable at all - see the crosshair handler in MainScene. */
+  walkWallOpen: boolean;
+  setWalkWallOpen: (open: boolean) => void;
   setIsExporting: (exporting: boolean) => void;
   setCapturedImage: (image: string | null) => void;
   setUploadedBgImage: (image: string | null) => void;
@@ -318,6 +323,8 @@ export const useStore = create<AppState>((set, get) => ({
   setWalkPointerLocked: (locked) => set({ walkPointerLocked: locked }),
   walkFloorOpen: false,
   setWalkFloorOpen: (open) => set({ walkFloorOpen: open }),
+  walkWallOpen: false,
+  setWalkWallOpen: (open) => set({ walkWallOpen: open }),
   setIsExporting: (exporting) => set({ isExporting: exporting }),
   setCapturedImage: (image) => set({ capturedImage: image }),
   setUploadedBgImage: (image) => set({ uploadedBgImage: image }),
