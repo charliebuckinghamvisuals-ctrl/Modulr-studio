@@ -45,18 +45,28 @@ function LoadingScreen() {
 
   const isComplete = !active && (progress === 100 || progress === 0) && minTimeElapsed;
 
-  // Once dismissed the loader must never come back. Models are now warmed in
-  // the background after startup, and each on-demand placement loads through
-  // Suspense - both make useProgress go active again, which would otherwise
-  // throw the full-screen loader back over a scene the user is working in.
+  /**
+   * Going away is a ONE-WAY decision.
+   *
+   * 18 models are warmed in the background after startup, one at a time, and
+   * each one flips useProgress back to active. The old effect called
+   * setShow(true) on every one of those flips and cleared the pending fade,
+   * so the loader was thrown back over the scene again and again - the screen
+   * flashing ten times. Nothing was actually wrong; it was the same loader
+   * dismissing and being re-shown.
+   *
+   * Now the first completion latches: `fading` drives the opacity so a later
+   * flip cannot snap it back to full, and `dismissed` means the effect never
+   * runs a second time.
+   */
   const dismissed = useRef(false);
+  const [fading, setFading] = useState(false);
   useEffect(() => {
-    if (dismissed.current) return;
-    if (isComplete) {
-      const timeout = setTimeout(() => { dismissed.current = true; setShow(false); }, 800);
-      return () => clearTimeout(timeout);
-    }
-    setShow(true);
+    if (dismissed.current || !isComplete) return;
+    dismissed.current = true;
+    setFading(true);
+    const timeout = setTimeout(() => setShow(false), 800);
+    return () => clearTimeout(timeout);
   }, [isComplete]);
 
   useEffect(() => {
@@ -83,7 +93,7 @@ function LoadingScreen() {
   return (
     <div 
       className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-[#fafaf9] transition-opacity duration-700 ease-in-out" 
-      style={{ opacity: isComplete ? 0 : 1, pointerEvents: isComplete ? 'none' : 'auto' }}
+      style={{ opacity: fading ? 0 : 1, pointerEvents: fading ? 'none' : 'auto' }}
     >
       <div className="text-2xl font-bold tracking-[0.2em] text-[#3b4d4a] mb-8">MODULR 3D</div>
       <div className="w-64 max-w-sm">

@@ -503,11 +503,73 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
     st.updatePartition(part.id, horiz ? { lengthMm: newL, xMm: newCentre, doors } : { lengthMm: newL, zMm: newCentre, doors });
   };
 
+  /**
+   * Internal walls follow the gable instead of stopping short of it.
+   *
+   * hP is the wall height, which under a gable roof left a triangular gap
+   * between the top of every partition and the underside of the roof - you
+   * could see straight over the wall into the next room.
+   *
+   * Two cases, and which one applies depends on how the partition lies
+   * relative to the ridge:
+   *
+   *   ACROSS the slope - the roof height changes along the wall's length, so
+   *     the wall needs a pitched top. Built by raising it to the ridge and
+   *     cutting the two roof planes off it.
+   *   ALONG the ridge - the roof height is the same everywhere along the
+   *     wall, so it just needs to be taller. No cutting, no CSG.
+   */
+  const gRoofH = (room.roofHeightMm ?? 200) / 1000;
+  const isGableRoom = room.shape === 'Gable';
+  const sideGable = isGableRoom && room.gableOrientation === 'side';
+  const roomW = room.widthMm / 1000;
+  const roomD = room.depthMm / 1000;
+  // Half-span measured across the slope, and the wall's offset from the ridge.
+  const halfSpan = (sideGable ? roomD : roomW) / 2;
+  const acrossSlope = isGableRoom && (sideGable ? part.rotation === 90 : part.rotation !== 90);
+  // Distance from the ridge line to this wall, for the along-ridge case.
+  const ridgeOffset = sideGable ? pZ : pX;
+  const ridgeY = hP + gRoofH;
+  const roofYAt = (u: number) => hP + gRoofH * (1 - Math.min(1, Math.abs(u) / halfSpan));
+
+  // The height the BOX is built at. Along the ridge it is simply the roof
+  // height above that line; across it, the full ridge, then cut back.
+  const boxH = !isGableRoom ? hP : (acrossSlope ? ridgeY : Math.max(hP, roofYAt(ridgeOffset)));
+
+  /** Where the ridge falls along the wall's OWN x axis. */
+  const apexLocalX = sideGable ? -pZ : -pX;
+  const theta = Math.atan2(gRoofH, halfSpan);
+  const BIG = Math.max(roomW, roomD) * 2 + 4;
+
+  /**
+   * One roof plane, as a box big enough to swallow everything above it.
+   *
+   * Anchored on the ridge - local (apexLocalX, ridgeY - boxH/2) - then pushed
+   * half its length DOWN the slope and half its height along the slope's
+   * normal, so its lower face lies exactly on the roof line and it covers
+   * only its own side of the ridge. side +1 is the slope falling towards +x.
+   */
+  const slopeCut = (side: 1 | -1) => {
+    const c = Math.cos(theta), s = Math.sin(theta);
+    const anchorY = ridgeY - boxH / 2;
+    // Along the slope, and the slope's outward normal.
+    const dirX = side * c, dirY = -s;
+    const upX = side * s, upY = c;
+    return {
+      position: [
+        apexLocalX + dirX * (BIG / 2) + upX * (BIG / 2),
+        anchorY + dirY * (BIG / 2) + upY * (BIG / 2),
+        0,
+      ] as [number, number, number],
+      rotation: [0, 0, -side * theta] as [number, number, number],
+    };
+  };
+
   const doorHeight = (dr: any) => Math.min(dr.heightMm / 1000, hP - 0.05);
 
   return (
     <group
-      position={[pX, hP / 2, pZ]}
+      position={[pX, boxH / 2, pZ]}
       rotation={[0, rotAngle, 0]}
       onPointerOver={(e: any) => { e.stopPropagation(); useStore.getState().setHoveredElementId(`part-${part.id}`); }}
       onPointerOut={() => useStore.getState().setHoveredElementId(null)}
@@ -515,11 +577,21 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
       <mesh castShadow receiveShadow onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
         <Geometry>
           <Base>
-            <boxGeometry args={[pL, hP, pT]} />
+            <boxGeometry args={[pL, boxH, pT]} />
           </Base>
+          {/* Cut the roof off a wall that runs across the slope, so its top
+              follows the pitch instead of stopping square below it. */}
+          {acrossSlope && ([1, -1] as const).map(side => {
+            const cut = slopeCut(side);
+            return (
+              <Subtraction key={`slope${side}`} position={cut.position} rotation={cut.rotation}>
+                <boxGeometry args={[BIG, BIG, pT + 0.5]} />
+              </Subtraction>
+            );
+          })}
           {/* This wall's OWN doors, cut in local space - they move with it. */}
           {(part.doors || []).map((dr: any) => (
-            <Subtraction key={dr.id} position={[dr.offsetMm / 1000, doorHeight(dr) / 2 - hP / 2, 0]}>
+            <Subtraction key={dr.id} position={[dr.offsetMm / 1000, doorHeight(dr) / 2 - boxH / 2, 0]}>
               <boxGeometry args={[dr.widthMm / 1000, doorHeight(dr), 0.4]} />
             </Subtraction>
           ))}
@@ -529,7 +601,7 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
             const dH = door.heightMm / 1000;
             const dx = door.xMm / 1000 - pX;
             const dz = door.zMm / 1000 - pZ;
-            const dy = dH / 2 - hP / 2;
+            const dy = dH / 2 - boxH / 2;
             let localX = dx;
             let localZ = dz;
             if (part.rotation === 90) { localX = -dz; localZ = dx; }
@@ -563,7 +635,7 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
             castShadow receiveShadow
             onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
           >
-            <boxGeometry args={[pT, hP, legL]} />
+            <boxGeometry args={[pT, boxH, legL]} />
             <meshStandardMaterial
               color={room.interiorColor || '#ffffff'}
               roughness={0.9}
@@ -579,7 +651,7 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
         const dW = dr.widthMm / 1000;
         const dH = doorHeight(dr);
         const ox = dr.offsetMm / 1000;
-        const oy = dH / 2 - hP / 2;
+        const oy = dH / 2 - boxH / 2;
         return (
           <group key={`frame-${dr.id}`} position={[ox, oy, 0]}>
             <mesh position={[-dW / 2 + 0.015, 0, 0]} castShadow><boxGeometry args={[0.03, dH, pT + 0.02]} /><meshStandardMaterial color="#e8e2d8" roughness={0.7} /></mesh>
@@ -821,6 +893,32 @@ export function RoomGeometry() {
 
   const claddingBoxGeom = useMemo(() => createWorldScaleBoxGeometry(w, h + 0.05, d, true, 0, 0, 0, isVertical), [w, h, d, isVertical]);
   const gableTriangleGeom = useMemo(() => createWorldScaleGableGeometry(gSpan, roofH, wallThickness, 0, h + 0.05, 0, isVertical), [gSpan, roofH, wallThickness, h, isVertical]);
+
+  /**
+   * The interior cut for the gable apex.
+   *
+   * The main interior cutout is a BOX spanning the room's inner depth, and the
+   * gable triangles are added at the wall planes just outside it - so the two
+   * touch exactly and never intersect. Nothing carved the inside of the apex,
+   * which is why it kept the cladding while every wall below it went white.
+   *
+   * This is the same triangular section as the apex itself, run through the
+   * room's inner depth and 2mm INTO each gable end. That 2mm is the whole
+   * trick: an overlap makes the subtraction cut a real face, and a CSG cut
+   * face wears the material of the thing that cut it - the interior colour.
+   * Coplanar surfaces (which is what a flush cut would be) produce no face at
+   * all, which is exactly why the previous attempt showed nothing inside and
+   * a stray triangle outside.
+   */
+  const gableInteriorCutGeom = useMemo(
+    () => createWorldScaleGableGeometry(
+      gSpan,
+      roofH,
+      (isSideGable ? w : d) - wallThickness * 2 + 0.004,
+      0, h + 0.05, 0, isVertical,
+    ),
+    [gSpan, roofH, isSideGable, w, d, wallThickness, h, isVertical],
+  );
   const lShapeCutOuterGeom = useMemo(() => createWorldScaleBoxGeometry(cutW + 0.2, h + 1, cutD + 0.2, false, 0, 0, 0, isVertical), [cutW, cutD, h, roofH, isGable, isVertical]);
   // Roof plan size is exactly roofW x roofD (wall footprint + user overhangs).
   // A 100mm lip was previously baked in here (+0.2), so even with every
@@ -1098,6 +1196,21 @@ export function RoomGeometry() {
                       <meshStandardMaterial color="#ffffff" {...texBack}  metalness={0.1}  bumpScale={0.1} />
                     </Addition>
                   </>
+                )}
+
+                {/* Hollow the apex out from the inside, so the gable reads as a
+                    painted wall from within the room rather than as cladding.
+                    Placed after the Additions above: it has to have something
+                    to cut. Same transform as the apex triangles, just run
+                    through the room instead of sitting in the wall plane. */}
+                {isGable && (
+                  <Subtraction
+                    position={[0, h + 0.025, 0]}
+                    rotation={isSideGable ? [0, Math.PI/2, 0] : [0, 0, 0]}
+                  >
+                    <primitive object={gableInteriorCutGeom} attach="geometry" />
+                    <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
+                  </Subtraction>
                 )}
 
           
