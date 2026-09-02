@@ -134,22 +134,21 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
         );
       }
       /**
-       * One surface, one panel - never search past what you actually hit.
+       * A click ARMS the brush; it does not open anything.
        *
-       * Order within a hit matters: the floor plinth and the walls are both
-       * inside the shell group, so isFloor must be tested before isShell or
-       * every floor click would open the wall panel.
+       * Clicking a surface marks it and hands the mouse back, so a paint brush
+       * appears over what you picked. Clicking that brush opens its finishes,
+       * and choosing one returns you to walking. Two deliberate steps beat a
+       * panel that springs open every time the crosshair crosses a cabinet.
        */
       const target = resolveTarget(ndc);
       let handled = false;
       if (target) {
         const st = useStore.getState();
-        st.setSelectedObjectId(target.kind === 'object' ? target.id! : null);
-        st.setWalkFloorOpen(target.kind === 'floor');
-        st.setWalkWallOpen(target.kind === 'wall');
-        st.setWalkHover(null);
-        // Release the mouse so the panel is immediately clickable - picking a
-        // finish should not cost a second click just to get the cursor back.
+        st.setSelectedObjectId(null);
+        st.setWalkFloorOpen(false);
+        st.setWalkWallOpen(false);
+        st.setWalkPending(target);
         if (locked) document.exitPointerLock();
         handled = true;
       }
@@ -157,26 +156,8 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
       // means carry on walking.
       if (!handled && !locked) canvas.requestPointerLock();
     };
-    /**
-     * Keep the HUD's paint badge in step with what the crosshair is over.
-     *
-     * Throttled to ~10/sec rather than run per mouse-move: it is a raycast
-     * through the whole scene, and at 60+ move events a second on a laptop it
-     * would cost more than the walkthrough itself.
-     */
-    let lastProbe = 0;
-    const probeHover = () => {
-      const now = performance.now();
-      if (now - lastProbe < 100) return;
-      lastProbe = now;
-      if (document.pointerLockElement !== canvas) return;
-      const t = resolveTarget(new THREE.Vector2(0, 0));
-      useStore.getState().setWalkHover(t ? t.kind : null);
-    };
-
     const onMouseMove = (e: MouseEvent) => {
       if (document.pointerLockElement !== canvas) return;
-      probeHover();
       const sens = 0.0022;
       yaw.current -= e.movementX * sens;
       // Stop just short of vertical - at exactly +/-90 degrees the view
@@ -194,9 +175,9 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
         st.setSelectedObjectId(null);
         st.setWalkFloorOpen(false);
         st.setWalkWallOpen(false);
+        st.setWalkPending(null);
       } else {
         keys.current = {};
-        st.setWalkHover(null);
       }
     };
 

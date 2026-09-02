@@ -288,8 +288,22 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
                 Scaling is about the canopy top, and the duct is a straight
                 extrusion, so stretching it introduces no distortion. */}
             {obj.type === 'kitchen_extractor' && (() => {
-              const ceiling = (room.heightMm ?? 2050) / 1000;
-              const needed = ceiling - mountHeight(obj.type) - EXTRACTOR_CANOPY_H;
+              /*
+               * Measured from the FINISHED FLOOR, not from y=0.
+               *
+               * The extractor stands on the base plinth like everything else
+               * in the room, but the flue was sized from the ground, so it ran
+               * a plinth too long and pushed through the roof by exactly that
+               * much. On a gable, heightMm is the height to the RIDGE, so the
+               * ceiling above a wall-mounted extractor is the eaves - sizing
+               * to the ridge there overshot by the whole roof pitch.
+               */
+              const baseH = (room.baseHeightMm ?? 100) / 1000;
+              const totalH = (room.heightMm ?? 2050) / 1000;
+              const ceiling = room.shape === 'Gable'
+                ? totalH - (room.roofHeightMm ?? 200) / 1000
+                : totalH;
+              const needed = ceiling - baseH - mountHeight(obj.type) - EXTRACTOR_CANOPY_H;
               const s = Math.max(0.02, needed / EXTRACTOR_FLUE_H);
               return (
                 <group position={[0, EXTRACTOR_CANOPY_H, 0]} scale={[1, s, 1]}>

@@ -15,19 +15,24 @@ function Key({ children, wide = false }: { children: React.ReactNode; wide?: boo
 /**
  * Walkthrough heads-up display.
  *
- * Two states, because the walkthrough has two: before the mouse is captured
- * there is nothing to explain except how to start, and after it is captured
- * the controls need to be legible at a glance without covering the room.
- * Deliberately small and low-contrast - it is a hint, not a panel - and
- * pointer-events-none so it can never intercept a click meant for the scene.
+ * Three states, and the order of them is the whole interaction:
+ *
+ *   walking  - a bare dot, nothing in the way, free to move and look
+ *   armed    - you clicked something, so a brush appears over it
+ *   editing  - you clicked the brush, so its finishes are open
+ *
+ * Picking a finish drops straight back to walking. The brush used to follow
+ * the crosshair on hover, which meant it was on screen almost permanently -
+ * there is very little in a room that is not repaintable - so it read as a
+ * stuck cursor rather than a cue.
  */
 export function WalkHud() {
   const viewMode = useStore(s => s.viewMode);
   const locked = useStore(s => s.walkPointerLocked);
-  // A finish panel is open when the crosshair picked something; the big
+  const pending = useStore(s => s.walkPending);
+  // A finish panel is open when the brush was clicked; the big
   // 'click to look around' card would sit right on top of it.
   const editing = useStore(s => s.selectedObjectId !== null || s.walkFloorOpen || s.walkWallOpen);
-  const hover = useStore(s => s.walkHover);
 
   if (viewMode !== 'walking') return null;
 
@@ -35,7 +40,42 @@ export function WalkHud() {
     return (
       <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
         <div className="bg-black/55 backdrop-blur-sm text-white/85 px-4 py-1.5 rounded-full text-[11px] font-medium">
-          Pick a finish below, then click the room to carry on walking
+          Pick a finish below and you will carry straight on walking
+        </div>
+      </div>
+    );
+  }
+
+  /*
+   * Armed: the brush sits at the crosshair, where you were aiming, and is the
+   * only thing on screen that takes a click. Clicking anywhere else in the
+   * room disarms and puts you back to walking (handled in MainScene).
+   */
+  if (!locked && pending) {
+    const label =
+      pending.kind === 'object' ? 'Change finish'
+      : pending.kind === 'floor' ? 'Change floor'
+      : 'Change wall colour';
+    return (
+      <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+        <div className="flex flex-col items-center gap-2 animate-[fadeIn_120ms_ease-out]">
+          <button
+            type="button"
+            onClick={() => {
+              const st = useStore.getState();
+              if (pending.kind === 'object') st.setSelectedObjectId(pending.id ?? null);
+              st.setWalkFloorOpen(pending.kind === 'floor');
+              st.setWalkWallOpen(pending.kind === 'wall');
+              st.setWalkPending(null);
+            }}
+            className="pointer-events-auto w-12 h-12 rounded-full bg-white shadow-[0_2px_14px_rgba(0,0,0,0.5)] ring-2 ring-white/70 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+            aria-label={label}
+          >
+            <Paintbrush size={20} className="text-[#3b4d4a]" />
+          </button>
+          <span className="px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-semibold tracking-wide">
+            {label}
+          </span>
         </div>
       </div>
     );
@@ -54,27 +94,9 @@ export function WalkHud() {
 
   return (
     <>
-      {/*
-        Crosshair, and a paint target when there is something to repaint.
-
-        A bare dot gives no clue that anything is clickable, so finding a
-        finish meant clicking around hopefully. The brush appears over
-        anything repaintable - a unit, a tap, the floor, a wall - and names it,
-        so it is obvious what a click will open before you spend one.
-      */}
+      {/* Walking: a bare dot and nothing else. */}
       <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-        {hover ? (
-          <div className="flex flex-col items-center gap-2 animate-[fadeIn_120ms_ease-out]">
-            <div className="w-11 h-11 rounded-full bg-white/95 shadow-[0_2px_12px_rgba(0,0,0,0.45)] ring-2 ring-white/70 flex items-center justify-center">
-              <Paintbrush size={19} className="text-[#3b4d4a]" />
-            </div>
-            <span className="px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-semibold tracking-wide">
-              {hover === 'object' ? 'Change finish' : hover === 'floor' ? 'Change floor' : 'Change wall colour'}
-            </span>
-          </div>
-        ) : (
-          <div className="w-[5px] h-[5px] rounded-full bg-white/80 shadow-[0_0_3px_rgba(0,0,0,0.8)]" />
-        )}
+        <div className="w-[5px] h-[5px] rounded-full bg-white/80 shadow-[0_0_3px_rgba(0,0,0,0.8)]" />
       </div>
 
       <div className="absolute bottom-6 left-6 z-30 pointer-events-none select-none">

@@ -136,6 +136,17 @@ export function ObjectEditorPanel() {
   // a Done button remain.
   const finishesOnly = viewMode === 'walking';
 
+  /**
+   * In the walkthrough, choosing a finish IS the whole errand - so it puts the
+   * panel away and hands you straight back to walking. Anywhere else the panel
+   * stays put, because there you are still laying the room out.
+   */
+  const afterPick = () => {
+    if (!finishesOnly) return;
+    useStore.getState().setSelectedObjectId(null);
+    resumeWalking();
+  };
+
   return (
     // Docked bottom-centre so it never covers the object being edited - the
     // old floating top-right card sat over the scene. Frequent actions
@@ -197,7 +208,7 @@ export function ObjectEditorPanel() {
         {/* Door/carcass colour. Only the body material is recoloured, so the
             worktop, sink and handles keep their own finish. */}
         {TINT_MATERIAL[obj.type] && (
-          <ColourRow current={(obj.color ?? UNIT_COLOURS[0].hex).toLowerCase()} onPick={(hex) => updateObject(obj.id, { color: hex })} />
+          <ColourRow current={(obj.color ?? UNIT_COLOURS[0].hex).toLowerCase()} onPick={(hex) => { updateObject(obj.id, { color: hex }); afterPick(); }} />
         )}
 
         {/* Worktop. Stored on the ROOM, not the unit - a kitchen has one
@@ -213,7 +224,7 @@ export function ObjectEditorPanel() {
                   <button
                     key={wt.id}
                     title={wt.name}
-                    onClick={() => updateRoom({ worktopMaterial: wt.id })}
+                    onClick={() => { updateRoom({ worktopMaterial: wt.id }); afterPick(); }}
                     style={{ backgroundImage: 'url(textures/' + wt.prefix + '_color.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
                     className={'w-7 h-7 rounded-md border transition-all ' + (active ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20 scale-110' : 'border-black/15 hover:scale-110')}
                   />
@@ -229,7 +240,7 @@ export function ObjectEditorPanel() {
             label="Fabric"
             presets={FABRIC_COLOURS}
             current={(obj.color ?? FABRIC_COLOURS[0].hex).toLowerCase()}
-            onPick={(hex) => updateObject(obj.id, { color: hex })}
+            onPick={(hex) => { updateObject(obj.id, { color: hex }); afterPick(); }}
           />
         )}
 
@@ -245,7 +256,7 @@ export function ObjectEditorPanel() {
                   <button
                     key={f.hex}
                     title={f.name}
-                    onClick={() => updateObject(obj.id, { color: f.hex })}
+                    onClick={() => { updateObject(obj.id, { color: f.hex }); afterPick(); }}
                     style={{ background: `linear-gradient(135deg, ${f.hex} 30%, #ffffff88 48%, ${f.hex} 62%)`, backgroundColor: f.hex }}
                     className={`w-6 h-6 rounded-full border transition-all ${
                       active ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20 scale-110' : 'border-black/15 hover:scale-110'
