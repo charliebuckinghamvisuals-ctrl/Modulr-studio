@@ -17,7 +17,7 @@ import { resumeWalking } from '../../utils/walk';
  * learn rather than one.
  */
 
-const WALL_COLOURS = [
+export const WALL_COLOURS = [
   { name: 'Brilliant White', hex: '#ffffff' },
   { name: 'Chalk',           hex: '#f4f1ea' },
   { name: 'Soft Stone',      hex: '#e8e2d8' },

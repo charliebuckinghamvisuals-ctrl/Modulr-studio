@@ -858,6 +858,10 @@ export function RoomGeometry() {
 
   // baseH is declared with the other height calculations further up.
   const roofH = (room.roofHeightMm ?? 200) / 1000;
+  /** Thickness of the sloped roof slabs - they are as deep as their visible
+   *  bargeboard. Declared here rather than with the roof, because the ceiling
+   *  hangs off the underside of these slabs and is worked out further up. */
+  const gableFascia = Math.min(0.4, Math.max(0.05, (room.gableFasciaMm ?? 100) / 1000));
 
   const cutBoxSize = 50;
   // LShape
@@ -935,8 +939,24 @@ export function RoomGeometry() {
 
     const wallTop = h + 0.025;
     const pitch = Math.atan2(roofH, spanHalf);
-    // Height of the roof's underside at a given distance from the ridge.
-    const underside = (u: number) => wallTop + roofH * (1 - Math.abs(u) / spanHalf);
+
+    /*
+     * Where the roof's UNDERSIDE is, at a given distance from the ridge.
+     *
+     * The gable triangle's sloping edge is not it. Two things sit between:
+     * the roof group hangs off the wall height h while the triangle starts
+     * 25mm higher at the wall head, and the slabs then straddle their own
+     * centre line by half a bargeboard. Sitting the ceiling on the triangle's
+     * edge buried it inside the slab, so from in the room you still saw the
+     * dark roof - exactly what this was meant to cover. (Measured against the
+     * live scene: on an 8m span with a 1m rise, predicted 2.6485 and the roof
+     * came back at 2.648.)
+     */
+    const perp = Math.cos(pitch);
+    const roofUnder = (u: number) =>
+      wallTop + roofH * (1 - Math.abs(u) / spanHalf) - 0.025 - (gableFascia / 2) / perp;
+    // Centre of a ceiling panel hung just clear of that underside.
+    const soffit = (u: number) => roofUnder(u) - (GABLE_CEILING_T / 2) / perp - 0.006;
 
     // Where the flat panel stops: the point at which the roof drops below it.
     // Zero when vaulted, or when the ceiling is asked for above the ridge.
@@ -946,29 +966,45 @@ export function RoomGeometry() {
       // This whole group already sits on the finished floor, so these heights
       // need no base added - they ARE the height a customer would measure.
       const asked = (room.gableCeilingHeightMm ?? 2400) / 1000;
-      flatY = Math.max(1.8, Math.min(asked, wallTop + roofH - 0.05));
-      uFlat = Math.max(0, Math.min(halfU, spanHalf * (1 - (flatY - wallTop) / roofH)));
+      flatY = Math.max(1.8, Math.min(asked, soffit(0) - 0.02));
+      // Where the pitch drops past the flat panel - solved on the same line
+      // the sloped strips hang from, so the two meet flush instead of
+      // stepping. soffit(u) = flatY, rearranged for u.
+      const rise = flatY + 0.025 + (gableFascia / 2) / perp + (GABLE_CEILING_T / 2) / perp + 0.006 - wallTop;
+      uFlat = Math.max(0, Math.min(halfU, spanHalf * (1 - rise / roofH)));
     }
 
-    const panels: { pos: [number, number, number]; rotZ: number; size: [number, number] }[] = [];
+    /*
+     * World-scale UVs, exactly as the walls have.
+     *
+     * A plain boxGeometry carries 0-1 UVs, but the wallpaper is tiled by the
+     * metre - so on a panel metres wide the paper stretched to a single
+     * enormous tile and the ceiling read as a different, much coarser
+     * material than the walls it meets. This is the same helper the interior
+     * cut uses, so the two now share one mapping.
+     */
+    const panels: { pos: [number, number, number]; rotZ: number; geom: THREE.BufferGeometry }[] = [];
+    const slab = (len: number, wide: number, offU: number) =>
+      createWorldScaleBoxGeometry(len, GABLE_CEILING_T, wide, false, offU, 0, 0);
+
     if (uFlat > 0.001) {
-      panels.push({ pos: [0, flatY, 0], rotZ: 0, size: [uFlat * 2, halfV * 2] });
+      panels.push({ pos: [0, flatY, 0], rotZ: 0, geom: slab(uFlat * 2, halfV * 2, 0) });
     }
     // A sloped strip each side, from where the flat panel ends out to the wall.
     if (halfU - uFlat > 0.001) {
       for (const side of [-1, 1]) {
         const mid = side * (uFlat + halfU) / 2;
         panels.push({
-          pos: [mid, underside(mid), 0],
+          pos: [mid, soffit(mid), 0],
           // +X rises on the left of the ridge and falls on the right, matching
           // the roof slabs above.
           rotZ: side < 0 ? pitch : -pitch,
-          size: [(halfU - uFlat) / Math.cos(pitch), halfV * 2],
+          geom: slab((halfU - uFlat) / Math.cos(pitch), halfV * 2, mid),
         });
       }
     }
     return panels;
-  }, [isGable, gSpan, wallThickness, isSideGable, w, d, roofH, h,
+  }, [isGable, gSpan, wallThickness, isSideGable, w, d, roofH, h, gableFascia,
       room.gableFlatCeiling, room.gableCeilingHeightMm]);
 
   const lShapeCutOuterGeom = useMemo(() => createWorldScaleBoxGeometry(cutW + 0.2, h + 1, cutD + 0.2, false, 0, 0, 0, isVertical), [cutW, cutD, h, roofH, isGable, isVertical]);
@@ -981,7 +1017,6 @@ export function RoomGeometry() {
   // user-adjustable, 100mm by default. Every roof edge overhangs 50mm: the
   // slabs run 50mm past both gable ends and 50mm past the eaves, like a real
   // roof line, instead of finishing dead flush with the cladding.
-  const gableFascia = Math.min(0.4, Math.max(0.05, (room.gableFasciaMm ?? 100) / 1000));
   const ROOF_LIP = 0.05;
   const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((gSpan/2 + gOhLow1) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, gRunLen + ROOF_LIP * 2, false, 0, 0, 0), [gSpan, gOhLow1, gablePitch, gRunLen, gableFascia]);
   const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((gSpan/2 + gOhLow2) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, gRunLen + ROOF_LIP * 2, false, 0, 0, 0), [gSpan, gOhLow2, gablePitch, gRunLen, gableFascia]);
@@ -1446,7 +1481,7 @@ export function RoomGeometry() {
           <group rotation={[0, isSideGable ? Math.PI/2 : 0, 0]}>
             {gableCeiling.map((p, i) => (
               <mesh key={`gable-ceiling-${i}`} position={p.pos} rotation={[0, 0, p.rotZ]} receiveShadow>
-                <boxGeometry args={[p.size[0], GABLE_CEILING_T, p.size[1]]} />
+                <primitive object={p.geom} attach="geometry" />
                 <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
               </mesh>
             ))}

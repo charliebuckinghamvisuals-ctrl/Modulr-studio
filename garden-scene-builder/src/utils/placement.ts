@@ -55,6 +55,29 @@ export function clampToRoomInterior(room: Room, x: number, z: number, margin = 0
 
 /** Room-local coordinates and inner half-extents - used for the live
  *  distance-to-wall readouts while dragging. */
+/**
+ * Height of the ceiling above the FINISHED FLOOR - the datum everything
+ * inside the room is measured from.
+ *
+ * heightMm means different things by shape. On a box it is the wall height.
+ * On a GABLE it is the whole building, ground to ridge, so the wall height
+ * has to be recovered from it - reading it as a wall height there sent an
+ * extractor flue out through the roof by the base plinth plus the whole roof
+ * pitch. Anything that must stop at the ceiling wants the LOWEST ceiling over
+ * it, which on a gable is the eaves rather than the ridge, or the flat
+ * ceiling if one has been boarded in.
+ */
+export function interiorCeilingHeight(room: Room): number {
+  const total = (room.heightMm ?? 2050) / 1000;
+  if (room.shape !== 'Gable') return total - 0.01;
+  const base = (room.baseHeightMm ?? 100) / 1000;
+  const roof = (room.roofHeightMm ?? 200) / 1000;
+  const eaves = total - base - roof + 0.025;
+  return room.gableFlatCeiling
+    ? Math.min(eaves, (room.gableCeilingHeightMm ?? 2400) / 1000)
+    : eaves;
+}
+
 export function roomLocal(room: Room, x: number, z: number) {
   const rx = (room.x ?? 0) / 1000;
   const rz = (room.z ?? 0) / 1000;

@@ -5,6 +5,7 @@ import { isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT
 import { DimensionSlider } from '../DimensionSlider';
 import { useSavedColours, addSavedColour, removeSavedColour } from '../../utils/savedColours';
 import { resumeWalking } from '../../utils/walk';
+import { WALL_COLOURS } from './WalkWallPanel';
 
 /**
  * Hex code entry for the unit colour - lets a customer type an actual paint
@@ -319,23 +320,27 @@ export function ObjectEditorPanel() {
 
         {(obj.type === 'interior_wall' || obj.type === 'interior_door') && (
           <>
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-700">Color</span>
-              </div>
-              <input 
-                type="color" 
-                value={obj.color || useStore.getState().scene.room.interiorColor || '#ffffff'} 
-                onChange={(e) => updateObject(obj.id, { color: e.target.value })}
-                className="w-8 h-8 rounded-full cursor-pointer border-0 shadow-sm overflow-hidden"
-              />
-            </div>
+            {/* The same swatches the room's own walls offer, rather than the
+                bare colour well this had: one native picker with no presets
+                is why repainting a partition to match the room was so
+                awkward. Falls back to the room colour, so an untouched
+                partition follows the walls automatically. */}
+            <ColourRow
+              label="Colour"
+              presets={WALL_COLOURS}
+              current={(obj.color || scene.room.interiorColor || '#ffffff').toLowerCase()}
+              onPick={(hex, settled) => { updateObject(obj.id, { color: hex }); if (settled) afterPick(); }}
+            />
+            {!finishesOnly && (
+              <>
 <DimensionSlider label={obj.type === 'interior_door' ? 'Door Width' : 'Wall Length (Width)'} min={100} max={6000} step={10} value={obj.widthMm || (obj.type === 'interior_door' ? 800 : 1000)} onChange={(v) => updateObject(obj.id, { widthMm: v })} />
 <DimensionSlider label={obj.type === 'interior_door' ? 'Frame Depth' : 'Wall Thickness'} min={50} max={500} step={10} value={obj.depthMm || (obj.type === 'interior_door' ? 150 : 100)} onChange={(v) => updateObject(obj.id, { depthMm: v })} />
+              </>
+            )}
           </>
         )}
 
-        {obj.type === 'interior_wall' && (
+        {obj.type === 'interior_wall' && !finishesOnly && (
           <>
 <DimensionSlider label="L-Shape Return Length" min={0} max={6000} step={10} value={obj.returnLengthMm || 0} onChange={(v) => updateObject(obj.id, { returnLengthMm: v })} />
             

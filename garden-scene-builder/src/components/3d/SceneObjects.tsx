@@ -2,13 +2,15 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { SceneObject } from '../../types';
 import * as THREE from 'three';
-import { useRef, useState, useEffect, Suspense } from 'react';
+import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
 import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H } from '../../modelRegistry';
 import { applyModelMaterials, retintModel, resurfaceWorktop } from '../../utils/materialFixes';
-import { isInteriorType, clampToRoomInterior, roomLocal, FOOTPRINT_RADIUS } from '../../utils/placement';
+import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, FOOTPRINT_RADIUS } from '../../utils/placement';
+import { wallpaperProps } from '../../utils/wallpaper';
+import { createWorldScaleBoxGeometry } from '../../utils/geometry';
 import { RotateCw, Copy, Trash2 } from 'lucide-react';
 import { WorktopRuns } from './WorktopRuns';
 
@@ -149,6 +151,36 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
     room: s.scene.room
   })));
   const isSelected = selectedObjectId === obj.id;
+  const paper = wallpaperProps();
+
+  /**
+   * Partition walls, sized and mapped like the room's own walls.
+   *
+   * Height was hardcoded at 2.5m, which is taller than most of these rooms
+   * are inside - so a partition pushed up through the ceiling. It now stops
+   * at whatever the ceiling actually is, which on a gable is the eaves.
+   * (Under a vaulted gable that leaves the pitch open above it; shaping the
+   * top to the slope is a separate job.)
+   *
+   * The geometry carries world-scale UVs because the wallpaper is tiled by
+   * the metre - a plain box would have stretched one tile across the whole
+   * wall and looked nothing like the walls beside it.
+   */
+  const partition = useMemo(() => {
+    if (obj.type !== 'interior_wall') return null;
+    const w = obj.widthMm ? obj.widthMm / 1000 : 1;
+    const d = obj.depthMm ? obj.depthMm / 1000 : 0.1;
+    const h = Math.max(0.3, interiorCeilingHeight(room) - 0.005);
+    const retL = obj.returnLengthMm ? obj.returnLengthMm / 1000 : 0;
+    return {
+      w, d, h, retL,
+      mainGeom: createWorldScaleBoxGeometry(w, h, d, false, 0, 0, 0),
+      returnGeom: retL > 0 ? createWorldScaleBoxGeometry(d, h, retL, false, 0, 0, 0) : null,
+    };
+  }, [obj.type, obj.widthMm, obj.depthMm, obj.returnLengthMm,
+      room.shape, room.heightMm, room.baseHeightMm, room.roofHeightMm,
+      room.gableFlatCeiling, room.gableCeilingHeightMm]);
+
   const [isDragging, setIsDragging] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const { raycaster, camera } = useThree();
@@ -298,18 +330,7 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
                * a wall, and the ceiling above a wall is the eaves, not the
                * ridge - and lower still if a flat ceiling has been boarded in.
                */
-              const roomH = (room.heightMm ?? 2050) / 1000;
-              let ceiling: number;
-              if (room.shape === 'Gable') {
-                const wallH = roomH - (room.baseHeightMm ?? 100) / 1000 - (room.roofHeightMm ?? 200) / 1000;
-                ceiling = wallH + 0.025;
-                if (room.gableFlatCeiling) {
-                  ceiling = Math.min(ceiling, (room.gableCeilingHeightMm ?? 2400) / 1000);
-                }
-              } else {
-                ceiling = roomH - 0.01;
-              }
-              const needed = ceiling - mountHeight(obj.type) - EXTRACTOR_CANOPY_H;
+              const needed = interiorCeilingHeight(room) - mountHeight(obj.type) - EXTRACTOR_CANOPY_H;
               const s = Math.max(0.02, needed / EXTRACTOR_FLUE_H);
               return (
                 <group position={[0, EXTRACTOR_CANOPY_H, 0]} scale={[1, s, 1]}>
@@ -669,31 +690,31 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
       );
     }
 
-    if (obj.type === 'interior_wall') {
-      const w = obj.widthMm ? obj.widthMm / 1000 : 1;
-      const d = obj.depthMm ? obj.depthMm / 1000 : 0.1;
-      const h = 2.5; // 2.5m high by default inside
-      const retL = obj.returnLengthMm ? obj.returnLengthMm / 1000 : 0;
-      
+    if (obj.type === 'interior_wall' && partition) {
+      const { w, d, h, retL, mainGeom, returnGeom } = partition;
       const gapW = obj.doorGapWidthMm ? obj.doorGapWidthMm / 1000 : 0.8;
       const gapOff = obj.doorGapOffsetMm ? obj.doorGapOffsetMm / 1000 : 0;
-      
+
       return (
         <group>
+            {/* Same paper, same colour, same world-scale mapping as the room's
+                own walls. It was a flat untextured slab before, which is why a
+                partition read as a different, duller material standing in a
+                papered room - and why repainting the walls left it behind. */}
             <mesh position={[0, h/2, 0]} castShadow receiveShadow>
-               <meshStandardMaterial color={obj.color || room.interiorColor || '#ffffff'} roughness={0.9} />
+               <meshStandardMaterial {...paper} color={obj.color || room.interiorColor || '#ffffff'} />
                <Geometry>
                  <Base>
-                   <boxGeometry args={[w, h, d]} />
+                   <primitive object={mainGeom} attach="geometry" />
                  </Base>
-                 {retL > 0 && (
+                 {retL > 0 && returnGeom && (
                    <Base position={[w/2 - d/2, 0, retL/2 - d/2]}>
-                     <boxGeometry args={[d, h, retL]} />
+                     <primitive object={returnGeom} attach="geometry" />
                    </Base>
                  )}
                  {obj.hasDoorGap && (
                    <Subtraction position={[gapOff, -h/2 + 2.1/2, 0]}>
-                     <boxGeometry args={[gapW, 2.1, d * 3]} />
+                     <boxGeometry args={[gapW, Math.min(2.1, h - 0.05), d * 3]} />
                    </Subtraction>
                  )}
                </Geometry>
