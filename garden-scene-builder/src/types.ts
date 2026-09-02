@@ -111,6 +111,17 @@ export interface Room {
   hasApexGlazing?: boolean;
   /** 'framed' (default): rake rails + mullions. 'plain': frameless glass. */
   apexGlazingStyle?: 'framed' | 'plain';
+  /** Gable only. Off (default): the ceiling follows the roof pitch, vaulted to
+   *  the ridge. On: a flat ceiling is boarded across at gableCeilingHeightMm,
+   *  with the roof void above it. */
+  gableFlatCeiling?: boolean;
+  /** Gable only. Flat ceiling height in mm, measured from the FINISHED FLOOR -
+   *  which is what a customer means by "how high is the ceiling", and is not
+   *  the same as heightMm (that one is the whole building, ground to ridge).
+   *  Clamped in the geometry between the wall head and the ridge; set it at or
+   *  below the wall head for a plain flat ceiling, or part way up for a flat
+   *  centre with the pitch still showing at the eaves. */
+  gableCeilingHeightMm?: number;
   cladding: CladdingType;
   claddingFront?: CladdingType;
   claddingBack?: CladdingType;

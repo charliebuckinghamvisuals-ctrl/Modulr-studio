@@ -350,6 +350,71 @@ export function Sidebar() {
                       </button>
                     </div>
                   )}
+
+                  {/* Ceiling. A gable is vaulted by default - you see the
+                      pitch from inside - but plenty of builds board a flat
+                      ceiling in and use the void above for insulation and
+                      services. Heights are internal, floor to ceiling, which
+                      is the number a customer will quote at you; heightMm is
+                      the whole building, ground to ridge, so the two are not
+                      interchangeable. */}
+                  {(() => {
+                    const baseH = room.baseHeightMm ?? 100;
+                    const roofH = room.roofHeightMm ?? 200;
+                    // Internal wall head and ridge, both from the finished floor.
+                    const wallHead = Math.round((room.heightMm ?? 2350) - baseH - roofH + 25);
+                    const ridge = wallHead + roofH;
+                    const maxC = Math.max(1800, ridge - 50);
+                    const value = Math.round(Math.min(maxC, Math.max(1800, room.gableCeilingHeightMm ?? wallHead)));
+                    return (
+                      <>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-xs font-medium text-gray-700">Flat Ceiling</span>
+                          <button
+                            onClick={() => updateRoom({
+                              gableFlatCeiling: !room.gableFlatCeiling,
+                              // Start at the wall head - a plain flat ceiling -
+                              // rather than at some height the room may not have.
+                              gableCeilingHeightMm: room.gableCeilingHeightMm ?? wallHead,
+                            })}
+                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${room.gableFlatCeiling ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300/60'}`}
+                          >
+                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${room.gableFlatCeiling ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
+                          </button>
+                        </div>
+                        {!room.gableFlatCeiling && (
+                          <p className="text-[10px] text-gray-400 leading-snug">Vaulted &mdash; the ceiling follows the roof pitch up to the ridge.</p>
+                        )}
+                        {room.gableFlatCeiling && (
+                          <>
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="range"
+                                min={1800} max={maxC} step={10}
+                                value={value}
+                                onChange={e => updateRoom({ gableCeilingHeightMm: Number(e.target.value) })}
+                                className="w-full apple-slider"
+                              />
+                              <div className="flex items-center gap-1 shrink-0">
+                                <input
+                                  type="number"
+                                  min={1800} max={maxC}
+                                  value={value}
+                                  onChange={e => updateRoom({ gableCeilingHeightMm: Math.max(1800, Math.min(maxC, Number(e.target.value))) })}
+                                  onKeyDown={e => e.stopPropagation()}
+                                  className="w-[68px] bg-gray-50 border border-black/5 rounded-lg px-2 py-1 text-xs font-semibold text-[#3b4d4a] outline-none focus:ring-2 focus:ring-[#3b4d4a]"
+                                />
+                                <span className="text-[10px] text-gray-400">mm</span>
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-gray-400 leading-snug">
+                              Internal height, floor to ceiling. At {wallHead}mm it is flat wall to wall; raise it and the pitch stays on show at the eaves. Ridge is {ridge}mm.
+                            </p>
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
               <div className="mt-3 flex items-center justify-between p-4 bg-white border border-black/5 rounded-xl shadow-sm">

@@ -20,6 +20,11 @@ import { DragHandle } from './DragHandles';
  *  z-fighting, thin enough to read as paint rather than a second wall. */
 const GABLE_LINER_T = 0.012;
 
+/** Ceiling panel thickness. Deliberately fatter than the apex liner: these sit
+ *  centred on the roof's underside, so half of it needs to be inside the slab
+ *  to close the joint at the eaves. */
+const GABLE_CEILING_T = 0.04;
+
 function DimText({ value, onValueChange, position, rotation, children, isDraggable, hideOnExport, hideIfZero }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState(String(value));
@@ -901,6 +906,71 @@ export function RoomGeometry() {
     () => createWorldScaleGableGeometry(gSpan, roofH, GABLE_LINER_T, 0, h + 0.05, 0, isVertical),
     [gSpan, roofH, h, isVertical],
   );
+  /**
+   * The gable ceiling, as a list of panels.
+   *
+   * A gable room had no ceiling at all, so from inside you were looking at the
+   * underside of the roof slabs - which wear the ROOF colour, and read as a
+   * dark lid over a white room. The roof planes themselves cannot simply be
+   * repainted underneath: they overhang the walls, and that same underside is
+   * the external soffit.
+   *
+   * So the ceiling is lined, like the apex is. Everything below is worked in
+   * the gable's own frame - u across the span, v along the ridge - and the
+   * group carries the same Y rotation the roof group does, so one set of
+   * numbers serves both ridge orientations.
+   *
+   * Vaulted (the default) is two sloped panels following the pitch. Flat is a
+   * level panel across the middle, and - if it sits above the wall head - the
+   * pitch still showing as a strip at each eaves, because that is where the
+   * roof genuinely is. Drop the height to the wall head and those strips close
+   * up into an ordinary flat ceiling.
+   */
+  const gableCeiling = useMemo(() => {
+    if (!isGable) return null;
+    const spanHalf = gSpan / 2;
+    const halfU = spanHalf - wallThickness;
+    const halfV = (isSideGable ? w : d) / 2 - wallThickness;
+    if (halfU <= 0.01 || halfV <= 0.01 || roofH <= 0.001) return null;
+
+    const wallTop = h + 0.025;
+    const pitch = Math.atan2(roofH, spanHalf);
+    // Height of the roof's underside at a given distance from the ridge.
+    const underside = (u: number) => wallTop + roofH * (1 - Math.abs(u) / spanHalf);
+
+    // Where the flat panel stops: the point at which the roof drops below it.
+    // Zero when vaulted, or when the ceiling is asked for above the ridge.
+    let flatY = 0;
+    let uFlat = 0;
+    if (room.gableFlatCeiling) {
+      // This whole group already sits on the finished floor, so these heights
+      // need no base added - they ARE the height a customer would measure.
+      const asked = (room.gableCeilingHeightMm ?? 2400) / 1000;
+      flatY = Math.max(1.8, Math.min(asked, wallTop + roofH - 0.05));
+      uFlat = Math.max(0, Math.min(halfU, spanHalf * (1 - (flatY - wallTop) / roofH)));
+    }
+
+    const panels: { pos: [number, number, number]; rotZ: number; size: [number, number] }[] = [];
+    if (uFlat > 0.001) {
+      panels.push({ pos: [0, flatY, 0], rotZ: 0, size: [uFlat * 2, halfV * 2] });
+    }
+    // A sloped strip each side, from where the flat panel ends out to the wall.
+    if (halfU - uFlat > 0.001) {
+      for (const side of [-1, 1]) {
+        const mid = side * (uFlat + halfU) / 2;
+        panels.push({
+          pos: [mid, underside(mid), 0],
+          // +X rises on the left of the ridge and falls on the right, matching
+          // the roof slabs above.
+          rotZ: side < 0 ? pitch : -pitch,
+          size: [(halfU - uFlat) / Math.cos(pitch), halfV * 2],
+        });
+      }
+    }
+    return panels;
+  }, [isGable, gSpan, wallThickness, isSideGable, w, d, roofH, h,
+      room.gableFlatCeiling, room.gableCeilingHeightMm]);
+
   const lShapeCutOuterGeom = useMemo(() => createWorldScaleBoxGeometry(cutW + 0.2, h + 1, cutD + 0.2, false, 0, 0, 0, isVertical), [cutW, cutD, h, roofH, isGable, isVertical]);
   // Roof plan size is exactly roofW x roofD (wall footprint + user overhangs).
   // A 100mm lip was previously baked in here (+0.2), so even with every
@@ -1360,6 +1430,28 @@ export function RoomGeometry() {
             </mesh>
           ));
         })()}
+
+        {/*
+          Gable ceiling. Same rotation as the roof group, so the panels
+          computed in the gable's own frame land the right way round for both
+          ridge orientations. Interior wallpaper props and interiorColor, so
+          the ceiling is the same surface as the walls and repaints with them.
+
+          Centred ON the roof's underside rather than hung below it: the panel
+          is thick enough that its top half buries itself in the slab, which
+          leaves no seam of daylight at the eaves and nothing coplanar to
+          shimmer.
+        */}
+        {!isPlanView && gableCeiling && (
+          <group rotation={[0, isSideGable ? Math.PI/2 : 0, 0]}>
+            {gableCeiling.map((p, i) => (
+              <mesh key={`gable-ceiling-${i}`} position={p.pos} rotation={[0, 0, p.rotZ]} receiveShadow>
+                <boxGeometry args={[p.size[0], GABLE_CEILING_T, p.size[1]]} />
+                <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
+              </mesh>
+            ))}
+          </group>
+        )}
 
         {/* Internal Floor */}
         <mesh position={[0, 0.005, 0]} receiveShadow userData={{ isFloor: true }}>

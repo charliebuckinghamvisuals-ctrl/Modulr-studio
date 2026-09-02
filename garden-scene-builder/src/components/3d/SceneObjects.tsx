@@ -289,21 +289,27 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
                 extrusion, so stretching it introduces no distortion. */}
             {obj.type === 'kitchen_extractor' && (() => {
               /*
-               * Measured from the FINISHED FLOOR, not from y=0.
+               * How far it is from the canopy to the ceiling, measured from
+               * the finished floor - the same datum mountHeight uses.
                *
-               * The extractor stands on the base plinth like everything else
-               * in the room, but the flue was sized from the ground, so it ran
-               * a plinth too long and pushed through the roof by exactly that
-               * much. On a gable, heightMm is the height to the RIDGE, so the
-               * ceiling above a wall-mounted extractor is the eaves - sizing
-               * to the ridge there overshot by the whole roof pitch.
+               * On a GABLE, heightMm is the whole building, ground to ridge,
+               * so the flue was being sized to the ridge plus the base plinth
+               * and drove straight out through the roof. An extractor hangs on
+               * a wall, and the ceiling above a wall is the eaves, not the
+               * ridge - and lower still if a flat ceiling has been boarded in.
                */
-              const baseH = (room.baseHeightMm ?? 100) / 1000;
-              const totalH = (room.heightMm ?? 2050) / 1000;
-              const ceiling = room.shape === 'Gable'
-                ? totalH - (room.roofHeightMm ?? 200) / 1000
-                : totalH;
-              const needed = ceiling - baseH - mountHeight(obj.type) - EXTRACTOR_CANOPY_H;
+              const roomH = (room.heightMm ?? 2050) / 1000;
+              let ceiling: number;
+              if (room.shape === 'Gable') {
+                const wallH = roomH - (room.baseHeightMm ?? 100) / 1000 - (room.roofHeightMm ?? 200) / 1000;
+                ceiling = wallH + 0.025;
+                if (room.gableFlatCeiling) {
+                  ceiling = Math.min(ceiling, (room.gableCeilingHeightMm ?? 2400) / 1000);
+                }
+              } else {
+                ceiling = roomH - 0.01;
+              }
+              const needed = ceiling - mountHeight(obj.type) - EXTRACTOR_CANOPY_H;
               const s = Math.max(0.02, needed / EXTRACTOR_FLUE_H);
               return (
                 <group position={[0, EXTRACTOR_CANOPY_H, 0]} scale={[1, s, 1]}>
