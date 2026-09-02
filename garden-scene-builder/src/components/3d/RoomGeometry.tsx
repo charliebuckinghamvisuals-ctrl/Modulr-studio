@@ -16,6 +16,10 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { DragHandle } from './DragHandles';
 
+/** Apex liner thickness: enough to sit clear of the gable face without
+ *  z-fighting, thin enough to read as paint rather than a second wall. */
+const GABLE_LINER_T = 0.012;
+
 function DimText({ value, onValueChange, position, rotation, children, isDraggable, hideOnExport, hideIfZero }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState(String(value));
@@ -883,29 +887,19 @@ export function RoomGeometry() {
   const gableTriangleGeom = useMemo(() => createWorldScaleGableGeometry(gSpan, roofH, wallThickness, 0, h + 0.05, 0, isVertical), [gSpan, roofH, wallThickness, h, isVertical]);
 
   /**
-   * The interior cut for the gable apex.
+   * The apex liner: a thin painted triangle laid on the INSIDE face of each
+   * gable end, so the apex reads as wall from within the room rather than as
+   * cladding carried on up.
    *
-   * The main interior cutout is a BOX spanning the room's inner depth, and the
-   * gable triangles are added at the wall planes just outside it - so the two
-   * touch exactly and never intersect. Nothing carved the inside of the apex,
-   * which is why it kept the cladding while every wall below it went white.
-   *
-   * This is the same triangular section as the apex itself, run through the
-   * room's inner depth and 2mm INTO each gable end. That 2mm is the whole
-   * trick: an overlap makes the subtraction cut a real face, and a CSG cut
-   * face wears the material of the thing that cut it - the interior colour.
-   * Coplanar surfaces (which is what a flush cut would be) produce no face at
-   * all, which is exactly why the previous attempt showed nothing inside and
-   * a stray triangle outside.
+   * Not a CSG cut. The cut was the same triangle as the apex itself, so its
+   * two sloping faces were exactly coplanar with the apex's - and a coplanar
+   * subtraction is the one case CSG cannot classify, so it took the whole
+   * gable end away instead of shaving the inside of it. A liner has nothing to
+   * classify: it is a separate mesh sitting in front of the face it covers.
    */
-  const gableInteriorCutGeom = useMemo(
-    () => createWorldScaleGableGeometry(
-      gSpan,
-      roofH,
-      (isSideGable ? w : d) - wallThickness * 2 + 0.004,
-      0, h + 0.05, 0, isVertical,
-    ),
-    [gSpan, roofH, isSideGable, w, d, wallThickness, h, isVertical],
+  const gableLinerGeom = useMemo(
+    () => createWorldScaleGableGeometry(gSpan, roofH, GABLE_LINER_T, 0, h + 0.05, 0, isVertical),
+    [gSpan, roofH, h, isVertical],
   );
   const lShapeCutOuterGeom = useMemo(() => createWorldScaleBoxGeometry(cutW + 0.2, h + 1, cutD + 0.2, false, 0, 0, 0, isVertical), [cutW, cutD, h, roofH, isGable, isVertical]);
   // Roof plan size is exactly roofW x roofD (wall footprint + user overhangs).
@@ -1198,20 +1192,8 @@ export function RoomGeometry() {
                   </>
                 )}
 
-                {/* Hollow the apex out from the inside, so the gable reads as a
-                    painted wall from within the room rather than as cladding.
-                    Placed after the Additions above: it has to have something
-                    to cut. Same transform as the apex triangles, just run
-                    through the room instead of sitting in the wall plane. */}
-                {isGable && (
-                  <Subtraction
-                    position={[0, h + 0.025, 0]}
-                    rotation={isSideGable ? [0, Math.PI/2, 0] : [0, 0, 0]}
-                  >
-                    <primitive object={gableInteriorCutGeom} attach="geometry" />
-                    <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
-                  </Subtraction>
-                )}
+                {/* The apex is lined from the inside instead of being cut -
+                    see GableLiners below the shell. */}
 
           
               </>
@@ -1344,6 +1326,40 @@ export function RoomGeometry() {
           cutW, cutD, frontH, backH, roofPitch,
           deferredDoors, deferredWindows,
         ])}
+
+        {/*
+          Apex liners, one per gable end.
+
+          Same transform as the apex triangles in the shell above, moved in by
+          a wall thickness so each sits flat on the inside face of its gable.
+          They carry the interior wallpaper props AND room.interiorColor, so
+          the apex is not merely a similar white - it is the same surface as
+          every wall below it, and it repaints with them.
+
+          Rendered here rather than inside <Geometry> on purpose: anything in
+          there is a CSG operand and gets welded into the shell, which is how
+          the previous attempts ended up either deleting the gable or leaving a
+          triangle floating over the roof.
+        */}
+        {!isPlanView && isGable && (() => {
+          const inset = wallThickness + GABLE_LINER_T / 2;
+          // The front apex is glazed rather than clad when apex glazing is on,
+          // so it has no wall to line. The back one is always solid.
+          const ends: number[] = isSideGable
+            ? (room.hasApexGlazing ? [] : [w/2 - inset, -w/2 + inset])
+            : (room.hasApexGlazing ? [-d/2 + inset] : [d/2 - inset, -d/2 + inset]);
+          return ends.map((v, i) => (
+            <mesh
+              key={`gable-liner-${i}`}
+              position={isSideGable ? [v, h + 0.025, 0] : [0, h + 0.025, v]}
+              rotation={[0, isSideGable ? Math.PI/2 : 0, 0]}
+              receiveShadow
+            >
+              <primitive object={gableLinerGeom} attach="geometry" />
+              <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
+            </mesh>
+          ));
+        })()}
 
         {/* Internal Floor */}
         <mesh position={[0, 0.005, 0]} receiveShadow userData={{ isFloor: true }}>
