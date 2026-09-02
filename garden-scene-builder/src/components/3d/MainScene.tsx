@@ -83,6 +83,28 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
      * pressing Esc. Clicking the scene again re-captures and you walk on.
      */
     const picker = new THREE.Raycaster();
+
+    /**
+     * What is under the crosshair right now, or null.
+     *
+     * Shared by the click handler and the hover probe so there is exactly one
+     * definition of "what am I pointing at" - the HUD can never promise a
+     * paint target the click would resolve differently.
+     */
+    const resolveTarget = (ndc: THREE.Vector2): { kind: 'object' | 'floor' | 'wall'; id?: string } | null => {
+      picker.setFromCamera(ndc, camera);
+      for (const hit of picker.intersectObjects(scene.children, true)) {
+        if (!hit.object.visible) continue;
+        let node: THREE.Object3D | null = hit.object;
+        while (node) {
+          if (node.userData?.objectId) return { kind: 'object', id: node.userData.objectId as string };
+          if (node.userData?.isFloor) return { kind: 'floor' };
+          if (node.userData?.isShell) return { kind: 'wall' };
+          node = node.parent;
+        }
+      }
+      return null;
+    };
     const onCanvasDown = (e: PointerEvent) => {
       const locked = document.pointerLockElement === canvas;
       // Locked, the crosshair IS the pointer. Unlocked - which is how you are
@@ -98,64 +120,50 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
           -((e.clientY - r.top) / r.height) * 2 + 1,
         );
       }
-      picker.setFromCamera(ndc, camera);
-      const hits = picker.intersectObjects(scene.children, true);
+      /**
+       * One surface, one panel - never search past what you actually hit.
+       *
+       * Order within a hit matters: the floor plinth and the walls are both
+       * inside the shell group, so isFloor must be tested before isShell or
+       * every floor click would open the wall panel.
+       */
+      const target = resolveTarget(ndc);
       let handled = false;
-      for (const hit of hits) {
-        // Ignore the invisible helpers and the placement catcher plane.
-        if (!hit.object.visible) continue;
-
-        /**
-         * Take the NEAREST marker on this hit and act on it - never search
-         * past a surface you actually hit.
-         *
-         * The old loop only knew about objects and the floor. A wall matched
-         * neither, so it fell through to the next intersection along the ray
-         * and opened whatever stood behind it: aim at a wall, get the floor;
-         * aim at the floor across a cabinet, get the cabinet. Walls now carry
-         * isShell (see RoomGeometry), so every surface in the room resolves to
-         * exactly one panel - the one you were looking at.
-         *
-         * Order matters within a single hit: an object sitting against a wall
-         * is a child of neither, but the floor mesh is a descendant of the
-         * shell group, so isFloor must be checked before isShell or every
-         * floor click would open the wall panel.
-         */
-        let node: THREE.Object3D | null = hit.object;
-        let target: 'object' | 'floor' | 'shell' | null = null;
-        let objectId: string | null = null;
-        while (node) {
-          if (node.userData?.objectId) { target = 'object'; objectId = node.userData.objectId as string; break; }
-          if (node.userData?.isFloor) { target = 'floor'; break; }
-          if (node.userData?.isShell) { target = 'shell'; break; }
-          node = node.parent;
-        }
-        if (!target) continue; // genuinely nothing of ours - keep looking
-
+      if (target) {
         const st = useStore.getState();
-        if (target === 'object') {
-          st.setWalkFloorOpen(false);
-          st.setWalkWallOpen(false);
-          st.setSelectedObjectId(objectId);
-        } else if (target === 'floor') {
-          st.setSelectedObjectId(null);
-          st.setWalkWallOpen(false);
-          st.setWalkFloorOpen(true);
-        } else {
-          st.setSelectedObjectId(null);
-          st.setWalkFloorOpen(false);
-          st.setWalkWallOpen(true);
-        }
+        st.setSelectedObjectId(target.kind === 'object' ? target.id! : null);
+        st.setWalkFloorOpen(target.kind === 'floor');
+        st.setWalkWallOpen(target.kind === 'wall');
+        st.setWalkHover(null);
+        // Release the mouse so the panel is immediately clickable - picking a
+        // finish should not cost a second click just to get the cursor back.
         if (locked) document.exitPointerLock();
         handled = true;
-        break;
       }
       // Clicked past everything selectable while the cursor was out - that
       // means carry on walking.
       if (!handled && !locked) canvas.requestPointerLock();
     };
+    /**
+     * Keep the HUD's paint badge in step with what the crosshair is over.
+     *
+     * Throttled to ~10/sec rather than run per mouse-move: it is a raycast
+     * through the whole scene, and at 60+ move events a second on a laptop it
+     * would cost more than the walkthrough itself.
+     */
+    let lastProbe = 0;
+    const probeHover = () => {
+      const now = performance.now();
+      if (now - lastProbe < 100) return;
+      lastProbe = now;
+      if (document.pointerLockElement !== canvas) return;
+      const t = resolveTarget(new THREE.Vector2(0, 0));
+      useStore.getState().setWalkHover(t ? t.kind : null);
+    };
+
     const onMouseMove = (e: MouseEvent) => {
       if (document.pointerLockElement !== canvas) return;
+      probeHover();
       const sens = 0.0022;
       yaw.current -= e.movementX * sens;
       // Stop just short of vertical - at exactly +/-90 degrees the view
@@ -175,6 +183,7 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
         st.setWalkWallOpen(false);
       } else {
         keys.current = {};
+        st.setWalkHover(null);
       }
     };
 

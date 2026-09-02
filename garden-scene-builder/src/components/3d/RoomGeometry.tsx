@@ -953,7 +953,19 @@ export function RoomGeometry() {
       
     };
 
+    /**
+     * The plinth IS the floor you stand on, so it carries isFloor.
+     *
+     * The floor-finish mesh sits at y=0.005 inside a plinth that runs from 0
+     * to baseH - buried. The surface actually under your feet in the
+     * walkthrough is this base. Before the shell was pickable a click here
+     * matched nothing and the ray carried on until it found the buried
+     * isFloor mesh, which is why the floor panel used to open; once the shell
+     * became pickable this got there first and opened the WALL panel instead.
+     * Marking it for what it is fixes that at the source.
+     */
     const pointerEvents = {
+      userData: { isFloor: true },
       onPointerOver: (e: any) => { e.stopPropagation(); useStore.getState().setHoveredElementId('room'); },
       onPointerOut: () => useStore.getState().setHoveredElementId(null)
     };

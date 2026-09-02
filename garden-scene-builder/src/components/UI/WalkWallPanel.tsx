@@ -67,7 +67,10 @@ export function WalkWallPanel() {
             <button
               key={c.hex}
               title={c.name}
-              onClick={() => updateRoom({ interiorColor: c.hex })}
+              // Pick, and you are walking again - the colour is applied and
+              // the mouse handed straight back, rather than leaving the panel
+              // parked over the room waiting for a Done nobody looks for.
+              onClick={() => { updateRoom({ interiorColor: c.hex }); setOpen(false); resumeWalking(); }}
               style={{ background: c.hex }}
               className={`w-7 h-7 rounded-full border transition-all ${
                 current === c.hex.toLowerCase()

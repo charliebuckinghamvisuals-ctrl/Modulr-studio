@@ -64,7 +64,10 @@ export function WalkFloorPanel() {
             <button
               key={f.id}
               title={f.name}
-              onClick={() => updateRoom({ interiorFloorType: f.id as any })}
+              // Same as the wall panel: choosing a floor applies it and hands
+              // the mouse back, so you are walking on it immediately. The
+              // scale slider below stays put for anyone adjusting it.
+              onClick={() => { updateRoom({ interiorFloorType: f.id as any }); setOpen(false); resumeWalking(); }}
               className={`group rounded-xl border overflow-hidden bg-white transition-all ${
                 active ? 'border-[#3b4d4a] ring-2 ring-[#3b4d4a]/25 shadow-md' : 'border-black/5 hover:border-[#3b4d4a]/40 hover:shadow-sm'
               }`}

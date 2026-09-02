@@ -1,3 +1,4 @@
+import { Paintbrush } from 'lucide-react';
 import { useStore } from '../../store';
 
 /** One key on the little WASD diagram. */
@@ -25,7 +26,8 @@ export function WalkHud() {
   const locked = useStore(s => s.walkPointerLocked);
   // A finish panel is open when the crosshair picked something; the big
   // 'click to look around' card would sit right on top of it.
-  const editing = useStore(s => s.selectedObjectId !== null || s.walkFloorOpen);
+  const editing = useStore(s => s.selectedObjectId !== null || s.walkFloorOpen || s.walkWallOpen);
+  const hover = useStore(s => s.walkHover);
 
   if (viewMode !== 'walking') return null;
 
@@ -52,10 +54,27 @@ export function WalkHud() {
 
   return (
     <>
-      {/* Crosshair: without a cursor there is no other cue for what you are
-          pointing at, and clicking selects whatever is under it. */}
+      {/*
+        Crosshair, and a paint target when there is something to repaint.
+
+        A bare dot gives no clue that anything is clickable, so finding a
+        finish meant clicking around hopefully. The brush appears over
+        anything repaintable - a unit, a tap, the floor, a wall - and names it,
+        so it is obvious what a click will open before you spend one.
+      */}
       <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-        <div className="w-[5px] h-[5px] rounded-full bg-white/80 shadow-[0_0_3px_rgba(0,0,0,0.8)]" />
+        {hover ? (
+          <div className="flex flex-col items-center gap-2 animate-[fadeIn_120ms_ease-out]">
+            <div className="w-11 h-11 rounded-full bg-white/95 shadow-[0_2px_12px_rgba(0,0,0,0.45)] ring-2 ring-white/70 flex items-center justify-center">
+              <Paintbrush size={19} className="text-[#3b4d4a]" />
+            </div>
+            <span className="px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-semibold tracking-wide">
+              {hover === 'object' ? 'Change finish' : hover === 'floor' ? 'Change floor' : 'Change wall colour'}
+            </span>
+          </div>
+        ) : (
+          <div className="w-[5px] h-[5px] rounded-full bg-white/80 shadow-[0_0_3px_rgba(0,0,0,0.8)]" />
+        )}
       </div>
 
       <div className="absolute bottom-6 left-6 z-30 pointer-events-none select-none">

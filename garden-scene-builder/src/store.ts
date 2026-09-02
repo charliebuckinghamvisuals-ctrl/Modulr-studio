@@ -47,6 +47,11 @@ interface AppState {
    *  pickable at all - see the crosshair handler in MainScene. */
   walkWallOpen: boolean;
   setWalkWallOpen: (open: boolean) => void;
+  /** What the walkthrough crosshair is currently over, so the HUD can show a
+   *  paint target rather than a bare dot. Null when it is over nothing
+   *  repaintable. */
+  walkHover: 'object' | 'floor' | 'wall' | null;
+  setWalkHover: (t: 'object' | 'floor' | 'wall' | null) => void;
   setIsExporting: (exporting: boolean) => void;
   setCapturedImage: (image: string | null) => void;
   setUploadedBgImage: (image: string | null) => void;
@@ -325,6 +330,8 @@ export const useStore = create<AppState>((set, get) => ({
   setWalkFloorOpen: (open) => set({ walkFloorOpen: open }),
   walkWallOpen: false,
   setWalkWallOpen: (open) => set({ walkWallOpen: open }),
+  walkHover: null,
+  setWalkHover: (t) => set(s => (s.walkHover === t ? s : { walkHover: t })),
   setIsExporting: (exporting) => set({ isExporting: exporting }),
   setCapturedImage: (image) => set({ capturedImage: image }),
   setUploadedBgImage: (image) => set({ uploadedBgImage: image }),
