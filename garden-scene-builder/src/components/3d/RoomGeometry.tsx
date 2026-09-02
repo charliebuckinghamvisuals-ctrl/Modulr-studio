@@ -549,36 +549,20 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
    */
   const boxH = hP;
 
-  /** World gradient coordinate at a point along the wall. The roof falls away
-   *  from the ridge in one axis only; which axis depends on the ridge, and
-   *  whether it varies along THIS wall depends on how the wall lies. */
-  const uBase = sideGable ? pZ : pX;
-  const uAt = (localX: number) => uBase + (acrossSlope ? localX : 0);
-  /** Height of the roof above the top of the wall, at a point along it. */
-  const capAt = (localX: number) =>
-    Math.max(0, roofYAt(uAt(localX)) - hP);
-
-  const capGeom = useMemo(() => {
-    if (!isGableRoom) return null;
-    const halfL = pL / 2;
-    const yL = capAt(-halfL), yR = capAt(halfL);
-    if (yL <= 0.001 && yR <= 0.001) return null;
-
-    const shape = new THREE.Shape();
-    shape.moveTo(-halfL, 0);
-    shape.lineTo(halfL, 0);
-    shape.lineTo(halfL, yR);
-    // The ridge only needs a point of its own if it actually crosses this wall.
-    const apexX = -uBase;
-    if (acrossSlope && apexX > -halfL && apexX < halfL) shape.lineTo(apexX, gRoofH);
-    shape.lineTo(-halfL, yL);
-    shape.closePath();
-
-    const g = new THREE.ExtrudeGeometry(shape, { depth: pT, bevelEnabled: false });
-    g.translate(0, 0, -pT / 2);
-    return g;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isGableRoom, acrossSlope, sideGable, pL, pT, pX, pZ, hP, gRoofH, halfSpan]);
+  /*
+   * NOTE: internal walls do NOT yet follow the gable - they stop at wall
+   * height and leave a triangular gap to the underside of the roof.
+   *
+   * Two attempts at closing it have been backed out. The first raised the
+   * wall to the ridge and cut the roof planes off with rotated boxes: a wrong
+   * transform there does not fail safely, the cut misses and the wall stands
+   * through the roof. The second built the cap as an extruded profile, which
+   * is the right approach, but it went out in the same build as a black
+   * screen and could not be cleared of causing it.
+   *
+   * Backed out on purpose rather than left in unproven. Reinstate the profile
+   * version only alongside someone who can actually see the render.
+   */
 
   const doorHeight = (dr: any) => Math.min(dr.heightMm / 1000, hP - 0.05);
 
@@ -626,20 +610,6 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
         />
       </mesh>
 
-      {/* Fills the triangle between the top of the wall and the underside of
-          the roof, so you cannot see over an internal wall into the next room.
-          Sits on top of the wall body, in the same finish. */}
-      {capGeom && (
-        <mesh position={[0, boxH / 2, 0]} castShadow receiveShadow>
-          <primitive object={capGeom} attach="geometry" />
-          <meshStandardMaterial
-            color={room.interiorColor || '#ffffff'}
-            roughness={0.9}
-            emissive={isSelected ? '#10b981' : '#000000'}
-            emissiveIntensity={isSelected ? 0.18 : 0}
-          />
-        </mesh>
-      )}
 
       {/* L-shape leg: a perpendicular run welded to one end of the main
           wall, so a corner is ONE unit instead of two walls nudged together.

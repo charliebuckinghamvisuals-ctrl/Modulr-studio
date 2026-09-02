@@ -438,14 +438,6 @@ export function MainScene() {
     if (controlsEnabled) gl.shadowMap.needsUpdate = true;
   }, [controlsEnabled, gl]);
 
-  // Debug/E2E hook, matching __modulrStore: lets a test resolve what the
-  // walkthrough crosshair is actually pointing at. Nothing reads it in normal
-  // use.
-  useEffect(() => {
-    (window as any).__modulrScene = scene;
-    (window as any).__modulrCam = camera;
-  }, [scene, camera]);
-
   // Debug handle: exposes the live three.js scene so tooling can inspect
   // real geometry state (e.g. whether the wall mesh ever empties mid-drag).
   // Mirrors the existing __modulrStore handle; nothing reads it in the app.
