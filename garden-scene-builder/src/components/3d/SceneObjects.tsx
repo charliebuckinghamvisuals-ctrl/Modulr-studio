@@ -196,12 +196,20 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   const pos: [number, number, number] = [obj.x, baseH + mountHeight(obj.type), obj.z];
 
   const handlePointerDown = (e: any) => {
+    /**
+     * The walkthrough does not select through here at all.
+     *
+     * It used to select on any click and then bail out, which quietly took
+     * over the walkthrough's own click: the finishes panel sprang open the
+     * instant you touched anything, and because that happens on the FIRST
+     * click of a walkthrough - the one meant to capture the mouse - you could
+     * not set off walking until you had found Done. Picking a finish in there
+     * is a two-step brush, handled in MainScene; this handler is for laying
+     * the room out, which is not the client's job.
+     */
+    if (viewMode === 'walking') return;
     e.stopPropagation();
     setSelectedObjectId(obj.id);
-    // In the walkthrough an item can be SELECTED - so a client can change its
-    // colour or finish - but never moved. The layout is the designer's; the
-    // finishes are the client's.
-    if (viewMode === 'walking') return;
 
     // Draggable in EVERY editing view. Plan-only dragging was the single
     // biggest interaction complaint: in the default 3D view objects selected
@@ -896,8 +904,11 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerMove={handlePointerMove}
-      onClick={(e) => e.stopPropagation()}
+      // Left alone in the walkthrough, so a click there reaches the canvas and
+      // does what the walkthrough means by a click.
+      onClick={(e) => { if (viewMode !== 'walking') e.stopPropagation(); }}
       onDoubleClick={(e) => {
+        if (viewMode === 'walking') return;
         e.stopPropagation();
         window.dispatchEvent(new CustomEvent('focus-object', { detail: { x: obj.x, z: obj.z } }));
       }}

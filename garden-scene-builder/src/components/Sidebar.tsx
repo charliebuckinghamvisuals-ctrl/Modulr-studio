@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Settings, Plus, Box, Tent, Map, Settings2, Trash2, DoorOpen, DoorClosed, ChevronDown, ChevronRight, Save, FilePlus } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Link } from 'react-router-dom';
+import { gableCeilingMaxMm } from '../utils/placement';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS } from '../modelRegistry';
@@ -361,10 +362,11 @@ export function Sidebar() {
                   {(() => {
                     const baseH = room.baseHeightMm ?? 100;
                     const roofH = room.roofHeightMm ?? 200;
-                    // Internal wall head and ridge, both from the finished floor.
-                    const wallHead = Math.round((room.heightMm ?? 2350) - baseH - roofH + 25);
-                    const ridge = wallHead + roofH;
-                    const maxC = Math.max(1800, ridge - 50);
+                    // Internal wall head, from the finished floor.
+                    const wallHead = Math.round((room.heightMm ?? 2350) - baseH - roofH + 15);
+                    // The real limit, from the same maths the geometry uses -
+                    // so the slider cannot offer a height it would then clamp.
+                    const maxC = Math.max(1800, gableCeilingMaxMm(room));
                     const value = Math.round(Math.min(maxC, Math.max(1800, room.gableCeilingHeightMm ?? wallHead)));
                     return (
                       <>
@@ -408,7 +410,7 @@ export function Sidebar() {
                               </div>
                             </div>
                             <p className="text-[10px] text-gray-400 leading-snug">
-                              Internal height, floor to ceiling. At {wallHead}mm it is flat wall to wall; raise it and the pitch stays on show at the eaves. Ridge is {ridge}mm.
+                              Internal height, floor to ceiling. At {wallHead}mm it is flat wall to wall; raise it and the pitch stays on show at the eaves. The most this roof allows is {maxC}mm.
                             </p>
                           </>
                         )}

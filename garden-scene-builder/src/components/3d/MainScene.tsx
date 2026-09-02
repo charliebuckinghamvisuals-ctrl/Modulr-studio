@@ -134,27 +134,33 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
         );
       }
       /**
-       * A click ARMS the brush; it does not open anything.
+       * A click while WALKING arms the brush; it does not open anything.
        *
        * Clicking a surface marks it and hands the mouse back, so a paint brush
        * appears over what you picked. Clicking that brush opens its finishes,
        * and choosing one returns you to walking. Two deliberate steps beat a
        * panel that springs open every time the crosshair crosses a cabinet.
+       *
+       * A click while the cursor is OUT only arms if the brush is already up.
+       * Otherwise it just starts you walking - the very first click on
+       * entering the walkthrough lands on a wall like any other, and arming
+       * off that meant you could not simply set off: you had to dismiss a
+       * brush you never asked for before you could move.
        */
-      const target = resolveTarget(ndc);
-      let handled = false;
+      const st = useStore.getState();
+      const arming = locked || st.walkPending !== null;
+      const target = arming ? resolveTarget(ndc) : null;
       if (target) {
-        const st = useStore.getState();
         st.setSelectedObjectId(null);
         st.setWalkFloorOpen(false);
         st.setWalkWallOpen(false);
         st.setWalkPending(target);
         if (locked) document.exitPointerLock();
-        handled = true;
+      } else if (!locked) {
+        // Nothing to arm, or armed and clicked past everything - walk on.
+        st.setWalkPending(null);
+        canvas.requestPointerLock();
       }
-      // Clicked past everything selectable while the cursor was out - that
-      // means carry on walking.
-      if (!handled && !locked) canvas.requestPointerLock();
     };
     const onMouseMove = (e: MouseEvent) => {
       if (document.pointerLockElement !== canvas) return;

@@ -78,6 +78,31 @@ export function interiorCeilingHeight(room: Room): number {
     : eaves;
 }
 
+/** Ceiling panel thickness, and the floor finish they are measured above.
+ *  Here rather than in RoomGeometry so the sidebar can quote the same limits
+ *  the geometry enforces, instead of a number the geometry then clamps. */
+export const GABLE_CEILING_T = 0.04;
+const FLOOR_TOP = 0.01;
+
+/**
+ * Highest a flat gable ceiling can go, in mm above the finished floor.
+ *
+ * Not the ridge: the roof group hangs off the wall height while the gable
+ * starts 25mm above it, the slabs straddle their centre line by half a
+ * bargeboard, and the ceiling panel needs its own thickness and a little
+ * clearance under that.
+ */
+export function gableCeilingMaxMm(room: Room): number {
+  const base = (room.baseHeightMm ?? 100) / 1000;
+  const roof = (room.roofHeightMm ?? 200) / 1000;
+  const fascia = Math.min(0.4, Math.max(0.05, (room.gableFasciaMm ?? 100) / 1000));
+  const wallTop = (room.heightMm ?? 2050) / 1000 - base - roof + 0.025;
+  const spanHalf = ((room.gableOrientation === 'side' ? room.depthMm : room.widthMm) / 1000) / 2;
+  const perp = Math.cos(Math.atan2(roof, Math.max(0.1, spanHalf)));
+  const centre = wallTop + roof - 0.025 - (fascia / 2) / perp - (GABLE_CEILING_T / 2) / perp - 0.006;
+  return Math.round((centre - GABLE_CEILING_T / 2 - FLOOR_TOP) * 1000);
+}
+
 export function roomLocal(room: Room, x: number, z: number) {
   const rx = (room.x ?? 0) / 1000;
   const rz = (room.z ?? 0) / 1000;

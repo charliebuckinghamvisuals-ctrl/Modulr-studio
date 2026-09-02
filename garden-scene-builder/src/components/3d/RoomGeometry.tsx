@@ -15,15 +15,11 @@ import { wallpaperProps } from '../../utils/wallpaper';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { DragHandle } from './DragHandles';
+import { GABLE_CEILING_T } from '../../utils/placement';
 
 /** Apex liner thickness: enough to sit clear of the gable face without
  *  z-fighting, thin enough to read as paint rather than a second wall. */
 const GABLE_LINER_T = 0.012;
-
-/** Ceiling panel thickness. Deliberately fatter than the apex liner: these sit
- *  centred on the roof's underside, so half of it needs to be inside the slab
- *  to close the joint at the eaves. */
-const GABLE_CEILING_T = 0.04;
 
 function DimText({ value, onValueChange, position, rotation, children, isDraggable, hideOnExport, hideIfZero }: any) {
   const [isEditing, setIsEditing] = useState(false);
@@ -965,8 +961,11 @@ export function RoomGeometry() {
     if (room.gableFlatCeiling) {
       // This whole group already sits on the finished floor, so these heights
       // need no base added - they ARE the height a customer would measure.
+      // Positioned by its UNDERSIDE, above the floor finish - so the height on
+      // the slider is the height you would measure standing in the room, not
+      // the height of the middle of a board.
       const asked = (room.gableCeilingHeightMm ?? 2400) / 1000;
-      flatY = Math.max(1.8, Math.min(asked, soffit(0) - 0.02));
+      flatY = Math.max(1.8, Math.min(0.01 + asked + GABLE_CEILING_T / 2, soffit(0)));
       // Where the pitch drops past the flat panel - solved on the same line
       // the sloped strips hang from, so the two meet flush instead of
       // stepping. soffit(u) = flatY, rearranged for u.
