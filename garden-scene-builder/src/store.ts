@@ -50,6 +50,7 @@ interface AppState {
   
   // History Actions
   saveState: () => void;
+  newDesign: () => void;
   undo: () => void;
   redo: () => void;
   
@@ -337,6 +338,31 @@ export const useStore = create<AppState>((set, get) => ({
       futureScenes: []
     };
   }),
+
+  /**
+   * Start again from a blank building.
+   *
+   * The autosave that restores your work after a refresh has no off switch, so
+   * once a design existed there was no way back to an empty one - opening the
+   * configurator always reloaded the last thing you touched. This clears the
+   * stored scene as well as the in-memory one; without that the next reload
+   * would simply bring the old design back and look like the button had done
+   * nothing.
+   *
+   * Undo history goes too. Undoing across a deliberate "new design" would
+   * resurrect half of the previous building.
+   */
+  newDesign: () => {
+    try { localStorage.removeItem(AUTOSAVE_KEY); } catch { /* private mode */ }
+    set({
+      scene: JSON.parse(JSON.stringify(initialState)),
+      pastScenes: [],
+      futureScenes: [],
+      selectedObjectId: null,
+      selectedElementId: null,
+      activePlacementType: null,
+    });
+  },
 
   undo: () => set((state) => {
     if (state.pastScenes.length === 0) return state;

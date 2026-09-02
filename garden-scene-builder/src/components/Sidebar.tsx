@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, createContext, useContext } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Settings, Plus, Box, Tent, Map, Settings2, Trash2, DoorOpen, DoorClosed, ChevronDown, ChevronRight } from 'lucide-react';
+import { Settings, Plus, Box, Tent, Map, Settings2, Trash2, DoorOpen, DoorClosed, ChevronDown, ChevronRight, Save, FilePlus } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Link } from 'react-router-dom';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
@@ -77,12 +77,14 @@ export function Sidebar() {
   // Reactive read so the selected wall's card highlights as selection changes.
   const selectedElementId = useStore(s => s.selectedElementId);
 
-  const { room, env, viewMode, areDoorsOpen, toggleDoors } = useStore(useShallow(s => ({
+  const { room, scene, env, viewMode, areDoorsOpen, toggleDoors, newDesign } = useStore(useShallow(s => ({
     room: s.scene.room,
+    scene: s.scene,
     env: s.scene.env,
     viewMode: s.viewMode,
     areDoorsOpen: s.areDoorsOpen,
-    toggleDoors: s.toggleDoors
+    toggleDoors: s.toggleDoors,
+    newDesign: s.newDesign
   })));
 
   const updateRoom = wrap(store.updateRoom);
@@ -118,7 +120,7 @@ export function Sidebar() {
               {areDoorsOpen ? <DoorOpen size={16}/> : <DoorClosed size={16}/>}
             </button>
           )}
-          <button 
+          <button
             onClick={toggleTime}
             className="w-8 h-8 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center shadow-sm border border-black/5 text-gray-500 hover:text-gray-800 transition-colors"
             title="Toggle Day/Night"
@@ -126,6 +128,42 @@ export function Sidebar() {
             {env.time === 'day' ? <Map size={16}/> : <Settings2 size={16}/>}
           </button>
         </div>
+      </div>
+
+      {/*
+        New and Save live HERE, in the sidebar, because the pair on the canvas
+        only renders in the 3D and walkthrough views - switch to plan or an
+        elevation and Save disappears, which is exactly when someone goes
+        looking for it. The sidebar is on screen in every view.
+      */}
+      <div className="px-6 pt-4 flex gap-2">
+        <button
+          onClick={() => {
+            const hasWork = scene.objects.length > 0 || room.doors.length > 0 || room.windows.length > 0;
+            // Only nag when there is something to lose. Confirming an empty
+            // scene is pure friction.
+            if (hasWork && !window.confirm('Start a new design? Anything not saved to your projects will be lost.')) return;
+            newDesign();
+          }}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-black/10 text-[11px] font-semibold text-gray-600 hover:bg-black/5 hover:text-gray-900 transition-colors"
+          title="Clear the canvas and start again"
+        >
+          <FilePlus size={13} /> New
+        </button>
+        <button
+          onClick={() => {
+            window.parent.postMessage({
+              type: 'SAVE_3D_DESIGN',
+              scene: useStore.getState().scene,
+              price: useStore.getState().calculatePrice(),
+              savedAt: Date.now(),
+            }, window.location.origin);
+          }}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#3b4d4a] text-white text-[11px] font-semibold hover:bg-[#2d3a38] transition-colors"
+          title="Save this design to your projects"
+        >
+          <Save size={13} /> Save Design
+        </button>
       </div>
 
       <div className="p-3 border-b border-black/5 bg-white space-y-2">
