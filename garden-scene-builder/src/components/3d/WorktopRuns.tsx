@@ -6,6 +6,7 @@ import { SceneObject } from '../../types';
 import { NATIVE_WIDTH_MM, hasWorktop, worktopById } from '../../modelRegistry';
 import { createWorktopMaterial } from '../../utils/materialFixes';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
+import { roomLocal } from '../../utils/placement';
 
 /**
  * ONE worktop per run of cabinets, instead of one per cabinet.
@@ -20,9 +21,9 @@ import { createWorldScaleBoxGeometry } from '../../utils/geometry';
  * cabinet is not what a customer is choosing) and this component lays a
  * continuous slab over each run.
  *
- * A "run" is a set of units at the same rotation, on the same line, close
- * enough to touch. Units at another angle or across the room form their own
- * runs, so an L-shaped kitchen or an island gets its own slab.
+ * A "run" is a set of units at the same rotation, on the same line, ACTUALLY
+ * TOUCHING. Units at another angle or across the room form their own runs,
+ * so an L-shaped kitchen or an island gets its own slab.
  */
 
 // From the models themselves: the top sits 870-900mm above the unit's base
@@ -33,10 +34,29 @@ const DEPTH = 0.64;
 // The sink bowl drops through a 700 x 450 hole in the middle of its unit.
 const SINK_HOLE_W = 0.70;
 const SINK_HOLE_D = 0.45;
-// Units closer than this along a run are treated as touching.
-const JOIN_GAP = 0.06;
+/**
+ * Units closer than this along a run are treated as touching.
+ *
+ * This was 60mm, which meant a unit parked one 50mm grid cell short of its
+ * neighbour still got a continuous slab laid over the gap - so it LOOKED
+ * joined when it was not, and nothing on screen told you the difference.
+ * Now it is a hair over zero: the slab only bridges units that really meet,
+ * so a gap in the worktop IS the signal that a unit has not snapped. The
+ * drag code (SceneObjects) magnetises units flush so that snap is easy to hit.
+ */
+const JOIN_GAP = 0.012;
 // How far off the line a unit can sit and still be part of the same run.
 const LINE_TOLERANCE = 0.15;
+
+/**
+ * Upstand: a 100mm strip standing on the back edge of the worktop where the
+ * run meets a wall. Standard on fitted kitchens - it closes the joint between
+ * worktop and wall - and absent on an island, which has no wall to meet.
+ */
+const UPSTAND_H = 0.10;
+const UPSTAND_T = 0.018;
+// The run's back edge must be this close to an inside wall face to get one.
+const WALL_REACH = 0.08;
 
 type Seg = { cx: number; cz: number; w: number; d: number };
 
@@ -82,7 +102,7 @@ export function WorktopRuns() {
       (byAngle.get(key) ?? byAngle.set(key, []).get(key)!).push(o);
     });
 
-    const out: { pos: [number, number, number]; rot: number; segs: Seg[] }[] = [];
+    const out: { pos: [number, number, number]; rot: number; length: number; segs: Seg[]; upstand: boolean }[] = [];
     const Y = new THREE.Vector3(0, 1, 0);
 
     byAngle.forEach(group => {
@@ -117,7 +137,18 @@ export function WorktopRuns() {
             .filter(p => p.o.type.startsWith('kitchen_sink'))
             .map(p => ({ cx: p.t - midT, w: SINK_HOLE_W }));
           const centre = origin.clone().addScaledVector(dir, midT).addScaledVector(perp, s);
-          out.push({ pos: [centre.x, 0, centre.z], rot, segs: segmentsFor(length, holes) });
+
+          // Does the back edge of this run meet an inside wall face? Units
+          // face +z locally, so the back edge is a half-depth behind the
+          // centre along -perp. Checked in room space so a rotated room or a
+          // return leg against the side wall both count.
+          const back = centre.clone().addScaledVector(perp, -DEPTH / 2);
+          const rl = roomLocal(room, back.x, back.z);
+          const upstand =
+            (rl.hx - Math.abs(rl.lx)) < WALL_REACH ||
+            (rl.hz - Math.abs(rl.lz)) < WALL_REACH;
+
+          out.push({ pos: [centre.x, 0, centre.z], rot, length, segs: segmentsFor(length, holes), upstand });
           current = [];
         };
         line.forEach(p => {
@@ -131,7 +162,7 @@ export function WorktopRuns() {
     });
 
     return out;
-  }, [objects]);
+  }, [objects, room]);
 
   // Interior objects stand on the finished floor, and so does the worktop.
   const baseH = ((room.baseHeightMm ?? 100) / 1000) + 0.005;
@@ -143,6 +174,7 @@ export function WorktopRuns() {
           {run.segs.map((seg, j) => (
             <SlabPiece key={j} seg={seg} material={material} y={TOP_Y + THICKNESS / 2} />
           ))}
+          {run.upstand && <Upstand length={run.length} material={material} />}
         </group>
       ))}
     </group>
@@ -158,5 +190,18 @@ function SlabPiece({ seg, material, y }: { seg: Seg; material: THREE.Material; y
   );
   return (
     <mesh position={[seg.cx, y, seg.cz]} geometry={geom} material={material} castShadow receiveShadow />
+  );
+}
+
+/** One continuous strip along the whole run's back edge, sink or no sink -
+ *  an upstand does not stop for the bowl, the bowl sits in front of it. */
+function Upstand({ length, material }: { length: number; material: THREE.Material }) {
+  const cz = -DEPTH / 2 + UPSTAND_T / 2;
+  const geom = useMemo(
+    () => createWorldScaleBoxGeometry(length, UPSTAND_H, UPSTAND_T, false, 0, 0, cz),
+    [length, cz],
+  );
+  return (
+    <mesh position={[0, TOP_Y + THICKNESS + UPSTAND_H / 2, cz]} geometry={geom} material={material} castShadow receiveShadow />
   );
 }

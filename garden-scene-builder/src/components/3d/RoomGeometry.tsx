@@ -821,6 +821,19 @@ export function RoomGeometry() {
 
   const claddingBoxGeom = useMemo(() => createWorldScaleBoxGeometry(w, h + 0.05, d, true, 0, 0, 0, isVertical), [w, h, d, isVertical]);
   const gableTriangleGeom = useMemo(() => createWorldScaleGableGeometry(gSpan, roofH, wallThickness, 0, h + 0.05, 0, isVertical), [gSpan, roofH, wallThickness, h, isVertical]);
+  /**
+   * Painted INSIDE face of each gable end.
+   *
+   * The gable triangle above is one CSG solid wearing the wall's cladding on
+   * every face, so from inside the room the apex read as boards - glaring in
+   * the walkthrough, where the eye is right under it. The straight walls get
+   * their white from the interior cutout's material; the triangle sits above
+   * that cutout, so nothing ever painted it. This is a 4mm liner in the
+   * interior colour, inset a few millimetres from the wall's inner face. It
+   * is deliberately NOT coplanar with the CSG triangle: a coplanar copy
+   * z-fought and produced the "glitching" the comment further down describes.
+   */
+  const gableLinerGeom = useMemo(() => createWorldScaleGableGeometry(gSpan, roofH, 0.004, 0, h + 0.05, 0, isVertical), [gSpan, roofH, h, isVertical]);
   const lShapeCutOuterGeom = useMemo(() => createWorldScaleBoxGeometry(cutW + 0.2, h + 1, cutD + 0.2, false, 0, 0, 0, isVertical), [cutW, cutD, h, roofH, isGable, isVertical]);
   // Roof plan size is exactly roofW x roofD (wall footprint + user overhangs).
   // A 100mm lip was previously baked in here (+0.2), so even with every
@@ -1334,11 +1347,38 @@ export function RoomGeometry() {
               <meshStandardMaterial color={roofColorHex} metalness={0.4} roughness={0.5} />
             </mesh>
 
-            {/* NO separate gable-end meshes here. The wall mesh itself already
-                ADDS clad gable triangles (gableTriangleGeom) as part of the
-                same CSG piece, with UVs that continue the wall's boards. A
+            {/* No separate EXTERIOR gable-end meshes here. The wall mesh itself
+                already ADDS clad gable triangles (gableTriangleGeom) as part of
+                the same CSG piece, with UVs that continue the wall's boards. A
                 second overlapping triangle z-fought with it - the "glitching
-                like it's not the same piece" was two coplanar copies. */}
+                like it's not the same piece" was two coplanar copies.
+
+                The liners below are the INSIDE face only, inset from the inner
+                wall surface by a few mm so they share no plane with the CSG
+                triangle. Same conditions as the exterior triangles: a glazed
+                apex has no wall to paint. */}
+            {(() => {
+              const inset = wallThickness + 0.005;
+              const liner = (pos: [number, number, number], rotY: number, key: string) => (
+                <mesh key={key} position={pos} rotation={[0, rotY, 0]} geometry={gableLinerGeom} receiveShadow>
+                  <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} side={THREE.DoubleSide} />
+                </mesh>
+              );
+              if (isSideGable) {
+                return room.hasApexGlazing ? null : (
+                  <>
+                    {liner([w / 2 - inset, h + 0.025, 0], Math.PI / 2, 'gl-r')}
+                    {liner([-w / 2 + inset, h + 0.025, 0], Math.PI / 2, 'gl-l')}
+                  </>
+                );
+              }
+              return (
+                <>
+                  {!room.hasApexGlazing && liner([0, h + 0.025, d / 2 - inset], 0, 'gl-f')}
+                  {liner([0, h + 0.025, -d / 2 + inset], 0, 'gl-b')}
+                </>
+              );
+            })()}
           </group>
         )}
         {!isPlanView && !isGable && (

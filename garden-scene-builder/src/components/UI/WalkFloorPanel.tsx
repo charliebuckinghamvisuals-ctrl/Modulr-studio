@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useStore } from '../../store';
 import { DimensionSlider } from '../DimensionSlider';
 import { resumeWalking } from '../../utils/walk';
@@ -23,6 +25,10 @@ const FLOORS = [
 export function WalkFloorPanel() {
   const viewMode = useStore(s => s.viewMode);
   const open = useStore(s => s.walkFloorOpen);
+  // Minimised to just its header. The panel sits bottom-centre, which is
+  // where you are looking while walking - so it can hide the very floor you
+  // are choosing. Collapsing keeps it one click away without moving it.
+  const [collapsed, setCollapsed] = useState(false);
   const room = useStore(s => s.scene.room);
   const updateRoom = useStore(s => s.updateRoom);
   const setOpen = useStore(s => s.setWalkFloorOpen);
@@ -31,8 +37,17 @@ export function WalkFloorPanel() {
 
   return (
     <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-2xl border border-black/5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] rounded-2xl px-5 py-3 z-20 w-80 text-[#3b4d4a]">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Floor</h3>
+      <div className={`flex justify-between items-center ${collapsed ? '' : 'mb-2'}`}>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            title={collapsed ? 'Expand' : 'Minimise'}
+            className="text-gray-400 hover:text-[#3b4d4a] transition-colors"
+          >
+            {collapsed ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Floor</h3>
+        </div>
         <button
           onClick={() => { setOpen(false); resumeWalking(); }}
           className="text-[10px] font-bold uppercase tracking-wide text-gray-400 hover:text-[#3b4d4a] transition-colors"
@@ -41,6 +56,7 @@ export function WalkFloorPanel() {
         </button>
       </div>
 
+      {!collapsed && (<>
       <div className="grid grid-cols-3 gap-2">
         {FLOORS.map(f => {
           const active = room.interiorFloorType === f.id;
@@ -75,6 +91,7 @@ export function WalkFloorPanel() {
           onChange={(v) => updateRoom({ floorScale: v / 100 })}
         />
       </div>
+      </>)}
     </div>
   );
 }

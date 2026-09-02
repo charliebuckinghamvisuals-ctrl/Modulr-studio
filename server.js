@@ -3092,7 +3092,21 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
             return res.status(503).json({ error: 'Could not verify your plan. Please try again shortly.' });
         }
         if (!ANIMATION_PLANS.has(plan)) {
-            return res.status(403).json({ error: 'Animation Studio is part of the Business plan.' });
+            // Same per-account override withEntitlements honours, so the
+            // button and the endpoint agree. One extra read, and only on the
+            // path that was about to refuse.
+            let override = false;
+            if (db) {
+                try {
+                    const snap = await db.collection('users').doc(req.user.uid).get();
+                    override = snap.exists && snap.data().animationEnabled === true;
+                } catch (e) {
+                    console.error('[ANIMATION] Override lookup failed:', e.message || e);
+                }
+            }
+            if (!override) {
+                return res.status(403).json({ error: 'Animation Studio is part of the Business plan.' });
+            }
         }
 
         // Claimed BEFORE the model is called, not after. Google bills for the
@@ -3317,7 +3331,17 @@ const fourKLeftFor = (data) => {
  *  derive these from the plan string itself — that would mean maintaining the
  *  entitlement list in two places, free to drift apart. */
 const withEntitlements = (payload, data) => {
-    const canUseAnimation = ANIMATION_PLANS.has(payload.plan);
+    /**
+     * `animationEnabled` on the user document is a per-account override.
+     *
+     * Animation is otherwise gated by PLAN, and the only plans that carry it
+     * are the paid ones. That leaves no way to let one tester or team member
+     * try it without moving them onto Business - which would also lift their
+     * render cap and mark them as a customer. The flag grants exactly the one
+     * thing. The monthly clip allowance still applies to them like anyone
+     * else, so the cost stays bounded. Set with scripts/grant-animation.mjs.
+     */
+    const canUseAnimation = ANIMATION_PLANS.has(payload.plan) || data?.animationEnabled === true;
     const canExport4K = FOUR_K_PLANS.has(payload.plan);
     return {
         ...payload,

@@ -1,6 +1,6 @@
 import { useStore } from '../../store';
 import { useEffect, useState } from 'react';
-import { Trash2, RotateCw, Copy } from 'lucide-react';
+import { Trash2, RotateCw, Copy, ChevronDown, ChevronUp } from 'lucide-react';
 import { isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS } from '../../modelRegistry';
 import { DimensionSlider } from '../DimensionSlider';
 import { useSavedColours, addSavedColour, removeSavedColour } from '../../utils/savedColours';
@@ -123,6 +123,8 @@ function ColourRow({ current, onPick, presets = UNIT_COLOURS, label = 'Colour' }
 }
 
 export function ObjectEditorPanel() {
+  // Declared before the early return below so the hook order never shifts.
+  const [collapsed, setCollapsed] = useState(false);
   const { selectedObjectId, scene, updateObject, removeObject, viewMode, updateRoom } = useStore();
   const obj = scene.objects.find(o => o.id === selectedObjectId);
 
@@ -139,8 +141,21 @@ export function ObjectEditorPanel() {
     // old floating top-right card sat over the scene. Frequent actions
     // (rotate / duplicate / delete) live in the mini toolbar at the object.
     <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-2xl border border-black/5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] rounded-2xl px-5 py-3 z-20 w-80 text-[#3b4d4a]">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{obj.type.replace(/_/g, ' ')}</h3>
+      <div className={`flex justify-between items-center ${collapsed ? '' : 'mb-2'}`}>
+        <div className="flex items-center gap-2">
+          {/* Minimise to the header only. Docked bottom-centre, this panel
+              sits over the floor in the walkthrough and over the bottom of
+              the plan while you are dragging - handy until it is exactly
+              where you need to see. One click folds it to a strip. */}
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            title={collapsed ? 'Expand' : 'Minimise'}
+            className="text-gray-400 hover:text-[#3b4d4a] transition-colors"
+          >
+            {collapsed ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{obj.type.replace(/_/g, ' ')}</h3>
+        </div>
         {finishesOnly ? (
           <button
             onClick={() => { useStore.getState().setSelectedObjectId(null); resumeWalking(); }}
@@ -158,6 +173,7 @@ export function ObjectEditorPanel() {
         )}
       </div>
 
+      {!collapsed && (
       <div className="space-y-3">
         {/* Actions moved here from the pill that floated over the object.
             Not rendered at all in the walkthrough - hiding them with CSS
@@ -327,6 +343,7 @@ export function ObjectEditorPanel() {
           </>
         )}
       </div>
+      )}
     </div>
   );
 }

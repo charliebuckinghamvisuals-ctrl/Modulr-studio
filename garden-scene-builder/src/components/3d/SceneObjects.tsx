@@ -6,7 +6,7 @@ import { useRef, useState, useEffect, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
-import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H } from '../../modelRegistry';
+import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H } from '../../modelRegistry';
 import { applyModelMaterials, retintModel, resurfaceWorktop } from '../../utils/materialFixes';
 import { isInteriorType, clampToRoomInterior, roomLocal, FOOTPRINT_RADIUS } from '../../utils/placement';
 import { RotateCw, Copy, Trash2 } from 'lucide-react';
@@ -207,6 +207,51 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
           const MAG = 0.12;
           if (Math.abs(nx - -ix) < MAG) nx = -ix; else if (Math.abs(nx - ix) < MAG) nx = ix;
           if (Math.abs(nz - -iz) < MAG) nz = -iz; else if (Math.abs(nz - iz) < MAG) nz = iz;
+
+          /**
+           * Kitchen units magnetise flush to a neighbouring unit.
+           *
+           * Grid snapping alone let a unit stop one 50mm cell short of the
+           * next and read as joined - and the continuous worktop then bridged
+           * the gap and hid it, so "is this snapped?" had no answer on screen.
+           * Two halves of the fix: here, a unit within 120mm of a neighbour's
+           * free edge - same angle, same line - jumps flush against it and
+           * onto its line. Over in WorktopRuns the slab now only bridges units
+           * that actually touch. So a snapped unit shows one continuous top,
+           * and an unsnapped one shows a break. That break is the tell.
+           */
+          if (hasWorktop(obj.type)) {
+            const all = useStore.getState().scene.objects;
+            const myW = (obj.widthMm ?? NATIVE_WIDTH_MM[obj.type] ?? 600) / 1000;
+            const rot = obj.rot ?? 0;
+            const up = new THREE.Vector3(0, 1, 0);
+            const dir = new THREE.Vector3(1, 0, 0).applyAxisAngle(up, rot);
+            const perp = new THREE.Vector3(0, 0, 1).applyAxisAngle(up, rot);
+            const UNIT_MAG = 0.12;
+            let best: { dist: number; x: number; z: number } | null = null;
+            for (const n of all) {
+              if (n.id === obj.id || !hasWorktop(n.type)) continue;
+              const dRot = Math.abs(((n.rot ?? 0) - rot) % (Math.PI * 2));
+              if (Math.min(dRot, Math.PI * 2 - dRot) > 0.02) continue;
+              const nW = (n.widthMm ?? NATIVE_WIDTH_MM[n.type] ?? 600) / 1000;
+              const v = new THREE.Vector3(nx - n.x, 0, nz - n.z);
+              const t = v.dot(dir), s = v.dot(perp);
+              if (Math.abs(s) > 0.15) continue;
+              for (const side of [1, -1]) {
+                // Where my centre sits when my edge meets theirs on this side.
+                const target = side * (nW / 2 + myW / 2);
+                const dist = Math.abs(t - target);
+                if (dist < UNIT_MAG && (!best || dist < best.dist)) {
+                  // Lands flush along the run AND on the neighbour's line, so
+                  // a unit dragged in slightly skew still meets it square.
+                  const p = new THREE.Vector3(n.x, 0, n.z).addScaledVector(dir, target);
+                  best = { dist, x: p.x, z: p.z };
+                }
+              }
+            }
+            if (best) { nx = best.x; nz = best.z; }
+          }
+
           // Never draggable out through a wall
           const c = clampToRoomInterior(room, nx, nz);
           nx = c.x; nz = c.z;
