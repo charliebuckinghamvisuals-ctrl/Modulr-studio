@@ -43,6 +43,13 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   kitchen_hob_gas: 'models/kitchen_hob_gas.glb',
   kitchen_hob_induction: 'models/kitchen_hob_induction.glb',
   kitchen_extractor: 'models/kitchen_extractor.glb',
+  kitchen_wall_unit_600: 'models/kitchen_wall_unit_600.glb',
+  kitchen_wall_unit_1200: 'models/kitchen_wall_unit_1200.glb',
+  bar_stool: 'models/bar_stool.glb',
+  bar_stool_tall: 'models/bar_stool_tall.glb',
+  dining_table: 'models/dining_table.glb',
+  towel_heater: 'models/towel_heater.glb',
+  external_extraction_fan: 'models/external_extraction_fan.glb',
 };
 
 /**
@@ -59,6 +66,10 @@ export const NATIVE_WIDTH_MM: Partial<Record<ObjectType, number>> = {
   kitchen_sink_1200: 1203,
   kitchen_drawer_2: 600,
   kitchen_drawer_3: 600,
+  // Wall units stretch along their length like the base units below them, so
+  // a run of wall cupboards can be sized to the run of floor cupboards.
+  kitchen_wall_unit_600: 600,
+  kitchen_wall_unit_1200: 1200,
 };
 
 /** Allowed width range per type, in mm. */
@@ -68,6 +79,8 @@ export const WIDTH_RANGE_MM: Partial<Record<ObjectType, [number, number]>> = {
   kitchen_drawer_3: [400, 900],
   kitchen_unit_1200: [900, 1800],
   kitchen_sink_1200: [900, 1800],
+  kitchen_wall_unit_600: [400, 900],
+  kitchen_wall_unit_1200: [900, 1800],
 };
 
 export const isWidthAdjustable = (type: ObjectType) => NATIVE_WIDTH_MM[type] !== undefined;
@@ -92,6 +105,10 @@ export const TINT_MATERIAL: Partial<Record<ObjectType, string>> = {
   kitchen_drawer_2: 'M03_Pewter_Shine',
   kitchen_drawer_3: 'M03_Pewter_Shine',
   kitchen_tall_larder: 'M03_Pewter_Shine',
+  // The wall units came out of the export carrying ONLY this material, so
+  // they recolour cleanly with the run of base units beneath them.
+  kitchen_wall_unit_600: 'M03_Pewter_Shine',
+  kitchen_wall_unit_1200: 'M03_Pewter_Shine',
 };
 
 /**
@@ -111,6 +128,15 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   kitchen_hob_induction: 900,
   // 600mm clearance over the hob is the standard extraction height.
   kitchen_extractor: 1500,
+  // Wall cupboards hang at the same height as the hood, so a run of them
+  // lines up with it across the wall.
+  kitchen_wall_unit_600: 1500,
+  kitchen_wall_unit_1200: 1500,
+  // A towel rail is fixed clear of the floor.
+  towel_heater: 300,
+  // The extract terminal goes high on the OUTSIDE wall. Not an interior type,
+  // so this is measured from the ground rather than the finished floor.
+  external_extraction_fan: 2000,
 };
 
 /** The extractor's flue is a separate model so it can be stretched to meet
@@ -163,6 +189,32 @@ export const MATERIAL_TWEAKS: Partial<Record<ObjectType, Record<string, Material
 export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
   kitchen_tap_straight: ['[Mirror 01]1'],
   kitchen_tap_curved: ['<auto>', '<auto>1'],
+  // A towel rail is all metalwork, so the whole thing takes the finish.
+  towel_heater: ['fragranit'],
+  // Brushed steel legs under a timber top.
+  dining_table: ['[Steel Brushed Stainless]'],
+};
+
+/**
+ * Types whose imported materials should be forced DIELECTRIC (metalness 0).
+ *
+ * The SketchUp exporter writes metalness 0.5 on every material it does not
+ * know about - a value that exists nowhere in reality. Half-metal darkens the
+ * diffuse colour and drinks the light, which is what makes imported furniture
+ * look muddy and grey next to the units. Anything genuinely metal is named in
+ * METAL_MATERIALS above and is handled before this.
+ *
+ * Deliberately opt-in per type rather than applied to every model: the older
+ * imports have been tuned by eye against the scene lighting and are signed
+ * off, and re-basing them now would change models nobody complained about.
+ */
+export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
+  bar_stool: true,
+  bar_stool_tall: true,
+  dining_table: true,
+  towel_heater: true,
+  external_extraction_fan: true,
+  bed: true,
 };
 
 /**
@@ -313,11 +365,18 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   kitchen_hob_gas: 'Gas Hob',
   kitchen_hob_induction: 'Induction Hob',
   kitchen_extractor: 'Extractor Hood',
+  kitchen_wall_unit_600: 'Wall Unit (Single)',
+  kitchen_wall_unit_1200: 'Wall Unit (Double)',
+  external_extraction_fan: 'External Extract Fan',
+  dining_table: 'Dining Table',
+  bar_stool: 'Bar Stool',
+  bar_stool_tall: 'Bar Stool (Tall)',
   toilet: 'Toilet',
   vanity: 'Vanity Unit',
   shower: 'Shower (Large)',
   shower_corner: 'Shower (Corner)',
   shower_small: 'Shower (Small)',
+  towel_heater: 'Towel Radiator',
 };
 
 export const GLB_OBJECT_TYPES = Object.keys(GLB_OBJECT_LABELS).filter(t => (MODEL_URLS as Record<string, string>)[t]) as ObjectType[];

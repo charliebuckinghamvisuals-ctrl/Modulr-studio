@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { ObjectType } from '../types';
 import {
-  TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH,
+  TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH, FORCE_DIELECTRIC,
   FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById,
 } from '../modelRegistry';
 import type { WorktopDef } from '../modelRegistry';
@@ -339,6 +339,17 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         if (tweak.metalness !== undefined) copy.metalness = tweak.metalness;
         if (tweak.envMapIntensity !== undefined) copy.envMapIntensity = tweak.envMapIntensity;
         if (tweak.dropMap) copy.map = null;
+        copy.needsUpdate = true;
+        return copy;
+      }
+
+      if (FORCE_DIELECTRIC[type] && m.metalness > 0 && !m.metalnessMap) {
+        // See FORCE_DIELECTRIC: the exporter's blanket metalness 0.5 is not a
+        // real material. Roughness is nudged off its 0.5 default too, since
+        // that reads as an unplaceable semi-gloss on timber and fabric.
+        const copy = m.clone();
+        copy.metalness = 0;
+        if (copy.roughness === 0.5) copy.roughness = 0.7;
         copy.needsUpdate = true;
         return copy;
       }

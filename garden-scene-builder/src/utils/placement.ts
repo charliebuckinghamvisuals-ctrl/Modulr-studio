@@ -14,6 +14,10 @@ export const INTERIOR_TYPES: ObjectType[] = [
   'kitchen_tap_straight', 'kitchen_tap_curved',
   'kitchen_drawer_2', 'kitchen_drawer_3', 'kitchen_tall_larder',
   'kitchen_hob_gas', 'kitchen_hob_induction', 'kitchen_extractor',
+  'kitchen_wall_unit_600', 'kitchen_wall_unit_1200',
+  'bar_stool', 'bar_stool_tall', 'towel_heater',
+  // external_extraction_fan is deliberately NOT here - it is the outside
+  // terminal of the extract run, so it has to be placeable on an outside wall.
 ];
 
 export const isInteriorType = (type: ObjectType) => INTERIOR_TYPES.includes(type);
@@ -30,6 +34,9 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
   kitchen_hob_gas: 0.55, kitchen_hob_induction: 0.45, kitchen_extractor: 0.7,
   // Taps are tiny - a default-sized ring would swallow the sink unit.
   kitchen_tap_straight: 0.28, kitchen_tap_curved: 0.28,
+  kitchen_wall_unit_600: 0.55, kitchen_wall_unit_1200: 0.85,
+  bar_stool: 0.4, bar_stool_tall: 0.4,
+  dining_table: 1.2, towel_heater: 0.45, external_extraction_fan: 0.35,
 };
 
 /**
