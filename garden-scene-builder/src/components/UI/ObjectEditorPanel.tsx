@@ -40,8 +40,14 @@ function HexField({ value, onCommit }: { value: string; onCommit: (hex: string) 
  * a "Save" affordance that names it into the palette. Saved colours live in
  * localStorage (see utils/savedColours), so they follow the customer across
  * units and across designs on this browser.
+ *
+ * onPick's second argument says whether the colour is SETTLED. A swatch is one
+ * decisive click, so it is. The colour wheel is not: the browser fires a change
+ * on every drag of the picker, so treating those as settled closed the panel
+ * the instant you started choosing - the caller must leave the panel up until
+ * Done. The hex field settles only on commit, so it counts.
  */
-function ColourRow({ current, onPick, presets = UNIT_COLOURS, label = 'Colour' }: { current: string; onPick: (hex: string) => void; presets?: { name: string; hex: string }[]; label?: string }) {
+function ColourRow({ current, onPick, presets = UNIT_COLOURS, label = 'Colour' }: { current: string; onPick: (hex: string, settled: boolean) => void; presets?: { name: string; hex: string }[]; label?: string }) {
   const saved = useSavedColours();
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
@@ -62,14 +68,14 @@ function ColourRow({ current, onPick, presets = UNIT_COLOURS, label = 'Colour' }
       <span className="text-xs font-semibold text-gray-700 shrink-0 pt-1">{label}</span>
       <div className="flex gap-1.5 flex-wrap items-center">
         {presets.map(c => (
-          <button key={c.hex} title={c.name} onClick={() => onPick(c.hex)} style={{ background: c.hex }} className={ring(current === c.hex.toLowerCase())} />
+          <button key={c.hex} title={c.name} onClick={() => onPick(c.hex, true)} style={{ background: c.hex }} className={ring(current === c.hex.toLowerCase())} />
         ))}
         {/* The customer's saved palette. Hover a swatch for its name; the x
             removes it from the palette (units already painted keep their
             colour - the design stores the hex itself). */}
         {saved.map(c => (
           <span key={c.hex} className="relative group">
-            <button title={c.name} onClick={() => onPick(c.hex)} style={{ background: c.hex }} className={ring(current === c.hex.toLowerCase())} />
+            <button title={c.name} onClick={() => onPick(c.hex, true)} style={{ background: c.hex }} className={ring(current === c.hex.toLowerCase())} />
             <button
               title={`Remove "${c.name}" from saved colours`}
               onClick={(e) => { e.stopPropagation(); removeSavedColour(c.hex); }}
@@ -89,11 +95,11 @@ function ColourRow({ current, onPick, presets = UNIT_COLOURS, label = 'Colour' }
           <input
             type="color"
             value={/^#[0-9a-f]{6}$/.test(current) ? current : '#d4d4d4'}
-            onChange={(e) => onPick(e.target.value)}
+            onChange={(e) => onPick(e.target.value, false)}
             className="absolute inset-0 opacity-0 cursor-pointer"
           />
         </label>
-        <HexField value={current} onCommit={onPick} />
+        <HexField value={current} onCommit={(hex) => onPick(hex, true)} />
         {/* Save the current custom colour under a name. */}
         {!isPreset && !savedMatch && !naming && (
           <button
@@ -208,7 +214,7 @@ export function ObjectEditorPanel() {
         {/* Door/carcass colour. Only the body material is recoloured, so the
             worktop, sink and handles keep their own finish. */}
         {TINT_MATERIAL[obj.type] && (
-          <ColourRow current={(obj.color ?? UNIT_COLOURS[0].hex).toLowerCase()} onPick={(hex) => { updateObject(obj.id, { color: hex }); afterPick(); }} />
+          <ColourRow current={(obj.color ?? UNIT_COLOURS[0].hex).toLowerCase()} onPick={(hex, settled) => { updateObject(obj.id, { color: hex }); if (settled) afterPick(); }} />
         )}
 
         {/* Worktop. Stored on the ROOM, not the unit - a kitchen has one
@@ -240,7 +246,7 @@ export function ObjectEditorPanel() {
             label="Fabric"
             presets={FABRIC_COLOURS}
             current={(obj.color ?? FABRIC_COLOURS[0].hex).toLowerCase()}
-            onPick={(hex) => { updateObject(obj.id, { color: hex }); afterPick(); }}
+            onPick={(hex, settled) => { updateObject(obj.id, { color: hex }); if (settled) afterPick(); }}
           />
         )}
 

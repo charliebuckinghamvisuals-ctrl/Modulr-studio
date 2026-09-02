@@ -252,7 +252,7 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
 }
 
 function AnimatedDoorLeaves({ door, frameColorHex, frameThickness, sashThickness, depth, room }: { door: any, frameColorHex: string, frameThickness: number, sashThickness: number, depth: number, room: Room }) {
-  const { areDoorsOpen, toggleDoors, viewMode } = useStore();
+  const { areDoorsOpen } = useStore();
   const leavesRef = useRef<THREE.Group[]>([]);
 
   /**
@@ -352,18 +352,16 @@ function AnimatedDoorLeaves({ door, frameColorHex, frameThickness, sashThickness
               </group>
             )}
 
-            {viewMode === 'walking' && i === door.leaves - 1 && (
-               <Html position={[0, 0, depth * 0.5 + 0.1]} transform center>
-                 <button 
-                   onClick={(e) => { e.stopPropagation(); toggleDoors(); }}
-                   className="bg-black/80 hover:bg-black text-white px-3 py-2 rounded-lg border border-white/20 text-xs font-bold transition-all shadow-xl pointer-events-auto"
-                   style={{ cursor: 'pointer' }}
-                 >
-                   {areDoorsOpen ? "Close Door" : "Open Door"}
-                 </button>
-               </Html>
-            )}
+            {/*
+              No "Open Door" badge on the leaf.
 
+              It was an Html label welded to the leaf, so from inside the room
+              you read it back to front, and with one per door set they hung in
+              the glass across the whole elevation - the first thing a customer
+              saw on the walkthrough was floating UI, not their room. Doors are
+              still opened from Open Doors in the toolbar, which does the whole
+              set at once anyway.
+            */}
             {/* Panel: glass, or a solid slab for the entrance-door style */}
             {door.style === 'solid' ? (
               <mesh castShadow>

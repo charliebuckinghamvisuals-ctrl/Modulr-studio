@@ -79,7 +79,10 @@ export function WalkWallPanel() {
               }`}
             />
           ))}
-          {/* Any colour, for a customer who has a paint reference to hand. */}
+          {/* Any colour, for a customer who has a paint reference to hand.
+              Unlike a swatch this does NOT close the panel: the browser fires
+              a change on every drag of the picker, so closing on one shut the
+              panel the moment you started choosing. Done ends it. */}
           <label
             title="Custom colour"
             className="relative w-7 h-7 rounded-full border border-black/15 cursor-pointer overflow-hidden hover:scale-110 transition-all"
