@@ -198,6 +198,10 @@ export function Sidebar() {
         <div className="flex bg-gray-100 p-1 rounded-lg border border-black/5">
           <button onClick={() => setTab('building')} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${tab === 'building' ? 'bg-white shadow-sm text-[#1d1d1f]' : 'text-gray-400 hover:text-gray-600'}`}>Building</button>
           <button onClick={() => setTab('objects')} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${tab === 'objects' ? 'bg-white shadow-sm text-[#1d1d1f]' : 'text-gray-400 hover:text-gray-600'}`}>Objects</button>
+          {/* Kitchen gets its own tab. It was a section inside Objects, which
+              meant scrolling past the sofas to find a worktop, and the units
+              were in one place while their colours were in another. */}
+          <button onClick={() => setTab('kitchen')} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${tab === 'kitchen' ? 'bg-white shadow-sm text-[#1d1d1f]' : 'text-gray-400 hover:text-gray-600'}`}>Kitchen</button>
         </div>
       </div>
 
@@ -1161,6 +1165,48 @@ export function Sidebar() {
           </StepContext.Provider>
         )}
 
+        {/*
+          The whole kitchen in one place: what to add, then how it is
+          finished. Split across the Objects picker and an object panel it
+          meant hunting for a worktop past the sofas, and setting a door
+          colour six times because the units were nowhere near their finishes.
+        */}
+        {tab === 'kitchen' && (
+          <div className="space-y-7">
+            <section>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Add units</label>
+              <p className="text-[10px] text-gray-500 leading-relaxed mb-3">
+                Click an item, then click in the scene.
+                <span className="text-gray-400"> R rotates &middot; Esc cancels.</span>
+              </p>
+              <div className="grid grid-cols-2 gap-2.5">
+                {([
+                  'kitchen_unit_600', 'kitchen_unit_1200', 'kitchen_sink_1200',
+                  'kitchen_drawer_2', 'kitchen_drawer_3', 'kitchen_tall_larder',
+                  'kitchen_wall_unit_600', 'kitchen_wall_unit_1200',
+                  'kitchen_hob_gas', 'kitchen_hob_induction', 'kitchen_extractor',
+                  'external_extraction_fan',
+                  'kitchen_tall_fridge', 'kitchen_tall_oven_single', 'kitchen_tall_oven_double',
+                  'kitchen_tap_straight', 'kitchen_tap_curved',
+                  'bar_stool', 'bar_stool_tall',
+                ] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-2">
+                Base unit widths are adjustable once placed. Taps drop straight onto the worktop at 900mm.
+              </p>
+            </section>
+
+            <section>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Finishes</label>
+              <div className="p-4 bg-white border border-black/5 rounded-xl shadow-sm">
+                <KitchenPanel />
+              </div>
+            </section>
+          </div>
+        )}
+
         {tab === 'objects' && (
           <div className="space-y-7">
             {/* No negative margin: the line wraps at this width, and pulling
@@ -1197,24 +1243,8 @@ export function Sidebar() {
               </div>
             </section>
 
-            <section>
-              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Kitchen</label>
-              <div className="grid grid-cols-2 gap-2.5">
-                {([
-                  'kitchen_unit_600', 'kitchen_unit_1200', 'kitchen_sink_1200',
-                  'kitchen_drawer_2', 'kitchen_drawer_3', 'kitchen_tall_larder',
-                  'kitchen_wall_unit_600', 'kitchen_wall_unit_1200',
-                  'kitchen_hob_gas', 'kitchen_hob_induction', 'kitchen_extractor',
-                  'external_extraction_fan',
-                  'kitchen_tall_fridge', 'kitchen_tall_oven_single', 'kitchen_tall_oven_double',
-                  'kitchen_tap_straight', 'kitchen_tap_curved',
-                ] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
-                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
-                ))}
-              </div>
-              <p className="text-[10px] text-gray-400 mt-2">Base unit widths are adjustable once placed. Taps drop straight onto the worktop at 900mm.</p>
-            </section>
-
+            {/* Kitchen units live on the Kitchen tab, with the finishes that
+                apply to them. */}
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Bathroom</label>
               <div className="grid grid-cols-2 gap-2.5">
@@ -1228,16 +1258,6 @@ export function Sidebar() {
                 the fittings are actually visible and can be dragged. Laying
                 them out from the furniture picker meant placing them into a
                 view that had the roof over them. */}
-            {/* The kitchen as a whole: finish, door colour per run, worktop.
-                Per-unit overrides stay on the object panel, for the island in
-                a contrasting colour. */}
-            <section>
-              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Kitchen</label>
-              <div className="p-4 bg-white border border-black/5 rounded-xl shadow-sm">
-                <KitchenPanel />
-              </div>
-            </section>
-
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Lighting</label>
               <button
