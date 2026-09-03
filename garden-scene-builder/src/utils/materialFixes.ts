@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { ObjectType } from '../types';
 import {
   TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH, FORCE_DIELECTRIC,
-  EMISSIVE_MATERIAL, LIGHT_COLOURS,
+  EMISSIVE_MATERIAL, LIGHT_COLOURS, UNMIRROR_NORMALS,
   FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById,
 } from '../modelRegistry';
 import type { WorktopDef } from '../modelRegistry';
@@ -276,7 +276,7 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
      * first because the mirrored copy usually SHARES it with the one that is
      * the right way round.
      */
-    if (mesh.matrixWorld.determinant() < 0 && !mesh.userData.__unmirrored) {
+    if (UNMIRROR_NORMALS[type] && mesh.matrixWorld.determinant() < 0 && !mesh.userData.__unmirrored) {
       const geom = mesh.geometry.clone();
       const n = geom.getAttribute('normal');
       if (n) {

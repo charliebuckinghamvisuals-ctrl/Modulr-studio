@@ -97,7 +97,7 @@ export function SpotLayout() {
           >Front to back</button>
         </div>
         <p className="text-[10px] text-gray-400 leading-snug">
-          {rowCount} spots, {mm(rowPitch)}mm apart, down the middle. Drag any one afterwards to move it.
+          {rowCount} spots, {mm(rowPitch)}mm apart, down the middle.
         </p>
         <button
           onClick={() => addSpotRow(rowCount, axis, 0)}
@@ -126,6 +126,13 @@ export function SpotLayout() {
           <LayoutGrid size={14} /> {spotCount ? 'Replace with grid' : 'Lay out grid'}
         </button>
       </div>
+
+      {spotCount > 0 && (
+        <p className="text-[10px] text-gray-500 leading-snug bg-black/[0.03] rounded-lg px-2.5 py-2">
+          Drag any spot and its whole row moves with it, keeping its spacing.
+          Arrow keys nudge the row too. Hold <span className="font-semibold">Alt</span> to move a single fitting.
+        </p>
+      )}
 
       {spotCount > 0 && (
         <div className="flex items-center justify-between pt-1">

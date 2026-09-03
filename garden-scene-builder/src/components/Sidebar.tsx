@@ -1163,7 +1163,12 @@ export function Sidebar() {
 
         {tab === 'objects' && (
           <div className="space-y-7">
-            <p className="text-[10px] text-gray-500 -mb-2">Click an item, then click in the scene to place it. <span className="text-gray-400">R rotates, Esc cancels.</span></p>
+            {/* No negative margin: the line wraps at this width, and pulling
+                it up put the second line through the first section heading. */}
+            <p className="text-[10px] text-gray-500 leading-relaxed">
+              Click an item, then click in the scene.
+              <span className="text-gray-400"> R rotates &middot; Esc cancels.</span>
+            </p>
 
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Seating</label>

@@ -133,6 +133,9 @@ interface AppState {
    *  depth, at `offset` from the room's centre line on the other axis. */
   addSpotRow: (count: number, axis: 'across' | 'down', offset?: number) => void;
   clearSpots: () => void;
+  /** Move an object to x,z, carrying the rest of its run with it. Pass solo
+   *  to break one fitting out of the line instead. */
+  moveWithGroup: (id: string, x: number, z: number, solo?: boolean) => void;
   /** Preview the design after dark. Daylight swamps the fittings, so without
    *  this a lighting layout cannot actually be judged. */
   nightPreview: boolean;
@@ -868,10 +871,13 @@ export const useStore = create<AppState>((set, get) => ({
     const kept = replace ? state.scene.objects.filter(o => o.type !== 'spot_light') : state.scene.objects;
     const spots: SceneState['objects'] = [];
     for (let r = 0; r < rows; r++) {
+      // Each row of the grid is its own group, so a grid can be nudged one
+      // row at a time - which is how you adjust for a beam or a rooflight.
+      const groupId = uuidv4();
       for (let c = 0; c < cols; c++) {
         const x = -iw / 2 + iw * (c + 0.5) / cols;
         const z = -id / 2 + id * (r + 0.5) / rows;
-        spots.push({ id: uuidv4(), type: 'spot_light', x, z, rot: 0, scale: 1 });
+        spots.push({ id: uuidv4(), type: 'spot_light', x, z, rot: 0, scale: 1, groupId });
       }
     }
     return { scene: { ...state.scene, objects: [...kept, ...spots] } };
@@ -891,15 +897,56 @@ export const useStore = create<AppState>((set, get) => ({
     const wt = (room.wallThicknessMm ?? 150) / 1000;
     const span = (axis === 'across' ? room.widthMm : room.depthMm) / 1000 - wt * 2;
     const spots: SceneState['objects'] = [];
+    const groupId = uuidv4();
     for (let i = 0; i < count; i++) {
       const along = -span / 2 + span * (i + 0.5) / count;
       spots.push({
-        id: uuidv4(), type: 'spot_light', rot: 0, scale: 1,
+        id: uuidv4(), type: 'spot_light', rot: 0, scale: 1, groupId,
         x: axis === 'across' ? along : offset,
         z: axis === 'across' ? offset : along,
       });
     }
     return { scene: { ...state.scene, objects: [...state.scene.objects, ...spots] } };
+  }),
+
+  /**
+   * Move an object, taking its whole run with it.
+   *
+   * The run stays RIGID: the delta is worked out once and clamped so that
+   * every member stays inside the room, rather than clamping each one
+   * separately - which would squash the row against a wall and destroy the
+   * even spacing that is the entire point of laying it out.
+   *
+   * `solo` moves just the one, for the odd fitting that needs shifting off
+   * the line.
+   */
+  moveWithGroup: (id, x, z, solo = false) => set((state) => {
+    const objects = state.scene.objects;
+    const src = objects.find(o => o.id === id);
+    if (!src) return {};
+    const room = state.scene.room;
+    const target = isInteriorType(src.type) ? clampToRoomInterior(room, x, z) : { x, z };
+    const mates = (!solo && src.groupId) ? objects.filter(o => o.groupId === src.groupId && o.id !== id) : [];
+    if (!mates.length) {
+      return { scene: { ...state.scene, objects: objects.map(o => o.id === id ? { ...o, x: target.x, z: target.z } : o) } };
+    }
+    // Whichever member hits a wall first sets how far the run can go.
+    let dx = target.x - src.x, dz = target.z - src.z;
+    for (const o of mates) {
+      const c = clampToRoomInterior(room, o.x + dx, o.z + dz);
+      const mx = c.x - o.x, mz = c.z - o.z;
+      if (Math.abs(mx) < Math.abs(dx)) dx = mx;
+      if (Math.abs(mz) < Math.abs(dz)) dz = mz;
+    }
+    const gid = src.groupId;
+    return {
+      scene: {
+        ...state.scene,
+        objects: objects.map(o => (o.id === id || o.groupId === gid)
+          ? { ...o, x: o.x + dx, z: o.z + dz }
+          : o),
+      },
+    };
   }),
 
   clearSpots: () => set((state) => ({

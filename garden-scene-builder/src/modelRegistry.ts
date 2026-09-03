@@ -243,6 +243,22 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
  * imports have been tuned by eye against the scene lighting and are signed
  * off, and re-basing them now would change models nobody complained about.
  */
+/**
+ * Types with a MIRRORED component whose normals need turning back.
+ *
+ * SketchUp places a matching pair - two pillows, two bedside tables - as one
+ * component used twice with the second flipped, and transforming a normal by a
+ * mirror turns it inward, so that copy is lit as though it faced away.
+ *
+ * Opt-in per type rather than applied to every mirrored mesh: run globally it
+ * turned the fabric thumbnails in the picker black, so whatever it was
+ * catching there was not a case that needed fixing. Add a type here only when
+ * a mirrored part is visibly wrong on it.
+ */
+export const UNMIRROR_NORMALS: Partial<Record<ObjectType, true>> = {
+  bed: true,
+};
+
 export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
   bar_stool: true,
   bar_stool_tall: true,

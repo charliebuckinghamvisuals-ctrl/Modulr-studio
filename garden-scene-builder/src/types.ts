@@ -187,6 +187,10 @@ export interface SceneObject {
   doorGapOffsetMm?: number;
   doorGapWidthMm?: number;
   returnLengthMm?: number;
+  /** Objects laid out together as one run - a row of downlights. They move as
+   *  a unit, because dragging six spots one at a time to shift a row 200mm is
+   *  exactly the tedium the layout tool exists to remove. */
+  groupId?: string;
 }
 
 export interface FenceRun {

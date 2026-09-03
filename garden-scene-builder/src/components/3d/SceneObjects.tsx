@@ -88,9 +88,20 @@ function ModelFallback() {
 }
 
 export function SceneObjects() {
-  const { objects, isExporting } = useStore(useShallow(s => ({
+  const { objects, isExporting, lightsEmit } = useStore(useShallow(s => ({
     objects: s.scene.objects,
-    isExporting: s.isExporting
+    isExporting: s.isExporting,
+    /*
+     * Real lights only while you are LOOKING at the lighting.
+     *
+     * The number of live lights is compiled into every shader in the scene,
+     * so a dozen of them makes each frame dearer AND makes React adding or
+     * removing one stall while programs rebuild - which is why dragging a
+     * downlight around the design view froze before it would move. Laying
+     * out is done in daylight, where a spot pool would be invisible anyway;
+     * the fittings still glow, so you can see exactly where they are.
+     */
+    lightsEmit: s.nightPreview || s.viewMode === 'walking',
   })));
 
   /**
@@ -112,10 +123,13 @@ export function SceneObjects() {
       if (!o) return;
       const step = e.shiftKey ? 0.25 : 0.05;
       let handled = true;
-      if (e.key === 'ArrowLeft')       { st.saveState(); st.updateObject(id, { x: o.x - step }); }
-      else if (e.key === 'ArrowRight') { st.saveState(); st.updateObject(id, { x: o.x + step }); }
-      else if (e.key === 'ArrowUp')    { st.saveState(); st.updateObject(id, { z: o.z - step }); }
-      else if (e.key === 'ArrowDown')  { st.saveState(); st.updateObject(id, { z: o.z + step }); }
+      // Nudging takes the run with it too, so a row can be walked into place
+      // with the arrows exactly as it can be dragged. Alt nudges one.
+      const solo = e.altKey;
+      if (e.key === 'ArrowLeft')       { st.saveState(); st.moveWithGroup(id, o.x - step, o.z, solo); }
+      else if (e.key === 'ArrowRight') { st.saveState(); st.moveWithGroup(id, o.x + step, o.z, solo); }
+      else if (e.key === 'ArrowUp')    { st.saveState(); st.moveWithGroup(id, o.x, o.z - step, solo); }
+      else if (e.key === 'ArrowDown')  { st.saveState(); st.moveWithGroup(id, o.x, o.z + step, solo); }
       else if (e.key === 'r' || e.key === 'R') { st.saveState(); st.updateObject(id, { rot: o.rot + Math.PI / 4 }); }
       else if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) { st.saveState(); st.duplicateObject(id); }
       else if (e.key === 'Delete' || e.key === 'Backspace') { st.saveState(); st.removeObject(id); st.setSelectedObjectId(null); }
@@ -145,7 +159,7 @@ export function SceneObjects() {
           if (isExporting && ['tree', 'conifer', 'hedge', 'shrub', 'flowerbed', 'planter', 'bench', 'slab', 'patio'].includes(obj.type)) {
             return null;
           }
-          const castsLight = isLightFitting(obj.type) && lit < LIT_CAP;
+          const castsLight = lightsEmit && isLightFitting(obj.type) && lit < LIT_CAP;
           if (castsLight) lit++;
           return <ObjectMesh key={obj.id} obj={obj} castsLight={castsLight} />;
         });
@@ -172,6 +186,10 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
   // A spot light aims at its target object, so each fitting carries its own,
   // parented to the fitting and therefore moving with it.
   const beamTarget = useMemo(() => new THREE.Object3D(), []);
+  /** Whether this drag moves only this fitting (Alt held when it was grabbed). */
+  const dragSolo = useRef(false);
+  const pendingMove = useRef<{ x: number; z: number } | null>(null);
+  const moveFrame = useRef(0);
 
   /**
    * Partition walls, sized and mapped like the room's own walls.
@@ -255,6 +273,8 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
     // but would not move, so placing furniture meant constantly flipping to
     // plan. The ground-plane intersection works from any camera angle.
     useStore.getState().saveState(); // one undo step per drag, throttled in the store
+    // Decided at grab time, not per move, so a row cannot half-detach mid-drag.
+    dragSolo.current = !!e.altKey;
     setIsDragging(true);
     useStore.getState().setControlsEnabled(false);
     e.target.setPointerCapture(e.pointerId);
@@ -262,6 +282,11 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
 
   const handlePointerUp = (e: any) => {
     e.stopPropagation();
+    // Flush whatever the last frame did not get to, so the object lands
+    // exactly where the pointer was released.
+    if (moveFrame.current) { cancelAnimationFrame(moveFrame.current); moveFrame.current = 0; }
+    const p = pendingMove.current;
+    if (p) { useStore.getState().moveWithGroup(obj.id, p.x, p.z, dragSolo.current); pendingMove.current = null; }
     setIsDragging(false);
     useStore.getState().setControlsEnabled(true);
     e.target.releasePointerCapture(e.pointerId);
@@ -335,7 +360,24 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
           const c = clampToRoomInterior(room, nx, nz);
           nx = c.x; nz = c.z;
         }
-        updateObject(obj.id, { x: nx, z: nz });
+        /*
+         * Commit at most once a frame.
+         *
+         * A pointermove fires far faster than the scene can redraw, and each
+         * one rebuilt the whole objects array and re-rendered every item in
+         * it. Dragging a light through a room full of fittings spent longer
+         * on React than on rendering, which is what made it feel stuck.
+         * Coalescing to one commit per frame drops that to what is actually
+         * drawn, and the last position always wins so nothing is lost.
+         */
+        pendingMove.current = { x: nx, z: nz };
+        if (moveFrame.current === 0) {
+          moveFrame.current = requestAnimationFrame(() => {
+            moveFrame.current = 0;
+            const p = pendingMove.current;
+            if (p) useStore.getState().moveWithGroup(obj.id, p.x, p.z, dragSolo.current);
+          });
+        }
       }
     }
   };
