@@ -4,7 +4,12 @@ import { useStore } from '../../store';
 import { ExportPDFModal } from './ExportPDFModal';
 
 export function ActionButtons() {
-  const { viewMode, setViewMode, areDoorsOpen, toggleDoors, isExporting, cameraFov, setCameraFov } = useStore();
+  const { viewMode, setViewMode, areDoorsOpen, toggleDoors, isExporting, cameraFov, setCameraFov, walkFov, setWalkFov } = useStore();
+  // The slider drives whichever view you are actually in, so each keeps the
+  // lens that suits it rather than one setting fighting both.
+  const isWalk = viewMode === 'walking';
+  const lens = isWalk ? walkFov : cameraFov;
+  const setLens = isWalk ? setWalkFov : setCameraFov;
   const [showExportModal, setShowExportModal] = useState(false);
 
   /**
@@ -28,14 +33,14 @@ export function ActionButtons() {
           {/* Camera lens control - frames the shot that goes to the render
               engine. Lower = tighter/flatter (telephoto), higher = wider. */}
           <div className="bg-white/90 backdrop-blur-md border border-[#3b4d4a]/20 px-4 py-2 rounded-full shadow-md flex items-center gap-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#3b4d4a] whitespace-nowrap">Lens {cameraFov}°</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#3b4d4a] whitespace-nowrap">Lens {lens}°</span>
             <input
               type="range"
               min={25}
               max={90}
               step={1}
-              value={cameraFov}
-              onChange={(e) => setCameraFov(Number(e.target.value))}
+              value={lens}
+              onChange={(e) => setLens(Number(e.target.value))}
               className="w-24 accent-[#3b4d4a] cursor-pointer"
             />
           </div>

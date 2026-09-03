@@ -117,6 +117,12 @@ interface AppState {
    *  shot they send to the render engine with a wide or tight lens. */
   cameraFov: number;
   setCameraFov: (fov: number) => void;
+  /** The walkthrough keeps its OWN lens. Standing inside a room wants a wider
+   *  angle than framing the building from outside does - at the 50° used for
+   *  elevations you see so little of a small room that it feels like looking
+   *  down a tube. Each view now remembers the lens that suits it. */
+  walkFov: number;
+  setWalkFov: (fov: number) => void;
   
   // Object Actions
   addObject: (type: ObjectType, x: number, z: number, rot?: number) => void;
@@ -807,6 +813,8 @@ export const useStore = create<AppState>((set, get) => ({
 
   cameraFov: 50,
   setCameraFov: (fov) => set({ cameraFov: Math.min(100, Math.max(20, fov)) }),
+  walkFov: 60,
+  setWalkFov: (fov) => set({ walkFov: Math.min(100, Math.max(20, fov)) }),
 
   addObject: (type, x, z, rot = 0) => set((state) => {
     // Interior objects can never land outside the building - drops used to

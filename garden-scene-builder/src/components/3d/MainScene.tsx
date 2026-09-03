@@ -293,7 +293,7 @@ function ScreenshotHelper() {
 }
 
 export function MainScene() {
-  const { viewMode, addObject, setSelectedObjectId, setSelectedElementId, controlsEnabled, renderTransform, isExporting, cameraFov } = useStore(useShallow(s => ({
+  const { viewMode, addObject, setSelectedObjectId, setSelectedElementId, controlsEnabled, renderTransform, isExporting, cameraFov, walkFov } = useStore(useShallow(s => ({
     viewMode: s.viewMode,
     addObject: s.addObject,
     setSelectedObjectId: s.setSelectedObjectId,
@@ -301,7 +301,8 @@ export function MainScene() {
     controlsEnabled: s.controlsEnabled,
     renderTransform: s.renderTransform,
     isExporting: s.isExporting,
-    cameraFov: s.cameraFov
+    cameraFov: s.cameraFov,
+    walkFov: s.walkFov
   })));
   const controlsRef = useRef<any>(null);
   const { camera, raycaster, pointer, gl } = useThree();
@@ -475,7 +476,7 @@ export function MainScene() {
       ) : isOrthographic ? (
         <OrthographicCamera makeDefault position={[10, 10, 15]} zoom={80} near={0.1} far={1000} />
       ) : (
-        <PerspectiveCamera makeDefault position={[10, 10, 15]} fov={cameraFov} near={0.1} far={1000} />
+        <PerspectiveCamera makeDefault position={[10, 10, 15]} fov={viewMode === 'walking' ? walkFov : cameraFov} near={0.1} far={1000} />
       )}
 
       {/* Lighting and Environment */}
