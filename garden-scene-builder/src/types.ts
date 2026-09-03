@@ -190,6 +190,13 @@ export interface SceneObject {
   doorGapOffsetMm?: number;
   doorGapWidthMm?: number;
   returnLengthMm?: number;
+  /** A BESPOKE unit: detached from its kitchen run, so changing the run's
+   *  colour leaves it alone. For the island in a contrasting colour, which is
+   *  a normal thing to specify and was impossible while a family recolour
+   *  overwrote every unit in it. */
+  independent?: boolean;
+  /** Worktop override for a bespoke unit. Falls back to the room's. */
+  worktopMaterial?: string;
   /** Objects laid out together as one run - a row of downlights. They move as
    *  a unit, because dragging six spots one at a time to shift a row 200mm is
    *  exactly the tedium the layout tool exists to remove. */

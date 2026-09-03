@@ -86,10 +86,25 @@ function segmentsFor(runLength: number, holes: { cx: number; w: number }[]): Seg
 export function WorktopRuns() {
   const { objects, room } = useStore(useShallow(s => ({ objects: s.scene.objects, room: s.scene.room })));
 
-  const material = useMemo(
-    () => createWorktopMaterial(worktopById(room.worktopMaterial)),
-    [room.worktopMaterial],
-  );
+  /**
+   * One material per worktop actually in use, not one for the whole kitchen.
+   *
+   * A bespoke unit can carry its own surface - an oak island against a marble
+   * run is a normal thing to specify - so the slab takes the worktop of the
+   * unit it belongs to, falling back to the room's. Materials are cached by id
+   * so two runs in the same surface still share one.
+   */
+  const materials = useMemo(() => {
+    const ids = new Set<string | undefined>([room.worktopMaterial]);
+    objects.forEach(o => { if (o.worktopMaterial) ids.add(o.worktopMaterial); });
+    const map = new Map<string, THREE.Material>();
+    ids.forEach(id => map.set(id ?? '', createWorktopMaterial(worktopById(id))));
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room.worktopMaterial, objects.map(o => o.worktopMaterial ?? '').join('|')]);
+
+  const materialFor = (id?: string) =>
+    materials.get(id ?? '') ?? materials.get(room.worktopMaterial ?? '')!;
 
   const runs = useMemo(() => {
     const units = objects.filter(o => hasWorktop(o.type));
@@ -102,7 +117,7 @@ export function WorktopRuns() {
       (byAngle.get(key) ?? byAngle.set(key, []).get(key)!).push(o);
     });
 
-    const out: { pos: [number, number, number]; rot: number; length: number; segs: Seg[]; upstand: boolean; ownerId: string }[] = [];
+    const out: { pos: [number, number, number]; rot: number; length: number; segs: Seg[]; upstand: boolean; ownerId: string; worktop?: string }[] = [];
     const Y = new THREE.Vector3(0, 1, 0);
 
     byAngle.forEach(group => {
@@ -151,7 +166,10 @@ export function WorktopRuns() {
           // The run answers to one of its own units, so clicking the worktop
           // in the walkthrough opens that unit's finishes rather than falling
           // through to whatever is behind it.
-          out.push({ pos: [centre.x, 0, centre.z], rot, length, segs: segmentsFor(length, holes), upstand, ownerId: current[0].o.id });
+          // A bespoke unit carries its own worktop, so an island can be
+          // topped in something different from the run against the wall.
+          out.push({ pos: [centre.x, 0, centre.z], rot, length, segs: segmentsFor(length, holes), upstand,
+                     ownerId: current[0].o.id, worktop: current[0].o.worktopMaterial });
           current = [];
         };
         line.forEach(p => {
@@ -176,9 +194,9 @@ export function WorktopRuns() {
       {runs.map((run, i) => (
         <group key={i} userData={{ objectId: run.ownerId }} position={[run.pos[0], baseH, run.pos[2]]} rotation={[0, run.rot, 0]}>
           {run.segs.map((seg, j) => (
-            <SlabPiece key={j} seg={seg} material={material} y={TOP_Y + THICKNESS / 2} />
+            <SlabPiece key={j} seg={seg} material={materialFor(run.worktop)} y={TOP_Y + THICKNESS / 2} />
           ))}
-          {run.upstand && <Upstand length={run.length} material={material} />}
+          {run.upstand && <Upstand length={run.length} material={materialFor(run.worktop)} />}
         </group>
       ))}
     </group>

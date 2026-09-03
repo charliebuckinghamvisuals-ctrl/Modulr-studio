@@ -228,20 +228,63 @@ export function ObjectEditorPanel() {
           is what someone almost always means, with "just this one" there for
           the exception rather than as the only option.
         */}
+        {/*
+          Bespoke takes a unit OUT of its run for good - an island in a
+          contrasting colour with its own worktop. Without it, "just this one"
+          lasted only until the next run recolour painted over it.
+        */}
         {family && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-gray-700 shrink-0">Apply to</span>
-            <div className="flex gap-1 flex-wrap">
-              {([family, 'all', 'one'] as const).map(s => (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-700">
+                Bespoke unit
+                <span className="block text-[10px] font-normal text-gray-400 leading-tight">
+                  {obj.independent
+                    ? 'Its own colour and worktop, ignores the run'
+                    : `Follows ${FAMILY_LABEL[family].toLowerCase()}`}
+                </span>
+              </span>
+              <button
+                onClick={() => updateObject(obj.id, { independent: !obj.independent })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all shrink-0 ${obj.independent ? 'bg-emerald-500' : 'bg-gray-300/60'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all shadow-md ${obj.independent ? 'translate-x-[24px]' : 'translate-x-[3px]'}`} />
+              </button>
+            </div>
+            {!obj.independent && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-gray-700 shrink-0">Apply to</span>
+                <div className="flex gap-1 flex-wrap">
+                  {([family, 'all'] as const).map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setScope(s)}
+                      className={`px-2 py-1 text-[10px] font-semibold rounded-md uppercase tracking-wide transition-colors ${
+                        scope === s ? 'bg-[#3b4d4a] text-white' : 'bg-black/5 text-gray-600 hover:bg-black/10'
+                      }`}
+                    >
+                      {s === 'all' ? 'All units' : FAMILY_LABEL[family]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Its own worktop, once it is bespoke. */}
+        {obj.independent && hasWorktop(obj.type) && (
+          <div className="flex items-start gap-3">
+            <span className="text-xs font-semibold text-gray-700 shrink-0 pt-1">Its worktop</span>
+            <div className="flex gap-1.5 flex-wrap">
+              {WORKTOPS.map(wt => (
                 <button
-                  key={s}
-                  onClick={() => setScope(s)}
-                  className={`px-2 py-1 text-[10px] font-semibold rounded-md uppercase tracking-wide transition-colors ${
-                    scope === s ? 'bg-[#3b4d4a] text-white' : 'bg-black/5 text-gray-600 hover:bg-black/10'
-                  }`}
-                >
-                  {s === 'all' ? 'All units' : s === 'one' ? 'Just this' : FAMILY_LABEL[family]}
-                </button>
+                  key={wt.id}
+                  title={wt.name}
+                  onClick={() => { updateObject(obj.id, { worktopMaterial: wt.id }); afterPick(); }}
+                  style={{ backgroundImage: 'url(textures/' + wt.prefix + '_color.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
+                  className={'w-7 h-7 rounded-md border transition-all ' + ((obj.worktopMaterial ?? scene.room.worktopMaterial ?? 'carrara') === wt.id ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20 scale-110' : 'border-black/15 hover:scale-110')}
+                />
               ))}
             </div>
           </div>
@@ -251,7 +294,7 @@ export function ObjectEditorPanel() {
           <ColourRow
             current={(obj.color ?? UNIT_COLOURS[0].hex).toLowerCase()}
             onPick={(hex, settled) => {
-              if (family && scope !== 'one') recolourUnits(scope === 'all' ? 'all' : family, hex);
+              if (family && !obj.independent) recolourUnits(scope === 'all' ? 'all' : family, hex);
               else updateObject(obj.id, { color: hex });
               if (settled) afterPick();
             }}

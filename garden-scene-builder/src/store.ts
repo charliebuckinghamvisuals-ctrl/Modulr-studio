@@ -990,6 +990,10 @@ export const useStore = create<AppState>((set, get) => ({
       objects: state.scene.objects.map(o => {
         const fam = UNIT_FAMILY[o.type];
         if (!fam) return o;
+        // A bespoke unit has been deliberately taken out of the run - an
+        // island in a contrasting colour - so a run recolour must not quietly
+        // drag it back in.
+        if (o.independent) return o;
         return (scope === 'all' || fam === scope) ? { ...o, color: hex } : o;
       }),
     },
