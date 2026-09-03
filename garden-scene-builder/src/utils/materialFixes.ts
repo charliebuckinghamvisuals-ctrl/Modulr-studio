@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { ObjectType } from '../types';
 import {
   TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH, FORCE_DIELECTRIC,
-  EMISSIVE_MATERIAL, LIGHT_COLOURS, UNMIRROR_NORMALS,
+  EMISSIVE_MATERIAL, LIGHT_COLOURS, UNMIRROR_NORMALS, finishSpec,
   FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById,
 } from '../modelRegistry';
 import type { WorktopDef } from '../modelRegistry';
@@ -241,7 +241,7 @@ function dressWorktop(mat: THREE.MeshStandardMaterial, def: WorktopDef) {
   mat.needsUpdate = true;
 }
 
-export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, color?: string, worktop?: string, hideWorktop = false) {
+export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, color?: string, worktop?: string, hideWorktop = false, finish_?: string) {
   const tintName = TINT_MATERIAL[type];
   const metalNames = METAL_MATERIALS[type];
   const tweaks = MATERIAL_TWEAKS[type];
@@ -352,21 +352,22 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         // 0.18m per tile puts the grain at a believable physical size, and
         // the geometry has no UVs of its own to respect.
         boxProjectUVs(mesh.geometry, 0.18);
+        // Matt, satin or gloss - three real products, not a slider. See
+        // UNIT_FINISHES: the satin numbers are the ones tuned by eye against
+        // renders, and matt and gloss move away from them in both directions.
+        const fin = finishSpec(finish_);
         const paint = new THREE.MeshPhysicalMaterial({
           color: color ? new THREE.Color(color) : m.color?.clone() ?? new THREE.Color('#d4d4d4'),
-          roughness: 0.34,
+          roughness: fin.roughness,
           metalness: 0,
           normalMap: grain.normalMap,
-          // Tuned by eye against renders: 0.12 was invisible even close up,
-          // 0.35 read as textured plaster rather than paint. 0.2 breaks a
-          // highlight without ever announcing itself as a texture.
-          normalScale: new THREE.Vector2(0.2, 0.2),
+          normalScale: new THREE.Vector2(fin.normalScale, fin.normalScale),
           roughnessMap: grain.roughnessMap,
-          clearcoat: 0.45,
-          clearcoatRoughness: 0.24,
-          // The room's HDR is what a door actually reflects; at 0.9 it was
-          // barely contributing, which flattened the panels further.
-          envMapIntensity: 1.15,
+          clearcoat: fin.clearcoat,
+          clearcoatRoughness: fin.clearcoatRoughness,
+          // The room's HDR is what a door actually reflects, and a gloss door
+          // reflects a great deal more of it than a matt one.
+          envMapIntensity: fin.env,
         });
         paint.name = m.name;
         bodyMats.push(paint);
@@ -414,6 +415,26 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
   });
 
   return { bodyMats, metalMats, worktopMats, lampMats };
+}
+
+/**
+ * Change the door finish on an already-instanced model, without rebuilding it.
+ * Matt/satin/gloss is a material change, not a new model - see UNIT_FINISHES.
+ */
+export function refinishUnits(
+  handles: { bodyMats: THREE.MeshPhysicalMaterial[] },
+  finish?: string,
+) {
+  const f = finishSpec(finish);
+  handles.bodyMats.forEach(mat => {
+    if (!(mat as any).isMeshPhysicalMaterial) return;
+    mat.roughness = f.roughness;
+    mat.clearcoat = f.clearcoat;
+    mat.clearcoatRoughness = f.clearcoatRoughness;
+    mat.envMapIntensity = f.env;
+    if (mat.normalScale) mat.normalScale.set(f.normalScale, f.normalScale);
+    mat.needsUpdate = true;
+  });
 }
 
 /** The finish entry a stored hex refers to, falling back to the model's

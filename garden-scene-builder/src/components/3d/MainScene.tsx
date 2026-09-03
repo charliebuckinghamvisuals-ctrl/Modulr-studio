@@ -166,8 +166,23 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
        * "Click to look around" card in the HUD is a real button now, so the
        * two intentions are separate and neither can shadow the other.
        */
+      /*
+       * Picking happens ONLY while the mouse is captured.
+       *
+       * This has bounced back and forth because one click was carrying two
+       * meanings - start walking, and pick this - so whichever won, the other
+       * looked broken. Locked or unlocked, first click or fifth, there was
+       * always a case where the wrong one fired.
+       *
+       * One rule now, with no exceptions: cursor out means the click resumes
+       * walking, cursor captured means the click picks whatever the crosshair
+       * is on. The pick point and the crosshair are then the same point by
+       * definition, so the brush can never appear over one thing while naming
+       * another - and entering the walkthrough can never arm a brush you did
+       * not ask for.
+       */
       const st = useStore.getState();
-      const target = resolveTarget(ndc);
+      const target = locked ? resolveTarget(ndc) : null;
       if (target) {
         st.setSelectedObjectId(null);
         st.setWalkFloorOpen(false);
@@ -211,6 +226,11 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
     canvas.addEventListener('pointerdown', onCanvasDown);
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('pointerlockchange', onLockChange);
+    // The Walk button captures the mouse as part of its own click, which
+    // happens BEFORE this component mounts - so the change event has already
+    // been and gone. Without this the HUD would sit there telling you to
+    // click to walk while you were already walking.
+    onLockChange();
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);

@@ -118,6 +118,32 @@ export const FAMILY_LABEL: Record<UnitFamily, string> = {
   tall: 'Tall units',
 };
 
+/**
+ * Door finish, as a kitchen is actually specified.
+ *
+ * Matt, satin and gloss are not a slider - they are three products, and the
+ * difference between them is how sharply the door returns a highlight. That is
+ * roughness plus the clearcoat over the colour: a matt door scatters and shows
+ * its own texture, a gloss door mirrors the room and hides it.
+ */
+export type UnitFinish = 'matt' | 'satin' | 'gloss';
+
+export const UNIT_FINISHES: {
+  id: UnitFinish; name: string;
+  roughness: number; clearcoat: number; clearcoatRoughness: number;
+  normalScale: number; env: number;
+}[] = [
+  // Grain stays visible, highlights stay broad and soft.
+  { id: 'matt',  name: 'Matt',  roughness: 0.78, clearcoat: 0.12, clearcoatRoughness: 0.55, normalScale: 0.26, env: 0.75 },
+  { id: 'satin', name: 'Satin', roughness: 0.34, clearcoat: 0.45, clearcoatRoughness: 0.24, normalScale: 0.20, env: 1.15 },
+  // A tight highlight and a real reflection; the orange peel all but vanishes
+  // under the lacquer, which is exactly what a gloss door looks like.
+  { id: 'gloss', name: 'Gloss', roughness: 0.10, clearcoat: 1.0,  clearcoatRoughness: 0.05, normalScale: 0.08, env: 1.6 },
+];
+
+export const finishSpec = (id?: string) =>
+  UNIT_FINISHES.find(f => f.id === id) ?? UNIT_FINISHES[1];
+
 export const unitFamily = (type: ObjectType) => UNIT_FAMILY[type];
 export const familyTypes = (f: UnitFamily) =>
   (Object.keys(UNIT_FAMILY) as ObjectType[]).filter(t => UNIT_FAMILY[t] === f);

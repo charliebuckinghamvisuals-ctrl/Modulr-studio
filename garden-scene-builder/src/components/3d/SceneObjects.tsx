@@ -7,7 +7,7 @@ import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
 import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS } from '../../modelRegistry';
-import { applyModelMaterials, retintModel, resurfaceWorktop } from '../../utils/materialFixes';
+import { applyModelMaterials, retintModel, resurfaceWorktop, refinishUnits } from '../../utils/materialFixes';
 import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS } from '../../utils/placement';
 import { wallpaperProps } from '../../utils/wallpaper';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
@@ -20,7 +20,7 @@ import { WorktopRuns } from './WorktopRuns';
  * (served at the site root) and inside the /3d-config/ iframe, where an
  * absolute path would miss.
  */
-function GlbModel({ url, type, color, worktop }: { url: string; type: SceneObject['type']; color?: string; worktop?: string }) {
+function GlbModel({ url, type, color, worktop, finish }: { url: string; type: SceneObject['type']; color?: string; worktop?: string; finish?: string }) {
     const { scene } = useGLTF(url);
 
     // Clone per instance. useGLTF caches one scene graph, so placing two of
@@ -33,7 +33,7 @@ function GlbModel({ url, type, color, worktop }: { url: string; type: SceneObjec
 
     if (!cloned.current) {
         cloned.current = scene.clone(true);
-        matHandles.current = applyModelMaterials(type, cloned.current, color, worktop, true);
+        matHandles.current = applyModelMaterials(type, cloned.current, color, worktop, true, finish);
     }
 
     // Recolour on demand without rebuilding the model.
@@ -41,6 +41,12 @@ function GlbModel({ url, type, color, worktop }: { url: string; type: SceneObjec
         if (!color || !matHandles.current) return;
         retintModel(type, matHandles.current, color);
     }, [color, type]);
+
+    // Matt / satin / gloss, applied without rebuilding the model.
+    useEffect(() => {
+        if (!matHandles.current) return;
+        refinishUnits(matHandles.current, finish);
+    }, [finish]);
 
     // Re-surface the worktop when the room's choice changes.
     useEffect(() => {
@@ -439,6 +445,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
               type={obj.type}
               color={obj.color}
               worktop={room.worktopMaterial}
+              finish={room.unitFinish}
             />
             {/* The extractor's flue is its own model, stretched on Y so its
                 top always lands on the ceiling. A duct that stops short

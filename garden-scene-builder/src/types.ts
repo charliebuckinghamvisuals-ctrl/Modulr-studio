@@ -145,6 +145,9 @@ export interface Room {
   /** Worktop surface id (see WORKTOPS). One kitchen has one worktop, so this
    *  lives on the room rather than per unit. */
   worktopMaterial?: string;
+  /** Cabinet door finish - matt, satin or gloss. Kitchen-wide, like the
+   *  worktop: mixing finishes across one run is not a thing people spec. */
+  unitFinish?: 'matt' | 'satin' | 'gloss';
   /** Board-size multiplier for the interior floor: 1 = the material's real
    *  scale, 2 = planks twice as wide. */
   floorScale?: number;

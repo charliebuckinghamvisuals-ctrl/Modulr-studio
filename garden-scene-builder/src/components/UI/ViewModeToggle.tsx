@@ -1,4 +1,5 @@
 import { useStore } from '../../store';
+import { resumeWalking } from '../../utils/walk';
 import { Layers, Cuboid, LocateFixed, Footprints, RotateCw, Lightbulb } from 'lucide-react';
 
 export function ViewModeToggle() {
@@ -18,7 +19,20 @@ export function ViewModeToggle() {
         3D View
       </button>
       <button
-        onClick={() => setViewMode('walking')}
+        onClick={() => {
+          setViewMode('walking');
+          /*
+           * Capture the mouse HERE, on the button press.
+           *
+           * Walking used to depend on clicking the scene first, and that one
+           * click also had to mean "pick this". Whichever meaning won, the
+           * other broke - which is why this kept coming back. Pointer lock
+           * needs a real user gesture and pressing Walk is one, so the
+           * walkthrough now starts already walking and the scene click is
+           * free to mean only "pick this". The two can no longer fight.
+           */
+          resumeWalking();
+        }}
         className={`flex items-center gap-2 px-6 py-2 rounded-full text-xs font-semibold transition-colors ${
           viewMode === 'walking' ? 'bg-[#3b4d4a] text-white shadow-sm' : 'text-gray-500 hover:text-white hover:bg-[#3b4d4a]'
         }`}

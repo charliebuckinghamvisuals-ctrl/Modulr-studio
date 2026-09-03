@@ -9,6 +9,7 @@ import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS } from '../modelRegistry';
 import { ObjectTile } from './UI/ObjectTile';
+import { KitchenPanel } from './UI/KitchenPanel';
 import { TemplatesSection } from './UI/TemplatesSection';
 
 /**
@@ -1227,6 +1228,16 @@ export function Sidebar() {
                 the fittings are actually visible and can be dragged. Laying
                 them out from the furniture picker meant placing them into a
                 view that had the roof over them. */}
+            {/* The kitchen as a whole: finish, door colour per run, worktop.
+                Per-unit overrides stay on the object panel, for the island in
+                a contrasting colour. */}
+            <section>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Kitchen</label>
+              <div className="p-4 bg-white border border-black/5 rounded-xl shadow-sm">
+                <KitchenPanel />
+              </div>
+            </section>
+
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Lighting</label>
               <button
