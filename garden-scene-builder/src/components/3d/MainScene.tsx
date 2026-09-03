@@ -152,9 +152,22 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
        * off that meant you could not simply set off: you had to dismiss a
        * brush you never asked for before you could move.
        */
+      /*
+       * Unlocked, a click picks WHERE YOU CLICKED. Always.
+       *
+       * It used to only pick if the brush was already up, so the first click
+       * after the cursor came back just re-captured the mouse - and the click
+       * AFTER that picked the crosshair at the middle of the screen rather
+       * than the thing you had aimed at. Click a cabinet low in the frame and
+       * you got the wall behind the crosshair, every time, which is why this
+       * kept coming back as "it only lets me change the wall colour".
+       *
+       * Starting to walk is no longer overloaded onto the same click: the
+       * "Click to look around" card in the HUD is a real button now, so the
+       * two intentions are separate and neither can shadow the other.
+       */
       const st = useStore.getState();
-      const arming = locked || st.walkPending !== null;
-      const target = arming ? resolveTarget(ndc) : null;
+      const target = resolveTarget(ndc);
       if (target) {
         st.setSelectedObjectId(null);
         st.setWalkFloorOpen(false);

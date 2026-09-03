@@ -1,5 +1,6 @@
 import { Paintbrush } from 'lucide-react';
 import { useStore } from '../../store';
+import { resumeWalking } from '../../utils/walk';
 
 /** One key on the little WASD diagram. */
 function Key({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
@@ -90,10 +91,20 @@ export function WalkHud() {
   if (!locked) {
     return (
       <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-        <div className="bg-black/70 backdrop-blur-sm text-white px-5 py-3 rounded-xl text-center shadow-2xl">
-          <div className="text-sm font-semibold">Click to look around</div>
-          <div className="text-[11px] text-white/60 mt-1">WASD to walk · Shift to jog · click an item or the floor to change its finish</div>
-        </div>
+        {/*
+          A real button, not a hint. Walking and picking a finish used to be
+          the same click, so one always shadowed the other - either you could
+          not set off, or your click landed on the crosshair instead of the
+          thing you aimed at. Now the button walks and a click picks.
+        */}
+        <button
+          type="button"
+          onClick={resumeWalking}
+          className="pointer-events-auto bg-black/70 hover:bg-black/85 backdrop-blur-sm text-white px-5 py-3 rounded-xl text-center shadow-2xl transition-colors cursor-pointer"
+        >
+          <div className="text-sm font-semibold">Click here to walk around</div>
+          <div className="text-[11px] text-white/60 mt-1">WASD to walk · Shift to jog · or click anything in the room to change its finish</div>
+        </button>
       </div>
     );
   }
