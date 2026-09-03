@@ -1190,7 +1190,7 @@ export function RoomGeometry() {
     <group userData={{ isShell: true }} position={[room.x / 1000, 0, room.z / 1000]} rotation={[0, room.rot, 0]}>
       {/* Interior light to prevent partitions from being too dark.
           Damped in the walkthrough - see the note on the warm light below. */}
-      <pointLight position={[0, h - 0.5, 0]} intensity={isNight ? 0 : (viewMode === 'walking' ? 0.5 : 1.5)} distance={15} decay={2} castShadow={false} />
+      <pointLight position={[0, h - 0.5, 0]} intensity={viewMode === 'walking' ? 0 : 1.5} distance={15} decay={2} castShadow={false} />
 
       {/* Base Plinth / Decking Area */}
       {renderBaseMeshes()}
@@ -1793,9 +1793,17 @@ export function RoomGeometry() {
         walkthrough is where a customer judges the paint, so there the even
         bounce fill in MainScene carries the room and these only warm it.
       */}
-      {/* Off under night preview: this is generic room glow, and leaving it on
-          would light the room for you and hide what the layout actually does. */}
-      <pointLight position={[0, h - 0.5, 0]} intensity={isNight ? 0 : (viewMode === 'walking' ? 1.0 : 3)} color="#ffe5b4" distance={10} castShadow={false} />
+      {/*
+        Off in the walkthrough entirely.
+
+        Both interior lights hang 500mm under the ceiling, and a point light
+        that close throws a broad soft pool straight up onto it - a glowing
+        blob over your head that belongs to no fitting at all. Damping it was
+        not enough; it is generic room glow, and in the walkthrough the even
+        bounce in MainScene lights the room while the spotlights do the rest.
+        Kept for the 3D view, where it reads as warmth through the glazing.
+      */}
+      <pointLight position={[0, h - 0.5, 0]} intensity={viewMode === 'walking' ? 0 : 3} color="#ffe5b4" distance={10} castShadow={false} />
 
       {/* Guttering & downpipe. Pent/flat: one half-round run along the low
           edge with its rim flush with the fascia top. Gable: a run along each

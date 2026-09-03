@@ -538,7 +538,7 @@ export function MainScene() {
         a shaded soffit is correct.
       */}
       {viewMode === 'walking' && !isExporting && (
-        <hemisphereLight color="#e8eef5" groundColor="#ffffff" intensity={isNight ? 0.2 : 1.7} />
+        <hemisphereLight color="#e8eef5" groundColor="#ffffff" intensity={isNight ? 0.2 : 2.1} />
       )}
 
       <group name="environment-background" visible={viewMode !== 'render'}>
