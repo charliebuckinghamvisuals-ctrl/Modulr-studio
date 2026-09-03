@@ -1,5 +1,5 @@
 import { useStore } from '../../store';
-import { Layers, Cuboid, LocateFixed, Footprints, RotateCw } from 'lucide-react';
+import { Layers, Cuboid, LocateFixed, Footprints, RotateCw, Lightbulb } from 'lucide-react';
 
 export function ViewModeToggle() {
   const { viewMode, setViewMode } = useStore();
@@ -37,6 +37,18 @@ export function ViewModeToggle() {
       >
         <Layers size={16} />
         Plan View
+      </button>
+      <button
+        onClick={() => {
+          setViewMode('lighting');
+          window.dispatchEvent(new CustomEvent('reset-plan-view'));
+        }}
+        className={`flex items-center gap-2 px-6 py-2 rounded-full text-xs font-semibold transition-colors ${
+          viewMode === 'lighting' ? 'bg-[#3b4d4a] text-white shadow-sm' : 'text-gray-500 hover:text-white hover:bg-[#3b4d4a]'
+        }`}
+      >
+        <Lightbulb size={16} />
+        Lighting
       </button>
       {viewMode === '3d' && (
         <>

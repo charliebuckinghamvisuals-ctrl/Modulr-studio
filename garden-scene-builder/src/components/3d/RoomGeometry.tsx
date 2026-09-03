@@ -65,7 +65,7 @@ function DimText({ value, onValueChange, position, rotation, children, isDraggab
     );
   }
 
-  const isPlanLabel = viewMode === 'plan';
+  const isPlanLabel = viewMode === 'plan' || viewMode === 'lighting';
 
   return (
     <Html center position={position} transform rotation={rotation}>
@@ -713,7 +713,7 @@ export function RoomGeometry() {
     viewMode: s.viewMode,
     controlsEnabled: s.controlsEnabled
   })));
-  const isPlanView = viewMode === 'plan';
+  const isPlanView = viewMode === 'plan' || viewMode === 'lighting';
   const isNight = useStore(s => s.nightPreview);
   const w = Math.max(0.5, room.widthMm / 1000);
   const d = Math.max(0.5, room.depthMm / 1000);

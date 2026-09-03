@@ -309,7 +309,9 @@ export function MainScene() {
   const [isOrthographic, setIsOrthographic] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
 
-  const isPlanView = viewMode === 'plan';
+  // The lighting view is a reflected ceiling plan, so it shares the plan's
+  // locked top-down camera and its stripped-away roof and ceiling.
+  const isPlanView = viewMode === 'plan' || viewMode === 'lighting';
 
   useEffect(() => {
     if (controlsRef.current) {

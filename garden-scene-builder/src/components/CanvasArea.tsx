@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { MainScene } from './3d/MainScene';
 import { useStore } from '../store';
 import { ViewModeToggle } from './UI/ViewModeToggle';
+import { LightingPanel } from './UI/LightingPanel';
 import { PricePill } from './UI/PricePill';
 import { ObjectEditorPanel } from './UI/ObjectEditorPanel';
 import { ElementEditorPanel } from './UI/ElementEditorPanel';
@@ -172,6 +173,7 @@ export function CanvasArea() {
         </div>
       )}
       <ViewModeToggle />
+      <LightingPanel />
       <CameraWidget />
       <HistoryButtons />
       <PricePill />

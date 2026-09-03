@@ -229,6 +229,9 @@ export interface SceneState {
   };
 }
 
-export type ViewMode = '3d' | 'plan' | 'capture' | 'render' | 'walking';
+/** 'lighting' is a reflected ceiling plan - the drawing the trade actually
+ *  uses to set out downlights. Top-down like 'plan', but with the roof and
+ *  ceiling stripped away so the fittings are the subject. */
+export type ViewMode = '3d' | 'plan' | 'capture' | 'render' | 'walking' | 'lighting';
 export type ToolMode = 'select' | 'place' | 'fence';
 

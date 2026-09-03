@@ -128,10 +128,11 @@ interface AppState {
   addObject: (type: ObjectType, x: number, z: number, rot?: number) => void;
   /** Lay out downlights on an even rows x cols grid. See the implementation
    *  for why centres, not edges. */
-  addSpotGrid: (rows: number, cols: number, replace?: boolean) => void;
-  /** Add one evenly spaced run of downlights across the width or down the
-   *  depth, at `offset` from the room's centre line on the other axis. */
-  addSpotRow: (count: number, axis: 'across' | 'down', offset?: number) => void;
+  addSpotGrid: (rows: number, cols: number, replace?: boolean, spacing?: number) => void;
+  /** Add one run of downlights across the width or down the depth, at
+   *  `offset` from the room's centre line. `spacing` (metres) sets an exact
+   *  pitch and centres the run; without it the span is divided evenly. */
+  addSpotRow: (count: number, axis: 'across' | 'down', offset?: number, spacing?: number) => void;
   clearSpots: () => void;
   /** Move an object to x,z, carrying the rest of its run with it. Pass solo
    *  to break one fitting out of the line instead. */
@@ -863,7 +864,7 @@ export const useStore = create<AppState>((set, get) => ({
    * Replaces any existing spots rather than adding to them, so nudging the
    * numbers re-lays the grid instead of piling a second one on top.
    */
-  addSpotGrid: (rows, cols, replace = true) => set((state) => {
+  addSpotGrid: (rows, cols, replace = true, spacing) => set((state) => {
     const room = state.scene.room;
     const wt = (room.wallThicknessMm ?? 150) / 1000;
     const iw = room.widthMm / 1000 - wt * 2;
@@ -875,8 +876,9 @@ export const useStore = create<AppState>((set, get) => ({
       // row at a time - which is how you adjust for a beam or a rooflight.
       const groupId = uuidv4();
       for (let c = 0; c < cols; c++) {
-        const x = -iw / 2 + iw * (c + 0.5) / cols;
-        const z = -id / 2 + id * (r + 0.5) / rows;
+        // Exact centres when a spacing is given, otherwise fit the room.
+        const x = spacing ? (c - (cols - 1) / 2) * spacing : -iw / 2 + iw * (c + 0.5) / cols;
+        const z = spacing ? (r - (rows - 1) / 2) * spacing : -id / 2 + id * (r + 0.5) / rows;
         spots.push({ id: uuidv4(), type: 'spot_light', x, z, rot: 0, scale: 1, groupId });
       }
     }
@@ -892,14 +894,23 @@ export const useStore = create<AppState>((set, get) => ({
    * half-space left to the wall at each end exactly as the grid does, so a row
    * dropped next to a grid still lines through with it.
    */
-  addSpotRow: (count, axis, offset = 0) => set((state) => {
+  addSpotRow: (count, axis, offset = 0, spacing) => set((state) => {
     const room = state.scene.room;
     const wt = (room.wallThicknessMm ?? 150) / 1000;
     const span = (axis === 'across' ? room.widthMm : room.depthMm) / 1000 - wt * 2;
     const spots: SceneState['objects'] = [];
     const groupId = uuidv4();
     for (let i = 0; i < count; i++) {
-      const along = -span / 2 + span * (i + 0.5) / count;
+      /*
+       * Given a spacing, that spacing is EXACT and the run is centred in the
+       * room - "downlights at 1200 centres" is how a layout is specified, so
+       * the number the user typed has to be the number on the ceiling. The
+       * leftover becomes the margin to the walls. Without one, fall back to
+       * dividing the span evenly.
+       */
+      const along = spacing
+        ? (i - (count - 1) / 2) * spacing
+        : -span / 2 + span * (i + 0.5) / count;
       spots.push({
         id: uuidv4(), type: 'spot_light', rot: 0, scale: 1, groupId,
         x: axis === 'across' ? along : offset,

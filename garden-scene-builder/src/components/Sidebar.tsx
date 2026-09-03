@@ -9,7 +9,6 @@ import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS } from '../modelRegistry';
 import { ObjectTile } from './UI/ObjectTile';
-import { SpotLayout } from './UI/SpotLayout';
 import { TemplatesSection } from './UI/TemplatesSection';
 
 /**
@@ -1224,21 +1223,24 @@ export function Sidebar() {
               </div>
             </section>
 
-            {/*
-              Lighting. A downlight layout is set out as a grid, not fitting by
-              fitting, so the grid tool is the primary control here and the
-              single tile is for adding an odd one afterwards. Night preview
-              sits with it because in daylight the fittings are invisible and
-              the layout cannot be judged at all.
-            */}
+            {/* Lighting has its own view now - a reflected ceiling plan, where
+                the fittings are actually visible and can be dragged. Laying
+                them out from the furniture picker meant placing them into a
+                view that had the roof over them. */}
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Lighting</label>
-              <SpotLayout />
-              <div className="grid grid-cols-2 gap-2.5 mt-3">
-                {(['spot_light'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
-                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
-                ))}
-              </div>
+              <button
+                onClick={() => {
+                  useStore.getState().setViewMode('lighting');
+                  window.dispatchEvent(new CustomEvent('reset-plan-view'));
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white border border-black/5 shadow-sm text-[11px] font-bold uppercase tracking-wide text-[#3b4d4a] hover:bg-gray-50 transition-colors"
+              >
+                Open lighting plan
+              </button>
+              <p className="text-[10px] text-gray-400 leading-snug mt-2">
+                Set out spotlights on a ceiling plan, in rows or a grid.
+              </p>
             </section>
 
             {/* Garden objects and the procedural light fittings were retired

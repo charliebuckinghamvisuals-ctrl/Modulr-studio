@@ -182,6 +182,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
     room: s.scene.room
   })));
   const isSelected = selectedObjectId === obj.id;
+  const isLightingView = viewMode === 'lighting';
   const paper = wallpaperProps();
   // A spot light aims at its target object, so each fitting carries its own,
   // parented to the fitting and therefore moving with it.
@@ -994,6 +995,41 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
         window.dispatchEvent(new CustomEvent('focus-object', { detail: { x: obj.x, z: obj.z } }));
       }}
     >
+      {/*
+        Reflected ceiling plan symbol.
+        In the lighting view a fitting is drawn as a SYMBOL, not a model - the
+        60mm bezel of a real downlight is a speck from 40m up, and the model
+        can be hidden by the building anyway. depthTest off puts it in front of
+        everything, so a fitting can never be lost behind the shell, which is
+        what made the 3D view useless for this. The pale disc is the pool it
+        throws, so the spacing can be judged by eye as well as by number.
+      */}
+      {isLightingView && isLightFitting(obj.type) && (
+        <group rotation={[-Math.PI / 2, 0, 0]} renderOrder={998}>
+          <mesh>
+            <circleGeometry args={[0.75, 40]} />
+            <meshBasicMaterial color={obj.color ?? LIGHT_COLOURS[0].hex} transparent opacity={0.22} depthTest={false} depthWrite={false} />
+          </mesh>
+          <mesh renderOrder={999}>
+            <ringGeometry args={[0.11, 0.15, 32]} />
+            <meshBasicMaterial color={isSelected ? '#10b981' : '#3b4d4a'} depthTest={false} depthWrite={false} />
+          </mesh>
+          <mesh renderOrder={999}>
+            <planeGeometry args={[0.30, 0.022]} />
+            <meshBasicMaterial color={isSelected ? '#10b981' : '#3b4d4a'} depthTest={false} depthWrite={false} />
+          </mesh>
+          <mesh renderOrder={999} rotation={[0, 0, Math.PI / 2]}>
+            <planeGeometry args={[0.30, 0.022]} />
+            <meshBasicMaterial color={isSelected ? '#10b981' : '#3b4d4a'} depthTest={false} depthWrite={false} />
+          </mesh>
+          {/* A generous invisible target - the symbol itself is too small to
+              grab reliably, which is half of "I can't move the lights". */}
+          <mesh renderOrder={997}>
+            <circleGeometry args={[0.42, 20]} />
+            <meshBasicMaterial transparent opacity={0} depthTest={false} depthWrite={false} />
+          </mesh>
+        </group>
+      )}
       {meshContent}
       {/*
         The beam. A spot rather than a point light, because the pool it throws
