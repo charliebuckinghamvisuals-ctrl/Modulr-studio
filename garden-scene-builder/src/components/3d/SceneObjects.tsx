@@ -183,6 +183,10 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
   })));
   const isSelected = selectedObjectId === obj.id;
   const isLightingView = viewMode === 'lighting';
+  /** Pool cast on the 750mm working plane, from the real drop and beam angle
+   *  (0.62rad half-angle, matching the spotLight below). */
+  const poolRadius = Math.max(0.35,
+    (ceilingHeightAt(room, obj.x, obj.z) - 0.75) * Math.tan(0.62));
   const paper = wallpaperProps();
   // A spot light aims at its target object, so each fitting carries its own,
   // parented to the fitting and therefore moving with it.
@@ -285,6 +289,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
     e.stopPropagation();
     // Flush whatever the last frame did not get to, so the object lands
     // exactly where the pointer was released.
+    useStore.getState().setAlignGuide(null);
     if (moveFrame.current) { cancelAnimationFrame(moveFrame.current); moveFrame.current = 0; }
     const p = pendingMove.current;
     if (p) { useStore.getState().moveWithGroup(obj.id, p.x, p.z, dragSolo.current); pendingMove.current = null; }
@@ -361,6 +366,38 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
           const c = clampToRoomInterior(room, nx, nz);
           nx = c.x; nz = c.z;
         }
+        /*
+         * Light fittings snap to LINE UP.
+         *
+         * A ceiling plan is judged on whether things line through, and a 50mm
+         * grid is not fine enough to guarantee that - two rows can sit one
+         * cell apart and look wrong for no visible reason. So a fitting being
+         * dragged latches onto the lines other fittings already sit on, and
+         * onto the room's centre lines, and the plan draws the line it caught
+         * so you can see the alignment rather than trust it.
+         */
+        if (isLightFitting(obj.type)) {
+          const SNAP = 0.11;
+          const st0 = useStore.getState();
+          const others = st0.scene.objects.filter(o =>
+            isLightFitting(o.type) && o.id !== obj.id && o.groupId !== obj.groupId);
+          const catchTo = (v: number, candidates: number[]) => {
+            let best = v, dist = SNAP;
+            for (const c of candidates) {
+              const d = Math.abs(v - c);
+              if (d < dist) { dist = d; best = c; }
+            }
+            return best === v ? null : best;
+          };
+          const sx = catchTo(nx, [0, ...others.map(o => o.x)]);
+          const sz = catchTo(nz, [0, ...others.map(o => o.z)]);
+          if (sx !== null) nx = sx;
+          if (sz !== null) nz = sz;
+          st0.setAlignGuide(sx !== null || sz !== null
+            ? { x: sx ?? undefined, z: sz ?? undefined }
+            : null);
+        }
+
         /*
          * Commit at most once a frame.
          *
@@ -1006,9 +1043,22 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
       */}
       {isLightingView && isLightFitting(obj.type) && (
         <group rotation={[-Math.PI / 2, 0, 0]} renderOrder={998}>
+          {/*
+            Coverage, not decoration. The disc is the pool this fitting throws
+            on a worktop 750mm up, worked from its real mounting height and
+            beam angle - so it grows in a tall room and shrinks in a low one.
+            Blended ADDITIVELY, so overlaps brighten and gaps stay dark: the
+            drawing reads as a coverage map and a thin patch is obvious
+            without measuring anything.
+          */}
           <mesh>
-            <circleGeometry args={[0.75, 40]} />
-            <meshBasicMaterial color={obj.color ?? LIGHT_COLOURS[0].hex} transparent opacity={0.22} depthTest={false} depthWrite={false} />
+            <circleGeometry args={[poolRadius, 40]} />
+            <meshBasicMaterial
+              color={obj.color ?? LIGHT_COLOURS[0].hex}
+              transparent opacity={0.16}
+              blending={THREE.AdditiveBlending}
+              depthTest={false} depthWrite={false}
+            />
           </mesh>
           <mesh renderOrder={999}>
             <ringGeometry args={[0.11, 0.15, 32]} />

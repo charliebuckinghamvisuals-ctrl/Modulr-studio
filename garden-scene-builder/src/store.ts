@@ -141,6 +141,10 @@ interface AppState {
    *  this a lighting layout cannot actually be judged. */
   nightPreview: boolean;
   setNightPreview: (on: boolean) => void;
+  /** The line a dragged fitting has snapped onto, drawn on the ceiling plan
+   *  so "lined up" is something you can see rather than hope for. */
+  alignGuide: { x?: number; z?: number } | null;
+  setAlignGuide: (g: { x?: number; z?: number } | null) => void;
   duplicateObject: (id: string) => void;
   updateObject: (id: string, updates: Partial<SceneState['objects'][0]>) => void;
   removeObject: (id: string) => void;
@@ -832,6 +836,15 @@ export const useStore = create<AppState>((set, get) => ({
   setWalkFov: (fov) => set({ walkFov: Math.min(100, Math.max(20, fov)) }),
   nightPreview: false,
   setNightPreview: (on) => set({ nightPreview: on }),
+  alignGuide: null,
+  setAlignGuide: (g) => set(s => {
+    // Reference-equal when nothing changed, so a drag does not re-render the
+    // plan on every frame just to draw the same guide.
+    const a = s.alignGuide;
+    if (a === g) return s;
+    if (a && g && a.x === g.x && a.z === g.z) return s;
+    return { alignGuide: g };
+  }),
 
   addObject: (type, x, z, rot = 0) => set((state) => {
     // Interior objects can never land outside the building - drops used to

@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { RoomGeometry } from './RoomGeometry';
 import { SceneObjects } from './SceneObjects';
+import { LightingPlan } from './LightingPlan';
 import { PlacementGhost } from './PlacementGhost';
 import { ObjectType } from '../../types';
 import { clampToRoomInterior } from '../../utils/placement';
@@ -624,6 +625,7 @@ export function MainScene() {
 
         {/* Garden Objects */}
         <SceneObjects />
+        <LightingPlan />
       </group>
 
       {viewMode === 'walking' ? (
