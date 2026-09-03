@@ -1522,9 +1522,25 @@ export function RoomGeometry() {
           const inset = wallThickness + GABLE_LINER_T / 2;
           // The front apex is glazed rather than clad when apex glazing is on,
           // so it has no wall to line. The back one is always solid.
+          /*
+           * No liners at all once the apex is GLAZED.
+           *
+           * Apex glazing removes the triangle you are looking at, so from
+           * outside you see straight through to the far gable - and a liner
+           * there is a full-size sheet of near-white paper sitting right in
+           * the opening. Through clear glass that reads as a solid white
+           * panel where cladding should be, which is the "white gable" from
+           * outside. Without it you see the far apex clad, which reads as
+           * looking into a room, as it did before liners existed.
+           *
+           * The cost is that inside a glazed-apex gable the far apex stays
+           * clad rather than painted. That is a fair trade against a white
+           * triangle on the elevation, which is the first thing anyone sees.
+           */
+          if (room.hasApexGlazing) return null;
           const ends: number[] = isSideGable
-            ? (room.hasApexGlazing ? [] : [w/2 - inset, -w/2 + inset])
-            : (room.hasApexGlazing ? [-d/2 + inset] : [d/2 - inset, -d/2 + inset]);
+            ? [w/2 - inset, -w/2 + inset]
+            : [d/2 - inset, -d/2 + inset];
           return ends.map((v, i) => (
             <mesh
               key={`gable-liner-${i}`}
