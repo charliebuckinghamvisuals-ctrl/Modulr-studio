@@ -1188,8 +1188,9 @@ export function RoomGeometry() {
      * the crosshair takes the nearest marker it finds.
      */
     <group userData={{ isShell: true }} position={[room.x / 1000, 0, room.z / 1000]} rotation={[0, room.rot, 0]}>
-      {/* Interior light to prevent partitions from being too dark */}
-      <pointLight position={[0, h - 0.5, 0]} intensity={1.5} distance={15} decay={2} castShadow={false} />
+      {/* Interior light to prevent partitions from being too dark.
+          Damped in the walkthrough - see the note on the warm light below. */}
+      <pointLight position={[0, h - 0.5, 0]} intensity={viewMode === 'walking' ? 0.5 : 1.5} distance={15} decay={2} castShadow={false} />
 
       {/* Base Plinth / Decking Area */}
       {renderBaseMeshes()}
@@ -1784,7 +1785,15 @@ export function RoomGeometry() {
         The warm glow through the glazing is unchanged - that comes from the
         light's colour and intensity, not from its shadows.
       */}
-      <pointLight position={[0, h - 0.5, 0]} intensity={3} color="#ffe5b4" distance={10} castShadow={false} />
+      {/*
+        Damped in the walkthrough. Both interior lights hang 500mm under the
+        ceiling, and with inverse-square falloff that put a bright pool
+        directly above them - measured 167 luminance on the ceiling against
+        135 on the wall and 88 in the ceiling corner, on one flat colour. The
+        walkthrough is where a customer judges the paint, so there the even
+        bounce fill in MainScene carries the room and these only warm it.
+      */}
+      <pointLight position={[0, h - 0.5, 0]} intensity={viewMode === 'walking' ? 1.0 : 3} color="#ffe5b4" distance={10} castShadow={false} />
 
       {/* Guttering & downpipe. Pent/flat: one half-round run along the low
           edge with its rim flush with the fascia top. Gable: a run along each

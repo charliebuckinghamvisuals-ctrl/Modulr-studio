@@ -519,6 +519,22 @@ export function MainScene() {
       */}
       {isExporting && <ambientLight intensity={3.0} color="#ffffff" />}
 
+      {/*
+        Interior bounce light, walkthrough only.
+        three.js has no global illumination. A ceiling faces DOWN, so it
+        catches nothing at all from a sun overhead and rendered markedly darker
+        than the walls it meets - the same paint reading as two colours, which
+        is exactly the complaint the export ambient above was added to solve
+        for elevations. In a real room a ceiling is lit almost entirely by
+        light bouncing up off the floor, and a hemisphere light IS that bounce:
+        down-facing surfaces receive its GROUND colour, so the ground is the
+        brighter of the two here. Not applied outside, where a sky-lit roof and
+        a shaded soffit is correct.
+      */}
+      {viewMode === 'walking' && !isExporting && (
+        <hemisphereLight color="#e8eef5" groundColor="#ffffff" intensity={1.7} />
+      )}
+
       <group name="environment-background" visible={viewMode !== 'render'}>
         {/*
           Generated sky rather than a photographic HDR backdrop. Sky is a
