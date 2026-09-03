@@ -15,7 +15,7 @@ export const INTERIOR_TYPES: ObjectType[] = [
   'kitchen_drawer_2', 'kitchen_drawer_3', 'kitchen_tall_larder',
   'kitchen_hob_gas', 'kitchen_hob_induction', 'kitchen_extractor',
   'kitchen_wall_unit_600', 'kitchen_wall_unit_1200',
-  'bar_stool', 'bar_stool_tall', 'towel_heater',
+  'bar_stool', 'bar_stool_tall', 'towel_heater', 'spot_light',
   // external_extraction_fan is deliberately NOT here - it is the outside
   // terminal of the extract run, so it has to be placeable on an outside wall.
 ];
@@ -37,6 +37,8 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
   kitchen_wall_unit_600: 0.55, kitchen_wall_unit_1200: 0.85,
   bar_stool: 0.4, bar_stool_tall: 0.4,
   dining_table: 1.2, towel_heater: 0.45, external_extraction_fan: 0.35,
+  // A 60mm bezel - anything like a normal ring would swallow the ceiling.
+  spot_light: 0.16,
 };
 
 /**
@@ -75,14 +77,52 @@ export function clampToRoomInterior(room: Room, x: number, z: number, margin = 0
  * ceiling if one has been boarded in.
  */
 export function interiorCeilingHeight(room: Room): number {
-  const total = (room.heightMm ?? 2050) / 1000;
-  if (room.shape !== 'Gable') return total - 0.01;
-  const base = (room.baseHeightMm ?? 100) / 1000;
-  const roof = (room.roofHeightMm ?? 200) / 1000;
-  const eaves = total - base - roof + 0.025;
-  return room.gableFlatCeiling
-    ? Math.min(eaves, (room.gableCeilingHeightMm ?? 2400) / 1000)
-    : eaves;
+  if (room.shape === 'Gable') {
+    const base = (room.baseHeightMm ?? 100) / 1000;
+    const roof = (room.roofHeightMm ?? 200) / 1000;
+    const eaves = (room.heightMm ?? 2050) / 1000 - base - roof + 0.025;
+    return room.gableFlatCeiling
+      ? Math.min(eaves, (room.gableCeilingHeightMm ?? 2400) / 1000)
+      : eaves;
+  }
+  // A box room is only flat if both heights agree. backHeightMm defaults to
+  // 2010 against a 2050 front, so MOST designs are quietly a mono-pitch, and
+  // reading heightMm alone gives the high end - the safe answer is the low one.
+  const front = (room.heightMm ?? 2050) / 1000;
+  const back = (room.backHeightMm ?? room.heightMm ?? 2050) / 1000;
+  return Math.min(front, back) - 0.02;
+}
+
+/**
+ * Ceiling height above the finished floor AT A POINT, for things that have to
+ * sit flush with it - a downlight in a sloping ceiling has to follow the
+ * slope, not hang below its lowest corner.
+ *
+ * z runs front (+) to back (-) in room-local space, and x across the span.
+ */
+export function ceilingHeightAt(room: Room, x: number, z: number): number {
+  if (room.shape === 'Gable') {
+    const base = (room.baseHeightMm ?? 100) / 1000;
+    const roof = (room.roofHeightMm ?? 200) / 1000;
+    const fascia = Math.min(0.4, Math.max(0.05, (room.gableFasciaMm ?? 100) / 1000));
+    const wallTop = (room.heightMm ?? 2050) / 1000 - base - roof + 0.025;
+    const sideGable = room.gableOrientation === 'side';
+    const spanHalf = ((sideGable ? room.depthMm : room.widthMm) / 1000) / 2;
+    const u = sideGable ? z : x;
+    const perp = Math.cos(Math.atan2(roof, Math.max(0.1, spanHalf)));
+    // Mirrors the soffit line in RoomGeometry's gableCeiling.
+    const slope = wallTop + roof * (1 - Math.min(1, Math.abs(u) / spanHalf))
+      - 0.025 - (fascia / 2) / perp - 0.02;
+    if (room.gableFlatCeiling) {
+      return Math.min(slope, (room.gableCeilingHeightMm ?? 2400) / 1000);
+    }
+    return slope;
+  }
+  const front = (room.heightMm ?? 2050) / 1000;
+  const back = (room.backHeightMm ?? room.heightMm ?? 2050) / 1000;
+  const halfD = Math.max(0.1, (room.depthMm / 1000) / 2);
+  const t = Math.max(-1, Math.min(1, z / halfD));
+  return (front + back) / 2 + t * (front - back) / 2 - 0.02;
 }
 
 /** Ceiling panel thickness, and the floor finish they are measured above.

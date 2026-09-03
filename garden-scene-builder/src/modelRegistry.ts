@@ -50,7 +50,42 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   dining_table: 'models/dining_table.glb',
   towel_heater: 'models/towel_heater.glb',
   external_extraction_fan: 'models/external_extraction_fan.glb',
+  spot_light: 'models/spot_light.glb',
 };
+
+/**
+ * Types that fix to the CEILING rather than stand on the floor, with the
+ * height of the fitting itself so it can be hung with its top face flush.
+ *
+ * A downlight cannot use MOUNT_HEIGHT_MM: that measures up from the floor, and
+ * the ceiling is not at a fixed height - it moves with the wall height, and
+ * under a vaulted gable it is not even level. These are positioned from
+ * interiorCeilingHeight() instead.
+ */
+export const CEILING_MOUNTED: Partial<Record<ObjectType, number>> = {
+  spot_light: 0.008,
+};
+
+export const isCeilingMounted = (type: ObjectType) => CEILING_MOUNTED[type] !== undefined;
+
+/**
+ * The material inside a fitting that is the LIT surface - the lens, not the
+ * bezel. It is driven as an emissive so it glows on its own rather than
+ * waiting to be lit by something else, which is what a lamp does.
+ */
+export const EMISSIVE_MATERIAL: Partial<Record<ObjectType, string>> = {
+  spot_light: 'M01_Silver_Fog',
+};
+
+/** Lamp colours, warmest first - the temperatures people actually specify. */
+export const LIGHT_COLOURS: { name: string; hex: string }[] = [
+  { name: 'Warm White 2700K', hex: '#ffd6a5' },
+  { name: 'Soft White 3000K', hex: '#ffe4c4' },
+  { name: 'Neutral 4000K', hex: '#fff4e6' },
+  { name: 'Cool White 5000K', hex: '#eaf1ff' },
+];
+
+export const isLightFitting = (type: ObjectType) => EMISSIVE_MATERIAL[type] !== undefined;
 
 /**
  * Objects whose WIDTH can be changed, with the width the model was built at.
@@ -337,6 +372,11 @@ export const MODEL_SCALES: Partial<Record<ObjectType, [number, number, number]>>
   kitchen_tall_oven_single: [1, 2.0 / 2.208, 1],
   kitchen_tall_oven_double: [1, 2.0 / 2.208, 1],
   kitchen_tall_larder: [1, 2.0 / 2.208, 1],
+  // The bezel was modelled at 60mm. Correct for the real fitting, but on a
+  // ceiling two and a half metres away it is a speck - too small to read as a
+  // layout and too small to grab. 100mm reads properly and is still a size
+  // downlights are actually made in.
+  spot_light: [1.7, 1.7, 1.7],
 };
 
 /** Picker labels for GLB-backed objects, in display order. */
@@ -377,6 +417,7 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   shower_corner: 'Shower (Corner)',
   shower_small: 'Shower (Small)',
   towel_heater: 'Towel Radiator',
+  spot_light: 'Spotlight',
 };
 
 export const GLB_OBJECT_TYPES = Object.keys(GLB_OBJECT_LABELS).filter(t => (MODEL_URLS as Record<string, string>)[t]) as ObjectType[];

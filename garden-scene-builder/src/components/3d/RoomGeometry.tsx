@@ -714,7 +714,7 @@ export function RoomGeometry() {
     controlsEnabled: s.controlsEnabled
   })));
   const isPlanView = viewMode === 'plan';
-  const isNight = false;
+  const isNight = useStore(s => s.nightPreview);
   const w = Math.max(0.5, room.widthMm / 1000);
   const d = Math.max(0.5, room.depthMm / 1000);
   
@@ -1190,7 +1190,7 @@ export function RoomGeometry() {
     <group userData={{ isShell: true }} position={[room.x / 1000, 0, room.z / 1000]} rotation={[0, room.rot, 0]}>
       {/* Interior light to prevent partitions from being too dark.
           Damped in the walkthrough - see the note on the warm light below. */}
-      <pointLight position={[0, h - 0.5, 0]} intensity={viewMode === 'walking' ? 0.5 : 1.5} distance={15} decay={2} castShadow={false} />
+      <pointLight position={[0, h - 0.5, 0]} intensity={isNight ? 0 : (viewMode === 'walking' ? 0.5 : 1.5)} distance={15} decay={2} castShadow={false} />
 
       {/* Base Plinth / Decking Area */}
       {renderBaseMeshes()}
@@ -1793,7 +1793,9 @@ export function RoomGeometry() {
         walkthrough is where a customer judges the paint, so there the even
         bounce fill in MainScene carries the room and these only warm it.
       */}
-      <pointLight position={[0, h - 0.5, 0]} intensity={viewMode === 'walking' ? 1.0 : 3} color="#ffe5b4" distance={10} castShadow={false} />
+      {/* Off under night preview: this is generic room glow, and leaving it on
+          would light the room for you and hide what the layout actually does. */}
+      <pointLight position={[0, h - 0.5, 0]} intensity={isNight ? 0 : (viewMode === 'walking' ? 1.0 : 3)} color="#ffe5b4" distance={10} castShadow={false} />
 
       {/* Guttering & downpipe. Pent/flat: one half-round run along the low
           edge with its rim flush with the fascia top. Gable: a run along each

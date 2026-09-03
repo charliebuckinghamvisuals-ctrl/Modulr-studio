@@ -442,9 +442,12 @@ export function MainScene() {
     return () => window.removeEventListener('focus-object', onFocus);
   }, []);
 
-  const isNight = false;
-  
-  
+  // Was hardcoded false: the whole night look - sun, HDR, environment
+  // intensity, grid colours - was already wired to this and simply never
+  // switched on. It is what makes a lighting layout visible.
+  const isNight = useStore(s => s.nightPreview);
+
+
   useFrame((_, delta) => {
     if (isSpinning && controlsRef.current) {
       controlsRef.current.azimuthAngle += delta * 0.3;
@@ -533,7 +536,7 @@ export function MainScene() {
         a shaded soffit is correct.
       */}
       {viewMode === 'walking' && !isExporting && (
-        <hemisphereLight color="#e8eef5" groundColor="#ffffff" intensity={1.7} />
+        <hemisphereLight color="#e8eef5" groundColor="#ffffff" intensity={isNight ? 0.2 : 1.7} />
       )}
 
       <group name="environment-background" visible={viewMode !== 'render'}>

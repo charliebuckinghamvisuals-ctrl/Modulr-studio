@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, Suspense } from 'react';
 import * as THREE from 'three';
 import { useGLTF } from '@react-three/drei';
 import { useStore } from '../../store';
-import { MODEL_URLS, MODEL_SCALES, mountHeight } from '../../modelRegistry';
-import { isInteriorType, clampToRoomInterior } from '../../utils/placement';
+import { MODEL_URLS, MODEL_SCALES, mountHeight, CEILING_MOUNTED, isCeilingMounted } from '../../modelRegistry';
+import { isInteriorType, clampToRoomInterior, interiorCeilingHeight } from '../../utils/placement';
 
 /** Semi-transparent clone of a GLB model, used as the placement preview. */
 function GhostGlb({ url }: { url: string }) {
@@ -57,8 +57,12 @@ export function PlacementGhost() {
   const interior = isInteriorType(type);
   const modelUrl = MODEL_URLS[type];
   // Matches the placed object exactly, so a tap previews at worktop
-  // height instead of jumping up 900mm the moment it is dropped.
-  const y = (interior ? baseH + 0.005 : 0) + mountHeight(type);
+  // height instead of jumping up 900mm the moment it is dropped, and a
+  // downlight previews on the ceiling rather than lying on the floor.
+  const floor = interior ? baseH + 0.01 : 0;
+  const y = isCeilingMounted(type)
+    ? floor + interiorCeilingHeight(room) - (CEILING_MOUNTED[type] ?? 0)
+    : floor + mountHeight(type);
 
   const moveGhost = (e: any) => {
     let x = e.point.x, z = e.point.z;

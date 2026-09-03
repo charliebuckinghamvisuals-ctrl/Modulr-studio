@@ -9,6 +9,7 @@ import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS } from '../modelRegistry';
 import { ObjectTile } from './UI/ObjectTile';
+import { SpotLayout } from './UI/SpotLayout';
 import { TemplatesSection } from './UI/TemplatesSection';
 
 /**
@@ -1213,6 +1214,23 @@ export function Sidebar() {
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Bathroom</label>
               <div className="grid grid-cols-2 gap-2.5">
                 {(['toilet', 'vanity', 'shower', 'shower_corner', 'shower_small', 'towel_heater'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
+                ))}
+              </div>
+            </section>
+
+            {/*
+              Lighting. A downlight layout is set out as a grid, not fitting by
+              fitting, so the grid tool is the primary control here and the
+              single tile is for adding an odd one afterwards. Night preview
+              sits with it because in daylight the fittings are invisible and
+              the layout cannot be judged at all.
+            */}
+            <section>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Lighting</label>
+              <SpotLayout />
+              <div className="grid grid-cols-2 gap-2.5 mt-3">
+                {(['spot_light'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>

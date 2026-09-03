@@ -1,7 +1,7 @@
 import { useStore } from '../../store';
 import { useEffect, useState } from 'react';
 import { Trash2, RotateCw, Copy, ChevronDown, ChevronUp } from 'lucide-react';
-import { isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS } from '../../modelRegistry';
+import { isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS } from '../../modelRegistry';
 import { DimensionSlider } from '../DimensionSlider';
 import { useSavedColours, addSavedColour, removeSavedColour } from '../../utils/savedColours';
 import { resumeWalking } from '../../utils/walk';
@@ -216,6 +216,17 @@ export function ObjectEditorPanel() {
             worktop, sink and handles keep their own finish. */}
         {TINT_MATERIAL[obj.type] && (
           <ColourRow current={(obj.color ?? UNIT_COLOURS[0].hex).toLowerCase()} onPick={(hex, settled) => { updateObject(obj.id, { color: hex }); if (settled) afterPick(); }} />
+        )}
+
+        {/* Lamp colour temperature. Warm or cool changes how the whole room
+            reads, so it belongs on the fitting rather than buried in a menu. */}
+        {isLightFitting(obj.type) && (
+          <ColourRow
+            label="Lamp"
+            presets={LIGHT_COLOURS}
+            current={(obj.color ?? LIGHT_COLOURS[0].hex).toLowerCase()}
+            onPick={(hex, settled) => { updateObject(obj.id, { color: hex }); if (settled) afterPick(); }}
+          />
         )}
 
         {/* Worktop. Stored on the ROOM, not the unit - a kitchen has one

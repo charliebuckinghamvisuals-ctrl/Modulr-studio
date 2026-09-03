@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { ObjectType } from '../types';
 import {
   TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH, FORCE_DIELECTRIC,
+  EMISSIVE_MATERIAL, LIGHT_COLOURS,
   FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById,
 } from '../modelRegistry';
 import type { WorktopDef } from '../modelRegistry';
@@ -250,6 +251,7 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
   const bodyMats: THREE.MeshPhysicalMaterial[] = [];
   const metalMats: THREE.MeshStandardMaterial[] = [];
   const worktopMats: THREE.MeshStandardMaterial[] = [];
+  const lampMats: THREE.MeshStandardMaterial[] = [];
 
   // Needed by the mirrored-normal fix below, which reads matrixWorld.
   root.updateMatrixWorld(true);
@@ -307,6 +309,30 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         dressWorktop(top, worktopDef);
         worktopMats.push(top);
         return top;
+      }
+
+      /*
+       * The lit lens of a fitting.
+       *
+       * Driven as an EMISSIVE, which is light the surface gives off rather
+       * than light falling on it - so the lens reads as switched on even when
+       * the room around it is dark, which is the whole point of previewing a
+       * lighting layout. toneMapped is off so it keeps its brightness through
+       * the ACES curve instead of being rolled back to a grey disc.
+       */
+      const emissiveName = EMISSIVE_MATERIAL[type];
+      if (emissiveName && m.name === emissiveName) {
+        const lamp = new THREE.MeshStandardMaterial({
+          name: m.name,
+          color: '#111111',
+          emissive: new THREE.Color(color ?? LIGHT_COLOURS[0].hex),
+          emissiveIntensity: 2.4,
+          roughness: 0.4,
+          metalness: 0,
+        });
+        lamp.toneMapped = false;
+        lampMats.push(lamp);
+        return lamp;
       }
 
       const fabricRepeat = FABRIC_REPEAT[type];
@@ -387,7 +413,7 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
     mesh.material = Array.isArray(mesh.material) ? next : next[0];
   });
 
-  return { bodyMats, metalMats, worktopMats };
+  return { bodyMats, metalMats, worktopMats, lampMats };
 }
 
 /** The finish entry a stored hex refers to, falling back to the model's
@@ -409,10 +435,14 @@ export function resurfaceWorktop(
 /** Recolour an already-instanced model without rebuilding it. */
 export function retintModel(
   type: ObjectType,
-  handles: { bodyMats: THREE.MeshPhysicalMaterial[]; metalMats: THREE.MeshStandardMaterial[] },
+  handles: { bodyMats: THREE.MeshPhysicalMaterial[]; metalMats: THREE.MeshStandardMaterial[]; lampMats?: THREE.MeshStandardMaterial[] },
   color: string,
 ) {
   handles.bodyMats.forEach(m => { m.color.set(color); m.needsUpdate = true; });
+  // A lamp's colour is the light it gives off, not the colour of its glass,
+  // so it lands on the emissive - and the spot light beside it takes the same
+  // hex, keeping lens and beam the same temperature.
+  handles.lampMats?.forEach(m => { m.emissive.set(color); m.needsUpdate = true; });
   if (handles.metalMats.length) {
     const finish = finishFor(type, color);
     handles.metalMats.forEach(m => {

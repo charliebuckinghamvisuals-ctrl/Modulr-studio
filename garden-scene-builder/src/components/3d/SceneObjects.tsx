@@ -6,9 +6,9 @@ import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
-import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H } from '../../modelRegistry';
+import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS } from '../../modelRegistry';
 import { applyModelMaterials, retintModel, resurfaceWorktop } from '../../utils/materialFixes';
-import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, FOOTPRINT_RADIUS } from '../../utils/placement';
+import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS } from '../../utils/placement';
 import { wallpaperProps } from '../../utils/wallpaper';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
 import { RotateCw, Copy, Trash2 } from 'lucide-react';
@@ -130,19 +130,36 @@ export function SceneObjects() {
 
   return (
     <group>
-      {objects.map(obj => {
-        if (isExporting && ['tree', 'conifer', 'hedge', 'shrub', 'flowerbed', 'planter', 'bench', 'slab', 'patio'].includes(obj.type)) {
-          return null;
-        }
-        return <ObjectMesh key={obj.id} obj={obj} />;
-      })}
+      {(() => {
+        /*
+         * Only the first LIT_CAP fittings get a REAL light.
+         *
+         * Every live light is work for the GPU on every frame, and a lighting
+         * layout is exactly the design that tempts you to place twenty of
+         * them. Past the cap a fitting still shows and still glows - you can
+         * lay out as many as you like - it just stops adding to the shader
+         * cost. Twelve is enough to light a garden room convincingly.
+         */
+        let lit = 0;
+        return objects.map(obj => {
+          if (isExporting && ['tree', 'conifer', 'hedge', 'shrub', 'flowerbed', 'planter', 'bench', 'slab', 'patio'].includes(obj.type)) {
+            return null;
+          }
+          const castsLight = isLightFitting(obj.type) && lit < LIT_CAP;
+          if (castsLight) lit++;
+          return <ObjectMesh key={obj.id} obj={obj} castsLight={castsLight} />;
+        });
+      })()}
       {/* One slab per run of cabinets, laid over the hidden per-unit tops. */}
       <WorktopRuns />
     </group>
   );
 }
 
-function ObjectMesh({ obj }: { obj: SceneObject }) {
+/** How many light fittings actually emit light - see the note at the map. */
+const LIT_CAP = 12;
+
+function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?: boolean }) {
   const { selectedObjectId, setSelectedObjectId, updateObject, viewMode, room } = useStore(useShallow(s => ({
     selectedObjectId: s.selectedObjectId,
     setSelectedObjectId: s.setSelectedObjectId,
@@ -152,6 +169,9 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   })));
   const isSelected = selectedObjectId === obj.id;
   const paper = wallpaperProps();
+  // A spot light aims at its target object, so each fitting carries its own,
+  // parented to the fitting and therefore moving with it.
+  const beamTarget = useMemo(() => new THREE.Object3D(), []);
 
   /**
    * Partition walls, sized and mapped like the room's own walls.
@@ -184,8 +204,19 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const { raycaster, camera } = useThree();
-  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-  
+  /**
+   * The surface a drag slides along.
+   *
+   * Floor level for anything standing on the floor, but a ceiling fitting has
+   * to slide along the CEILING - dragging it against the floor plane made it
+   * shoot away from the cursor, because the ray crosses y=0 metres past where
+   * you actually grabbed it. A plane constant is the negated height.
+   */
+  const dragPlaneY = isCeilingMounted(obj.type)
+    ? ((room.baseHeightMm ?? 100) / 1000) + 0.01 + ceilingHeightAt(room, obj.x, obj.z)
+    : 0;
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -dragPlaneY);
+
   // Interior objects stand on the FINISHED floor (top of the base plinth),
   // not on the outside ground - without the lift they sink baseH into the
   // floor.
@@ -197,7 +228,11 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   const baseH = isInterior ? ((room.baseHeightMm ?? 100) / 1000) + 0.01 : 0;
   // Worktop-mounted objects (taps) sit on the 900mm sink unit rather than on
   // the floor, so they are lifted by their mount height as well.
-  const pos: [number, number, number] = [obj.x, baseH + mountHeight(obj.type), obj.z];
+  // A ceiling fitting hangs from the ceiling, which moves with the wall
+  // height - so it is placed DOWN from there rather than up from the floor.
+  const pos: [number, number, number] = isCeilingMounted(obj.type)
+    ? [obj.x, baseH + ceilingHeightAt(room, obj.x, obj.z) - (CEILING_MOUNTED[obj.type] ?? 0), obj.z]
+    : [obj.x, baseH + mountHeight(obj.type), obj.z];
 
   const handlePointerDown = (e: any) => {
     /**
@@ -918,6 +953,29 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
       }}
     >
       {meshContent}
+      {/*
+        The beam. A spot rather than a point light, because the pool it throws
+        on the floor IS the thing being designed - a bare point light lights
+        the room evenly and tells you nothing about where the fittings are.
+        No shadows: a shadow-casting light costs a full render pass per frame,
+        and a dozen of them would make the walkthrough unusable on a laptop.
+      */}
+      {castsLight && (
+        <>
+          <primitive object={beamTarget} position={[0, -3, 0]} />
+          <spotLight
+            position={[0, -0.01, 0]}
+            target={beamTarget}
+            color={obj.color ?? LIGHT_COLOURS[0].hex}
+            intensity={9}
+            angle={0.62}
+            penumbra={0.55}
+            distance={7}
+            decay={1.6}
+            castShadow={false}
+          />
+        </>
+      )}
       {isSelected && (
         <mesh position={[0, 0.02, 0]} rotation={[-Math.PI/2, 0, 0]}>
           {/* A tight ring reads as "this object", the old 2m halo read as

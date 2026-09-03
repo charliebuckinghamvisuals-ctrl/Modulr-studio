@@ -126,6 +126,17 @@ interface AppState {
   
   // Object Actions
   addObject: (type: ObjectType, x: number, z: number, rot?: number) => void;
+  /** Lay out downlights on an even rows x cols grid. See the implementation
+   *  for why centres, not edges. */
+  addSpotGrid: (rows: number, cols: number, replace?: boolean) => void;
+  /** Add one evenly spaced run of downlights across the width or down the
+   *  depth, at `offset` from the room's centre line on the other axis. */
+  addSpotRow: (count: number, axis: 'across' | 'down', offset?: number) => void;
+  clearSpots: () => void;
+  /** Preview the design after dark. Daylight swamps the fittings, so without
+   *  this a lighting layout cannot actually be judged. */
+  nightPreview: boolean;
+  setNightPreview: (on: boolean) => void;
   duplicateObject: (id: string) => void;
   updateObject: (id: string, updates: Partial<SceneState['objects'][0]>) => void;
   removeObject: (id: string) => void;
@@ -815,6 +826,8 @@ export const useStore = create<AppState>((set, get) => ({
   setCameraFov: (fov) => set({ cameraFov: Math.min(100, Math.max(20, fov)) }),
   walkFov: 60,
   setWalkFov: (fov) => set({ walkFov: Math.min(100, Math.max(20, fov)) }),
+  nightPreview: false,
+  setNightPreview: (on) => set({ nightPreview: on }),
 
   addObject: (type, x, z, rot = 0) => set((state) => {
     // Interior objects can never land outside the building - drops used to
@@ -833,6 +846,65 @@ export const useStore = create<AppState>((set, get) => ({
       }
     };
   }),
+
+  /**
+   * Lay a grid of downlights across the room in one go.
+   *
+   * Placing spots one at a time and eyeballing the gaps is the slow, annoying
+   * part of a lighting layout, and uneven spacing is obvious once it is built.
+   * This divides the room into rows x cols equal cells and puts a fitting at
+   * the CENTRE of each, which is the standard way to set downlights out: it
+   * gives even spacing between fittings AND a half-space margin to the walls,
+   * so no light sits hard against one.
+   *
+   * Replaces any existing spots rather than adding to them, so nudging the
+   * numbers re-lays the grid instead of piling a second one on top.
+   */
+  addSpotGrid: (rows, cols, replace = true) => set((state) => {
+    const room = state.scene.room;
+    const wt = (room.wallThicknessMm ?? 150) / 1000;
+    const iw = room.widthMm / 1000 - wt * 2;
+    const id = room.depthMm / 1000 - wt * 2;
+    const kept = replace ? state.scene.objects.filter(o => o.type !== 'spot_light') : state.scene.objects;
+    const spots: SceneState['objects'] = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = -iw / 2 + iw * (c + 0.5) / cols;
+        const z = -id / 2 + id * (r + 0.5) / rows;
+        spots.push({ id: uuidv4(), type: 'spot_light', x, z, rot: 0, scale: 1 });
+      }
+    }
+    return { scene: { ...state.scene, objects: [...kept, ...spots] } };
+  }),
+
+  /**
+   * One evenly spaced run of downlights, ADDED to whatever is already there.
+   *
+   * A real ceiling is usually a few runs rather than one grid - a row over the
+   * worktop, a row down the middle, a pair over the desk - so rows compose.
+   * Spacing is even along the run and the whole run is centred, with a
+   * half-space left to the wall at each end exactly as the grid does, so a row
+   * dropped next to a grid still lines through with it.
+   */
+  addSpotRow: (count, axis, offset = 0) => set((state) => {
+    const room = state.scene.room;
+    const wt = (room.wallThicknessMm ?? 150) / 1000;
+    const span = (axis === 'across' ? room.widthMm : room.depthMm) / 1000 - wt * 2;
+    const spots: SceneState['objects'] = [];
+    for (let i = 0; i < count; i++) {
+      const along = -span / 2 + span * (i + 0.5) / count;
+      spots.push({
+        id: uuidv4(), type: 'spot_light', rot: 0, scale: 1,
+        x: axis === 'across' ? along : offset,
+        z: axis === 'across' ? offset : along,
+      });
+    }
+    return { scene: { ...state.scene, objects: [...state.scene.objects, ...spots] } };
+  }),
+
+  clearSpots: () => set((state) => ({
+    scene: { ...state.scene, objects: state.scene.objects.filter(o => o.type !== 'spot_light') },
+  })),
 
   duplicateObject: (id) => set((state) => {
     const src = state.scene.objects.find(o => o.id === id);
