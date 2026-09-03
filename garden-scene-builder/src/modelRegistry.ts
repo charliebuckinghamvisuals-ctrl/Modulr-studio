@@ -88,6 +88,41 @@ export const LIGHT_COLOURS: { name: string; hex: string }[] = [
 export const isLightFitting = (type: ObjectType) => EMISSIVE_MATERIAL[type] !== undefined;
 
 /**
+ * Which run of cabinets a unit belongs to.
+ *
+ * Nobody specifies a kitchen cabinet by cabinet. A customer picks a door
+ * colour for the BASE run, and then either matches the tall units to it or
+ * deliberately contrasts them - a sage base with oak tall units is a normal
+ * choice, six differently coloured base units is not. Recolouring one at a
+ * time made the common case the tedious one and the mistake easy.
+ */
+export type UnitFamily = 'base' | 'wall' | 'tall';
+
+export const UNIT_FAMILY: Partial<Record<ObjectType, UnitFamily>> = {
+  kitchen_unit_600: 'base',
+  kitchen_unit_1200: 'base',
+  kitchen_sink_1200: 'base',
+  kitchen_drawer_2: 'base',
+  kitchen_drawer_3: 'base',
+  kitchen_wall_unit_600: 'wall',
+  kitchen_wall_unit_1200: 'wall',
+  kitchen_tall_fridge: 'tall',
+  kitchen_tall_oven_single: 'tall',
+  kitchen_tall_oven_double: 'tall',
+  kitchen_tall_larder: 'tall',
+};
+
+export const FAMILY_LABEL: Record<UnitFamily, string> = {
+  base: 'Base units',
+  wall: 'Wall units',
+  tall: 'Tall units',
+};
+
+export const unitFamily = (type: ObjectType) => UNIT_FAMILY[type];
+export const familyTypes = (f: UnitFamily) =>
+  (Object.keys(UNIT_FAMILY) as ObjectType[]).filter(t => UNIT_FAMILY[t] === f);
+
+/**
  * Objects whose WIDTH can be changed, with the width the model was built at.
  *
  * Only the X axis is scaled, so the carcass keeps its true 600mm depth and

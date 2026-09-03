@@ -1,7 +1,7 @@
 import { useStore } from '../../store';
 import { useEffect, useState } from 'react';
 import { Trash2, RotateCw, Copy, ChevronDown, ChevronUp } from 'lucide-react';
-import { isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS } from '../../modelRegistry';
+import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS } from '../../modelRegistry';
 import { DimensionSlider } from '../DimensionSlider';
 import { useSavedColours, addSavedColour, removeSavedColour } from '../../utils/savedColours';
 import { resumeWalking } from '../../utils/walk';
@@ -132,8 +132,15 @@ function ColourRow({ current, onPick, presets = UNIT_COLOURS, label = 'Colour' }
 export function ObjectEditorPanel() {
   // Declared before the early return below so the hook order never shifts.
   const [collapsed, setCollapsed] = useState(false);
-  const { selectedObjectId, scene, updateObject, removeObject, viewMode, updateRoom } = useStore();
+  const { selectedObjectId, scene, updateObject, removeObject, viewMode, updateRoom, recolourUnits } = useStore();
+  // Defaults to the selected unit's own run - the usual intent. Reset when a
+  // different family is selected so it never silently paints the wrong run.
+  const [scope, setScope] = useState<any>(null);
   const obj = scene.objects.find(o => o.id === selectedObjectId);
+  // Worked out BEFORE the early return: a hook after it would change the hook
+  // order the moment nothing is selected, which React refuses outright.
+  const family = obj ? unitFamily(obj.type) : undefined;
+  useEffect(() => { setScope(family ?? null); }, [family, obj?.id]);
 
   if (!obj || viewMode === 'capture' || viewMode === 'render') return null;
 
@@ -214,8 +221,41 @@ export function ObjectEditorPanel() {
         )}
         {/* Door/carcass colour. Only the body material is recoloured, so the
             worktop, sink and handles keep their own finish. */}
+        {/*
+          Which cabinets this colour lands on.
+          A door colour belongs to a RUN, not one carcass - see UNIT_FAMILY.
+          Defaults to the whole family the selected unit is in, because that
+          is what someone almost always means, with "just this one" there for
+          the exception rather than as the only option.
+        */}
+        {family && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-gray-700 shrink-0">Apply to</span>
+            <div className="flex gap-1 flex-wrap">
+              {([family, 'all', 'one'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setScope(s)}
+                  className={`px-2 py-1 text-[10px] font-semibold rounded-md uppercase tracking-wide transition-colors ${
+                    scope === s ? 'bg-[#3b4d4a] text-white' : 'bg-black/5 text-gray-600 hover:bg-black/10'
+                  }`}
+                >
+                  {s === 'all' ? 'All units' : s === 'one' ? 'Just this' : FAMILY_LABEL[family]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {TINT_MATERIAL[obj.type] && (
-          <ColourRow current={(obj.color ?? UNIT_COLOURS[0].hex).toLowerCase()} onPick={(hex, settled) => { updateObject(obj.id, { color: hex }); if (settled) afterPick(); }} />
+          <ColourRow
+            current={(obj.color ?? UNIT_COLOURS[0].hex).toLowerCase()}
+            onPick={(hex, settled) => {
+              if (family && scope !== 'one') recolourUnits(scope === 'all' ? 'all' : family, hex);
+              else updateObject(obj.id, { color: hex });
+              if (settled) afterPick();
+            }}
+          />
         )}
 
         {/* Lamp colour temperature. Warm or cool changes how the whole room

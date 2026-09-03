@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { SceneState, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { isInteriorType, clampToRoomInterior } from './utils/placement';
+import { UNIT_FAMILY } from './modelRegistry';
 
 // Debug/E2E hook: lets automated tests drive the store directly (drag
 // simulation, perf probes). Harmless in production - nothing reads it.
@@ -134,6 +135,8 @@ interface AppState {
    *  pitch and centres the run; without it the span is divided evenly. */
   addSpotRow: (count: number, axis: 'across' | 'down', offset?: number, spacing?: number) => void;
   clearSpots: () => void;
+  /** Set the door colour for a whole run of cabinets, or every unit. */
+  recolourUnits: (scope: 'base' | 'wall' | 'tall' | 'all', hex: string) => void;
   /** Move an object to x,z, carrying the rest of its run with it. Pass solo
    *  to break one fitting out of the line instead. */
   moveWithGroup: (id: string, x: number, z: number, solo?: boolean) => void;
@@ -972,6 +975,25 @@ export const useStore = create<AppState>((set, get) => ({
       },
     };
   }),
+
+  /**
+   * Recolour a whole run of cabinets at once.
+   *
+   * `scope` is a family - base, wall or tall - or 'all' for every unit in the
+   * kitchen. See UNIT_FAMILY: a door colour belongs to a run, not to a single
+   * carcass, so this is the normal way to change it and the per-unit swatch is
+   * the exception.
+   */
+  recolourUnits: (scope, hex) => set((state) => ({
+    scene: {
+      ...state.scene,
+      objects: state.scene.objects.map(o => {
+        const fam = UNIT_FAMILY[o.type];
+        if (!fam) return o;
+        return (scope === 'all' || fam === scope) ? { ...o, color: hex } : o;
+      }),
+    },
+  })),
 
   clearSpots: () => set((state) => ({
     scene: { ...state.scene, objects: state.scene.objects.filter(o => o.type !== 'spot_light') },
