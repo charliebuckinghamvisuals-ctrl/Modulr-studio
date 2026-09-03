@@ -251,11 +251,39 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
   const metalMats: THREE.MeshStandardMaterial[] = [];
   const worktopMats: THREE.MeshStandardMaterial[] = [];
 
+  // Needed by the mirrored-normal fix below, which reads matrixWorld.
+  root.updateMatrixWorld(true);
+
   root.traverse(child => {
     const mesh = child as THREE.Mesh;
     if (!mesh.isMesh) return;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+
+    /**
+     * Un-mirror a mesh placed by a negative-determinant transform.
+     *
+     * SketchUp components get mirrored all the time - a pair of matching
+     * pillows is one component placed twice, the second flipped. Transforming
+     * a normal by a mirror turns it INWARD, so that copy is lit as though its
+     * top faced the floor: measured -0.77 average normal Y against +0.77 on
+     * its twin, which is why one pillow of a pair came out a different shade.
+     *
+     * three.js already flips the winding for mirrored objects, so the facing
+     * is fine and only the normals need turning back. The geometry is cloned
+     * first because the mirrored copy usually SHARES it with the one that is
+     * the right way round.
+     */
+    if (mesh.matrixWorld.determinant() < 0 && !mesh.userData.__unmirrored) {
+      const geom = mesh.geometry.clone();
+      const n = geom.getAttribute('normal');
+      if (n) {
+        for (let i = 0; i < n.count; i++) n.setXYZ(i, -n.getX(i), -n.getY(i), -n.getZ(i));
+        n.needsUpdate = true;
+        mesh.geometry = geom;
+      }
+      mesh.userData.__unmirrored = true;
+    }
 
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     const next = mats.map((m: any) => {

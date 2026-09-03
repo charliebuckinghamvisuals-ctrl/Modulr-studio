@@ -168,7 +168,8 @@ export function WorktopRuns() {
   }, [objects, room]);
 
   // Interior objects stand on the finished floor, and so does the worktop.
-  const baseH = ((room.baseHeightMm ?? 100) / 1000) + 0.005;
+  // Matches SceneObjects: the floor slab's TOP face, not its centre.
+  const baseH = ((room.baseHeightMm ?? 100) / 1000) + 0.01;
 
   return (
     <group>

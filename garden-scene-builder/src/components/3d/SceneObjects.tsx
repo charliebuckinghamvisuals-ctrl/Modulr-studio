@@ -190,7 +190,11 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   // not on the outside ground - without the lift they sink baseH into the
   // floor.
   const isInterior = isInteriorType(obj.type);
-  const baseH = isInterior ? ((room.baseHeightMm ?? 100) / 1000) + 0.005 : 0;
+  // The floor finish is a 10mm slab whose CENTRE sits at 0.005 above the
+  // plinth, so its walkable top face is at 0.01 - not 0.005. Standing objects
+  // on the centre buried the bottom 5mm of every one of them, which reads as
+  // sunk on anything with a flat base sitting straight on the floor.
+  const baseH = isInterior ? ((room.baseHeightMm ?? 100) / 1000) + 0.01 : 0;
   // Worktop-mounted objects (taps) sit on the 900mm sink unit rather than on
   // the floor, so they are lifted by their mount height as well.
   const pos: [number, number, number] = [obj.x, baseH + mountHeight(obj.type), obj.z];

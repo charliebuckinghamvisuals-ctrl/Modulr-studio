@@ -837,6 +837,19 @@ export function RoomGeometry() {
   );
   const paper = wallpaperProps();
 
+  /**
+   * Geometry for a brush whose CUT FACE becomes an interior surface.
+   *
+   * A CSG cut face takes the material AND the UVs of the operand that cut it.
+   * These brushes were plain boxes with plain colour, so the ceiling, the wall
+   * tops and every door and window reveal came out the same hex as the walls
+   * but a completely different SURFACE - no paper, different roughness - which
+   * is why a room read as several shades of the one colour. World-scale UVs
+   * here, and the paper on the material, make them all one wall finish.
+   */
+  const interiorCut = (cw: number, ch: number, cd: number) =>
+    createWorldScaleBoxGeometry(cw, ch, cd, false, 0, 0, 0);
+
 
 
   const isDeckingMaterial = room.hasDecking || room.hasPictureFrame || room.baseMaterial === 'timber_decking' || room.baseMaterial === 'composite_decking';
@@ -1318,13 +1331,13 @@ export function RoomGeometry() {
               <>
                 {/* Left part of the L */}
                 <Subtraction position={[-cutW/2, h/2, 0]}>
-                  <boxGeometry args={[w - cutW - wallThickness*2, h + 1, d - wallThickness*2]} />
-                  <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
+                  <primitive object={interiorCut(w - cutW - wallThickness*2, h + 1, d - wallThickness*2)} attach="geometry" />
+                  <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
                 </Subtraction>
                 {/* Back-right part of the L */}
                 <Subtraction position={[w/2 - cutW/2 - wallThickness, h/2, -cutD/2]}>
-                  <boxGeometry args={[cutW + wallThickness*2, h + 1, d - cutD - wallThickness*2]} />
-                  <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
+                  <primitive object={interiorCut(cutW + wallThickness*2, h + 1, d - cutD - wallThickness*2)} attach="geometry" />
+                  <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
                 </Subtraction>
               </>
             )}
@@ -1336,8 +1349,8 @@ export function RoomGeometry() {
             {/* Top Cutout for flat roofs to enforce wall top color */}
             {!isPitched && !isGable && (
               <Subtraction position={[0, h + 0.025, 0]}>
-                 <boxGeometry args={[w + 1, 0.05 + 0.001, d + 1]} />
-                 <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
+                 <primitive object={interiorCut(w + 1, 0.05 + 0.001, d + 1)} attach="geometry" />
+                 <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
               </Subtraction>
             )}
 
@@ -1364,8 +1377,8 @@ export function RoomGeometry() {
 
               return (
                 <Subtraction key={door.id} position={pos}>
-                  <boxGeometry args={size} />
-                  <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
+                  <primitive object={interiorCut(size[0], size[1], size[2])} attach="geometry" />
+                  <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
                 </Subtraction>
               );
             })}
@@ -1380,8 +1393,8 @@ export function RoomGeometry() {
                 ]} 
                 rotation={[roofPitch, 0, 0]}
               >
-                 <boxGeometry args={[w + 1, 4, d + 2]} />
-                 <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
+                 <primitive object={interiorCut(w + 1, 4, d + 2)} attach="geometry" />
+                 <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
               </Subtraction>
             )}
 
@@ -1412,8 +1425,8 @@ export function RoomGeometry() {
 
               return (
                 <Subtraction key={`cut-${win.id}`} position={pos}>
-                  <boxGeometry args={size} />
-                  <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
+                  <primitive object={interiorCut(size[0], size[1], size[2])} attach="geometry" />
+                  <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
                 </Subtraction>
               );
             })}
@@ -1611,10 +1624,13 @@ export function RoomGeometry() {
         )}
         {!isPlanView && !isGable && (
           <mesh position={[0, (isPitched && !isGable ? (frontH + backH)/2 : h) - 0.005, 0]} rotation={[isPitched && !isGable ? roofPitch : 0, 0, 0]} receiveShadow>
-            <meshStandardMaterial color={room.interiorColor || '#ffffff'} roughness={0.9} />
+            {/* The flat/pitched ceiling. Papered like the walls it meets -
+                plain colour here was the same hex but a different surface,
+                which is what made a room read as several shades of one paint. */}
+            <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
             <Geometry>
                <Base>
-                 <boxGeometry args={[w - wallThickness*2, 0.01, isPitched && !isGable ? Math.sqrt((frontH-backH)**2 + d**2) - wallThickness*2 : d - wallThickness*2]} />
+                 <primitive object={interiorCut(w - wallThickness*2, 0.01, isPitched && !isGable ? Math.sqrt((frontH-backH)**2 + d**2) - wallThickness*2 : d - wallThickness*2)} attach="geometry" />
                </Base>
                {isLShape && (
                   <Subtraction position={[w/2 - cutW/2 + 0.1, 0, d/2 - cutD/2 + 0.1]}>
