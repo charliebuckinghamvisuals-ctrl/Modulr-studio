@@ -57,8 +57,14 @@ export function WalkHud() {
       : pending.kind === 'floor' ? 'Change floor'
       : 'Change wall colour';
     return (
-      <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-        <div className="flex flex-col items-center gap-2 animate-[fadeIn_120ms_ease-out]">
+      <div className="absolute inset-0 z-30 pointer-events-none">
+        <div
+          className="absolute flex flex-col items-center gap-2 animate-[fadeIn_120ms_ease-out] -translate-x-1/2 -translate-y-1/2"
+          // Sits where the pick actually landed. Pinned to the centre it could
+          // hover over a sofa while reading "change wall colour", because an
+          // unlocked click resolves at the cursor, not at the crosshair.
+          style={{ left: `${(pending.sx ?? 0.5) * 100}%`, top: `${(pending.sy ?? 0.5) * 100}%` }}
+        >
           <button
             type="button"
             onClick={() => {

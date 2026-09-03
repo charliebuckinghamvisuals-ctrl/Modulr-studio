@@ -57,8 +57,8 @@ interface AppState {
    * cue. Now the default is a bare dot and free movement, and the brush only
    * appears once you have actually picked something out.
    */
-  walkPending: { kind: 'object' | 'floor' | 'wall'; id?: string } | null;
-  setWalkPending: (t: { kind: 'object' | 'floor' | 'wall'; id?: string } | null) => void;
+  walkPending: { kind: 'object' | 'floor' | 'wall'; id?: string; sx?: number; sy?: number } | null;
+  setWalkPending: (t: { kind: 'object' | 'floor' | 'wall'; id?: string; sx?: number; sy?: number } | null) => void;
   setIsExporting: (exporting: boolean) => void;
   setCapturedImage: (image: string | null) => void;
   setUploadedBgImage: (image: string | null) => void;

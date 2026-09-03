@@ -127,12 +127,16 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
       // behaviour spent the first click just re-capturing the mouse, which
       // meant every colour change cost an extra click.
       let ndc = new THREE.Vector2(0, 0);
+      // Where on screen the pick happened, 0..1. The brush is drawn HERE
+      // rather than at the middle of the screen: unlocked, the pick comes
+      // from the cursor, so a brush pinned to the centre could sit over a
+      // sofa while its label described the wall the cursor was actually on.
+      let sx = 0.5, sy = 0.5;
       if (!locked) {
         const r = canvas.getBoundingClientRect();
-        ndc = new THREE.Vector2(
-          ((e.clientX - r.left) / r.width) * 2 - 1,
-          -((e.clientY - r.top) / r.height) * 2 + 1,
-        );
+        sx = (e.clientX - r.left) / r.width;
+        sy = (e.clientY - r.top) / r.height;
+        ndc = new THREE.Vector2(sx * 2 - 1, -(sy * 2) + 1);
       }
       /**
        * A click while WALKING arms the brush; it does not open anything.
@@ -155,7 +159,7 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
         st.setSelectedObjectId(null);
         st.setWalkFloorOpen(false);
         st.setWalkWallOpen(false);
-        st.setWalkPending(target);
+        st.setWalkPending({ ...target, sx, sy });
         if (locked) document.exitPointerLock();
       } else if (!locked) {
         // Nothing to arm, or armed and clicked past everything - walk on.
