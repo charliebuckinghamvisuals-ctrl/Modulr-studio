@@ -67,6 +67,65 @@ function DimText({ value, onValueChange, position, rotation, children, isDraggab
 
   const isPlanLabel = viewMode === 'plan' || viewMode === 'lighting';
 
+  /**
+   * On a plan, a dimension is DRAWN, not stuck on.
+   *
+   * These were HTML badges transformed into the scene, and an Html with
+   * `transform` inherits whatever flip its rotation carries - which is why
+   * half the numbers on a plan came out mirrored and upside down. Real text
+   * geometry cannot mirror, sits in the drawing rather than floating over it,
+   * and scales with the zoom like every other line on the page. The white
+   * halo is what keeps it readable over a floor texture.
+   *
+   * Still editable: click it and the input below takes over, so typing a
+   * dimension to resize something is unchanged.
+   */
+  if (isPlanLabel && !isEditing) {
+    const label = (typeof children === 'string' || typeof children === 'number')
+      ? String(children)
+      : String(value);
+    /*
+     * Never upside down.
+     *
+     * Call sites pass [-PI/2, 0, t] with t of 0, +/-PI/2 or PI, which suited
+     * an Html plate but as real geometry turns "6000" into "0009". Drafting
+     * convention is that a dimension reads left-to-right or bottom-to-top and
+     * never any other way, so the in-plane angle is wrapped into (-90, 90]:
+     * PI becomes 0, -PI/2 becomes PI/2, and the number stays put.
+     */
+    const flat = (() => {
+      const r = Array.isArray(rotation) ? rotation : [-Math.PI / 2, 0, 0];
+      let t = Math.atan2(Math.sin(r[2] ?? 0), Math.cos(r[2] ?? 0));
+      if (t > Math.PI / 2) t -= Math.PI;
+      if (t <= -Math.PI / 2) t += Math.PI;
+      return [-Math.PI / 2, 0, t] as [number, number, number];
+    })();
+
+    return (
+      <Text
+        position={position}
+        rotation={flat}
+        fontSize={0.24}
+        color="#1d1d1f"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.035}
+        outlineColor="#ffffff"
+        onClick={(e: any) => {
+          if (!onValueChange) return;
+          e.stopPropagation();
+          setIsEditing(true);
+          setControlsEnabled(false);
+          setTempValue(String(value));
+        }}
+        onPointerOver={() => { if (onValueChange) document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      >
+        {label}
+      </Text>
+    );
+  }
+
   return (
     <Html center position={position} transform rotation={rotation}>
       <div
