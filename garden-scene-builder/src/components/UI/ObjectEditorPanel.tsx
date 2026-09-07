@@ -480,42 +480,15 @@ export function ObjectEditorPanel() {
                 Add Door Cutout
               </label>
 
-              {obj.hasDoorGap && (() => {
-                const wallW = obj.widthMm || 1000;
-                const gapW = obj.doorGapWidthMm || 800;
-                const retL = obj.returnLengthMm || 0;
-                const thick = obj.depthMm || 100;
-                const onReturn = !!obj.doorGapOnReturn && retL > 0;
-                // The stored offset is from the wall's midpoint; the number a
-                // person actually wants is "how far from the end".
-                const fromStart = Math.round(wallW / 2 + (obj.doorGapOffsetMm || 0) - gapW / 2);
-                return (
-                  <div className="space-y-4">
-                    {retL > 0 && (
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-semibold text-gray-700 shrink-0">Opening in</span>
-                        <div className="flex gap-1.5">
-                          {([[false, 'Main wall'], [true, 'Return wall']] as const).map(([val, label]) => (
-                            <button
-                              key={String(val)}
-                              onClick={() => updateObject(obj.id, { doorGapOnReturn: val })}
-                              className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-md transition-colors ${onReturn === val ? 'bg-[#3b4d4a] text-white' : 'bg-black/5 hover:bg-black/10 text-[#3b4d4a]'}`}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-<DimensionSlider label="Opening Width" min={500} max={2000} step={10} value={gapW} onChange={(v) => updateObject(obj.id, { doorGapWidthMm: v })} />
-                    {onReturn ? (
-<DimensionSlider label="From the corner" min={thick} max={Math.max(thick, retL - gapW)} step={10} value={Math.round(obj.doorGapReturnMm ?? 100)} onChange={(v) => updateObject(obj.id, { doorGapReturnMm: v })} />
-                    ) : (
-<DimensionSlider label="From the start end" min={0} max={Math.max(0, wallW - gapW)} step={10} value={fromStart} onChange={(v) => updateObject(obj.id, { doorGapOffsetMm: Math.round(v + gapW / 2 - wallW / 2) })} />
-                    )}
-                  </div>
-                );
-              })()}
+              {obj.hasDoorGap && (
+                <div className="space-y-2">
+<DimensionSlider label="Opening Width" min={500} max={2000} step={10} value={obj.doorGapWidthMm || 800} onChange={(v) => updateObject(obj.id, { doorGapWidthMm: v })} />
+                  {/* Where it goes is set on the wall itself - the handle
+                      slides it, the label takes a typed distance, and the
+                      other run offers to take it. See PartitionOpenings. */}
+                  <p className="text-[10px] text-gray-400 leading-snug">Position it on the wall: drag the green handle, click the distance to type one, or use "Move door here" on the other run.</p>
+                </div>
+              )}
             </div>
           </>
         )}

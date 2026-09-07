@@ -13,6 +13,7 @@ import { wallpaperProps } from '../../utils/wallpaper';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
 import { RotateCw, Copy, Trash2 } from 'lucide-react';
 import { WorktopRuns } from './WorktopRuns';
+import { PartitionOpenings } from './PartitionOpenings';
 
 /**
  * Generic GLB object - any type registered in modelRegistry renders through
@@ -909,6 +910,10 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
                  })()}
                </Geometry>
             </mesh>
+            {/* Door openings are placed on the wall itself - see PartitionOpenings. */}
+            {isSelected && viewMode !== 'walking' && (
+              <PartitionOpenings obj={obj} w={w} d={d} h={h} retL={retL} />
+            )}
         </group>
       );
     }
