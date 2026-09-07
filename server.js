@@ -104,6 +104,61 @@ const PRICE_CATALOG = {
  * (depth of field, background bokeh, foreground softening) for users who want
  * a photographic feel. Blur must never be the default it silently was.
  */
+/**
+ * PASS 2 - MATERIALS AND LIGHTING, on the pro image model.
+ *
+ * The two image models split the job between them. flash-image is faithful:
+ * handed a flat configurator view it reproduces the building exactly, but its
+ * surfaces stay a little flat - "the configurator textures dropped into a
+ * rendered garden", as Charlie put it. The pro model is the better materials
+ * artist, but handed that SAME flat view it re-composes the building (the
+ * 25 Aug regression). Handed a finished photoreal render instead, it has
+ * nothing left to interpret: in the 4 Sep A/B it kept every edge and upgraded
+ * the surfaces. So pass 1 locks the geometry, pass 2 finishes it, and the QA
+ * inspection runs on pass 2 against the ORIGINAL source - any drift and pass
+ * 1 is what ships.
+ */
+const MATERIALS_PASS_PROMPT = `
+      YOU ARE A MATERIALS AND LIGHTING FINISHING PASS - NOT A DESIGNER.
+      The input is an already-correct architectural render. Its geometry, camera,
+      every edge, every opening, every proportion and the exact framing are FINAL
+      and are not yours to touch. Treat the image as a locked 3D scene that has
+      been rendered once at draft quality: your only job is to re-render its
+      SURFACES at flagship offline quality - Blender Cycles / V-Ray with a
+      professional CGI artist's material library.
+
+      PIXEL-LEVEL GEOMETRY LOCK: every edge in the output sits exactly where it
+      sits in the input. Same building length, height and depth; same door and
+      window count, size and position; same roof line and fascia depth; same
+      decking outline; same camera and crop. Do not move, add, remove, resize or
+      restyle ANYTHING. If you are unsure whether something is geometry or
+      material, leave it exactly as it is.
+
+      UPGRADE ONLY THESE, KEEPING EACH ITEM'S COLOUR AND TYPE:
+      - Cladding: real composite/timber board relief - visible grain, the shadow
+        line in every board groove, subtle tonal variation board to board, correct
+        roughness and soft sheen. Same colour family as the input, never shifted.
+      - Fascia and frames: crisp powder-coated aluminium with a fine edge highlight
+        and correct reflectance. Same colour as the input.
+      - A solid door stays a SOLID, FLUSH, PLAIN door: no raised panels, no
+        mouldings, no glazing, no letterbox, no change of handle. Glazed doors
+        stay glazed with the same leaf count and bar pattern.
+      - NO RESTYLING OF ANY KIND: no added trims, panels, lights, house numbers,
+        planters, furniture, steps or canopies. Nothing that is not in the input.
+      - Glass: real reflections of the garden and sky, slight refraction, a dim
+        interior visible through it.
+      - Decking and paving: individual boards or slabs with grain and joints, and a
+        contact shadow where the building meets them.
+      - Lighting: physically based sun and sky, ambient occlusion in every reveal,
+        recess and under the fascia; soft contact shadows on the ground.
+      - Surroundings: keep the same garden, fence, planting and sky; only their
+        material realism may improve.
+
+      FINAL OUTPUT: indistinguishable from a top-tier archviz still, immaculate
+      new materials (no dirt, weathering or damage), and geometrically identical
+      to the input at every pixel.
+`;
+
 const buildHouseStyle = (cameraEffects) => `
       HOUSE STYLE - APPLY TO EVERY RENDER:
 
@@ -1969,13 +2024,112 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                 const wStr = mm(spec.widthMm), dStr = mm(spec.depthMm);
                 if (wStr && dStr) lines.push(`- Building footprint: ${wStr} wide x ${dStr} deep.`);
                 if (spec.shape) lines.push(`- Roof form: ${spec.shape === 'Gable' ? 'gable (dual pitched)' : 'flat roof'}.`);
+
+                /**
+                 * CLADDING COLOUR, PER ELEVATION - from the client's order.
+                 *
+                 * This used to be left out on purpose: a single global
+                 * cladding value overrode a design that was black on one face
+                 * and mahogany on another. The right fix was never to drop the
+                 * colour and let a vision model guess it from a flat-shaded
+                 * screenshot - that is how a dark green building came back
+                 * grey. The spec carries the colour PER ELEVATION, so it is
+                 * stated per elevation, and the model has nothing to guess.
+                 */
+                const CLADDING_LOOKS = {
+                    cedar_composite: 'warm cedar-toned composite boards (natural reddish-brown timber tone)',
+                    oak_composite: 'oak-toned composite boards (mid golden-brown)',
+                    light_oak_composite: 'light oak-toned composite boards (pale honey)',
+                    black_composite: 'BLACK composite boards (deep charcoal-black, #1f2123)',
+                    dark_grey_composite: 'DARK GREY composite boards (#4a5057)',
+                    light_grey_composite: 'light grey composite boards (#a9aeb2)',
+                    grey_composite: 'grey composite boards (#a9aeb2)',
+                    white_composite: 'off-white composite boards (#e8e6e1)',
+                    slate_blue_composite: 'SLATE BLUE composite boards (muted blue-grey, #7c93a6)',
+                    sage_composite: 'SAGE GREEN composite boards (muted grey-green, #7e8c74)',
+                    clay_composite: 'clay / terracotta-toned composite boards (#9a6b58)',
+                    timber: 'natural larch timber boards',
+                    cedar: 'natural cedar timber boards',
+                    oak: 'oak timber boards',
+                    composite_wood: 'brown composite boards',
+                    composite_brown: 'brown composite boards',
+                    composite_black: 'BLACK composite boards (deep charcoal-black)',
+                    composite_grey: 'grey composite boards',
+                    charred_wood: 'charred (shou sugi ban) BLACK timber boards',
+                    render_white: 'smooth white render',
+                    box_metal_grey: 'grey box-profile standing-seam metal sheet',
+                    box_metal_black: 'BLACK box-profile standing-seam metal sheet',
+                    corrugated_metal: 'corrugated metal sheet',
+                    fire_board_grey: 'grey fibre-cement board',
+                };
+                const look = (id) => (typeof id === 'string' && CLADDING_LOOKS[id]) ? CLADDING_LOOKS[id] : (typeof id === 'string' && id.trim() ? sanitizeString(id.replace(/_/g, ' '), 40) : null);
+                const base = look(spec.cladding);
+                const faces = [
+                    ['Front', look(spec.claddingFront) || base],
+                    ['Back', look(spec.claddingBack) || base],
+                    ['Left', look(spec.claddingLeft) || base],
+                    ['Right', look(spec.claddingRight) || base],
+                ].filter(f => f[1]);
+                if (faces.length) {
+                    const uniform = faces.every(f => f[1] === faces[0][1]);
+                    if (uniform && faces.length === 4) {
+                        lines.push(`- Cladding, ALL elevations: ${faces[0][1]}. This is the ordered colour - render exactly this colour family as real boards. Do NOT shift it toward grey or any other colour.`);
+                    } else {
+                        lines.push('- Cladding is DIFFERENT per elevation - each face keeps its own listed colour:');
+                        faces.forEach(([label, desc]) => lines.push(`  - ${label} elevation: ${desc}.`));
+                    }
+                    const gable = look(spec.claddingGable);
+                    if (gable && spec.shape === 'Gable') lines.push(`  - Gable apex triangles: ${gable}.`);
+                }
+                if (spec.fasciaMaterial) {
+                    const f = sanitizeString(String(spec.fasciaMaterial), 20);
+                    lines.push(f === 'match_cladding'
+                        ? '- Fascia / roof edge trim: the SAME material and colour as the cladding, boards running continuously up to the roof edge.'
+                        : `- Fascia / roof edge trim: ${f.toUpperCase()}, a crisp flat band along the top of every wall, clearly distinct from the cladding below it.`);
+                }
+                if (spec.roofMaterial) {
+                    const roofNames = { epdm: 'EPDM rubber membrane', sedum: 'sedum green roof', upvc: 'uPVC roof sheet', metal: 'standing-seam metal roof' };
+                    const r = roofNames[spec.roofMaterial] || sanitizeString(String(spec.roofMaterial), 20);
+                    const rc = typeof spec.roofColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(spec.roofColor) ? ` in ${spec.roofColor}` : '';
+                    lines.push(`- Roof covering: ${r}${rc}.`);
+                }
+                if (typeof spec.frameColor === 'string' && spec.frameColor.trim()) {
+                    const fc = sanitizeString(spec.frameColor, 20).toUpperCase();
+                    lines.push(`- Window and door frames: ${fc} aluminium on every opening. A SOLID door leaf is ${fc} like its frame - never the cladding colour.`);
+                }
+
+                /**
+                 * WHERE on the wall. Counting openings is not enough: a door a
+                 * fifth of the way along a long blank wall came back next to
+                 * the glazing with the blank run gone, on a building that had
+                 * shrunk to fit. offsetMm is measured from the wall's midpoint,
+                 * and which way is "right" depends on which wall you are
+                 * standing outside of - so it is spelt out as blank wall to
+                 * each corner, which is what the eye actually checks.
+                 */
+                const wallLen = (wall) => (wall === 'left' || wall === 'right') ? spec.depthMm : spec.widthMm;
+                const where = (op) => {
+                    const L = wallLen(op.wall), off = op.offsetMm, w = op.widthMm;
+                    if (![L, off, w].every(v => typeof v === 'number' && isFinite(v)) || L <= 0) return '';
+                    const rightIsPositive = op.wall === 'front' || op.wall === 'left';
+                    const toRight = rightIsPositive ? off : -off;
+                    const gapL = Math.max(0, Math.round(L / 2 + toRight - w / 2));
+                    const gapR = Math.max(0, Math.round(L / 2 - toRight - w / 2));
+                    const centre = Math.abs(toRight) < 50 ? 'centred on the wall' : `centred ${Math.round(Math.abs(toRight))}mm ${toRight > 0 ? 'right' : 'left'} of the wall's midpoint`;
+                    return ` Position, viewed from outside: ${centre}, leaving ${gapL}mm of blank wall to the left-hand corner and ${gapR}mm to the right-hand corner.`;
+                };
+
                 const doors = Array.isArray(spec.doors) ? spec.doors.slice(0, 12) : [];
                 lines.push(doors.length
                     ? `- Door sets across the whole building, all elevations: ${doors.length}, listed below. Only the ones the source image shows are in frame.`
                     : `- Door sets: NONE anywhere on this building. Render no exterior door sets.`);
                 doors.forEach((dr, i) => {
-                    const style = dr.style === 'crittall' ? 'black steel Crittall-style with a grid of slim glazing bars' : 'standard glazed';
-                    lines.push(`  - Door ${i + 1}: ${Math.max(1, parseInt(dr.leaves) || 1)} leaf, ${mm(dr.widthMm) || 'unspecified width'} x ${mm(dr.heightMm) || 'unspecified height'}, ${style}, on the ${sanitizeString(String(dr.wall || ''), 10) || 'front'} elevation.`);
+                    // 'solid' used to fall into the glazed branch - the prompt told
+                    // the model an entrance door was glass, and it obliged.
+                    const style = dr.style === 'crittall' ? 'black steel Crittall-style with a grid of slim glazing bars'
+                        : dr.style === 'solid' ? 'SOLID UNGLAZED entrance door - an opaque flush panel leaf with NO glass anywhere in it; not a glazed set, not Crittall'
+                        : 'standard glazed';
+                    lines.push(`  - Door ${i + 1}: ${Math.max(1, parseInt(dr.leaves) || 1)} leaf, ${mm(dr.widthMm) || 'unspecified width'} x ${mm(dr.heightMm) || 'unspecified height'}, ${style}, on the ${sanitizeString(String(dr.wall || ''), 10) || 'front'} elevation.${where(dr)}`);
                 });
                 const windows = Array.isArray(spec.windows) ? spec.windows.slice(0, 12) : [];
                 lines.push(windows.length
@@ -1983,33 +2137,20 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                     : `- Windows: NONE anywhere on this building. Do not add any window openings on any elevation.${doors.length ? ' The only glazing is in the door sets listed above.' : ''}`);
                 windows.forEach((wn, i) => {
                     const style = wn.style === 'crittall' ? 'Crittall-style glazing bar grid' : 'standard';
-                    lines.push(`  - Window ${i + 1}: ${mm(wn.widthMm) || '?'} x ${mm(wn.heightMm) || '?'}, ${style}, ${sanitizeString(String(wn.wall || ''), 10) || 'front'} elevation.`);
+                    lines.push(`  - Window ${i + 1}: ${mm(wn.widthMm) || '?'} x ${mm(wn.heightMm) || '?'}, ${style}, ${sanitizeString(String(wn.wall || ''), 10) || 'front'} elevation.${where(wn)}`);
                 });
-                /**
-                 * GEOMETRY ONLY - no material or colour claims.
-                 *
-                 * This block used to assert `spec.cladding`, the single global
-                 * cladding value. A building can be clad differently on each
-                 * elevation, so on a design that was black on one face and
-                 * mahogany on another this said "clad in cedar composite" and,
-                 * being labelled absolute truth, overrode what the image plainly
-                 * showed. The render came back uniformly light.
-                 *
-                 * Appearance now comes from the image analysis, exactly as it
-                 * does for a manual upload. The spec is kept only for the things
-                 * a picture genuinely can be miscounted on - how many doors,
-                 * how wide, which elevation - where it cannot contradict what is
-                 * visible, only make it precise.
-                 */
-                if (spec.claddingOrientation) lines.push(`- Cladding board direction: ${spec.claddingOrientation === 'vertical' ? 'vertical' : 'horizontal'} (direction only - take the material and colour from the image).`);
+                if (spec.claddingOrientation) lines.push(`- Cladding board direction: ${spec.claddingOrientation === 'vertical' ? 'vertical' : 'horizontal'}.`);
                 const sky = Array.isArray(spec.skylights) ? spec.skylights.length : 0;
                 if (sky > 0) lines.push(`- Skylights across the whole roof: ${sky}. Only the ones the source image shows are in frame.`);
                 if (!lines.length) return '';
                 return `
-      CONFIGURED BUILDING SPECIFICATION - the client configured this exact
-      building. Use this list to be exact about the SIZE, STYLE and POSITION of
-      what the source image shows. It says nothing about materials, colour or
-      finish: take those from the image and the MATERIAL ASSIGNMENTS section.
+      CONFIGURED BUILDING SPECIFICATION - the client configured and ORDERED this
+      exact building. Use this list to be exact about the SIZE, STYLE and
+      POSITION of what the source image shows. Where it states a cladding
+      colour, a fascia, a roof covering or a door type, that is the client's
+      order: render exactly that, as a real physical material - it overrides
+      the flat-shaded colour in the source image AND anything in the MATERIAL
+      ASSIGNMENTS section that disagrees with it.
       The list covers the WHOLE building - all four elevations - while the
       source image's camera sees only some of them. THE SOURCE IMAGE DECIDES
       WHAT IS IN FRAME: render an opening only where the source shows one.
@@ -2026,6 +2167,30 @@ ${lines.map(l => '      ' + l).join('\n')}
             }
         };
         const configSpecBlock = buildConfigSpecBlock(req.body.configSpec);
+
+        /**
+         * The same order, as one line for the QA inspector.
+         *
+         * The inspector judges the render against the flat-shaded SOURCE, in
+         * which a solid door is a dark rectangle that reads as glass - it
+         * rejected a correct solid door for exactly that reason and then
+         * pushed the retry back toward glazed. Door type and counts are
+         * judged against what was ordered, not against the shading.
+         */
+        const buildSpecFacts = (spec) => {
+            if (!spec || typeof spec !== 'object') return '';
+            try {
+                const doors = Array.isArray(spec.doors) ? spec.doors.slice(0, 12) : [];
+                const windows = Array.isArray(spec.windows) ? spec.windows.slice(0, 12) : [];
+                const wall = (o) => sanitizeString(String(o.wall || 'front'), 10);
+                const d = doors.length
+                    ? doors.map((dr, i) => `door ${i + 1} on the ${wall(dr)} wall is ${dr.style === 'solid' ? 'a SOLID unglazed panel door' : dr.style === 'crittall' ? 'glazed with Crittall bars' : 'glazed'}`).join('; ')
+                    : 'no exterior doors';
+                const w = windows.length ? `${windows.length} window${windows.length === 1 ? '' : 's'} (${windows.map(wn => wall(wn)).join(', ')})` : 'no windows';
+                return `Across the whole building: ${d}; ${w}. Only the elevations the source camera sees are in frame.`;
+            } catch { return ''; }
+        };
+        const specFacts = buildSpecFacts(req.body.configSpec);
 
         /**
          * The spec is ground truth for what EXISTS; the material analyser only
@@ -2045,6 +2210,18 @@ ${lines.map(l => '      ' + l).join('\n')}
                 }
                 if (Array.isArray(spec.doors) && spec.doors.length === 0) {
                     materials.doors = 'NONE. This building has zero exterior door sets - do not render any.';
+                }
+                /**
+                 * Same principle for colour and door type. The analyser
+                 * describes what a flat-shaded screenshot LOOKS like, and its
+                 * "dark grey composite" for a dark green building is exactly
+                 * how the colour drifted. The spec knows what was ordered.
+                 */
+                if (typeof spec.cladding === 'string' && spec.cladding.trim()) {
+                    materials.walls = 'Cladding EXACTLY as listed per elevation in the CONFIGURED BUILDING SPECIFICATION - that colour family, rendered as real boards with grain, joints and shadow lines. Do NOT take the wall colour from the image analysis or from the flat fill in the source.';
+                }
+                if (Array.isArray(spec.doors) && spec.doors.some(d => d && d.style === 'solid')) {
+                    materials.doors = 'See the CONFIGURED BUILDING SPECIFICATION for each door set. A door listed there as SOLID is an opaque, unglazed panel door with no glass in it at all. ' + (materials.doors && materials.doors.toLowerCase() !== 'none' ? materials.doors : '');
                 }
             }
         }
@@ -2248,13 +2425,24 @@ ${lines.join('\n')}
         /** Run one generation pass; returns the image as base64, or null. */
         const runRender = async (promptText) => {
             const response = await ai.models.generateContent({
-                // Every plan renders on Gemini's best image model (Nano Banana
-                // Pro): quality is the product and must not differ by tier -
-                // plans differ on volume and resolution, never on fidelity.
-                // Costs $0.134/image at 1K-2K and $0.24 at 4K (verified
-                // ai.google.dev/gemini-api/docs/pricing, Aug 2026) - factor
-                // this into per-render cost when billing goes live.
-                model: 'gemini-3-pro-image',
+                /**
+                 * FLASH-IMAGE, ON PURPOSE. This was switched to the "best"
+                 * image model (gemini-3-pro-image) on 25 Aug 2026 for quality,
+                 * and that is the commit that broke the render engine: the pro
+                 * model RE-COMPOSES. Given a configurator view it shortened the
+                 * building, moved a side window onto the front, restyled a
+                 * solid door as glazed and pulled the camera in - with the
+                 * prompt screaming geometry lock at it. Charlie reported it
+                 * three times as "the AI changing my design".
+                 *
+                 * Proven with scripts/render-ab.mjs on 4 Sep 2026 - same
+                 * source, same prompt, one variable at a time: flash-image
+                 * reproduced the building exactly (geometry, sage cladding,
+                 * solid black door, side window, fascia); every pro-model
+                 * variant changed the building. Fidelity IS the quality here.
+                 * Do not "upgrade" this model without re-running that harness.
+                 */
+                model: 'gemini-3.1-flash-image',
                 contents: {
                     parts: [imagePart, { text: promptText }]
                 },
@@ -2318,7 +2506,7 @@ ${lines.join('\n')}
          * source" is always achievable - and the source is geometry-exact for
          * a configurator screenshot.
          */
-        const inspectRenderFidelity = async (srcB64, renderB64) => {
+        const inspectRenderFidelity = async (srcB64, renderB64, facts) => {
             qaCalls++;
             try {
                 const resp = await ai.models.generateContent({
@@ -2328,7 +2516,8 @@ ${lines.join('\n')}
                             fileToGenerativePart(srcB64, "image/jpeg"),
                             fileToGenerativePart(renderB64, "image/jpeg"),
                             { text:
-                                'Image 1 is a source image of a single garden building; image 2 is a photorealistic render made from it. Materials, colours, lighting, weather and surroundings are allowed to differ - judge ONLY the building geometry and the camera. Glazing that is part of a door belongs to the door and is never a window. Report: sameViewpoint - true only if the render keeps the source camera angle, side and framing of the building, with nothing the source shows cropped out; doorsMatch - true only if the render shows exactly the exterior door sets the source shows, same count on the same walls, none added, removed or moved; windowsMatch - true only if the render shows exactly the window openings the source shows - adding any window the source does not show, or losing one it does, is false, and a blank wall in the source must stay blank; roofMatch - true only if the roof form is unchanged (flat stays flat, pitched stays pitched).' }
+                                (facts ? 'CLIENT SPECIFICATION - the ground truth for door TYPE and opening counts, because image 1 is a flat-shaded CAD view in which a solid door looks like dark glass: ' + facts + ' ' : '') +
+                                'Image 1 is a source image of a single garden building; image 2 is a photorealistic render made from it. Lighting, weather, surroundings and surface texture are allowed to differ - judge the building geometry, the camera, the cladding COLOUR FAMILY and whether each door is solid or glazed. Glazing that is part of a door belongs to the door and is never a window. Report: sameViewpoint - true only if the render keeps the source camera angle, side and framing of the building, with nothing the source shows cropped out; doorsMatch - true only if the render shows exactly the exterior door sets the source shows, same count on the same walls, none added, removed or moved; windowsMatch - true only if the render shows exactly the window openings the source shows - adding any window the source does not show, or losing one it does, is false, and a blank wall in the source must stay blank; roofMatch - true only if the roof form is unchanged (flat stays flat, pitched stays pitched); claddingColourMatch - true only if the wall cladding in the render is the same colour family as in the source (dark green stays green rather than turning grey, black stays black, a slightly lighter or darker shade of the same colour is fine); doorStyleMatch - judged against the CLIENT SPECIFICATION when one is given, otherwise the source: true only if every door listed as SOLID is an opaque unglazed FLUSH door in the render - a flush door that has gained raised panels, mouldings, glazing or a letterbox is a restyle and FAILS - and every glazed door is glazed in the render with the same leaf count.' }
                         ]
                     },
                     config: {
@@ -2340,9 +2529,15 @@ ${lines.join('\n')}
                                 doorsMatch: { type: Type.BOOLEAN, description: "true only if the render shows exactly the door sets the source shows" },
                                 windowsMatch: { type: Type.BOOLEAN, description: "true only if the render shows exactly the windows the source shows" },
                                 roofMatch: { type: Type.BOOLEAN, description: "true only if the roof form is unchanged" },
+                                claddingColourMatch: { type: Type.BOOLEAN, description: "true only if the render's wall cladding is the same colour family as the source's" },
+                                doorStyleMatch: { type: Type.BOOLEAN, description: "true only if solid doors stay solid and glazed doors stay glazed" },
                                 problem: { type: Type.STRING, description: "One short sentence naming the worst difference; empty string if none" },
                             },
-                            required: ["sameViewpoint", "doorsMatch", "windowsMatch", "roofMatch"]
+                            // Every flag is required. With structured output the
+                            // model may omit an optional field, and an omitted
+                            // claddingColourMatch is never `=== false` - so the
+                            // colour and door-type guards silently never fired.
+                            required: ["sameViewpoint", "doorsMatch", "windowsMatch", "roofMatch", "claddingColourMatch", "doorStyleMatch"]
                         }
                     }
                 });
@@ -2351,6 +2546,33 @@ ${lines.join('\n')}
                 console.warn('[VERIFY] inspection errored:', e.message || e);
                 return null;
             }
+        };
+
+        /** Pass 2: the pro model finishes the surfaces of a pass-1 render. */
+        const runMaterialsPass = async (pass1B64) => {
+            const response = await ai.models.generateContent({
+                model: 'gemini-3-pro-image',
+                contents: {
+                    parts: [fileToGenerativePart(pass1B64, "image/jpeg"), { text: MATERIALS_PASS_PROMPT }]
+                },
+                config: {
+                    outputMimeType: "image/jpeg",
+                    imageConfig: {
+                        aspectRatio: isSketchUpMode ? (ratio || "16:9") : "16:9",
+                        imageSize: "2K",
+                        ...(seed !== undefined && !isNaN(seed) && { seed })
+                    },
+                    temperature: 0.2,
+                    ...(seed !== undefined && !isNaN(seed) && { seed })
+                }
+            });
+            for (const part of response.candidates?.[0]?.content?.parts || []) {
+                if (part.inlineData) {
+                    const rData = part.inlineData.data;
+                    return Buffer.isBuffer(rData) ? rData.toString("base64") : ((rData instanceof Uint8Array || rData instanceof ArrayBuffer) ? Buffer.from(rData).toString("base64") : rData);
+                }
+            }
+            return null;
         };
 
         let b64Data = await runRender(prompt);
@@ -2373,12 +2595,14 @@ ${lines.join('\n')}
             /** Run every check against one attempt; failures are prompt-ready sentences. */
             const gatherFailures = async (renderB64) => {
                 const failures = [];
-                const seen = await inspectRenderFidelity(base64Image, renderB64);
+                const seen = await inspectRenderFidelity(base64Image, renderB64, specFacts);
                 if (!seen) return failures;
                 const why = seen.problem ? ` (${sanitizeString(String(seen.problem), 160)})` : '';
                 if (seen.doorsMatch === false) failures.push(`the render does not show the same exterior door sets as the source image${why}. Render EXACTLY the door sets the source shows - same count, same walls, same positions; none added, none removed, none moved`);
                 if (seen.windowsMatch === false) failures.push(`the render does not show the same windows as the source image${why}. Do NOT add any window opening the source does not show, and do not remove any it does - a blank wall in the source stays a blank wall`);
                 if (seen.roofMatch === false) failures.push(`the render changed the roof form${why}. Keep the source image's exact roof form - flat stays flat, pitched stays pitched`);
+                if (seen.claddingColourMatch === false) failures.push(`the render changed the cladding colour${why}. The wall cladding must stay the same colour family as the source image${req.body.configSpec ? ' and exactly the colour listed in the CONFIGURED BUILDING SPECIFICATION' : ''} - do not shift it toward grey or any other colour`);
+                if (seen.doorStyleMatch === false) failures.push(`the render changed a door's type${why}. A solid, unglazed door in the source stays a solid, unglazed panel with no glass; a glazed door stays glazed`);
                 if (checkFraming && seen.sameViewpoint === false) {
                     failures.push(`the render changed the camera${why}. The source image's exact camera position, angle, framing and crop are MANDATORY: same side of the building, same distance, nothing the source shows cropped out`);
                 }
@@ -2396,7 +2620,7 @@ ${lines.join('\n')}
 ${failures.map(f => `      - ${f}`).join('\n')}
       Fix these exactly. The SOURCE image is the absolute truth for geometry,
       openings and camera - reproduce exactly the doors, windows, roof and
-      viewpoint it shows, nothing more and nothing less.${req.body.configSpec ? ' The CONFIGURED BUILDING SPECIFICATION only sizes and styles what the source already shows - it never adds anything.' : ''}`;
+      viewpoint it shows, nothing more and nothing less.${req.body.configSpec ? ' The CONFIGURED BUILDING SPECIFICATION only sizes and styles what the source already shows - it never adds anything - and it is the absolute truth for cladding colour, fascia and whether a door is solid or glazed.' : ''}`;
                 const retryB64 = await runRender(prompt + correction);
                 if (retryB64) {
                     const failures2 = await gatherFailures(retryB64);
@@ -2409,13 +2633,43 @@ ${failures.map(f => `      - ${f}`).join('\n')}
             console.warn('[VERIFY] verification skipped:', e.message || e);
         }
 
-        logRender(req, 'renderBuilding', 'gemini-3-pro-image', '2K', {
+        /**
+         * PASS 2 - see MATERIALS_PASS_PROMPT. CGI sources only: a photograph
+         * already has real materials. Inspected against the ORIGINAL source
+         * with the same checks as pass 1; the moment it fails one, pass 1
+         * ships instead. It can improve a render, never make one worse.
+         */
+        let refined = false;
+        if (isSketchUpMode && b64Data) {
+            try {
+                const finished = await runMaterialsPass(b64Data);
+                if (finished) {
+                    const seenFailures = await inspectRenderFidelity(base64Image, finished, specFacts);
+                    const drift = !seenFailures ? [] : [
+                        seenFailures.doorsMatch === false && 'doors',
+                        seenFailures.windowsMatch === false && 'windows',
+                        seenFailures.roofMatch === false && 'roof',
+                        seenFailures.claddingColourMatch === false && 'cladding colour',
+                        seenFailures.doorStyleMatch === false && 'door type',
+                        (!studioBackground && seenFailures.sameViewpoint === false) && 'camera',
+                    ].filter(Boolean);
+                    if (!drift.length) { b64Data = finished; refined = true; }
+                    else console.warn('[REFINE] pass 2 changed the building (' + drift.join(', ') + '), keeping pass 1' + (seenFailures.problem ? ': ' + String(seenFailures.problem).slice(0, 160) : ''));
+                }
+            } catch (e) {
+                console.warn('[REFINE] materials pass skipped:', e.message || e);
+            }
+        }
+
+        logRender(req, 'renderBuilding', 'gemini-3.1-flash-image', '2K', {
             sketchUpMode: isSketchUpMode,
             verified: verification.checked ? verification.passed : null,
             retried: !!verification.retried,
             // Billable calls this render actually made, so the log prices
             // itself: image calls on the Pro model, plus the QA inspections.
-            imageCalls: verification.retried ? 2 : 1,
+            imageCalls: (verification.retried ? 2 : 1) + (refined ? 1 : 0),
+            refined,
+            refineModel: refined ? 'gemini-3-pro-image' : null,
             qaCalls,
             qaModel: qaCalls ? 'gemini-3.5-flash-lite' : null,
             // Why it failed, in the inspector's own words - truncated because
@@ -2423,7 +2677,7 @@ ${failures.map(f => `      - ${f}`).join('\n')}
             failures: (verification.failures || []).map(f => String(f).slice(0, 300)),
         });
 
-        return res.json({ result: b64Data, verification });
+        return res.json({ result: b64Data, verification: { ...verification, refined } });
     } catch (error) {
         console.error("Render error in /api/renderBuilding:", error, error.stack);
         // Log the real error above; never echo internals to the client.
