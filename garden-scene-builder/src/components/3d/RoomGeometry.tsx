@@ -945,6 +945,28 @@ export function RoomGeometry() {
   const interiorCut = (cw: number, ch: number, cd: number) =>
     createWorldScaleBoxGeometry(cw, ch, cd, false, 0, 0, 0);
 
+  /**
+   * The flat/pitched ceiling slab, memoised.
+   *
+   * This was an inline interiorCut() call in the JSX, which built a NEW
+   * geometry on every render of RoomGeometry - and RoomGeometry re-renders
+   * on every store change, including every pointer-move of a drag. A new
+   * geometry means a new uuid in SafeCsg's fingerprint, so the ceiling's
+   * boolean was torn down and rebuilt on every frame of dragging anything:
+   * measured 20 rebuilds for 20 moves of a toilet. That per-frame dispose
+   * and swap is what flashed. Every other interiorCut() call sits inside
+   * the shell's own memo and only runs when the shell changes.
+   */
+  const ceilingGeom = useMemo(
+    () => interiorCut(
+      w - wallThickness * 2,
+      0.01,
+      isPitched && !isGable ? Math.sqrt((frontH - backH) ** 2 + d ** 2) - wallThickness * 2 : d - wallThickness * 2,
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [w, d, wallThickness, isPitched, isGable, frontH, backH],
+  );
+
 
 
   const isDeckingMaterial = room.hasDecking || room.hasPictureFrame || room.baseMaterial === 'timber_decking' || room.baseMaterial === 'composite_decking';
@@ -1744,7 +1766,7 @@ export function RoomGeometry() {
             <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
             <Geometry>
                <Base>
-                 <primitive object={interiorCut(w - wallThickness*2, 0.01, isPitched && !isGable ? Math.sqrt((frontH-backH)**2 + d**2) - wallThickness*2 : d - wallThickness*2)} attach="geometry" />
+                 <primitive object={ceilingGeom} attach="geometry" />
                </Base>
                {isLShape && (
                   <Subtraction position={[w/2 - cutW/2 + 0.1, 0, d/2 - cutD/2 + 0.1]}>

@@ -427,7 +427,38 @@ export function ObjectEditorPanel() {
             />
             {!finishesOnly && (
               <>
-<DimensionSlider label={obj.type === 'interior_door' ? 'Door Width' : 'Wall Length (Width)'} min={100} max={6000} step={10} value={obj.widthMm || (obj.type === 'interior_door' ? 800 : 1000)} onChange={(v) => updateObject(obj.id, { widthMm: v })} />
+{obj.type === 'interior_door' && (
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-semibold text-gray-700 shrink-0">Style</span>
+                <div className="flex gap-1.5">
+                  {([['flush', 'Flush'], ['panelled', 'Panelled'], ['glazed', 'Half Glazed']] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      onClick={() => updateObject(obj.id, { doorStyle: id })}
+                      className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-md transition-colors ${(obj.doorStyle ?? 'flush') === id ? 'bg-[#3b4d4a] text-white' : 'bg-black/5 hover:bg-black/10 text-[#3b4d4a]'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+<DimensionSlider
+  label={obj.type === 'interior_door' ? 'Door Width' : 'Wall Length (grows from the far end)'}
+  min={100} max={6000} step={10}
+  value={obj.widthMm || (obj.type === 'interior_door' ? 800 : 1000)}
+  onChange={(v) => {
+    if (obj.type !== 'interior_wall') { updateObject(obj.id, { widthMm: v }); return; }
+    // A wall grows from ONE end. Growing from the centre moved both ends,
+    // so a wall lined up on a corner drifted off it every time it was
+    // lengthened. The start end stays put; the centre shifts by half the
+    // change along the wall's own axis (rotation.y = r maps local +X to
+    // world (cos r, 0, -sin r)).
+    const half = (v - (obj.widthMm || 1000)) / 2000;
+    const r = obj.rot || 0;
+    updateObject(obj.id, { widthMm: v, x: obj.x + half * Math.cos(r), z: obj.z - half * Math.sin(r) });
+  }}
+/>
 <DimensionSlider label={obj.type === 'interior_door' ? 'Frame Depth' : 'Wall Thickness'} min={50} max={500} step={10} value={obj.depthMm || (obj.type === 'interior_door' ? 150 : 100)} onChange={(v) => updateObject(obj.id, { depthMm: v })} />
               </>
             )}
@@ -449,12 +480,42 @@ export function ObjectEditorPanel() {
                 Add Door Cutout
               </label>
 
-              {obj.hasDoorGap && (
-                <div className="space-y-4">
-<DimensionSlider label="Cutout Width" min={500} max={2000} step={10} value={obj.doorGapWidthMm || 800} onChange={(v) => updateObject(obj.id, { doorGapWidthMm: v })} />
-<DimensionSlider label="Cutout Position" min={-(obj.widthMm||1000)/2} max={(obj.widthMm||1000)/2} step={10} value={obj.doorGapOffsetMm || 0} onChange={(v) => updateObject(obj.id, { doorGapOffsetMm: v })} />
-                </div>
-              )}
+              {obj.hasDoorGap && (() => {
+                const wallW = obj.widthMm || 1000;
+                const gapW = obj.doorGapWidthMm || 800;
+                const retL = obj.returnLengthMm || 0;
+                const thick = obj.depthMm || 100;
+                const onReturn = !!obj.doorGapOnReturn && retL > 0;
+                // The stored offset is from the wall's midpoint; the number a
+                // person actually wants is "how far from the end".
+                const fromStart = Math.round(wallW / 2 + (obj.doorGapOffsetMm || 0) - gapW / 2);
+                return (
+                  <div className="space-y-4">
+                    {retL > 0 && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-semibold text-gray-700 shrink-0">Opening in</span>
+                        <div className="flex gap-1.5">
+                          {([[false, 'Main wall'], [true, 'Return wall']] as const).map(([val, label]) => (
+                            <button
+                              key={String(val)}
+                              onClick={() => updateObject(obj.id, { doorGapOnReturn: val })}
+                              className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-md transition-colors ${onReturn === val ? 'bg-[#3b4d4a] text-white' : 'bg-black/5 hover:bg-black/10 text-[#3b4d4a]'}`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+<DimensionSlider label="Opening Width" min={500} max={2000} step={10} value={gapW} onChange={(v) => updateObject(obj.id, { doorGapWidthMm: v })} />
+                    {onReturn ? (
+<DimensionSlider label="From the corner" min={thick} max={Math.max(thick, retL - gapW)} step={10} value={Math.round(obj.doorGapReturnMm ?? 100)} onChange={(v) => updateObject(obj.id, { doorGapReturnMm: v })} />
+                    ) : (
+<DimensionSlider label="From the start end" min={0} max={Math.max(0, wallW - gapW)} step={10} value={fromStart} onChange={(v) => updateObject(obj.id, { doorGapOffsetMm: Math.round(v + gapW / 2 - wallW / 2) })} />
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </>
         )}

@@ -191,9 +191,18 @@ export interface SceneObject {
   depthMm?: number;
   color?: string;
   hasDoorGap?: boolean;
+  /** Gap centre, measured from the wall's midpoint (legacy). The editor now
+   *  shows and edits it as a distance from the wall's start end. */
   doorGapOffsetMm?: number;
   doorGapWidthMm?: number;
   returnLengthMm?: number;
+  /** Put the door gap in the L-shape's return leg instead of the main run. */
+  doorGapOnReturn?: boolean;
+  /** Gap start, measured along the return from the outside corner. */
+  doorGapReturnMm?: number;
+  /** Interior door leaf. Procedural placeholders until the modelled doors
+   *  arrive; each style will then map to a GLB. */
+  doorStyle?: 'flush' | 'panelled' | 'glazed';
   /** A BESPOKE unit: detached from its kitchen run, so changing the run's
    *  colour leaves it alone. For the island in a contrasting colour, which is
    *  a normal thing to specify and was impossible while a family recolour

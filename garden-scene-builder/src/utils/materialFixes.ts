@@ -335,9 +335,13 @@ type Island = { tris: number[]; min: THREE.Vector3; max: THREE.Vector3 };
  * do metal parts: a model exported with its metalwork under its own material
  * name needs nothing here - just an entry in METAL_MATERIALS.
  */
-const ISLAND_SPLITS: Partial<Record<ObjectType, { material: string; pick: (islands: Island[]) => Island | undefined }>> = {
+const ISLAND_SPLITS: Partial<Record<ObjectType, { material: string; standOff?: number; pick: (islands: Island[]) => Island | undefined }>> = {
   toilet: {
     material: 'FlushPlate',
+    // The plate was modelled flush with the back of the pan, so with the pan
+    // against a wall it sat IN the wall's surface and vanished. A real plate
+    // stands proud of the tiles; 12mm forward keeps it clear of the paper.
+    standOff: 0.012,
     pick: islands => {
       const thin = islands.filter(i => {
         const s = [i.max.x - i.min.x, i.max.y - i.min.y, i.max.z - i.min.z].sort((a, b) => a - b);
@@ -396,7 +400,7 @@ function islandsOf(geometry: THREE.BufferGeometry): Island[] {
  * never touched, because it is shared with every other instance of the model
  * and with the picker thumbnail.
  */
-function detachIsland(mesh: THREE.Mesh, island: Island, materialName: string) {
+function detachIsland(mesh: THREE.Mesh, island: Island, materialName: string, standOff = 0) {
   const src = mesh.geometry;
   const index = src.getIndex();
   const total = index ? index.count / 3 : src.getAttribute('position').count / 3;
@@ -424,6 +428,13 @@ function detachIsland(mesh: THREE.Mesh, island: Island, materialName: string) {
   part.receiveShadow = true;
   // A child with the identity transform sits exactly where its parent does.
   mesh.add(part);
+  // standOff is in world metres along the model's front (+Z); the child is
+  // positioned in the mesh's own units, so divide by its world scale.
+  if (standOff) {
+    const s = new THREE.Vector3();
+    mesh.getWorldScale(s);
+    part.position.z = standOff / (s.z || 1);
+  }
   // Both flagged: a second pass must not cut the plate out of the plate.
   mesh.userData.__islandSplit = materialName;
   part.userData.__islandSplit = materialName;
@@ -437,7 +448,7 @@ function splitIslandsFor(type: ObjectType, root: THREE.Object3D) {
   root.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh && !m.userData.__islandSplit) meshes.push(m); });
   for (const mesh of meshes) {
     const island = rule.pick(islandsOf(mesh.geometry));
-    if (island) { detachIsland(mesh, island, rule.material); return; }
+    if (island) { detachIsland(mesh, island, rule.material, rule.standOff); return; }
   }
 }
 

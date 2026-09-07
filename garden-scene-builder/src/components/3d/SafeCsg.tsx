@@ -77,13 +77,33 @@ export type SafeGeometryProps = {
  *  parameters alone made the vertical/horizontal cladding toggle a no-op.
  *  Geometries are memoized upstream, so the uuid is stable between renders
  *  and only changes when a genuinely new geometry is supplied. */
-function signature(ops: Brush[]): string {
+/**
+ * A brush's transform relative to the operations group - which is the frame
+ * the boolean is evaluated in (update() forces the group's world matrix to
+ * identity first). This used to key on matrixWorld, which also carries every
+ * ancestor above the group: drag an internal wall and its world matrix
+ * changes on every pointer move, so the boolean was rebuilt - disposed and
+ * swapped - on every frame of the drag, and the wall flashed in and out.
+ * Moving the whole object does not change the boolean; only the brushes'
+ * placement within it does.
+ */
+function relativeMatrix(o: THREE.Object3D, root: THREE.Object3D): THREE.Matrix4 {
+  const m = new THREE.Matrix4()
+  let n: THREE.Object3D | null = o
+  while (n && n !== root) {
+    n.updateMatrix()
+    m.premultiply(n.matrix)
+    n = n.parent
+  }
+  return m
+}
+
+function signature(ops: Brush[], root: THREE.Object3D): string {
   return ops
     .map((o) => {
-      o.updateMatrixWorld()
       const g: any = o.geometry
       const params = g?.parameters ? Object.values(g.parameters).join(',') : ''
-      const m = o.matrixWorld.elements.map((n) => Math.round(n * 1e4)).join(',')
+      const m = relativeMatrix(o, root).elements.map((n) => Math.round(n * 1e4)).join(',')
       return `${o.operator}|${params}|${g?.uuid || ''}|${m}`
     })
     .join(';')
@@ -107,7 +127,7 @@ export const Geometry = React.forwardRef<any, SafeGeometryProps>(({ children, co
     // dependency array, so any unrelated state change re-ran the whole
     // boolean. Measured: 61 rebuilds during a single 12-step window drag.
     // Skip when the inputs are byte-for-byte the same as last time.
-    const sig = signature(ops)
+    const sig = signature(ops, operations.current)
     if (sig === lastSig.current) return
     lastSig.current = sig
     if (sig !== lastAttempt.current) { lastAttempt.current = sig; failRetries.current = 0 }

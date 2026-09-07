@@ -201,6 +201,13 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
   const dragSolo = useRef(false);
   const pendingMove = useRef<{ x: number; z: number } | null>(null);
   const moveFrame = useRef(0);
+  const groupRef = useRef<THREE.Group>(null);
+  /**
+   * How far the object's real surfaces reach from its origin, in world axes,
+   * measured at the moment it is grabbed. What the wall snap and the wall
+   * clamp work from - see handlePointerMove. Null until the model has loaded.
+   */
+  const dragExt = useRef<{ minX: number; maxX: number; minZ: number; maxZ: number } | null>(null);
 
   /**
    * Partition walls, sized and mapped like the room's own walls.
@@ -286,6 +293,29 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
     useStore.getState().saveState(); // one undo step per drag, throttled in the store
     // Decided at grab time, not per move, so a row cannot half-detach mid-drag.
     dragSolo.current = !!e.altKey;
+    /**
+     * Measure the object once per grab. Only lit surfaces count - the
+     * selection ring, drag handles and highlight are all MeshBasicMaterial,
+     * and letting them in put a 750mm ring round a 280mm tap.
+     */
+    dragExt.current = null;
+    const g = groupRef.current;
+    if (g) {
+      g.updateMatrixWorld(true);
+      const bb = new THREE.Box3();
+      const one = new THREE.Box3();
+      g.traverse(o => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh || !m.visible) return;
+        const mat: any = Array.isArray(m.material) ? m.material[0] : m.material;
+        if (!mat || mat.isMeshBasicMaterial) return;
+        one.setFromObject(m);
+        if (!one.isEmpty()) bb.union(one);
+      });
+      if (!bb.isEmpty()) {
+        dragExt.current = { minX: bb.min.x - g.position.x, maxX: bb.max.x - g.position.x, minZ: bb.min.z - g.position.z, maxZ: bb.max.z - g.position.z };
+      }
+    }
     setIsDragging(true);
     useStore.getState().setControlsEnabled(false);
     e.target.setPointerCapture(e.pointerId);
@@ -313,16 +343,30 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
         const snap = 0.05;
         let nx = Math.round(intersect.x / snap) * snap;
         let nz = Math.round(intersect.z / snap) * snap;
-        // Interior objects gently magnetise to the inside wall faces when
-        // within 12cm, so "push it against the wall" lands flush instead of
-        // hovering a grid-cell away.
         if (isInterior) {
-          const wallT = 0.05;
-          const ix = room.widthMm / 2000 - wallT;
-          const iz = room.depthMm / 2000 - wallT;
-          const MAG = 0.12;
-          if (Math.abs(nx - -ix) < MAG) nx = -ix; else if (Math.abs(nx - ix) < MAG) nx = ix;
-          if (Math.abs(nz - -iz) < MAG) nz = -iz; else if (Math.abs(nz - iz) < MAG) nz = iz;
+          /**
+           * Walls: the object's near FACE snaps to the inner wall face when
+           * within 120mm, and no face can ever pass one.
+           *
+           * This used to snap the object's CENTRE to 50mm inside the OUTER
+           * face - a hardcoded guess at the wall, and no idea how deep the
+           * object was. A wall-hung toilet pushed "against the wall" ended up
+           * with its back, and its flush plate, 230mm inside the plaster. The
+           * extents are measured at grab time from the model's own surfaces.
+           */
+          const ext = dragExt.current;
+          if (ext) {
+            const wt = (room.wallThicknessMm ?? 150) / 1000;
+            const innerX = room.widthMm / 2000 - wt;
+            const innerZ = room.depthMm / 2000 - wt;
+            const MAG = 0.12;
+            if (Math.abs(innerX - (nx + ext.maxX)) < MAG) nx = innerX - ext.maxX;
+            else if (Math.abs((nx + ext.minX) + innerX) < MAG) nx = -innerX - ext.minX;
+            if (Math.abs(innerZ - (nz + ext.maxZ)) < MAG) nz = innerZ - ext.maxZ;
+            else if (Math.abs((nz + ext.minZ) + innerZ) < MAG) nz = -innerZ - ext.minZ;
+            nx = Math.min(innerX - ext.maxX, Math.max(-innerX - ext.minX, nx));
+            nz = Math.min(innerZ - ext.maxZ, Math.max(-innerZ - ext.minZ, nz));
+          }
 
           /**
            * Kitchen units magnetise flush to a neighbouring unit.
@@ -847,11 +891,22 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
                      <primitive object={returnGeom} attach="geometry" />
                    </Base>
                  )}
-                 {obj.hasDoorGap && (
+                 {obj.hasDoorGap && !obj.doorGapOnReturn && (
                    <Subtraction position={[gapOff, -h/2 + 2.1/2, 0]}>
                      <boxGeometry args={[gapW, Math.min(2.1, h - 0.05), d * 3]} />
                    </Subtraction>
                  )}
+                 {/* The gap in the RETURN leg, measured from the outside corner
+                     along the return. Kept clear of the corner itself, which
+                     is where the two legs share their thickness. */}
+                 {obj.hasDoorGap && obj.doorGapOnReturn && retL > 0 && (() => {
+                   const start = Math.max(d, Math.min(retL - gapW, (obj.doorGapReturnMm ?? 100) / 1000));
+                   return (
+                     <Subtraction position={[w/2 - d/2, -h/2 + 2.1/2, -d/2 + start + gapW/2]}>
+                       <boxGeometry args={[d * 3, Math.min(2.1, h - 0.05), gapW]} />
+                     </Subtraction>
+                   );
+                 })()}
                </Geometry>
             </mesh>
         </group>
@@ -868,9 +923,47 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
             <mesh position={[-w/2 - 0.025, h/2, 0]} castShadow><boxGeometry args={[0.05, h, d + 0.02]} /><meshStandardMaterial color={obj.color || room.interiorColor || '#ffffff'} roughness={0.9} /></mesh>
             <mesh position={[w/2 + 0.025, h/2, 0]} castShadow><boxGeometry args={[0.05, h, d + 0.02]} /><meshStandardMaterial color={obj.color || room.interiorColor || '#ffffff'} roughness={0.9} /></mesh>
             <mesh position={[0, h + 0.025, 0]} castShadow><boxGeometry args={[w + 0.1, 0.05, d + 0.02]} /><meshStandardMaterial color={obj.color || room.interiorColor || '#ffffff'} roughness={0.9} /></mesh>
-            {/* Door panel open at 45 deg */}
+            {/* Door leaf, open at 45 deg. Three PLACEHOLDER styles until the
+                modelled doors arrive: a flush slab, a four-panel leaf, and a
+                half-glazed one. Each will map to a GLB when there is one. */}
             <group position={[-w/2, 0.01, 0]} rotation={[0, Math.PI/4, 0]}>
-               <mesh position={[w/2, h/2, 0]} castShadow><boxGeometry args={[w, h, 0.04]} /><meshStandardMaterial color="#f0f0f0" roughness={0.5} /></mesh>
+              {(() => {
+                const style = obj.doorStyle ?? 'flush';
+                const leafCol = obj.color || '#f0f0f0';
+                const leaf = <meshStandardMaterial color={leafCol} roughness={0.5} />;
+                if (style === 'glazed') {
+                  // Lower slab, then a glass pane in the top half with a rail
+                  // between - the classic office/hallway door.
+                  const lowH = h * 0.5, railH = 0.06;
+                  const glassH = h - lowH - railH - 0.08;
+                  return (
+                    <group position={[w/2, 0, 0]}>
+                      <mesh position={[0, lowH/2, 0]} castShadow><boxGeometry args={[w, lowH, 0.04]} />{leaf}</mesh>
+                      <mesh position={[0, lowH + railH/2, 0]} castShadow><boxGeometry args={[w, railH, 0.04]} />{leaf}</mesh>
+                      {/* Stiles either side of the glass, and the top rail. */}
+                      <mesh position={[-w/2 + 0.04, lowH + railH + glassH/2, 0]} castShadow><boxGeometry args={[0.08, glassH, 0.04]} />{leaf}</mesh>
+                      <mesh position={[w/2 - 0.04, lowH + railH + glassH/2, 0]} castShadow><boxGeometry args={[0.08, glassH, 0.04]} />{leaf}</mesh>
+                      <mesh position={[0, h - 0.04, 0]} castShadow><boxGeometry args={[w, 0.08, 0.04]} />{leaf}</mesh>
+                      <mesh position={[0, lowH + railH + glassH/2, 0]}>
+                        <boxGeometry args={[w - 0.16, glassH, 0.01]} />
+                        <meshPhysicalMaterial color="#c9d6dc" transmission={0.85} ior={1.5} thickness={0.01} roughness={0.1} />
+                      </mesh>
+                    </group>
+                  );
+                }
+                return (
+                  <group position={[w/2, h/2, 0]}>
+                    <mesh castShadow><boxGeometry args={[w, h, 0.04]} />{leaf}</mesh>
+                    {style === 'panelled' && [-1, 1].map(sx => [-1, 1].map(sy => [-1, 1].map(sz => (
+                      // Four raised panels a side, 12mm proud, on both faces.
+                      <mesh key={`${sx}${sy}${sz}`} position={[sx * w * 0.24, sy * h * 0.24, sz * 0.026]} castShadow>
+                        <boxGeometry args={[w * 0.36, h * 0.38, 0.012]} />
+                        {leaf}
+                      </mesh>
+                    ))))}
+                  </group>
+                );
+              })()}
             </group>
         </group>
       );
@@ -1023,6 +1116,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
 
   return (
     <group
+      ref={groupRef}
       // Lets the walkthrough crosshair resolve a hit mesh back to its object.
       userData={{ objectId: obj.id }}
       position={pos}

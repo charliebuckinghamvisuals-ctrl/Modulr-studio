@@ -247,6 +247,9 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   // The extract terminal goes high on the OUTSIDE wall. Not an interior type,
   // so this is measured from the ground rather than the finished floor.
   external_extraction_fan: 2000,
+  // A wall-hung pan hangs clear of the floor - it was sitting on it. 100mm
+  // under this pan puts its seat at 477mm, comfort height.
+  toilet: 100,
 };
 
 /** The extractor's flue is a separate model so it can be stretched to meet
