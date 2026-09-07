@@ -215,6 +215,10 @@ export const TINT_MATERIAL: Partial<Record<ObjectType, string>> = {
   // they recolour cleanly with the run of base units beneath them.
   kitchen_wall_unit_600: 'M03_Pewter_Shine',
   kitchen_wall_unit_1200: 'M03_Pewter_Shine',
+  // The cabinet. It was exported with NO material at all, so nothing could
+  // reach it by name; vanity.glb was patched to give that mesh this one.
+  // The basin, tap and top keep their own finishes.
+  vanity: 'VanityBody',
 };
 
 /**
@@ -299,6 +303,10 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
   towel_heater: ['fragranit'],
   // Brushed steel legs under a timber top.
   dining_table: ['[Steel Brushed Stainless]'],
+  // The flush plate. Not a material in the export - the whole toilet is one
+  // "Porcelain" mesh - so it is cut out by shape at load and given this name;
+  // see ISLAND_SPLITS in utils/materialFixes. From here on it is a tap.
+  toilet: ['FlushPlate'],
 };
 
 /**
@@ -337,6 +345,9 @@ export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
   towel_heater: true,
   external_extraction_fan: true,
   bed: true,
+  // Porcelain and a painted cabinet - neither is half metal.
+  toilet: true,
+  vanity: true,
 };
 
 /**
@@ -429,6 +440,7 @@ export const METAL_FINISHES: { name: string; hex: string; roughness: number }[] 
 export const DEFAULT_FINISH: Partial<Record<ObjectType, string>> = {
   kitchen_tap_straight: '#e6e7e9',
   kitchen_tap_curved: '#c8a35f',
+  toilet: '#e6e7e9',
 };
 
 export const hasMetalFinish = (type: ObjectType) => METAL_MATERIALS[type] !== undefined;
@@ -464,6 +476,11 @@ export const MODEL_SCALES: Partial<Record<ObjectType, [number, number, number]>>
   // layout and too small to grab. 100mm reads properly and is still a size
   // downlights are actually made in.
   spot_light: [1.7, 1.7, 1.7],
+  // A low platform bed: measured mattress top at 0.57m over a 2.46 x 2.22m
+  // footprint, which reads as a mattress on the floor. Stretched on Y only
+  // to ~0.69m - hotel height - so the footprint the room was laid out around
+  // does not change. Fabric and a duvet take a 20% stretch without showing it.
+  bed: [1, 1.2, 1],
 };
 
 /** Picker labels for GLB-backed objects, in display order. */

@@ -311,12 +311,146 @@ function dressWorktop(mat: THREE.MeshStandardMaterial, def: WorktopDef) {
   mat.needsUpdate = true;
 }
 
+/**
+ * A connected island of triangles inside one mesh, with its local-space bounds.
+ * Bounds are in the mesh's own coordinates (the exporter's units, before the
+ * node scale), so pickers must use RELATIVE tests - ratios and orderings - not
+ * absolute sizes.
+ */
+type Island = { tris: number[]; min: THREE.Vector3; max: THREE.Vector3 };
+
+/**
+ * Parts that need their own material but were exported without one.
+ *
+ * The toilet came out of SketchUp as ONE mesh under ONE material,
+ * "Porcelain" - flush plate included. There is nothing to match by name, so
+ * a name-based finish could never reach the plate. But the plate IS its own
+ * island of geometry (nothing joins it to the pan), so it is found by shape
+ * at load time - the thinnest island with the highest top - cut into a mesh
+ * of its own, and given a named material that METAL_MATERIALS then treats
+ * exactly like a tap. Measured: 285 x 176 x 7mm at 0.83-1.0m; the only other
+ * thin island is the seat, 0.6m lower.
+ *
+ * This is a workaround for how that one model was exported, not the way to
+ * do metal parts: a model exported with its metalwork under its own material
+ * name needs nothing here - just an entry in METAL_MATERIALS.
+ */
+const ISLAND_SPLITS: Partial<Record<ObjectType, { material: string; pick: (islands: Island[]) => Island | undefined }>> = {
+  toilet: {
+    material: 'FlushPlate',
+    pick: islands => {
+      const thin = islands.filter(i => {
+        const s = [i.max.x - i.min.x, i.max.y - i.min.y, i.max.z - i.min.z].sort((a, b) => a - b);
+        // A plate: one dimension under a tenth of the next. Bolt caps are
+        // small in every direction and fail this; the seat passes but sits
+        // far lower.
+        return s[0] < s[1] * 0.1;
+      });
+      return thin.sort((a, b) => b.max.y - a.max.y)[0];
+    },
+  },
+};
+
+/** Triangle islands of a geometry: union-find over shared indices, plus
+ *  coincident positions (split normals and UV seams duplicate vertices). */
+function islandsOf(geometry: THREE.BufferGeometry): Island[] {
+  const pos = geometry.getAttribute('position');
+  const index = geometry.getIndex();
+  const n = pos.count;
+  const parent = new Int32Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+  const find = (x: number) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const unite = (a: number, b: number) => { parent[find(a)] = find(b); };
+  const triCount = index ? index.count / 3 : n / 3;
+  const vert = (t: number, k: number) => (index ? index.getX(t * 3 + k) : t * 3 + k);
+  for (let t = 0; t < triCount; t++) { unite(vert(t, 0), vert(t, 1)); unite(vert(t, 1), vert(t, 2)); }
+  const seen = new Map<string, number>();
+  for (let i = 0; i < n; i++) {
+    const k = `${pos.getX(i).toFixed(4)},${pos.getY(i).toFixed(4)},${pos.getZ(i).toFixed(4)}`;
+    const o = seen.get(k);
+    if (o === undefined) seen.set(k, i); else unite(i, o);
+  }
+  const groups = new Map<number, number[]>();
+  for (let t = 0; t < triCount; t++) {
+    const r = find(vert(t, 0));
+    let g = groups.get(r);
+    if (!g) { g = []; groups.set(r, g); }
+    g.push(t);
+  }
+  return [...groups.values()].map(tris => {
+    const min = new THREE.Vector3(Infinity, Infinity, Infinity);
+    const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+    for (const t of tris) for (let k = 0; k < 3; k++) {
+      const i = vert(t, k);
+      min.min(new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)));
+      max.max(new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)));
+    }
+    return { tris, min, max };
+  });
+}
+
+/**
+ * Cut one island out of a mesh into a child mesh of its own, under a named
+ * clone of the material. Both meshes get NEW geometries that share the
+ * source's attribute buffers with their own index - the source geometry is
+ * never touched, because it is shared with every other instance of the model
+ * and with the picker thumbnail.
+ */
+function detachIsland(mesh: THREE.Mesh, island: Island, materialName: string) {
+  const src = mesh.geometry;
+  const index = src.getIndex();
+  const total = index ? index.count / 3 : src.getAttribute('position').count / 3;
+  const inIsland = new Uint8Array(total);
+  for (const t of island.tris) inIsland[t] = 1;
+  const indicesWhere = (want: 0 | 1) => {
+    const out: number[] = [];
+    for (let t = 0; t < total; t++) {
+      if (inIsland[t] !== want) continue;
+      for (let k = 0; k < 3; k++) out.push(index ? index.getX(t * 3 + k) : t * 3 + k);
+    }
+    return out;
+  };
+  const withIndex = (idx: number[]) => {
+    const g = new THREE.BufferGeometry();
+    for (const [name, attr] of Object.entries(src.attributes)) g.setAttribute(name, attr as THREE.BufferAttribute);
+    g.setIndex(idx);
+    return g;
+  };
+  mesh.geometry = withIndex(indicesWhere(0));
+  const base = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.Material;
+  const part = new THREE.Mesh(withIndex(indicesWhere(1)), base.clone());
+  part.material.name = materialName;
+  part.castShadow = true;
+  part.receiveShadow = true;
+  // A child with the identity transform sits exactly where its parent does.
+  mesh.add(part);
+  // Both flagged: a second pass must not cut the plate out of the plate.
+  mesh.userData.__islandSplit = materialName;
+  part.userData.__islandSplit = materialName;
+  return part;
+}
+
+function splitIslandsFor(type: ObjectType, root: THREE.Object3D) {
+  const rule = ISLAND_SPLITS[type];
+  if (!rule) return;
+  const meshes: THREE.Mesh[] = [];
+  root.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh && !m.userData.__islandSplit) meshes.push(m); });
+  for (const mesh of meshes) {
+    const island = rule.pick(islandsOf(mesh.geometry));
+    if (island) { detachIsland(mesh, island, rule.material); return; }
+  }
+}
+
 export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, color?: string, worktop?: string, hideWorktop = false, finish_?: string, seed?: string) {
   const tintName = TINT_MATERIAL[type];
   const metalNames = METAL_MATERIALS[type];
   const tweaks = MATERIAL_TWEAKS[type];
   const finish = finishFor(type, color);
   const worktopDef = worktopById(worktop);
+
+  // Parts exported without a material of their own - see ISLAND_SPLITS.
+  // Before the traverse, so the new mesh is dressed with everything else.
+  splitIslandsFor(type, root);
 
   const bodyMats: THREE.MeshPhysicalMaterial[] = [];
   const metalMats: THREE.MeshStandardMaterial[] = [];
