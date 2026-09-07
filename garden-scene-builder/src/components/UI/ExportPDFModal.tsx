@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../../store';
 import { jsPDF } from 'jspdf';
 import { Download, X, Loader2 } from 'lucide-react';
@@ -28,6 +28,14 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
     priceMode: 'estimate' as 'estimate' | 'actual' | 'none',
     actualPrice: '',
   });
+
+  // Escape closes the dialog, as every other dialog here does. Not while a
+  // PDF is being generated - closing mid-render would drop a half-built file.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [loading, onClose]);
 
   const autoCrop = (base64: string): Promise<ShotResult> => {
     return new Promise((resolve) => {

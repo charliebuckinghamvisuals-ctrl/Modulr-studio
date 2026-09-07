@@ -63,9 +63,26 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
   // and matches how the space actually reads standing in it.
   const eyeY = ((room.baseHeightMm ?? 100) / 1000) + 1.5;
 
-  // Enter the room looking at it, rather than wherever the orbit camera was.
+  // Enter the room looking at it, rather than wherever the orbit camera was -
+  // and put the orbit camera back where it was on the way out.
   useEffect(() => {
     const camera = get().camera;
+    /**
+     * The walkthrough borrows the 3D view's camera and leaves it where the
+     * walker stood: 1.5m off the floor, pitched at whatever you last looked
+     * at. Coming back from Plan or Lighting never showed this, because that
+     * swap creates a fresh perspective camera at its default pose - but Walk
+     * to 3D View reuses this one, so you came back standing on the floor
+     * looking down at it. The pose is captured here and restored in the
+     * cleanup, which runs before CameraControls remounts and reads it.
+     * Restored onto THIS instance, not get().camera, because by cleanup time
+     * the default may already be a different camera.
+     */
+    const saved = {
+      position: camera.position.clone(),
+      quaternion: camera.quaternion.clone(),
+      order: camera.rotation.order,
+    };
     const startZ = Math.max(1.2, room.depthMm / 2000 - 1.0);
     position.current.set(0, eyeY, startZ);
     // A camera with rotation.y = 0 looks down -Z, which is the back of the
@@ -76,6 +93,11 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
     camera.rotation.set(0, 0, 0);
     camera.rotation.order = 'YXZ';
     camera.rotation.y = yaw.current;
+    return () => {
+      camera.position.copy(saved.position);
+      camera.quaternion.copy(saved.quaternion);
+      camera.rotation.order = saved.order;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
