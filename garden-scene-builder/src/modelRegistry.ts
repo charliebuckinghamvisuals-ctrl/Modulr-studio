@@ -310,6 +310,17 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
   // "Porcelain" mesh - so it is cut out by shape at load and given this name;
   // see ISLAND_SPLITS in utils/materialFixes. From here on it is a tap.
   toilet: ['FlushPlate'],
+  // Showers: frame, riser, head, handle and drain take the finish; the tray
+  // and the glass keep their own. Identified by measuring each material's
+  // extent in the scene - the large screen's materials are only numbered.
+  shower: ['PaletteMaterial004', 'PaletteMaterial005', 'PaletteMaterial006', 'PDM_Bathroom_Shower_Bases_Kohler_Gray_Stainless_Steel1', 'PDM_Shower_03_material_02'],
+  // The corner unit's valve and head assembly was exported with NO material
+  // name (219 meshes under the default), so the empty name is listed on
+  // purpose - it is the only unnamed material in that model.
+  shower_corner: ['Metal_06_1K', 'Metal_06_1K1', ''],
+  // The small unit's unnamed group spans the whole enclosure, tray included,
+  // so only its named metals take the finish.
+  shower_small: ['[Metal_Aluminum_Anodized]1', '[Metal_Seamed]'],
 };
 
 /**
@@ -436,6 +447,9 @@ export const METAL_FINISHES: { name: string; hex: string; roughness: number }[] 
   { name: 'Brushed Brass', hex: '#c8a35f', roughness: 0.32 },
   { name: 'Polished Brass', hex: '#d9b44a', roughness: 0.1 },
   { name: 'Matte Black', hex: '#26262a', roughness: 0.55 },
+  // Powder-coated white: the most common shower frame, and a common towel
+  // rail. Rough enough not to read as polished.
+  { name: 'White', hex: '#f2f2f2', roughness: 0.5 },
 ];
 
 /** Finish used before the customer picks one - the curved tap was modelled
