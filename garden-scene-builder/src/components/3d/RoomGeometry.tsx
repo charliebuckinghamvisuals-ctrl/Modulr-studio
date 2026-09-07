@@ -2184,6 +2184,20 @@ export function RoomGeometry() {
              <FrameBar position={[0, door.heightMm/2000 - doorFrameT/2, 0]} args={[door.widthMm/1000 - doorFrameT*2, doorFrameT, frameDepth]} outer={frameColorHex} inner={frameColorInnerHex} castShadow />
              <FrameBar position={[-door.widthMm/2000 + doorFrameT/2, 0, 0]} args={[doorFrameT, door.heightMm/1000, frameDepth]} outer={frameColorHex} inner={frameColorInnerHex} castShadow />
              <FrameBar position={[door.widthMm/2000 - doorFrameT/2, 0, 0]} args={[doorFrameT, door.heightMm/1000, frameDepth]} outer={frameColorHex} inner={frameColorInnerHex} castShadow />
+             {/*
+               Threshold. The frame sits flush with the OUTER face of the wall,
+               and the internal floor stops at the INNER face - so from inside
+               there was a strip of the base plinth showing between the two,
+               under the door, and the plinth is finished in decking. Every real
+               door set has an aluminium threshold across that gap; this is it,
+               spanning from the frame's inner face to the inner wall face
+               (plus 10mm under the floor edge so there is no hairline), sitting
+               4mm proud of the finished floor as a real one does.
+             */}
+             <mesh position={[0, -doorH/2 + 0.007, -wallThickness/2 - 0.005]} castShadow receiveShadow>
+               <boxGeometry args={[door.widthMm/1000, 0.014, wallThickness - frameDepth + 0.01]} />
+               <meshStandardMaterial color={frameColorInnerHex} metalness={0.6} roughness={0.3} />
+             </mesh>
           </group>
           {/* Entrance steps down to the garden - solid blocks in even ~170mm
               rises, each tread reaching 300mm further out. Skipped on the
