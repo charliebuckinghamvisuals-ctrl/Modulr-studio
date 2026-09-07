@@ -1016,7 +1016,18 @@ export function Sidebar() {
                       </button>
                       <span className="text-[10px] text-gray-400">{part.rotation === 0 ? 'runs left-right' : 'runs front-back'}</span>
                     </div>
-                    <DimensionSlider label="Length" min={400} max={6000} step={100} value={part.lengthMm} onChange={(v) => wrap(store.updatePartition)(part.id, { lengthMm: v })} />
+                    <DimensionSlider label="Length (grows from the far end)" min={400} max={6000} step={100} value={part.lengthMm} onChange={(v) => {
+                      // Grow from ONE end, as the red handles do. Growing from
+                      // the centre moved both ends, so a wall lined up on a
+                      // corner drifted off it every time it was lengthened.
+                      // The start (local -X) end stays put: the centre shifts
+                      // by half the change along local +X, which is world +X
+                      // at rotation 0 and world -Z at rotation 90.
+                      const half = (v - part.lengthMm) / 2;
+                      wrap(store.updatePartition)(part.id, part.rotation === 0
+                        ? { lengthMm: v, xMm: part.xMm + half }
+                        : { lengthMm: v, zMm: part.zMm - half });
+                    }} />
 
                     {/* L-shape: a corner as ONE wall - lining up two separate
                         walls at a corner was needlessly fiddly. */}

@@ -71,9 +71,14 @@ export interface InteriorDoorData {
  *  the old world-positioned interior doors got left behind. */
 export interface PartitionDoor {
   id: string;
+  /** On the main run: from the wall's centre along its local +X. On the leg
+   *  (onLeg): the distance from the corner along the leg to the door's near
+   *  edge - the number a person actually sets out with. */
   offsetMm: number;
   widthMm: number;
   heightMm: number;
+  /** The door is in the L-shape's leg rather than the main run. */
+  onLeg?: boolean;
 }
 
 export interface PartitionData {

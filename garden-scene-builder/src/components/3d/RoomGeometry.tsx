@@ -503,6 +503,49 @@ function AnimatedDoorLeaves({ door, frameColorHex, frameColorInnerHex, frameThic
  *   it; each door has a slide handle, and its opening is cut from this
  *   wall's own geometry in local space.
  */
+const CHIP = 'flex items-center gap-1 bg-white/95 backdrop-blur-md border border-black/10 rounded-full shadow-xl px-2 py-1 whitespace-nowrap';
+const CHIP_BTN = 'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide text-[#3b4d4a] hover:bg-[#3b4d4a] hover:text-white transition-colors';
+const stopEvt = (e: { stopPropagation: () => void }) => e.stopPropagation();
+
+/**
+ * The label over a door in an internal wall: how far it is from the corner
+ * (or, on a straight wall, from the end), typed into on click - "1200 from
+ * that end" is how a wall gets set out. Plus remove, and a swap to the other
+ * run of an L.
+ */
+function DoorLabel({ mm, from, onCommit, onRemove, onSwap, swapLabel }: {
+  mm: number; from: string; onCommit: (mm: number) => void; onRemove: () => void; onSwap?: () => void; swapLabel?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const setControlsEnabled = useStore(s => s.setControlsEnabled);
+  const commit = () => { setEditing(false); setControlsEnabled(true); const v = Number(draft); if (!isNaN(v)) onCommit(v); };
+  return (
+    <div style={{ pointerEvents: 'auto' }} onPointerDown={stopEvt} className={CHIP}>
+      {editing ? (
+        <input
+          autoFocus type="number" value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onFocus={e => e.target.select()}
+          onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setEditing(false); setControlsEnabled(true); } }}
+          onBlur={commit}
+          className="w-16 text-center text-[11px] font-mono font-bold text-[#1d1d1f] outline-none bg-transparent"
+        />
+      ) : (
+        <button
+          className="text-[11px] font-mono font-bold text-[#1d1d1f] px-1"
+          title={`Click to type a distance from the ${from}`}
+          onClick={(e) => { e.stopPropagation(); setDraft(String(mm)); setEditing(true); setControlsEnabled(false); }}
+        >
+          {mm} mm from {from}
+        </button>
+      )}
+      {onSwap && <button className={CHIP_BTN} title={swapLabel} onClick={(e) => { e.stopPropagation(); onSwap(); }}>{swapLabel}</button>}
+      <button className={CHIP_BTN} title="Remove this door" onClick={(e) => { e.stopPropagation(); onRemove(); }}>×</button>
+    </div>
+  );
+}
+
 function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; room: any; showDims: boolean }) {
   const isSelected = useStore(s => s.selectedElementId === `part-${part.id}`);
   const [dragging, setDragging] = useState(false);
@@ -663,6 +706,48 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
    */
 
   const doorHeight = (dr: any) => Math.min(dr.heightMm / 1000, hP - 0.05);
+  const viewMode = useStore(s => s.viewMode);
+
+  // The L-shape leg, if any, and which run each door is in.
+  const hasLeg = (part.legLengthMm || 0) > 100;
+  const legL = hasLeg ? part.legLengthMm / 1000 : 0;
+  const le: 1 | -1 = part.legEnd === -1 ? -1 : 1;
+  const ld: 1 | -1 = part.legDir === -1 ? -1 : 1;
+  const mainDoors = (part.doors || []).filter((dr: any) => !dr.onLeg);
+  const legDoors = hasLeg ? (part.doors || []).filter((dr: any) => dr.onLeg) : [];
+  // Main-run doors are set out from the CORNER when there is a leg (the end
+  // the leg is on), otherwise from the wall's local -X end.
+  const refEnd: 1 | -1 = hasLeg ? le : -1;
+  const mainFromMm = (dr: any) => Math.round(part.lengthMm / 2 - refEnd * dr.offsetMm - dr.widthMm / 2);
+  const mainOffsetFor = (fromMm: number, widthMm: number) => {
+    const lim = part.lengthMm / 2 - widthMm / 2 - 50;
+    const off = refEnd * (part.lengthMm / 2 - widthMm / 2 - Math.round(fromMm / 10) * 10);
+    return Math.min(lim, Math.max(-lim, off));
+  };
+  /** A leg door's centre in the group's frame; offsetMm is from the corner. */
+  const legDoorCentre = (dr: any): [number, number, number] =>
+    [le * (pL / 2 - pT / 2), 0, ld * (pT / 2 + dr.offsetMm / 1000 + dr.widthMm / 2000)];
+
+  /**
+   * Papered like the room's own walls, with world-scale UVs.
+   *
+   * This was a flat colour on a plain box: the same hex as the walls but a
+   * different surface, which is why a partition read as a duller, unpapered
+   * wall standing between papered ones. The geometries are memoised on
+   * purpose - an inline geometry inside a <Geometry> rebuilds the boolean on
+   * every render (see ceilingGeom).
+   */
+  const paper = wallpaperProps();
+  const mainGeom = useMemo(() => createWorldScaleBoxGeometry(pL, boxH, pT, false, 0, 0, 0), [pL, boxH, pT]);
+  const legGeom = useMemo(() => (hasLeg ? createWorldScaleBoxGeometry(pT, boxH, legL, false, 0, 0, 0) : null), [hasLeg, pT, boxH, legL]);
+  const wallMat = (
+    <meshStandardMaterial
+      {...paper}
+      color={room.interiorColor || '#ffffff'}
+      emissive={isSelected ? '#10b981' : '#000000'}
+      emissiveIntensity={isSelected ? 0.18 : 0}
+    />
+  );
 
   return (
     <group
@@ -671,13 +756,18 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
       onPointerOver={(e: any) => { e.stopPropagation(); useStore.getState().setHoveredElementId(`part-${part.id}`); }}
       onPointerOut={() => useStore.getState().setHoveredElementId(null)}
     >
-      <mesh castShadow receiveShadow onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+      {/* onClick stops here on purpose. The ground plane's onClick deselects
+          everything, and R3F's click is a separate event from the pointerup
+          this mesh already stops - so a click on the wall selected it and
+          the plane deselected it in the same instant. "Click a wall and
+          nothing happens" was that. */}
+      <mesh castShadow receiveShadow onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onClick={stopEvt}>
         <Geometry>
           <Base>
-            <boxGeometry args={[pL, boxH, pT]} />
+            <primitive object={mainGeom} attach="geometry" />
           </Base>
           {/* This wall's OWN doors, cut in local space - they move with it. */}
-          {(part.doors || []).map((dr: any) => (
+          {mainDoors.map((dr: any) => (
             <Subtraction key={dr.id} position={[dr.offsetMm / 1000, doorHeight(dr) / 2 - boxH / 2, 0]}>
               <boxGeometry args={[dr.widthMm / 1000, doorHeight(dr), 0.4]} />
             </Subtraction>
@@ -700,48 +790,57 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
             );
           })}
         </Geometry>
-        <meshStandardMaterial
-          color={room.interiorColor || '#ffffff'}
-          roughness={0.9}
-          emissive={isSelected ? '#10b981' : '#000000'}
-          emissiveIntensity={isSelected ? 0.18 : 0}
-        />
+        {wallMat}
       </mesh>
 
 
       {/* L-shape leg: a perpendicular run welded to one end of the main
           wall, so a corner is ONE unit instead of two walls nudged together.
           It shares the group, so body-drag, rotate and selection all treat
-          the L as a single wall. */}
-      {(part.legLengthMm || 0) > 100 && (() => {
-        const legL = part.legLengthMm / 1000;
-        const le = part.legEnd === -1 ? -1 : 1;
-        const ld = part.legDir === -1 ? -1 : 1;
-        return (
-          <mesh
-            position={[le * (pL / 2 - pT / 2), 0, ld * (legL / 2 + pT / 2)]}
-            castShadow receiveShadow
-            onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
-          >
-            <boxGeometry args={[pT, boxH, legL]} />
-            <meshStandardMaterial
-              color={room.interiorColor || '#ffffff'}
-              roughness={0.9}
-              emissive={isSelected ? '#10b981' : '#000000'}
-              emissiveIntensity={isSelected ? 0.18 : 0}
-            />
-          </mesh>
-        );
-      })()}
+          the L as a single wall. A boolean like the main run, so it can take
+          doors of its own - it was a plain box that could not. */}
+      {hasLeg && legGeom && (
+        <mesh
+          position={[le * (pL / 2 - pT / 2), 0, ld * (legL / 2 + pT / 2)]}
+          castShadow receiveShadow
+          onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onClick={stopEvt}
+        >
+          <Geometry>
+            <Base>
+              <primitive object={legGeom} attach="geometry" />
+            </Base>
+            {/* In the leg's own frame the corner is at -ld * legL/2, and a
+                door's offsetMm runs from there to its near edge. */}
+            {legDoors.map((dr: any) => (
+              <Subtraction key={dr.id} position={[0, doorHeight(dr) / 2 - boxH / 2, ld * (dr.offsetMm / 1000 + dr.widthMm / 2000 - legL / 2)]}>
+                <boxGeometry args={[0.4, doorHeight(dr), dr.widthMm / 1000]} />
+              </Subtraction>
+            ))}
+          </Geometry>
+          {wallMat}
+        </mesh>
+      )}
 
-      {/* Door frames for this wall's own doors. */}
-      {(part.doors || []).map((dr: any) => {
+      {/* Door frames for this wall's own doors, main run and leg. */}
+      {mainDoors.map((dr: any) => {
         const dW = dr.widthMm / 1000;
         const dH = doorHeight(dr);
         const ox = dr.offsetMm / 1000;
         const oy = dH / 2 - boxH / 2;
         return (
           <group key={`frame-${dr.id}`} position={[ox, oy, 0]}>
+            <mesh position={[-dW / 2 + 0.015, 0, 0]} castShadow><boxGeometry args={[0.03, dH, pT + 0.02]} /><meshStandardMaterial color="#e8e2d8" roughness={0.7} /></mesh>
+            <mesh position={[dW / 2 - 0.015, 0, 0]} castShadow><boxGeometry args={[0.03, dH, pT + 0.02]} /><meshStandardMaterial color="#e8e2d8" roughness={0.7} /></mesh>
+            <mesh position={[0, dH / 2 - 0.015, 0]} castShadow><boxGeometry args={[dW, 0.03, pT + 0.02]} /><meshStandardMaterial color="#e8e2d8" roughness={0.7} /></mesh>
+          </group>
+        );
+      })}
+      {legDoors.map((dr: any) => {
+        const dW = dr.widthMm / 1000;
+        const dH = doorHeight(dr);
+        const c = legDoorCentre(dr);
+        return (
+          <group key={`frame-${dr.id}`} position={[c[0], dH / 2 - boxH / 2, c[2]]} rotation={[0, Math.PI / 2, 0]}>
             <mesh position={[-dW / 2 + 0.015, 0, 0]} castShadow><boxGeometry args={[0.03, dH, pT + 0.02]} /><meshStandardMaterial color="#e8e2d8" roughness={0.7} /></mesh>
             <mesh position={[dW / 2 - 0.015, 0, 0]} castShadow><boxGeometry args={[0.03, dH, pT + 0.02]} /><meshStandardMaterial color="#e8e2d8" roughness={0.7} /></mesh>
             <mesh position={[0, dH / 2 - 0.015, 0]} castShadow><boxGeometry args={[dW, 0.03, pT + 0.02]} /><meshStandardMaterial color="#e8e2d8" roughness={0.7} /></mesh>
@@ -775,7 +874,7 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
               }} />
           )}
           {/* Door slide handles: green, above each opening. */}
-          {(part.doors || []).map((dr: any) => (
+          {mainDoors.map((dr: any) => (
             <DragHandle key={`slide-${dr.id}`} elementId={`part-${part.id}`} position={[dr.offsetMm / 1000, hP / 2 + 0.18, 0]} axis={part.rotation === 0 ? 'x' : 'z'} color="#10b981" visualAxis="x" snapInterval={0.05}
               onChange={(d) => {
                 const st = useStore.getState();
@@ -789,8 +888,87 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
                 st.updatePartitionDoor(part.id, dr.id, { offsetMm: next });
               }} />
           ))}
+          {/* The same for doors in the leg, sliding along it. Local +Z is
+              world +Z at rotation 0 and world +X at rotation 90 - the mapping
+              the leg tip handle uses. */}
+          {legDoors.map((dr: any) => {
+            const c = legDoorCentre(dr);
+            return (
+              <DragHandle key={`slide-${dr.id}`} elementId={`part-${part.id}`} position={[c[0], hP / 2 + 0.18, c[2]]} axis={part.rotation === 0 ? 'z' : 'x'} color="#10b981" visualAxis="z" snapInterval={0.05}
+                onChange={(d) => {
+                  const st = useStore.getState();
+                  const cur = (st.scene.room.partitions || []).find((p: any) => p.id === part.id);
+                  const curDr = cur && (cur.doors || []).find((x: any) => x.id === dr.id);
+                  if (!cur || !curDr) return;
+                  const lim = cur.legLengthMm - curDr.widthMm - 50;
+                  const next = Math.min(lim, Math.max(50, Math.round((curDr.offsetMm + ld * d * 1000) / 50) * 50));
+                  st.updatePartitionDoor(part.id, dr.id, { offsetMm: next });
+                }} />
+            );
+          })}
         </>
       )}
+
+      {/*
+        Doors placed ON the wall. Select it and each run - the main length,
+        and the leg of an L - offers "+ Door" above its middle; every door
+        carries a label with its distance from the corner (or the end, on a
+        straight wall) that you click and type into, a swap to the other run,
+        and remove. Above the wall's top so the wall's own panel cannot cover
+        it, and not in the walkthrough, where a click is the paint brush.
+      */}
+      {isSelected && viewMode !== 'walking' && (() => {
+        const st = useStore.getState;
+        const clampLeg = (mm: number, widthMm: number) => Math.min(part.legLengthMm - widthMm - 50, Math.max(50, Math.round(mm / 10) * 10));
+        const putOn = (doorId: string, leg: boolean, widthMm: number) =>
+          st().updatePartitionDoor(part.id, doorId, leg
+            ? { onLeg: true, offsetMm: clampLeg((part.legLengthMm - widthMm) / 2, widthMm) }
+            : { onLeg: false, offsetMm: 0 });
+        const addOn = (leg: boolean) => {
+          st().addPartitionDoor(part.id);
+          const cur = (st().scene.room.partitions || []).find((p: any) => p.id === part.id);
+          const nd = cur && cur.doors && cur.doors[cur.doors.length - 1];
+          if (nd) putOn(nd.id, leg, nd.widthMm);
+        };
+        const chipY = hP / 2 + 0.72;
+        const labelY = hP / 2 + 0.42;
+        const fromWord = hasLeg ? 'corner' : 'end';
+        return (
+          <>
+            <Html position={[0, chipY, 0]} center zIndexRange={[125, 0]}>
+              <button style={{ pointerEvents: 'auto' }} onPointerDown={stopEvt} onClick={(e) => { e.stopPropagation(); addOn(false); }} className={`${CHIP} ${CHIP_BTN}`} title="Add a door to this wall">+ Door</button>
+            </Html>
+            {hasLeg && (
+              <Html position={[le * (pL / 2 - pT / 2), chipY, ld * (legL / 2 + pT / 2)]} center zIndexRange={[125, 0]}>
+                <button style={{ pointerEvents: 'auto' }} onPointerDown={stopEvt} onClick={(e) => { e.stopPropagation(); addOn(true); }} className={`${CHIP} ${CHIP_BTN}`} title="Add a door to the leg">+ Door</button>
+              </Html>
+            )}
+            {mainDoors.map((dr: any) => (
+              <Html key={`lbl-${dr.id}`} position={[dr.offsetMm / 1000, labelY, 0]} center zIndexRange={[130, 0]}>
+                <DoorLabel
+                  mm={mainFromMm(dr)} from={fromWord}
+                  onCommit={(mm) => st().updatePartitionDoor(part.id, dr.id, { offsetMm: mainOffsetFor(mm, dr.widthMm) })}
+                  onRemove={() => st().removePartitionDoor(part.id, dr.id)}
+                  onSwap={hasLeg ? () => putOn(dr.id, true, dr.widthMm) : undefined} swapLabel="→ leg"
+                />
+              </Html>
+            ))}
+            {legDoors.map((dr: any) => {
+              const c = legDoorCentre(dr);
+              return (
+                <Html key={`lbl-${dr.id}`} position={[c[0], labelY, c[2]]} center zIndexRange={[130, 0]}>
+                  <DoorLabel
+                    mm={dr.offsetMm} from="corner"
+                    onCommit={(mm) => st().updatePartitionDoor(part.id, dr.id, { offsetMm: clampLeg(mm, dr.widthMm) })}
+                    onRemove={() => st().removePartitionDoor(part.id, dr.id)}
+                    onSwap={() => putOn(dr.id, false, dr.widthMm)} swapLabel="→ main"
+                  />
+                </Html>
+              );
+            })}
+          </>
+        );
+      })()}
     </group>
   );
 }
