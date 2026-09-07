@@ -441,6 +441,40 @@ function detachIsland(mesh: THREE.Mesh, island: Island, materialName: string, st
   return part;
 }
 
+/**
+ * Meshes that share a material with parts they are nothing like.
+ *
+ * The small shower's tray, valve, riser and head all came out of SketchUp
+ * under ONE unnamed material - so listing that material as metal would have
+ * chromed the tray. The tray meshes are at least NAMED, so they are moved to
+ * a material of their own here, and the empty name left behind is then the
+ * metalwork only. Checked by colouring each mesh in the scene: Geom3D_Shower
+ * is the tray's top surface, Geom3D_Shower_tray* its sides.
+ */
+const MESH_MATERIALS: Partial<Record<ObjectType, { mesh: RegExp; material: string; dress: (m: THREE.MeshStandardMaterial) => void }[]>> = {
+  shower_small: [{
+    mesh: /^Geom3D_Shower(_tray.*)?$/,
+    material: 'ShowerTray',
+    dress: m => { m.color.set('#f4f4f2'); m.metalness = 0; m.roughness = 0.45; },
+  }],
+};
+
+function renameMeshMaterials(type: ObjectType, root: THREE.Object3D) {
+  const rules = MESH_MATERIALS[type];
+  if (!rules) return;
+  root.traverse(o => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || Array.isArray(mesh.material)) return;
+    const rule = rules.find(r => r.mesh.test(mesh.name));
+    if (!rule || mesh.material.name === rule.material) return;
+    const copy = (mesh.material as THREE.MeshStandardMaterial).clone();
+    copy.name = rule.material;
+    rule.dress(copy);
+    copy.needsUpdate = true;
+    mesh.material = copy;
+  });
+}
+
 function splitIslandsFor(type: ObjectType, root: THREE.Object3D) {
   const rule = ISLAND_SPLITS[type];
   if (!rule) return;
@@ -462,6 +496,7 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
   // Parts exported without a material of their own - see ISLAND_SPLITS.
   // Before the traverse, so the new mesh is dressed with everything else.
   splitIslandsFor(type, root);
+  renameMeshMaterials(type, root);
 
   const bodyMats: THREE.MeshPhysicalMaterial[] = [];
   const metalMats: THREE.MeshStandardMaterial[] = [];

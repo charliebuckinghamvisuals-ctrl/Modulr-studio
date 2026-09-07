@@ -318,9 +318,10 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
   // name (219 meshes under the default), so the empty name is listed on
   // purpose - it is the only unnamed material in that model.
   shower_corner: ['Metal_06_1K', 'Metal_06_1K1', ''],
-  // The small unit's unnamed group spans the whole enclosure, tray included,
-  // so only its named metals take the finish.
-  shower_small: ['[Metal_Aluminum_Anodized]1', '[Metal_Seamed]'],
+  // The small unit's valve, riser and head are unnamed too - and shared that
+  // material with the tray, which is moved to 'ShowerTray' at load (see
+  // MESH_MATERIALS in utils/materialFixes) so the empty name is metal only.
+  shower_small: ['[Metal_Aluminum_Anodized]1', '[Metal_Seamed]', ''],
 };
 
 /**

@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
-import { CameraControls, Environment, ContactShadows, Plane, Text, Grid as DreiGrid, SoftShadows, PerspectiveCamera, OrthographicCamera, Sky, Cloud, Clouds } from '@react-three/drei';
+import { CameraControls, Environment, Lightformer, ContactShadows, Plane, Text, Grid as DreiGrid, SoftShadows, PerspectiveCamera, OrthographicCamera, Sky, Cloud, Clouds } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -679,15 +679,37 @@ export function MainScene() {
           </>
         )}
 
-        <Environment
-          files={isNight ? "textures/night.hdr" : "textures/garden_nook.hdr"}
-          blur={0.05}
-          // Muted during export. An HDR is directional by nature - it is a
-          // photograph of a real sky with a bright side - so leaving it at full
-          // strength would reintroduce exactly the uneven face-to-face lighting
-          // the flat ambient above is there to remove.
-          environmentIntensity={isExporting ? 0.08 : (isNight ? 0.3 : 1.0)}
-        />
+        {viewMode === 'walking' && !isExporting ? (
+          /*
+            Indoor reflections for the walkthrough.
+            The garden HDR is the right thing to reflect OUTSIDE, but a metal
+            surface indoors has no view of the garden - three.js does not
+            occlude the environment map with the room's walls, so a flat brass
+            post that happened to face the HDR's hedges came out dark grey,
+            while the round towel rail beside it (which samples the whole
+            hemisphere) stayed brass. One shower, "a mix of brass and
+            stainless". Inside, the reflections come from a bright, neutral
+            room instead: a lit ceiling, two window-like panels and a warm
+            floor bounce, rendered once into a small cubemap.
+          */
+          <Environment resolution={128} frames={1} environmentIntensity={isNight ? 0.25 : 0.5}>
+            <color attach="background" args={[isNight ? '#3b404a' : '#e8e5df']} />
+            <Lightformer form="rect" intensity={isNight ? 0.8 : 2.0} color="#fff5e6" position={[0, 4, 0]} rotation-x={Math.PI / 2} scale={[6, 6, 1]} />
+            <Lightformer form="rect" intensity={1.3} color="#eef3ff" position={[-6, 1.5, 0]} rotation-y={Math.PI / 2} scale={[4, 2.6, 1]} />
+            <Lightformer form="rect" intensity={1.3} color="#eef3ff" position={[6, 1.5, 0]} rotation-y={-Math.PI / 2} scale={[4, 2.6, 1]} />
+            <Lightformer form="rect" intensity={0.5} color="#cdb48f" position={[0, -4, 0]} rotation-x={-Math.PI / 2} scale={[8, 8, 1]} />
+          </Environment>
+        ) : (
+          <Environment
+            files={isNight ? "textures/night.hdr" : "textures/garden_nook.hdr"}
+            blur={0.05}
+            // Muted during export. An HDR is directional by nature - it is a
+            // photograph of a real sky with a bright side - so leaving it at full
+            // strength would reintroduce exactly the uneven face-to-face lighting
+            // the flat ambient above is there to remove.
+            environmentIntensity={isExporting ? 0.08 : (isNight ? 0.3 : 1.0)}
+          />
+        )}
 
         {/* Ground Plane */}
         <Plane 
