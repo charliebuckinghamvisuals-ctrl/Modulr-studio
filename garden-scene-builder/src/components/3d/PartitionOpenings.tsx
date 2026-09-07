@@ -131,9 +131,12 @@ export function PartitionOpenings({ obj, w, d, h, retL }: { obj: SceneObject; w:
 
   return (
     <group ref={frame}>
-      {/* A + at the middle of every run that does not hold the opening. */}
+      {/* A + at the middle of every run that does not hold the opening.
+          Above the wall's top, not at mid-height: the wall's editor panel
+          docks bottom-centre and covered the middle of the wall, which hid
+          the chips exactly when they were wanted. */}
       {runs.filter(s => s !== gapSeg).map(s => (
-        <Html key={`add-${s}`} position={localAt(s, segLen(s) / 2, 0.12)} center zIndexRange={[125, 0]}>
+        <Html key={`add-${s}`} position={(p => [p[0], h + 0.15, p[2]] as [number, number, number])(localAt(s, segLen(s) / 2))} center zIndexRange={[125, 0]}>
           <button
             style={{ pointerEvents: 'auto' }}
             onPointerDown={stop}

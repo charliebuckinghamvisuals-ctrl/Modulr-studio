@@ -111,7 +111,7 @@ export function Sidebar() {
         <div className="flex-1">
           <h1 className="text-xl font-semibold tracking-tight text-[#1d1d1f]">Modulr <span className="font-light">3D</span></h1>
           <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1 font-medium">
-            Configurator <span className="normal-case tracking-normal text-gray-300">Â· build {typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev'}</span>
+            Configurator <span className="normal-case tracking-normal text-gray-300">· build {typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev'}</span>
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
@@ -494,7 +494,7 @@ export function Sidebar() {
                   const baseH = room.baseHeightMm ?? 100;
                   const roofH = room.roofHeightMm ?? 200;
                   // For Gable, heightMm is ALREADY the total height (the 3D
-                  // maths subtracts base+roof from it) â€” adding base+roof here
+                  // maths subtracts base+roof from it) — adding base+roof here
                   // showed a total 450mm taller than the 3D label for the same
                   // building. Box stores wall height, so it still converts.
                   const heightIsTotal = room.shape === 'Gable';
@@ -966,7 +966,7 @@ export function Sidebar() {
                       // Clamp below the total height: a roof taller than the
                       // building makes the wall height negative and the walls
                       // invert into a broken mess (three.js tolerates it, so
-                      // there's no error â€” just a mangled model).
+                      // there's no error — just a mangled model).
                       const maxRoof = (room.heightMm ?? 2350) - (room.baseHeightMm ?? 100) - 100;
                       updateRoom({ roofHeightMm: Math.min(Math.max(0, parseInt(e.target.value) || 0), Math.max(100, maxRoof)) });
                     }} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
@@ -1012,7 +1012,7 @@ export function Sidebar() {
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-gray-800">Wall #{i + 1}</span>
                       <button onClick={(e) => { e.stopPropagation(); wrap(store.updatePartition)(part.id, { rotation: part.rotation === 0 ? 90 : 0 }); }} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors bg-blue-50 px-2 py-1 rounded">
-                        Rotate 90Â°
+                        Rotate 90°
                       </button>
                       <span className="text-[10px] text-gray-400">{part.rotation === 0 ? 'runs left-right' : 'runs front-back'}</span>
                     </div>
@@ -1025,7 +1025,7 @@ export function Sidebar() {
                         onClick={(e) => { e.stopPropagation(); wrap(store.updatePartition)(part.id, { legLengthMm: (part.legLengthMm || 0) > 100 ? 0 : 1500, legEnd: part.legEnd || 1, legDir: part.legDir || 1 }); }}
                         className={`text-[10px] font-semibold px-2 py-1 rounded transition-colors ${(part.legLengthMm || 0) > 100 ? 'bg-[#3b4d4a] text-white' : 'bg-blue-50 text-[#3b4d4a] hover:text-blue-600'}`}
                       >
-                        {(part.legLengthMm || 0) > 100 ? 'L-Shape âœ“' : 'Make L-Shape'}
+                        {(part.legLengthMm || 0) > 100 ? 'L-Shape ✓' : 'Make L-Shape'}
                       </button>
                       {(part.legLengthMm || 0) > 100 && (
                         <>
@@ -1079,7 +1079,7 @@ export function Sidebar() {
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold text-gray-800">Interior Door #{i + 1}</span>
                         <button onClick={(e) => wrap(store.updateInteriorDoor)(door.id, { rotation: door.rotation === 0 ? 90 : 0 })} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors bg-blue-50 px-2 py-1 rounded">
-                          Rotate 90Â°
+                          Rotate 90°
                         </button>
                       </div>
                       
