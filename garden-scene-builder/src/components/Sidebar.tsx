@@ -733,6 +733,22 @@ export function Sidebar() {
                 </div>
               </div>
 
+              {/* Inside face of the frames. Dual-colour - black out, white in -
+                  is a normal spec; 'Match' is the single-colour default. */}
+              <div>
+                <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Frames Inside</label>
+                <div className="flex gap-2 flex-wrap">
+                  <button onClick={() => updateRoom({ frameColorInner: undefined })} className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg transition-colors ${room.frameColorInner === undefined ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
+                    Match
+                  </button>
+                  {['anthracite', 'black', 'white', 'silver'].map(col => (
+                    <button key={col} onClick={() => updateRoom({ frameColorInner: col as any })} className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg capitalize transition-colors ${room.frameColorInner === col ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
+                      {col}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Frame Style</label>
                 <div className="flex gap-2">

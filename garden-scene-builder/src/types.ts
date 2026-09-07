@@ -139,6 +139,10 @@ export interface Room {
   baseMaterial: BaseMaterialType;
   roofMaterial: RoofMaterialType;
   frameColor: FrameColorType;
+  /** Colour of the INSIDE face of every window and door frame. Dual-colour
+   *  systems - black out, white in - are a normal spec. Unset means the same
+   *  as outside, so every design saved before this existed is unchanged. */
+  frameColorInner?: FrameColorType;
   frameStyle?: FrameStyleType;
   interiorColor: string;
   interiorFloorType: InteriorFloorType;

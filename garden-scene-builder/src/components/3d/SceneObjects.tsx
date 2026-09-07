@@ -20,7 +20,7 @@ import { WorktopRuns } from './WorktopRuns';
  * (served at the site root) and inside the /3d-config/ iframe, where an
  * absolute path would miss.
  */
-function GlbModel({ url, type, color, worktop, finish }: { url: string; type: SceneObject['type']; color?: string; worktop?: string; finish?: string }) {
+function GlbModel({ url, type, color, worktop, finish, seed }: { url: string; type: SceneObject['type']; color?: string; worktop?: string; finish?: string; seed?: string }) {
     const { scene } = useGLTF(url);
 
     // Clone per instance. useGLTF caches one scene graph, so placing two of
@@ -33,7 +33,7 @@ function GlbModel({ url, type, color, worktop, finish }: { url: string; type: Sc
 
     if (!cloned.current) {
         cloned.current = scene.clone(true);
-        matHandles.current = applyModelMaterials(type, cloned.current, color, worktop, true, finish);
+        matHandles.current = applyModelMaterials(type, cloned.current, color, worktop, true, finish, seed);
     }
 
     // Recolour on demand without rebuilding the model.
@@ -443,6 +443,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
               key={obj.type}
               url={modelUrl}
               type={obj.type}
+              seed={obj.id}
               color={obj.color}
               worktop={room.worktopMaterial}
               finish={room.unitFinish}

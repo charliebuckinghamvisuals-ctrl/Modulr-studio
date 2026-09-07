@@ -6,6 +6,7 @@ import { useFrame } from '@react-three/fiber';
 // the previous geometry instead of blanking the mesh (see SafeCsg.tsx).
 import { Geometry, Base, Subtraction, Addition } from './SafeCsg';
 import * as THREE from 'three';
+import { frameColourHex } from '../../utils/frameColours';
 import { Text, Line, Html, Edges, Billboard } from '@react-three/drei';
 import { useRealMaterial, resolveDeckingKey, resolveFloorKey } from '../../utils/materials';
 import { Suspense } from 'react';
@@ -190,23 +191,60 @@ function DimText({ value, onValueChange, position, rotation, children, isDraggab
 // Crittall-style glazing bars: grid of slim steel bars over a glass panel.
 // Pane sizes adapt to the glass dimensions (targeting ~800mm wide x ~650mm tall panes,
 // so a normal leaf gets no internal vertical bars and only 2-3 horizontal ones).
-function CrittallBars({ glassW, glassH, depth, color }: { glassW: number, glassH: number, depth: number, color: string }) {
+/**
+ * One member of a window or door frame, coloured per side.
+ *
+ * Dual-colour aluminium is two profiles - an outer shell and an inner one,
+ * thermally broken - and that is how it is built here. A member's depth is
+ * its local Z, which in every opening group runs through the wall with +Z
+ * outside (the sill is placed at +Z). The depth is split in two and each half
+ * takes its own colour. When the colours match it is one box, so a
+ * single-colour frame draws exactly as it always did.
+ */
+function FrameBar({ position, args, outer, inner, metalness = 0.6, roughness = 0.3, castShadow = false }: {
+  position: [number, number, number];
+  args: [number, number, number];
+  outer: string;
+  inner: string;
+  metalness?: number;
+  roughness?: number;
+  castShadow?: boolean;
+}) {
+  const [w, h, d] = args;
+  if (outer === inner) {
+    return (
+      <mesh position={position} castShadow={castShadow}>
+        <boxGeometry args={args} />
+        <meshStandardMaterial color={outer} metalness={metalness} roughness={roughness} />
+      </mesh>
+    );
+  }
+  const [x, y, z] = position;
+  return (
+    <group>
+      <mesh position={[x, y, z + d / 4]} castShadow={castShadow}>
+        <boxGeometry args={[w, h, d / 2]} />
+        <meshStandardMaterial color={outer} metalness={metalness} roughness={roughness} />
+      </mesh>
+      <mesh position={[x, y, z - d / 4]} castShadow={castShadow}>
+        <boxGeometry args={[w, h, d / 2]} />
+        <meshStandardMaterial color={inner} metalness={metalness} roughness={roughness} />
+      </mesh>
+    </group>
+  );
+}
+
+function CrittallBars({ glassW, glassH, depth, color, innerColor }: { glassW: number, glassH: number, depth: number, color: string, innerColor?: string }) {
   const barT = 0.018;
   const cols = Math.max(1, Math.round(glassW / 0.80));
   const rows = Math.max(2, Math.round(glassH / 0.65));
   return (
     <group>
       {Array.from({ length: cols - 1 }).map((_, i) => (
-        <mesh key={`v-${i}`} position={[-glassW/2 + (glassW/cols)*(i+1), 0, 0]}>
-          <boxGeometry args={[barT, glassH, depth]} />
-          <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} />
-        </mesh>
+        <FrameBar key={`v-${i}`} position={[-glassW/2 + (glassW/cols)*(i+1), 0, 0]} args={[barT, glassH, depth]} outer={color} inner={innerColor ?? color} />
       ))}
       {Array.from({ length: rows - 1 }).map((_, i) => (
-        <mesh key={`h-${i}`} position={[0, -glassH/2 + (glassH/rows)*(i+1), 0]}>
-          <boxGeometry args={[glassW, barT, depth]} />
-          <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} />
-        </mesh>
+        <FrameBar key={`h-${i}`} position={[0, -glassH/2 + (glassH/rows)*(i+1), 0]} args={[glassW, barT, depth]} outer={color} inner={innerColor ?? color} />
       ))}
     </group>
   );
@@ -315,7 +353,7 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
   );
 }
 
-function AnimatedDoorLeaves({ door, frameColorHex, frameThickness, sashThickness, depth, room }: { door: any, frameColorHex: string, frameThickness: number, sashThickness: number, depth: number, room: Room }) {
+function AnimatedDoorLeaves({ door, frameColorHex, frameColorInnerHex, frameThickness, sashThickness, depth, room }: { door: any, frameColorHex: string, frameColorInnerHex: string, frameThickness: number, sashThickness: number, depth: number, room: Room }) {
   const { areDoorsOpen } = useStore();
   const leavesRef = useRef<THREE.Group[]>([]);
 
@@ -401,10 +439,10 @@ function AnimatedDoorLeaves({ door, frameColorHex, frameThickness, sashThickness
             ref={el => { if(el) leavesRef.current[i] = el; }}
           >
             {/* Leaf Frame (Sash) */}
-            <mesh position={[0, (door.heightMm/1000)/2 - frameThickness - sashThickness/2, 0]}><boxGeometry args={[leafW, sashThickness, depth*0.5]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
-            <mesh position={[0, -(door.heightMm/1000)/2 + frameThickness + sashThickness/2, 0]}><boxGeometry args={[leafW, sashThickness, depth*0.5]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
-            <mesh position={[-leafW/2 + sashThickness/2, 0, 0]}><boxGeometry args={[sashThickness, door.heightMm/1000 - frameThickness*2, depth*0.5]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
-            <mesh position={[leafW/2 - sashThickness/2, 0, 0]}><boxGeometry args={[sashThickness, door.heightMm/1000 - frameThickness*2, depth*0.5]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
+            <FrameBar position={[0, (door.heightMm/1000)/2 - frameThickness - sashThickness/2, 0]} args={[leafW, sashThickness, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
+            <FrameBar position={[0, -(door.heightMm/1000)/2 + frameThickness + sashThickness/2, 0]} args={[leafW, sashThickness, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
+            <FrameBar position={[-leafW/2 + sashThickness/2, 0, 0]} args={[sashThickness, door.heightMm/1000 - frameThickness*2, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
+            <FrameBar position={[leafW/2 - sashThickness/2, 0, 0]} args={[sashThickness, door.heightMm/1000 - frameThickness*2, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
             
             {/* Door Handle */}
             {room.hasDoorHandles && (
@@ -428,10 +466,7 @@ function AnimatedDoorLeaves({ door, frameColorHex, frameThickness, sashThickness
             */}
             {/* Panel: glass, or a solid slab for the entrance-door style */}
             {door.style === 'solid' ? (
-              <mesh castShadow>
-                <boxGeometry args={[leafW - sashThickness*2, door.heightMm/1000 - frameThickness*2 - sashThickness*2, 0.045]} />
-                <meshStandardMaterial color={frameColorHex} metalness={0.35} roughness={0.55} />
-              </mesh>
+              <FrameBar position={[0, 0, 0]} args={[leafW - sashThickness*2, door.heightMm/1000 - frameThickness*2 - sashThickness*2, 0.045]} outer={frameColorHex} inner={frameColorInnerHex} metalness={0.35} roughness={0.55} castShadow />
             ) : (
               <mesh>
                 <boxGeometry args={[leafW - sashThickness*2, door.heightMm/1000 - frameThickness*2 - sashThickness*2, 0.02]} />
@@ -444,6 +479,7 @@ function AnimatedDoorLeaves({ door, frameColorHex, frameThickness, sashThickness
                 glassH={door.heightMm/1000 - frameThickness*2 - sashThickness*2}
                 depth={0.03}
                 color={frameColorHex}
+                innerColor={frameColorInnerHex}
               />
             )}
           </group>
@@ -915,14 +951,16 @@ export function RoomGeometry() {
 
   const baseMaterialColors: Record<string, string> = { concrete: '#8a8d8f', timber_decking: '#a3794a', composite_decking: '#545a5e' };
   const roofMaterialColors: Record<string, string> = { epdm: '#222222', sedum: '#2d3032', upvc: '#d3d5d7', metal: '#6a6d70' };
-  const frameColors: Record<string, string> = { anthracite: '#2d3032', black: '#1a1a1a', white: '#f0f0f0', silver: '#a0a4a8' };
   
   const baseColorHex = baseMaterialColors[room.baseMaterial as string] || '#8a8d8f';
   // An explicit roofColor overrides the colour implied by the roof material, so
   // the roof and the fascia can be specified independently rather than the roof
   // being locked to whatever its material happens to be.
   const roofColorHex = (room as any).roofColor || roofMaterialColors[room.roofMaterial as string] || '#222222';
-  const frameColorHex = frameColors[room.frameColor] || frameColors.anthracite;
+  const frameColorHex = frameColourHex(room.frameColor);
+  // Inside face of every frame member. Falls back to the outside colour, so a
+  // design saved before the split renders exactly as it did.
+  const frameColorInnerHex = frameColourHex(room.frameColorInner ?? room.frameColor);
 
   // baseH is declared with the other height calculations further up.
   const roofH = (room.roofHeightMm ?? 200) / 1000;
@@ -2067,6 +2105,7 @@ export function RoomGeometry() {
           key={door.id}
           position={pos}
           rotation={rot}
+          userData={{ openingId: door.id }}
           onClick={(e) => { 
             e.stopPropagation(); 
             if (viewMode !== 'walking') setSelectedElementId(door.id); 
@@ -2092,7 +2131,8 @@ export function RoomGeometry() {
               <DragHandle
                 elementId={door.id}
                 position={[0, 0, 0.15]}
-                axis="x"
+                axis={(door.wall === 'front' || door.wall === 'back') ? 'x' : 'z'}
+                visualAxis="x"
                 color="#00ff00"
                 onChange={(dx) => {
                   useStore.getState().updateDoor(door.id, { offsetMm: Math.round((door.offsetMm + dx * 1000) / 50) * 50 });
@@ -2101,7 +2141,8 @@ export function RoomGeometry() {
               <DragHandle
                 elementId={door.id}
                 position={[-door.widthMm/2000, 0, 0.15]}
-                axis="x"
+                axis={(door.wall === 'front' || door.wall === 'back') ? 'x' : 'z'}
+                visualAxis="x"
                 color="#ff0000"
                 snapInterval={0.05}
                 onChange={(dx) => {
@@ -2115,7 +2156,8 @@ export function RoomGeometry() {
               <DragHandle
                 elementId={door.id}
                 position={[door.widthMm/2000, 0, 0.15]}
-                axis="x"
+                axis={(door.wall === 'front' || door.wall === 'back') ? 'x' : 'z'}
+                visualAxis="x"
                 color="#ff0000"
                 snapInterval={0.05}
                 onChange={(dx) => {
@@ -2138,10 +2180,10 @@ export function RoomGeometry() {
           )}
           {/* Main frame border */}
           <group>
-             <mesh position={[0, -door.heightMm/2000 + doorFrameT/2, 0]} castShadow><boxGeometry args={[door.widthMm/1000 - doorFrameT*2, doorFrameT, frameDepth]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
-             <mesh position={[0, door.heightMm/2000 - doorFrameT/2, 0]} castShadow><boxGeometry args={[door.widthMm/1000 - doorFrameT*2, doorFrameT, frameDepth]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
-             <mesh position={[-door.widthMm/2000 + doorFrameT/2, 0, 0]} castShadow><boxGeometry args={[doorFrameT, door.heightMm/1000, frameDepth]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
-             <mesh position={[door.widthMm/2000 - doorFrameT/2, 0, 0]} castShadow><boxGeometry args={[doorFrameT, door.heightMm/1000, frameDepth]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
+             <FrameBar position={[0, -door.heightMm/2000 + doorFrameT/2, 0]} args={[door.widthMm/1000 - doorFrameT*2, doorFrameT, frameDepth]} outer={frameColorHex} inner={frameColorInnerHex} castShadow />
+             <FrameBar position={[0, door.heightMm/2000 - doorFrameT/2, 0]} args={[door.widthMm/1000 - doorFrameT*2, doorFrameT, frameDepth]} outer={frameColorHex} inner={frameColorInnerHex} castShadow />
+             <FrameBar position={[-door.widthMm/2000 + doorFrameT/2, 0, 0]} args={[doorFrameT, door.heightMm/1000, frameDepth]} outer={frameColorHex} inner={frameColorInnerHex} castShadow />
+             <FrameBar position={[door.widthMm/2000 - doorFrameT/2, 0, 0]} args={[doorFrameT, door.heightMm/1000, frameDepth]} outer={frameColorHex} inner={frameColorInnerHex} castShadow />
           </group>
           {/* Entrance steps down to the garden - solid blocks in even ~170mm
               rises, each tread reaching 300mm further out. Skipped on the
@@ -2165,7 +2207,7 @@ export function RoomGeometry() {
             );
           })()}
           {/* Leaves */}
-          <AnimatedDoorLeaves door={door} room={room} frameColorHex={frameColorHex} frameThickness={doorFrameT} sashThickness={doorSashT} depth={frameDepth} />
+          <AnimatedDoorLeaves door={door} room={room} frameColorHex={frameColorHex} frameColorInnerHex={frameColorInnerHex} frameThickness={doorFrameT} sashThickness={doorSashT} depth={frameDepth} />
         </group>
       )})}
 
@@ -2198,6 +2240,7 @@ export function RoomGeometry() {
             key={`win-${win.id}`} 
             position={pos} 
             rotation={rot}
+            userData={{ openingId: win.id }}
             onClick={(e) => { 
               e.stopPropagation(); 
               if (viewMode !== 'walking') setSelectedElementId(win.id); 
@@ -2267,10 +2310,10 @@ export function RoomGeometry() {
               </>
             )}
              {/* Outer Frame */}
-             <mesh position={[0, winH/2-winFrameT/2, 0]} castShadow><boxGeometry args={[winW, winFrameT, frameDepth]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
-             <mesh position={[0, -winH/2+winFrameT/2, 0]} castShadow><boxGeometry args={[winW, winFrameT, frameDepth]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
-             <mesh position={[-winW/2+winFrameT/2, 0, 0]} castShadow><boxGeometry args={[winFrameT, winH - winFrameT*2, frameDepth]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
-             <mesh position={[winW/2-winFrameT/2, 0, 0]} castShadow><boxGeometry args={[winFrameT, winH - winFrameT*2, frameDepth]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
+             <FrameBar position={[0, winH/2-winFrameT/2, 0]} args={[winW, winFrameT, frameDepth]} outer={frameColorHex} inner={frameColorInnerHex} castShadow />
+             <FrameBar position={[0, -winH/2+winFrameT/2, 0]} args={[winW, winFrameT, frameDepth]} outer={frameColorHex} inner={frameColorInnerHex} castShadow />
+             <FrameBar position={[-winW/2+winFrameT/2, 0, 0]} args={[winFrameT, winH - winFrameT*2, frameDepth]} outer={frameColorHex} inner={frameColorInnerHex} castShadow />
+             <FrameBar position={[winW/2-winFrameT/2, 0, 0]} args={[winFrameT, winH - winFrameT*2, frameDepth]} outer={frameColorHex} inner={frameColorInnerHex} castShadow />
              
              {/* Protruding Sill - only on raised windows; full-height glazing meets the floor */}
              {!win.fullHeight && (win.sillMm ?? 0) > 0 && (
@@ -2285,10 +2328,10 @@ export function RoomGeometry() {
 
                return (
                  <group key={`pane-${i}`} position={[posX, 0, 0]}>
-                   <mesh position={[0, winH/2-winFrameT-winSashT/2, 0]}><boxGeometry args={[paneW, winSashT, frameDepth*0.3]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
-                   <mesh position={[0, -winH/2+winFrameT+winSashT/2, 0]}><boxGeometry args={[paneW, winSashT, frameDepth*0.3]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
-                   <mesh position={[-paneW/2+winSashT/2, 0, 0]}><boxGeometry args={[winSashT, winH - winFrameT*2 - winSashT*2, frameDepth*0.3]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
-                   <mesh position={[paneW/2-winSashT/2, 0, 0]}><boxGeometry args={[winSashT, winH - winFrameT*2 - winSashT*2, frameDepth*0.3]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
+                   <FrameBar position={[0, winH/2-winFrameT-winSashT/2, 0]} args={[paneW, winSashT, frameDepth*0.3]} outer={frameColorHex} inner={frameColorInnerHex} />
+                   <FrameBar position={[0, -winH/2+winFrameT+winSashT/2, 0]} args={[paneW, winSashT, frameDepth*0.3]} outer={frameColorHex} inner={frameColorInnerHex} />
+                   <FrameBar position={[-paneW/2+winSashT/2, 0, 0]} args={[winSashT, winH - winFrameT*2 - winSashT*2, frameDepth*0.3]} outer={frameColorHex} inner={frameColorInnerHex} />
+                   <FrameBar position={[paneW/2-winSashT/2, 0, 0]} args={[winSashT, winH - winFrameT*2 - winSashT*2, frameDepth*0.3]} outer={frameColorHex} inner={frameColorInnerHex} />
                    {/* Glass */}
                    <mesh>
                      <boxGeometry args={[paneW - winSashT*2, winH - winFrameT*2 - winSashT*2, 0.02]} />
@@ -2300,6 +2343,7 @@ export function RoomGeometry() {
                        glassH={winH - winFrameT*2 - winSashT*2}
                        depth={0.03}
                        color={frameColorHex}
+                       innerColor={frameColorInnerHex}
                      />
                    )}
 

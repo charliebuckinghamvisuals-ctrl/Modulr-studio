@@ -475,7 +475,7 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       finY = specRow('Base', titleCase(String(scene.room.baseMaterial)), M, finY, colW);
       finY = specRow('Roof', titleCase(String(scene.room.roofMaterial)), M, finY, colW);
       finY = specRow('Interior', titleCase(String(scene.room.interiorColor || 'White')), M, finY, colW);
-      finY = specRow('Frames', titleCase(String(scene.room.frameColor)), M, finY, colW);
+      finY = specRow('Frames', titleCase(String(scene.room.frameColor)) + (scene.room.frameColorInner && scene.room.frameColorInner !== scene.room.frameColor ? ' / ' + titleCase(String(scene.room.frameColorInner)) + ' inside' : ''), M, finY, colW);
       finY = specRow('Floor', titleCase(String(scene.room.interiorFloorType || 'Oak')), M, finY, colW);
 
       let openY = sectionTitle('Openings & Fixtures', p2y, rightX);

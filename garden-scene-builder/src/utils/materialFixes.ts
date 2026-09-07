@@ -77,12 +77,33 @@ function fabricMaterial(repeat: number, color?: string) {
  * uneven sheen, which is what makes a highlight travel across a door instead
  * of sitting on it as a dead patch.
  *
- * So: a tileable value-noise normal map plus a matching roughness map, both
- * very low amplitude. Generated procedurally rather than downloaded because
- * it is a few kilobytes of maths, needs no licence, and the frequency can be
- * tuned to the real world size we project it at.
+ * So: a tileable fractal normal map plus a matching roughness map, both very
+ * low amplitude. Generated procedurally rather than downloaded because it is
+ * a few hundred kilobytes of maths, needs no licence, and the frequency can
+ * be tuned to the real-world size we project it at.
+ *
+ * The first version of this was two octaves of value noise at 0.18m per
+ * tile, which put the blobs at 20mm across - orange peel is under a
+ * millimetre - and it read as mottled plastic. See paintTextures for the
+ * scales used now.
  */
-const PAINT_TEX_SIZE = 256;
+const PAINT_TEX_SIZE = 1024;
+
+/**
+ * Physical width of one tile of the paint maps, in metres. The door UVs are
+ * box-projected in metres, so this alone decides how big the peel looks on a
+ * door: 60mm across 1024 pixels is 0.06mm per pixel, fine enough for the
+ * smallest octave below to be genuine sub-millimetre peel.
+ */
+export const PAINT_TILE_METRES = 0.06;
+
+/**
+ * Anisotropic filtering for the paint maps. A run of doors in the walkthrough
+ * is seen almost edge-on, which is exactly the case this exists for - without
+ * it the peel smears into streaks and shimmers as you walk. three.js clamps
+ * this to what the GPU supports, so asking for 16 is safe everywhere.
+ */
+const PAINT_ANISOTROPY = 16;
 
 let paintMaps: { normalMap: THREE.Texture; roughnessMap: THREE.Texture } | null = null;
 
@@ -120,17 +141,32 @@ function tileableNoise(size: number, cells: number, seed: number) {
 function paintTextures() {
   if (paintMaps) return paintMaps;
   const S = PAINT_TEX_SIZE;
-  // Two octaves: broad unevenness in the film, plus finer orange peel.
-  const coarse = tileableNoise(S, 8, 1.0);
-  const fine = tileableNoise(S, 32, 7.0);
+
+  /*
+   * Fractal noise across the scales orange peel actually has: about 0.2mm to
+   * 2.5mm at PAINT_TILE_METRES, weighted toward 0.7-1.5mm. Nothing coarser.
+   * A first cut added a 10mm "waviness" octave, and value noise peaks sit ON
+   * its lattice - so a matt door showed a neat grid of dots a centimetre
+   * apart, which is a tablecloth, not paint. The cell counts are coprime for
+   * the same reason: octaves that share a lattice reinforce it.
+   */
+  const OCTAVES: [number, number][] = [[23, 0.25], [41, 0.45], [89, 0.7], [181, 0.55], [331, 0.3]];
   const height = new Float32Array(S * S);
-  for (let i = 0; i < S * S; i++) height[i] = coarse[i] * 0.65 + fine[i] * 0.35;
+  let total = 0;
+  OCTAVES.forEach(([cells, amp], k) => {
+    const n = tileableNoise(S, cells, 1 + k * 7.3);
+    for (let i = 0; i < S * S; i++) height[i] += n[i] * amp;
+    total += amp;
+  });
+  for (let i = 0; i < S * S; i++) height[i] /= total;
 
   const at = (x: number, y: number) => height[((y + S) % S) * S + ((x + S) % S)];
 
   const normal = new Uint8Array(S * S * 4);
   const rough = new Uint8Array(S * S * 4);
-  const STRENGTH = 2.2;
+  // Slope gain. Fine octaves have steep per-pixel gradients, so this stays
+  // modest; the per-finish normalScale values scale it from there.
+  const STRENGTH = 5;
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       // Central-difference gradient -> tangent-space normal.
@@ -143,7 +179,8 @@ function paintTextures() {
       normal[i + 2] = (1 / len) * 0.5 * 255 + 127;
       normal[i + 3] = 255;
       // Sheen varies slightly with the film thickness: thicker sits glossier.
-      const r = 235 - height[y * S + x] * 60;
+      // Kept subtle - it multiplies the finish's own roughness.
+      const r = Math.max(0, Math.min(255, 210 + (height[y * S + x] - 0.5) * 70));
       rough[i] = rough[i + 1] = rough[i + 2] = r;
       rough[i + 3] = 255;
     }
@@ -156,11 +193,44 @@ function paintTextures() {
     t.minFilter = THREE.LinearMipmapLinearFilter;
     t.magFilter = THREE.LinearFilter;
     t.generateMipmaps = true;
+    t.anisotropy = PAINT_ANISOTROPY;
     t.needsUpdate = true;
     return t;
   };
   paintMaps = { normalMap: make(normal), roughnessMap: make(rough) };
   return paintMaps;
+}
+
+/**
+ * The paint maps as one placed unit samples them.
+ *
+ * Box projection is in the model's own space, so two identical cabinets get
+ * identical UVs and the peel repeats exactly from one door to the next - and
+ * a repeat is the one thing the eye is sure means "generated". Each placed
+ * object therefore reads the maps from its own offset, hashed from its id.
+ * The clones share the GPU image (a cloned texture keeps the same source),
+ * so this costs a couple of uniforms per unit and nothing else.
+ */
+const grainBySeed = new Map<string, { normalMap: THREE.Texture; roughnessMap: THREE.Texture }>();
+
+function grainFor(seed?: string) {
+  const src = paintTextures();
+  if (!seed) return src;
+  const hit = grainBySeed.get(seed);
+  if (hit) return hit;
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  const u = ((h >>> 0) % 1000) / 1000;
+  const v = (((h >>> 10) >>> 0) % 1000) / 1000;
+  const shifted = (t: THREE.Texture) => {
+    const c = t.clone();
+    c.offset.set(u, v);
+    c.needsUpdate = true;
+    return c;
+  };
+  const set = { normalMap: shifted(src.normalMap), roughnessMap: shifted(src.roughnessMap) };
+  grainBySeed.set(seed, set);
+  return set;
 }
 
 /**
@@ -241,7 +311,7 @@ function dressWorktop(mat: THREE.MeshStandardMaterial, def: WorktopDef) {
   mat.needsUpdate = true;
 }
 
-export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, color?: string, worktop?: string, hideWorktop = false, finish_?: string) {
+export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, color?: string, worktop?: string, hideWorktop = false, finish_?: string, seed?: string) {
   const tintName = TINT_MATERIAL[type];
   const metalNames = METAL_MATERIALS[type];
   const tweaks = MATERIAL_TWEAKS[type];
@@ -348,13 +418,15 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         // under a clearcoat, carrying fine orange-peel relief and slightly
         // uneven sheen. Flat colour alone is what made these look like
         // untextured CG - see paintTextures above.
-        const grain = paintTextures();
-        // 0.18m per tile puts the grain at a believable physical size, and
-        // the geometry has no UVs of its own to respect.
-        boxProjectUVs(mesh.geometry, 0.18);
+        const grain = grainFor(seed);
+        // FORCED over any UVs the exporter wrote. Some floor units carry a
+        // TEXCOORD_0 in arbitrary units and the wall units carry none, so
+        // respecting them put the peel at a different size on every unit -
+        // invisible on one door, a coarse grid on the next. Box projection in
+        // metres is exact for these flat panels and the same on all of them.
+        boxProjectUVs(mesh.geometry, PAINT_TILE_METRES, true);
         // Matt, satin or gloss - three real products, not a slider. See
-        // UNIT_FINISHES: the satin numbers are the ones tuned by eye against
-        // renders, and matt and gloss move away from them in both directions.
+        // UNIT_FINISHES for what each number is doing.
         const fin = finishSpec(finish_);
         const paint = new THREE.MeshPhysicalMaterial({
           color: color ? new THREE.Color(color) : m.color?.clone() ?? new THREE.Color('#d4d4d4'),
@@ -365,6 +437,12 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
           roughnessMap: grain.roughnessMap,
           clearcoat: fin.clearcoat,
           clearcoatRoughness: fin.clearcoatRoughness,
+          // The peel goes on the LACQUER, not just the paint under it. With
+          // the coat left perfectly smooth the reflection was a flawless
+          // mirror over a lumpy base - backwards from a real door, where it
+          // is the reflection rippling across the coat that sells it.
+          clearcoatNormalMap: grain.normalMap,
+          clearcoatNormalScale: new THREE.Vector2(fin.coatNormalScale, fin.coatNormalScale),
           // The room's HDR is what a door actually reflects, and a gloss door
           // reflects a great deal more of it than a matt one.
           envMapIntensity: fin.env,
@@ -433,6 +511,7 @@ export function refinishUnits(
     mat.clearcoatRoughness = f.clearcoatRoughness;
     mat.envMapIntensity = f.env;
     if (mat.normalScale) mat.normalScale.set(f.normalScale, f.normalScale);
+    if (mat.clearcoatNormalScale) mat.clearcoatNormalScale.set(f.coatNormalScale, f.coatNormalScale);
     mat.needsUpdate = true;
   });
 }

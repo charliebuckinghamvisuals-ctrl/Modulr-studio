@@ -34,7 +34,22 @@ import { clampToRoomInterior } from '../../utils/placement';
  *     cursor comes back for the sidebar and the finish swatches
  */
 function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
-  const { camera, gl, scene } = useThree();
+  /*
+   * The camera is read LIVE, never captured.
+   *
+   * This component used to take `camera` from useThree() at render and bake
+   * it into the click handler's closure. Entering the walkthrough from the
+   * 3D view reuses the same perspective camera, so that worked - but from
+   * plan view (or with Perspective switched off) the default camera is
+   * swapped for a new one AFTER that render, and the effect's deps did not
+   * include it. useFrame moved the new camera, so the view looked right,
+   * while the crosshair pick raycast from the OLD plan camera: forty metres
+   * up, pointing straight down through the roof. The first thing that ray
+   * hits is the shell, so every click read "change wall colour" no matter
+   * what you were looking at. Which is why this kept coming back - each fix
+   * was tried from 3D view and passed, and the room is laid out in plan.
+   */
+  const { gl, scene, get } = useThree();
   const room = useStore(s => s.scene.room);
   const keys = useRef<Record<string, boolean>>({});
   const yaw = useRef(0);
@@ -50,6 +65,7 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
 
   // Enter the room looking at it, rather than wherever the orbit camera was.
   useEffect(() => {
+    const camera = get().camera;
     const startZ = Math.max(1.2, room.depthMm / 2000 - 1.0);
     position.current.set(0, eyeY, startZ);
     // A camera with rotation.y = 0 looks down -Z, which is the back of the
@@ -92,8 +108,9 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
      * definition of "what am I pointing at" - the HUD can never promise a
      * paint target the click would resolve differently.
      */
-    const resolveTarget = (ndc: THREE.Vector2): { kind: 'object' | 'floor' | 'wall'; id?: string } | null => {
-      picker.setFromCamera(ndc, camera);
+    const resolveTarget = (ndc: THREE.Vector2): { kind: 'object' | 'floor' | 'wall' | 'opening'; id?: string } | null => {
+      // Live camera - see the note at the top of the component.
+      picker.setFromCamera(ndc, get().camera);
       for (const hit of picker.intersectObjects(scene.children, true)) {
         if (!hit.object.visible) continue;
 
@@ -111,6 +128,9 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
         let node: THREE.Object3D | null = hit.object;
         while (node) {
           if (node.userData?.objectId) return { kind: 'object', id: node.userData.objectId as string };
+          // A window or door - frame, sash or glass - before the wall it sits
+          // in, because the opening group is nested inside the shell group.
+          if (node.userData?.openingId) return { kind: 'opening', id: node.userData.openingId as string };
           if (node.userData?.isFloor) return { kind: 'floor' };
           if (node.userData?.isShell) return { kind: 'wall' };
           node = node.parent;
@@ -119,6 +139,10 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
       }
       return null;
     };
+    // Debug handle in the __modulr* family: the exact resolver the click
+    // uses, callable from DevTools or a headless check without pointer lock.
+    (window as any).__modulrWalkResolve = resolveTarget;
+
     const onCanvasDown = (e: PointerEvent) => {
       const locked = document.pointerLockElement === canvas;
       // Locked, the crosshair IS the pointer. Unlocked - which is how you are
@@ -187,6 +211,7 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
         st.setSelectedObjectId(null);
         st.setWalkFloorOpen(false);
         st.setWalkWallOpen(false);
+        st.setWalkFrameOpen(false);
         st.setWalkPending({ ...target, sx, sy });
         if (locked) document.exitPointerLock();
       } else if (!locked) {
@@ -214,6 +239,7 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
         st.setSelectedObjectId(null);
         st.setWalkFloorOpen(false);
         st.setWalkWallOpen(false);
+        st.setWalkFrameOpen(false);
         st.setWalkPending(null);
       } else {
         keys.current = {};
@@ -244,8 +270,9 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
     };
   }, [controlsEnabled, gl]);
 
-  useFrame((_, rawDelta) => {
+  useFrame((state, rawDelta) => {
     if (!controlsEnabled) return;
+    const camera = state.camera;
     // A tab that has been in the background hands back a huge delta, which
     // would teleport the walker across the room on the first frame.
     const delta = Math.min(rawDelta, 0.1);

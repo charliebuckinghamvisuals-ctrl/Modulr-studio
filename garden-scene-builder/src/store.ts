@@ -48,6 +48,13 @@ interface AppState {
    *  pickable at all - see the crosshair handler in MainScene. */
   walkWallOpen: boolean;
   setWalkWallOpen: (open: boolean) => void;
+  /** Frame panel, opened by clicking a window or door in the walkthrough.
+   *  walkFrameId is the opening that was clicked, so the panel can offer
+   *  that one's glazing style alongside the room-wide colours. */
+  walkFrameOpen: boolean;
+  setWalkFrameOpen: (open: boolean) => void;
+  walkFrameId: string | null;
+  setWalkFrameId: (id: string | null) => void;
   /**
    * What was CLICKED in the walkthrough and is waiting for a second click on
    * the brush to open its finishes.
@@ -58,8 +65,8 @@ interface AppState {
    * cue. Now the default is a bare dot and free movement, and the brush only
    * appears once you have actually picked something out.
    */
-  walkPending: { kind: 'object' | 'floor' | 'wall'; id?: string; sx?: number; sy?: number } | null;
-  setWalkPending: (t: { kind: 'object' | 'floor' | 'wall'; id?: string; sx?: number; sy?: number } | null) => void;
+  walkPending: { kind: 'object' | 'floor' | 'wall' | 'opening'; id?: string; sx?: number; sy?: number } | null;
+  setWalkPending: (t: { kind: 'object' | 'floor' | 'wall' | 'opening'; id?: string; sx?: number; sy?: number } | null) => void;
   setIsExporting: (exporting: boolean) => void;
   setCapturedImage: (image: string | null) => void;
   setUploadedBgImage: (image: string | null) => void;
@@ -365,6 +372,10 @@ export const useStore = create<AppState>((set, get) => ({
   setWalkFloorOpen: (open) => set({ walkFloorOpen: open }),
   walkWallOpen: false,
   setWalkWallOpen: (open) => set({ walkWallOpen: open }),
+  walkFrameOpen: false,
+  setWalkFrameOpen: (open) => set({ walkFrameOpen: open }),
+  walkFrameId: null,
+  setWalkFrameId: (id) => set({ walkFrameId: id }),
   walkPending: null,
   setWalkPending: (t) => set({ walkPending: t }),
   setIsExporting: (exporting) => set({ isExporting: exporting }),
@@ -460,6 +471,7 @@ export const useStore = create<AppState>((set, get) => ({
         cladding: state.scene.room.cladding,
         claddingOrientation: state.scene.room.claddingOrientation,
         frameColor: state.scene.room.frameColor,
+        frameColorInner: state.scene.room.frameColorInner,
         frameStyle: state.scene.room.frameStyle,
         roofMaterial: state.scene.room.roofMaterial,
         ...room,

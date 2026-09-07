@@ -131,14 +131,24 @@ export type UnitFinish = 'matt' | 'satin' | 'gloss';
 export const UNIT_FINISHES: {
   id: UnitFinish; name: string;
   roughness: number; clearcoat: number; clearcoatRoughness: number;
-  normalScale: number; env: number;
+  /** Relief in the base coat: softens the diffuse highlight. */
+  normalScale: number;
+  /** Relief in the lacquer itself - what makes a REFLECTION ripple. Orange
+   *  peel physically lives in the clearcoat, so this is where most of it
+   *  belongs on anything that reflects; the base only carries what shows
+   *  through a matt film. */
+  coatNormalScale: number;
+  env: number;
 }[] = [
-  // Grain stays visible, highlights stay broad and soft.
-  { id: 'matt',  name: 'Matt',  roughness: 0.78, clearcoat: 0.12, clearcoatRoughness: 0.55, normalScale: 0.26, env: 0.75 },
-  { id: 'satin', name: 'Satin', roughness: 0.34, clearcoat: 0.45, clearcoatRoughness: 0.24, normalScale: 0.20, env: 1.15 },
-  // A tight highlight and a real reflection; the orange peel all but vanishes
-  // under the lacquer, which is exactly what a gloss door looks like.
-  { id: 'gloss', name: 'Gloss', roughness: 0.10, clearcoat: 1.0,  clearcoatRoughness: 0.05, normalScale: 0.08, env: 1.6 },
+  // Matt: the lacquer barely reflects, so the relief lives in the base coat,
+  // where it breaks up the highlight rather than rippling a reflection.
+  { id: 'matt',  name: 'Matt',  roughness: 0.72, clearcoat: 0.10, clearcoatRoughness: 0.60, normalScale: 0.30, coatNormalScale: 0.30, env: 0.8 },
+  // Satin: the peel sits in the coat. It is the reflection wobbling across
+  // the door that reads as sprayed paint, not the base under it.
+  { id: 'satin', name: 'Satin', roughness: 0.40, clearcoat: 0.55, clearcoatRoughness: 0.22, normalScale: 0.15, coatNormalScale: 0.55, env: 1.1 },
+  // Gloss: a tight, real reflection, with just enough peel to stop it being
+  // a mirror - which is exactly what a gloss door looks like.
+  { id: 'gloss', name: 'Gloss', roughness: 0.14, clearcoat: 1.0,  clearcoatRoughness: 0.06, normalScale: 0.06, coatNormalScale: 0.40, env: 1.5 },
 ];
 
 export const finishSpec = (id?: string) =>

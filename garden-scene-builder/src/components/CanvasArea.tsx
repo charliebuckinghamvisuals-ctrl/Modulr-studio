@@ -12,6 +12,7 @@ import { CameraWidget } from './UI/CameraWidget';
 import { WalkHud } from './UI/WalkHud';
 import { WalkFloorPanel } from './UI/WalkFloorPanel';
 import { WalkWallPanel } from './UI/WalkWallPanel';
+import { WalkFramePanel } from './UI/WalkFramePanel';
 import { useRef, useState, useEffect } from 'react';
 import { useProgress } from '@react-three/drei';
 import * as THREE from 'three';
@@ -180,6 +181,7 @@ export function CanvasArea() {
       <WalkHud />
       <WalkFloorPanel />
       <WalkWallPanel />
+      <WalkFramePanel />
       <ObjectEditorPanel />
       <ElementEditorPanel />
       <ActionButtons />
