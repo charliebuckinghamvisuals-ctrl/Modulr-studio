@@ -63,26 +63,13 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
   // and matches how the space actually reads standing in it.
   const eyeY = ((room.baseHeightMm ?? 100) / 1000) + 1.5;
 
-  // Enter the room looking at it, rather than wherever the orbit camera was -
-  // and put the orbit camera back where it was on the way out.
+  // Enter the room looking at it, rather than wherever the orbit camera was.
+  // (Putting the orbit camera BACK afterwards is MainScene's job, through the
+  // controls - restoring the camera itself here is undone the moment
+  // CameraControls remounts, because it reads the walk pose into its own
+  // state during render, before any cleanup runs.)
   useEffect(() => {
     const camera = get().camera;
-    /**
-     * The walkthrough borrows the 3D view's camera and leaves it where the
-     * walker stood: 1.5m off the floor, pitched at whatever you last looked
-     * at. Coming back from Plan or Lighting never showed this, because that
-     * swap creates a fresh perspective camera at its default pose - but Walk
-     * to 3D View reuses this one, so you came back standing on the floor
-     * looking down at it. The pose is captured here and restored in the
-     * cleanup, which runs before CameraControls remounts and reads it.
-     * Restored onto THIS instance, not get().camera, because by cleanup time
-     * the default may already be a different camera.
-     */
-    const saved = {
-      position: camera.position.clone(),
-      quaternion: camera.quaternion.clone(),
-      order: camera.rotation.order,
-    };
     const startZ = Math.max(1.2, room.depthMm / 2000 - 1.0);
     position.current.set(0, eyeY, startZ);
     // A camera with rotation.y = 0 looks down -Z, which is the back of the
@@ -93,11 +80,6 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
     camera.rotation.set(0, 0, 0);
     camera.rotation.order = 'YXZ';
     camera.rotation.y = yaw.current;
-    return () => {
-      camera.position.copy(saved.position);
-      camera.quaternion.copy(saved.quaternion);
-      camera.rotation.order = saved.order;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -441,6 +423,34 @@ export function MainScene() {
     }
   }, [isPlanView]);
 
+  /**
+   * Where the 3D view was before a walk, so it can come back there.
+   *
+   * The walkthrough swaps CameraControls out and borrows its camera. On the
+   * way back, CameraControls remounts and reads whatever pose the camera has
+   * - the walker's, 1.5m off the floor, pitched at the last thing looked at -
+   * so 3D View reopened standing on the floor. The effect above never
+   * corrected it because isPlanView does not change on that transition, and
+   * Plan or Lighting to 3D only looked right because that swap builds a
+   * fresh camera. The orbit pose is snapshotted every frame while in 3D view
+   * (two vector copies) and handed to the fresh controls on return; with no
+   * snapshot - a walk entered from plan - the default 3D pose is used.
+   */
+  const savedOrbit = useRef<{ p: THREE.Vector3; t: THREE.Vector3 } | null>(null);
+  const prevViewMode = useRef(viewMode);
+  useEffect(() => {
+    const prev = prevViewMode.current;
+    prevViewMode.current = viewMode;
+    // Plan and Lighting reset 3D View to its default pose on the way back
+    // (the effect above), so a walk started from there should land on that
+    // same default, not on some earlier 3D pose.
+    if (viewMode === 'plan' || viewMode === 'lighting') savedOrbit.current = null;
+    if (prev !== 'walking' || viewMode !== '3d' || !controlsRef.current) return;
+    const s = savedOrbit.current;
+    if (s) controlsRef.current.setLookAt(s.p.x, s.p.y, s.p.z, s.t.x, s.t.y, s.t.z, false);
+    else controlsRef.current.setLookAt(10, 10, 15, 0, 0, 0, false);
+  }, [viewMode]);
+
   useEffect(() => {
     const handleCameraView = (e: any) => {
       const detail = typeof e.detail === 'string' ? { view: e.detail, snap: false } : e.detail;
@@ -540,6 +550,13 @@ export function MainScene() {
   useFrame((_, delta) => {
     if (isSpinning && controlsRef.current) {
       controlsRef.current.azimuthAngle += delta * 0.3;
+    }
+
+    // Snapshot the orbit pose while in 3D view - see savedOrbit above.
+    if (viewMode === '3d' && controlsRef.current) {
+      const s = savedOrbit.current ?? (savedOrbit.current = { p: new THREE.Vector3(), t: new THREE.Vector3() });
+      controlsRef.current.getPosition(s.p);
+      controlsRef.current.getTarget(s.t);
     }
 
     // Hard guarantee for plan view: whatever anything else does - a stray
