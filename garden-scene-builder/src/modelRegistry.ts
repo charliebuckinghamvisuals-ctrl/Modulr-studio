@@ -60,6 +60,13 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   heater_small: 'models/heater_small.glb',
   heater_large: 'models/heater_large.glb',
   boiler: 'models/boiler.glb',
+  shelving_unit: 'models/shelving_unit.glb',
+  chest_of_drawers: 'models/chest_of_drawers.glb',
+  desk_single: 'models/desk_single.glb',
+  bed_2: 'models/bed_2.glb',
+  office_chair: 'models/office_chair.glb',
+  aircon_indoor: 'models/aircon_indoor.glb',
+  aircon_outdoor: 'models/aircon_outdoor.glb',
   towel_heater: 'models/towel_heater.glb',
   external_extraction_fan: 'models/external_extraction_fan.glb',
   spot_light: 'models/spot_light.glb',
@@ -280,6 +287,9 @@ export const TINT_MATERIAL: Partial<Record<ObjectType, string>> = {
   // material, the grille keeps its own.
   heater_small: '',
   heater_large: '',
+  // Exported as one unnamed mesh each: painted furniture, any colour.
+  chest_of_drawers: '',
+  desk_single: '',
   // The cabinet. It was exported with NO material at all, so nothing could
   // reach it by name; vanity.glb was patched to give that mesh this one.
   // The basin, tap and top keep their own finishes.
@@ -318,6 +328,11 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   heater_small: 150,
   heater_large: 150,
   boiler: 900,
+  // A wall-split indoor unit sits high on the wall, clear of the ceiling.
+  aircon_indoor: 1750,
+  // The outdoor condenser goes on a bracket on the OUTSIDE wall - not an
+  // interior type, so this is measured from the ground.
+  aircon_outdoor: 300,
   // A towel rail is fixed clear of the floor.
   towel_heater: 300,
   // The extract terminal goes high on the OUTSIDE wall. Not an interior type,
@@ -433,6 +448,9 @@ export const TIMBER_MATERIAL: Partial<Record<ObjectType, {
   desk: { materials: [''], grain: 'x' },
   wardrobe: { materials: ['wood v', 'wood h'] },
   bedside_table: { materials: ['[Color A01]'] },
+  chest_of_drawers: { materials: [''], grain: 'x' },
+  desk_single: { materials: [''], grain: 'x' },
+  bed_2: { materials: ['Veneer A02 120cm'], grain: 'x' },
 };
 export const hasTimber = (type: ObjectType) => TIMBER_MATERIAL[type] !== undefined;
 
@@ -469,6 +487,7 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
   basin_tap_mixer: [''],
   basin_tap_widespread: ['Metal_06_1K'],
   basin_tap_wall: ['<auto>1', '*'],
+  shelving_unit: ['[Steel Brushed Stainless]'],
 };
 
 /**
@@ -509,6 +528,11 @@ export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
   heater_small: true,
   heater_large: true,
   boiler: true,
+  shelving_unit: true,
+  bed_2: true,
+  office_chair: true,
+  aircon_indoor: true,
+  aircon_outdoor: true,
   towel_heater: true,
   external_extraction_fan: true,
   bed: true,
@@ -697,6 +721,13 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   heater_small: 'Electric Heater (650)',
   heater_large: 'Electric Heater (850)',
   boiler: 'Combi Boiler',
+  shelving_unit: 'Shelving Unit',
+  chest_of_drawers: 'Chest of Drawers',
+  desk_single: 'Desk (Single)',
+  bed_2: 'Bed (Low Frame)',
+  office_chair: 'Office Chair',
+  aircon_indoor: 'Air Con (Wall Unit)',
+  aircon_outdoor: 'Air Con (Outdoor Unit)',
   bar_stool: 'Bar Stool',
   bar_stool_tall: 'Bar Stool (Tall)',
   toilet: 'Toilet',

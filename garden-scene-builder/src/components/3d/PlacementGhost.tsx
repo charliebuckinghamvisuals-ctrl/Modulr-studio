@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { useGLTF } from '@react-three/drei';
 import { useStore } from '../../store';
 import { MODEL_URLS, MODEL_SCALES, mountHeight, CEILING_MOUNTED, isCeilingMounted } from '../../modelRegistry';
-import { isInteriorType, clampToRoomInterior, interiorCeilingHeight, snapEndPanel } from '../../utils/placement';
+import { isInteriorType, clampToRoomInterior, interiorCeilingHeight, snapEndPanel, settleAgainstWalls } from '../../utils/placement';
 import { isEndPanel } from '../../modelRegistry';
 
 /** Semi-transparent clone of a GLB model, used as the placement preview. */
@@ -83,8 +83,34 @@ export function PlacementGhost() {
     st.saveState();
     // An end panel placed near the end of a run lands on it, 3mm off.
     const snap = isEndPanel(type) ? snapEndPanel(type, posRef.current.x, posRef.current.z, st.scene.objects) : null;
-    if (snap) st.addObject(type, snap.x, snap.z, snap.rot);
-    else st.addObject(type, posRef.current.x, posRef.current.z, rot);
+    if (snap) {
+      st.addObject(type, snap.x, snap.z, snap.rot, true);
+    } else {
+      let { x, z } = posRef.current;
+      let settled = false;
+      // Settle by the object's faces against the walls, as a drag does -
+      // measured from the ghost's own lit meshes, which are the model at
+      // this rotation. The drop ring is basic-material and is skipped.
+      const g = groupRef.current;
+      if (interior && g) {
+        g.updateMatrixWorld(true);
+        const bb = new THREE.Box3();
+        const one = new THREE.Box3();
+        g.traverse(o => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh || !m.visible) return;
+          const mat: any = Array.isArray(m.material) ? m.material[0] : m.material;
+          if (!mat || mat.isMeshBasicMaterial) return;
+          one.setFromObject(m);
+          if (!one.isEmpty()) bb.union(one);
+        });
+        if (!bb.isEmpty()) {
+          const s = settleAgainstWalls(room, x, z, { minX: bb.min.x - g.position.x, maxX: bb.max.x - g.position.x, minZ: bb.min.z - g.position.z, maxZ: bb.max.z - g.position.z });
+          x = s.x; z = s.z; settled = true;
+        }
+      }
+      st.addObject(type, x, z, rot, settled);
+    }
     st.setActivePlacementType(null);
   };
 

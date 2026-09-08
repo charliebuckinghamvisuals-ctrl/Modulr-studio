@@ -144,7 +144,10 @@ interface AppState {
   setWalkFov: (fov: number) => void;
   
   // Object Actions
-  addObject: (type: ObjectType, x: number, z: number, rot?: number) => void;
+  /** settled: the caller has already placed the object by its FACES against
+   *  the walls (see settleAgainstWalls), so the centre clamp - which keeps
+   *  a centre 50mm off a wall - must not pull a wall-hung tap back off it. */
+  addObject: (type: ObjectType, x: number, z: number, rot?: number, settled?: boolean) => void;
   /** Lay out downlights on an even rows x cols grid. See the implementation
    *  for why centres, not edges. */
   addSpotGrid: (rows: number, cols: number, replace?: boolean, spacing?: number) => void;
@@ -882,10 +885,12 @@ export const useStore = create<AppState>((set, get) => ({
     return { alignGuide: g };
   }),
 
-  addObject: (type, x, z, rot = 0) => set((state) => {
+  addObject: (type, x, z, rot = 0, settled = false) => set((state) => {
     // Interior objects can never land outside the building - drops used to
-    // fall wherever the cursor ray hit the ground, walls or not.
-    if (isInteriorType(type)) {
+    // fall wherever the cursor ray hit the ground, walls or not. A placement
+    // already settled by its faces keeps its position: the centre clamp's
+    // 50mm margin would lift a wall-hung tap's plate off the wall.
+    if (isInteriorType(type) && !settled) {
       const c = clampToRoomInterior(state.scene.room, x, z);
       x = c.x; z = c.z;
     }

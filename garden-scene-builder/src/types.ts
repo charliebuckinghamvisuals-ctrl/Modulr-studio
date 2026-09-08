@@ -23,7 +23,9 @@ export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 
  | 'spot_light' | 'tv_unit' | 'dining_table_round' | 'pendant_light'
  | 'end_panel_tall' | 'end_panel_base' | 'end_panel_wall'
  | 'basin_tap_mixer' | 'basin_tap_widespread' | 'basin_tap_wall'
- | 'heater_small' | 'heater_large' | 'boiler';
+ | 'heater_small' | 'heater_large' | 'boiler'
+ | 'shelving_unit' | 'chest_of_drawers' | 'desk_single' | 'bed_2' | 'office_chair'
+ | 'aircon_indoor' | 'aircon_outdoor';
 
 /** 'solid' is doors-only (entrance door); the window UI never offers it. */
 export type GlazingStyle = 'standard' | 'crittall' | 'solid';

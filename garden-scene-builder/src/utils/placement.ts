@@ -2,6 +2,34 @@ import type { ObjectType, Room, SceneObject } from '../types';
 import { UNIT_FAMILY, NATIVE_WIDTH_MM, END_PANELS, END_PANEL_T, END_PANEL_GAP, isEndPanel } from '../modelRegistry';
 
 /**
+ * Settle an object against the room's inner wall faces by its FACES.
+ *
+ * The same rule the drag uses: a face within 120mm of an inner wall face
+ * jumps onto it, and no face can pass one. Click-placement clamped only the
+ * object's CENTRE to the interior, so a wall-hung tap dropped by the wall
+ * went in with its plate 12mm inside the plaster and its spout standing
+ * out of the wall. ext is the object's extent around its origin, measured
+ * from its lit meshes.
+ */
+export function settleAgainstWalls(
+  room: Room, x: number, z: number,
+  ext: { minX: number; maxX: number; minZ: number; maxZ: number },
+): { x: number; z: number } {
+  const wt = (room.wallThicknessMm ?? 150) / 1000;
+  const innerX = room.widthMm / 2000 - wt;
+  const innerZ = room.depthMm / 2000 - wt;
+  const MAG = 0.12;
+  let nx = x, nz = z;
+  if (Math.abs(innerX - (nx + ext.maxX)) < MAG) nx = innerX - ext.maxX;
+  else if (Math.abs((nx + ext.minX) + innerX) < MAG) nx = -innerX - ext.minX;
+  if (Math.abs(innerZ - (nz + ext.maxZ)) < MAG) nz = innerZ - ext.maxZ;
+  else if (Math.abs((nz + ext.minZ) + innerZ) < MAG) nz = -innerZ - ext.minZ;
+  nx = Math.min(innerX - ext.maxX, Math.max(-innerX - ext.minX, nx));
+  nz = Math.min(innerZ - ext.maxZ, Math.max(-innerZ - ext.minZ, nz));
+  return { x: nx, z: nz };
+}
+
+/**
  * Where an end panel lands against the nearest run of its own family.
  *
  * A panel dragged or placed within reach of a base, wall or tall unit's free
@@ -63,6 +91,8 @@ export const INTERIOR_TYPES: ObjectType[] = [
   'end_panel_tall', 'end_panel_base', 'end_panel_wall',
   'basin_tap_mixer', 'basin_tap_widespread', 'basin_tap_wall',
   'heater_small', 'heater_large', 'boiler',
+  'shelving_unit', 'chest_of_drawers', 'desk_single', 'bed_2', 'office_chair', 'aircon_indoor',
+  // aircon_outdoor is the condenser on the OUTSIDE wall, like the extract terminal.
   // external_extraction_fan is deliberately NOT here - it is the outside
   // terminal of the extract run, so it has to be placeable on an outside wall.
 ];

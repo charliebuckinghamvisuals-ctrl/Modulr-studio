@@ -4,7 +4,7 @@ import {
   TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH, FORCE_DIELECTRIC,
   EMISSIVE_MATERIAL, LIGHT_COLOURS, UNMIRROR_NORMALS, finishSpec,
   FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById, TIMBER_MATERIAL,
-  veneerById, isVeneerFinish,
+  veneerById, isVeneerFinish, UNIT_FAMILY,
 } from '../modelRegistry';
 import type { WorktopDef } from '../modelRegistry';
 
@@ -690,7 +690,10 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         return fab;
       }
 
-      if (tintName && m.name === tintName && isVeneerFinish(finish_)) {
+      // Kitchen units only: the door finish is a KITCHEN setting and reaches
+      // every model, but the vanity is a painted bathroom cabinet - veneering
+      // it put wood on the basin's inner sides, which share its material.
+      if (tintName && m.name === tintName && isVeneerFinish(finish_) && UNIT_FAMILY[type]) {
         // A veneered door instead of a painted one. Projected in METRES
         // (the paint projects at its own tile size), so the grain is real
         // size and runs UP the door - the projection's V axis is world Y on

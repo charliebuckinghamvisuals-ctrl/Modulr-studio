@@ -1270,7 +1270,7 @@ export function Sidebar() {
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Seating</label>
               <div className="grid grid-cols-2 gap-2.5">
-                {(['sofa', 'sofa_l', 'armchair', 'footstool', 'bar_stool', 'bar_stool_tall'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['sofa', 'sofa_l', 'armchair', 'footstool', 'office_chair', 'bar_stool', 'bar_stool_tall'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
@@ -1279,7 +1279,7 @@ export function Sidebar() {
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Tables & Storage</label>
               <div className="grid grid-cols-2 gap-2.5">
-                {(['dining_table', 'dining_table_round', 'coffee_table', 'coffee_table_black', 'tv_unit', 'desk', 'wardrobe', 'bedside_table'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['dining_table', 'dining_table_round', 'coffee_table', 'coffee_table_black', 'tv_unit', 'desk', 'desk_single', 'shelving_unit', 'wardrobe', 'chest_of_drawers', 'bedside_table'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
@@ -1288,7 +1288,7 @@ export function Sidebar() {
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Bedroom</label>
               <div className="grid grid-cols-2 gap-2.5">
-                {(['bed'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['bed', 'bed_2'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
@@ -1308,7 +1308,7 @@ export function Sidebar() {
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Heating &amp; Utilities</label>
               <div className="grid grid-cols-2 gap-2.5">
-                {(['heater_small', 'heater_large', 'boiler'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['heater_small', 'heater_large', 'boiler', 'aircon_indoor', 'aircon_outdoor'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
