@@ -2061,8 +2061,18 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                     box_metal_black: 'BLACK box-profile standing-seam metal sheet',
                     corrugated_metal: 'corrugated metal sheet',
                     fire_board_grey: 'grey fibre-cement board',
+                    corrugated_iron: 'galvanised CORRUGATED STEEL sheet, vertical profile (dull grey metal)',
+                    painted_planks: 'PAINTED vertical timber boards',
                 };
-                const look = (id) => (typeof id === 'string' && CLADDING_LOOKS[id]) ? CLADDING_LOOKS[id] : (typeof id === 'string' && id.trim() ? sanitizeString(id.replace(/_/g, ' '), 40) : null);
+                // Painted planks carry their own colour - any hex the client
+                // chose - so the look names it rather than a fixed family.
+                const tint = (typeof spec.claddingTint === 'string' && /^#[0-9a-fA-F]{6}$/.test(spec.claddingTint)) ? spec.claddingTint.toLowerCase() : null;
+                const look = (id) => {
+                    if (typeof id !== 'string') return null;
+                    if (id === 'painted_planks' && tint) return `PAINTED vertical timber boards, paint colour ${tint}`;
+                    if (CLADDING_LOOKS[id]) return CLADDING_LOOKS[id];
+                    return id.trim() ? sanitizeString(id.replace(/_/g, ' '), 40) : null;
+                };
                 const base = look(spec.cladding);
                 const faces = [
                     ['Front', look(spec.claddingFront) || base],

@@ -1590,27 +1590,27 @@ export function RoomGeometry() {
             {/* Main block */}
             <Base position={[0, (h + 0.05)/2, 0]}>
               <primitive object={claddingBoxGeom} attach="geometry" />
-              <meshStandardMaterial key="mat-0" attach="material-0" color="#ffffff" {...texRight}  metalness={0.1}  bumpScale={0.1} />
-              <meshStandardMaterial key="mat-1" attach="material-1" color="#ffffff" {...texLeft}  metalness={0.1}  bumpScale={0.1} />
-              <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
-              <meshStandardMaterial key="mat-3" attach="material-3" color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
-              <meshStandardMaterial attach="material-4" color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
-              <meshStandardMaterial attach="material-5" color="#ffffff" {...texBack}  metalness={0.1}  bumpScale={0.1} />
+              <meshStandardMaterial key="mat-0" attach="material-0" color="#ffffff" metalness={0.1} {...texRight}  bumpScale={0.1} />
+              <meshStandardMaterial key="mat-1" attach="material-1" color="#ffffff" metalness={0.1} {...texLeft}  bumpScale={0.1} />
+              <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
+              <meshStandardMaterial key="mat-3" attach="material-3" color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
+              <meshStandardMaterial attach="material-4" color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
+              <meshStandardMaterial attach="material-5" color="#ffffff" metalness={0.1} {...texBack}  bumpScale={0.1} />
             </Base>
 
             {room.hasPictureFrame && (
               <>
                 <Addition position={[-w/2 + wallThickness/2, isGable ? (h+roofH)/2 : (h+0.05)/2, d/2 + ohFront/2 - 0.005]}>
                   <primitive object={pfLeftGeom} attach="geometry" />
-                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
+                  <meshStandardMaterial color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
                 </Addition>
                 <Addition position={[w/2 - wallThickness/2, isGable ? (h+roofH)/2 : (h+0.05)/2, d/2 + ohFront/2 - 0.005]}>
                   <primitive object={pfRightGeom} attach="geometry" />
-                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
+                  <meshStandardMaterial color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
                 </Addition>
                 <Addition position={[0, pfHeight - 0.15, d/2 + ohFront/2 - 0.005]}>
                   <primitive object={pfTopGeom} attach="geometry" />
-                  <meshStandardMaterial color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
+                  <meshStandardMaterial color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
                 </Addition>
               </>
             )}
@@ -1654,11 +1654,11 @@ export function RoomGeometry() {
                     <>
                     <Addition position={[w/2 - wallThickness/2, h + 0.025, 0]} rotation={[0, Math.PI/2, 0]}>
                       <primitive object={gableTriangleGeom} attach="geometry" />
-                      <meshStandardMaterial color="#ffffff" {...texRight}  metalness={0.1}  bumpScale={0.1} />
+                      <meshStandardMaterial color="#ffffff" metalness={0.1} {...texRight}  bumpScale={0.1} />
                     </Addition>
                     <Addition position={[-w/2 + wallThickness/2, h + 0.025, 0]} rotation={[0, Math.PI/2, 0]}>
                       <primitive object={gableTriangleGeom} attach="geometry" />
-                      <meshStandardMaterial color="#ffffff" {...texLeft}  metalness={0.1}  bumpScale={0.1} />
+                      <meshStandardMaterial color="#ffffff" metalness={0.1} {...texLeft}  bumpScale={0.1} />
                     </Addition>
                     </>
                     )}
@@ -1668,12 +1668,12 @@ export function RoomGeometry() {
                     {!room.hasApexGlazing && (
                     <Addition position={[0, h + 0.025, d/2 - wallThickness/2]}>
                       <primitive object={gableTriangleGeom} attach="geometry" />
-                      <meshStandardMaterial color="#ffffff" {...texFront}  metalness={0.1}  bumpScale={0.1} />
+                      <meshStandardMaterial color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
                     </Addition>
                     )}
                     <Addition position={[0, h + 0.025, -d/2 + wallThickness/2]}>
                       <primitive object={gableTriangleGeom} attach="geometry" />
-                      <meshStandardMaterial color="#ffffff" {...texBack}  metalness={0.1}  bumpScale={0.1} />
+                      <meshStandardMaterial color="#ffffff" metalness={0.1} {...texBack}  bumpScale={0.1} />
                     </Addition>
                   </>
                 )}

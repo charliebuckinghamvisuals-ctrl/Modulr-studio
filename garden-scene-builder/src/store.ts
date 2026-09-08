@@ -289,6 +289,8 @@ const initialState: SceneState = {
       slate_blue_composite: 180,
       sage_composite: 180,
       clay_composite: 180,
+      corrugated_iron: 150,
+      painted_planks: 175,
     },
     roofPrices: {
       epdm: 80,

@@ -6,6 +6,9 @@ export type CladdingType =
   | 'dark_grey_composite' | 'light_grey_composite' | 'white_composite'
   | 'slate_blue_composite' | 'sage_composite' | 'clay_composite'
   | 'grey_composite'
+  // Poly Haven sets added 8 Sep 2026: a corrugated steel sheet, and painted
+  // vertical boards whose colour is the room's claddingTint.
+  | 'corrugated_iron' | 'painted_planks'
   // Legacy values retained so previously saved scenes still resolve.
   | 'timber' | 'composite_wood' | 'composite_black' | 'composite_grey'
   | 'composite_brown' | 'oak' | 'cedar' | 'charred_wood' | 'render_white'
@@ -149,6 +152,8 @@ export interface Room {
   claddingLeft?: CladdingType;
   claddingRight?: CladdingType;
   claddingGable?: CladdingType;
+  /** Paint colour for the 'painted_planks' cladding - any hex. */
+  claddingTint?: string;
   fasciaMaterial?: 'match_cladding' | 'black' | 'anthracite' | 'white' | 'grey';
   /** Explicit roof colour. Undefined means follow the roof material's own colour. */
   roofColor?: string;

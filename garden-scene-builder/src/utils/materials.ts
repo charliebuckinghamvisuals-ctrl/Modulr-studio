@@ -82,6 +82,15 @@ export const MATERIAL_DEF = {
   slate_blue_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.62, color: '#7c93a6', neutral: true },
   sage_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.64, color: '#7e8c74', neutral: true },
   clay_composite: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.66, color: '#9a6b58', neutral: true },
+  // ── Poly Haven sets (CC0), 8 Sep 2026 ─────────────────────────────────────
+  // Corrugated Iron 02: vertical profile, 2.7m wide per tile. fixedScale
+  // keeps it at that size whatever the board-width slider says - a sheet
+  // profile is not a board. metalness makes it read as steel.
+  corrugated_iron: { prefix: 'corrugated_iron', tileSize: 2.7, roughness: 0.55, color: '#ffffff', noAo: true, fixedScale: true, metalness: 0.75 },
+  // White Planks Clean: 20 painted boards across 1.8m (90mm each). The colour
+  // map is neutralised to near-white so the room's claddingTint multiplies
+  // through as the paint colour - any colour, not a fixed range.
+  painted_planks: { prefix: 'white_planks', tileSize: 1.8, roughness: 0.7, color: '#e8e6e1', neutral: true, noAo: true, boards: 20, tintable: true },
   // Legacy keys from old saved scenes. Their original PNG textures no longer
   // exist in public/textures — pointing at the missing files faulted useTexture
   // and blanked the whole scene, so they resolve to the composite equivalents.
@@ -111,6 +120,8 @@ export const CLADDING_TO_DECKING: Record<string, string> = {
   slate_blue_composite: 'composite_slate_blue',
   sage_composite: 'composite_sage',
   clay_composite: 'composite_clay',
+  corrugated_iron: 'composite_grey',
+  painted_planks: 'composite_white',
 };
 
 /** Resolve the decking material, following the cladding when none is set. */
@@ -156,6 +167,8 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
   // Board size for interior floors, as a multiplier on the material's real
   // tile size: 2 lays planks twice as wide, 0.5 half as wide.
   const floorScale = useStore(state => state.scene.room.floorScale) || 1;
+  // The paint colour of a tintable cladding (painted planks).
+  const claddingTint = useStore(state => state.scene.room.claddingTint);
   // Hardware max, usually 16. Read from the renderer rather than hardcoded so a
   // device that supports less is not asked for something it cannot do.
   const maxAnisotropy = useThree(state => state.gl.capabilities.getMaxAnisotropy());
@@ -238,14 +251,17 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
                 const wallHeight = heightMeters > 0 ? heightMeters : 2.5;
                 s_y = 1 / wallHeight;
 
-                if (def.prefix === 'synthetic_wood') {
+                if ((def as any).fixedScale) {
+                    // A sheet profile, not boards: real size, slider ignored.
+                    s_x = 1 / def.tileSize;
+                } else if (def.prefix === 'synthetic_wood' || (def as any).boards) {
                     // BOARDS_IN_TEXTURE must match the actual number of boards
                     // across the texture image, or the Board Width slider lies.
                     // Measured by counting grooves in synthetic_wood_color.jpg:
                     // 34 boards across 1024px. This was previously 16, which
                     // rendered every board at 16/34 (47%) of the requested
                     // width, so a 200mm setting looked like roughly 94mm.
-                    const BOARDS_IN_TEXTURE = 34;
+                    const BOARDS_IN_TEXTURE = (def as any).boards ?? 34;
                     const singleBoardMeters = claddingWidthMm / 1000;
                     const textureWidthMeters = BOARDS_IN_TEXTURE * singleBoardMeters;
                     s_x = 1 / textureWidthMeters;
@@ -285,8 +301,12 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
     // memo dependency lists further up.
     return useMemo(() => ({
         ...cloned,
-        color: def.color,
+        // A tintable cladding takes the room's paint colour over its own.
+        color: ((def as any).tintable && claddingTint) ? claddingTint : def.color,
         roughness: def.roughness,
+        // Only when the material says so, so the spread does not override
+        // the wall's own default with undefined.
+        ...((def as any).metalness !== undefined ? { metalness: (def as any).metalness } : {}),
         normalScale: new THREE.Vector2(0.5, 0.5) // Step 3: start normalScale at 0.5
-    }), [cloned, def]);
+    }), [cloned, def, claddingTint]);
 }

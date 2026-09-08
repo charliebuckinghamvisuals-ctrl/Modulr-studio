@@ -8,6 +8,7 @@ import { gableCeilingMaxMm } from '../utils/placement';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS, INTERIOR_DOOR_STYLES } from '../modelRegistry';
+import { MATERIAL_DEF } from '../utils/materials';
 import { ObjectTile } from './UI/ObjectTile';
 import { KitchenPanel } from './UI/KitchenPanel';
 import { TemplatesSection } from './UI/TemplatesSection';
@@ -576,35 +577,51 @@ export function Sidebar() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {[
-                            // Swatch colours mirror MATERIAL_DEF exactly. If one is
-                            // changed there, change it here too or the picker lies
-                            // about what it is about to apply.
-                            { id: 'cedar_composite', color: 'bg-[#b0764b]', name: 'Cedar Composite' },
-                            { id: 'oak_composite', color: 'bg-[#c9a173]', name: 'Oak Composite' },
-                            { id: 'light_oak_composite', color: 'bg-[#dcc09a]', name: 'Light Oak' },
-                            { id: 'black_composite', color: 'bg-[#1f2123]', name: 'Black' },
-                            { id: 'dark_grey_composite', color: 'bg-[#4a5057]', name: 'Dark Grey' },
-                            { id: 'light_grey_composite', color: 'bg-[#a9aeb2]', name: 'Light Grey' },
-                            { id: 'white_composite', color: 'bg-[#e8e6e1]', name: 'White' },
-                            { id: 'slate_blue_composite', color: 'bg-[#7c93a6]', name: 'Slate Blue' },
-                            { id: 'sage_composite', color: 'bg-[#7e8c74]', name: 'Sage Green' },
-                            { id: 'clay_composite', color: 'bg-[#9a6b58]', name: 'Clay' },
+                            // Each swatch is the material's own texture, tinted
+                            // with its colour the way the wall is - so the
+                            // picker shows what it is about to apply.
+                            { id: 'cedar_composite', name: 'Cedar Composite' },
+                            { id: 'oak_composite', name: 'Oak Composite' },
+                            { id: 'light_oak_composite', name: 'Light Oak' },
+                            { id: 'black_composite', name: 'Black' },
+                            { id: 'dark_grey_composite', name: 'Dark Grey' },
+                            { id: 'light_grey_composite', name: 'Light Grey' },
+                            { id: 'white_composite', name: 'White' },
+                            { id: 'slate_blue_composite', name: 'Slate Blue' },
+                            { id: 'sage_composite', name: 'Sage Green' },
+                            { id: 'clay_composite', name: 'Clay' },
+                            { id: 'corrugated_iron', name: 'Corrugated Steel' },
+                            { id: 'painted_planks', name: 'Painted Boards (any colour)' },
                           ].map((cladding) => {
-                            const isActive = field.key === 'cladding' 
-                               ? room.cladding === cladding.id 
+                            const isActive = field.key === 'cladding'
+                               ? room.cladding === cladding.id
                                : (room as any)[field.key] === cladding.id;
+                            const def: any = (MATERIAL_DEF as any)[cladding.id];
+                            const img = `textures/${def.prefix}${def.neutral ? '_neutral' : ''}_color.jpg`;
+                            const tint = def.tintable ? (room.claddingTint || def.color) : def.color;
                             return (
-                              <div 
-                                key={cladding.id} 
-                                onClick={() => updateRoom({ [field.key]: cladding.id })} 
-                                className={`w-6 h-6 rounded-full p-0.5 cursor-pointer transition-all ${isActive ? 'ring-2 ring-[#3b4d4a] ring-offset-1 shadow-sm scale-110' : 'ring-1 ring-black/5 hover:scale-105 opacity-70 hover:opacity-100'}`} 
+                              <div
+                                key={cladding.id}
+                                onClick={() => updateRoom({ [field.key]: cladding.id })}
+                                className={`w-7 h-7 rounded-md cursor-pointer transition-all overflow-hidden ${isActive ? 'ring-2 ring-[#3b4d4a] ring-offset-1 shadow-sm scale-110' : 'ring-1 ring-black/10 hover:scale-105'}`}
                                 title={cladding.name}
-                              >
-                                <div className={`w-full h-full rounded-full shadow-inner ${cladding.color}`}></div>
-                              </div>
+                                style={{ backgroundImage: `url(${img})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: tint, backgroundBlendMode: 'multiply' }}
+                              />
                             );
                           })}
                         </div>
+                        {/* Painted boards take any colour: the paint is the
+                            room's claddingTint, shared by every face using it. */}
+                        {((field.key === 'cladding' ? room.cladding : (room as any)[field.key]) === 'painted_planks') && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <span className="text-[10px] font-medium text-gray-500">Paint</span>
+                            <input type="color" value={room.claddingTint || '#e8e6e1'} onChange={(e) => updateRoom({ claddingTint: e.target.value })} className="w-7 h-7 rounded-md cursor-pointer border-0 shadow-sm overflow-hidden" title="Paint colour" />
+                            {['#e8e6e1', '#1f2123', '#4a5057', '#7e8c74', '#7c93a6', '#9a6b58', '#2f3f4a', '#b7a98a'].map(hex => (
+                              <button key={hex} title={hex} onClick={() => updateRoom({ claddingTint: hex })} style={{ background: hex }}
+                                className={`w-5 h-5 rounded-full border transition-all ${(room.claddingTint || '#e8e6e1').toLowerCase() === hex ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20' : 'border-black/15 hover:scale-110'}`} />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
