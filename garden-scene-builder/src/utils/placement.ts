@@ -16,6 +16,7 @@ export const INTERIOR_TYPES: ObjectType[] = [
   'kitchen_hob_gas', 'kitchen_hob_induction', 'kitchen_extractor',
   'kitchen_wall_unit_600', 'kitchen_wall_unit_1200',
   'bar_stool', 'bar_stool_tall', 'towel_heater', 'spot_light', 'tv_unit',
+  'dining_table_round', 'pendant_light',
   // external_extraction_fan is deliberately NOT here - it is the outside
   // terminal of the extract run, so it has to be placeable on an outside wall.
 ];

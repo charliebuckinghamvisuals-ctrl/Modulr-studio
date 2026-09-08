@@ -44,13 +44,14 @@ function Stepper({ value, set, min, max, step = 1, suffix }: {
 
 export function LightingPanel() {
   const { viewMode, setViewMode, room, objects, addSpotGrid, addSpotRow, clearSpots,
-          nightPreview, setNightPreview, updateObject, selectedObjectId } =
+          nightPreview, setNightPreview, updateObject, selectedObjectId, addObject } =
     useStore(useShallow(s => ({
       viewMode: s.viewMode,
       setViewMode: s.setViewMode,
       room: s.scene.room,
       // Never filter in the selector - a new array every call re-renders forever.
       objects: s.scene.objects,
+      addObject: s.addObject,
       addSpotGrid: s.addSpotGrid,
       addSpotRow: s.addSpotRow,
       clearSpots: s.clearSpots,
@@ -61,6 +62,7 @@ export function LightingPanel() {
     })));
 
   const spots = objects.filter(o => o.type === 'spot_light');
+  const pendants = objects.filter(o => o.type === 'pendant_light');
   const wt = (room.wallThicknessMm ?? 150) / 1000;
   const iw = room.widthMm / 1000 - wt * 2;
   const id = room.depthMm / 1000 - wt * 2;
@@ -155,6 +157,19 @@ export function LightingPanel() {
           className="w-full py-2.5 rounded-lg bg-black/5 hover:bg-black/10 text-[11px] font-bold uppercase tracking-wide transition-colors">
           {spots.length ? 'Replace with grid' : 'Fill the room'}
         </button>
+      </div>
+
+      {/* A pendant is placed one at a time - over a table, in a corner - so
+          it lands at the room's centre and gets dragged from there. */}
+      <div className="px-4 py-3 space-y-2 border-b border-black/5">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Pendants</span>
+        <button onClick={() => addObject('pendant_light', 0, 0)}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-black/5 hover:bg-black/10 text-[11px] font-bold uppercase tracking-wide transition-colors">
+          <Plus size={14} /> Add a pendant
+        </button>
+        {pendants.length > 0 && (
+          <p className="text-[10px] text-gray-400">{pendants.length} pendant{pendants.length === 1 ? '' : 's'} &mdash; drag to place.</p>
+        )}
       </div>
 
       <div className="px-4 py-3 space-y-2 border-b border-black/5">

@@ -49,6 +49,8 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   bar_stool_tall: 'models/bar_stool_tall.glb',
   dining_table: 'models/dining_table.glb',
   tv_unit: 'models/tv_unit.glb',
+  dining_table_round: 'models/dining_table_round.glb',
+  pendant_light: 'models/pendant_light.glb',
   towel_heater: 'models/towel_heater.glb',
   external_extraction_fan: 'models/external_extraction_fan.glb',
   spot_light: 'models/spot_light.glb',
@@ -65,6 +67,9 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
  */
 export const CEILING_MOUNTED: Partial<Record<ObjectType, number>> = {
   spot_light: 0.008,
+  // Charlie's Baltimore pendant (8 Sep): rose to the bottom of the shade,
+  // origin at the shade's underside, so this is the full drop.
+  pendant_light: 0.778,
 };
 
 export const isCeilingMounted = (type: ObjectType) => CEILING_MOUNTED[type] !== undefined;
@@ -76,6 +81,8 @@ export const isCeilingMounted = (type: ObjectType) => CEILING_MOUNTED[type] !== 
  */
 export const EMISSIVE_MATERIAL: Partial<Record<ObjectType, string>> = {
   spot_light: 'M01_Silver_Fog',
+  // The pendant's bulb envelope.
+  pendant_light: 'Glass Thin',
 };
 
 /** Lamp colours, warmest first - the temperatures people actually specify. */
@@ -311,6 +318,15 @@ export const MATERIAL_TWEAKS: Partial<Record<ObjectType, Record<string, Material
     '[0137_Black]': { color: '#050506', roughness: 0.12, metalness: 0.4, envMapIntensity: 1.2 },
     'M08_Obsidian_Black': { roughness: 0.35, metalness: 0.2 },
   },
+  // The pendant: a black shade, a brushed-steel rod, bronze filament
+  // supports. The bulb glass is the emissive (see EMISSIVE_MATERIAL).
+  pendant_light: {
+    // Matt black shade. With any metalness the HDR turned it silver.
+    'M08_Obsidian_Black': { color: '#141414', roughness: 0.55, metalness: 0.05 },
+    '[Metal Corrugated Shiny]': { roughness: 0.35, metalness: 1.0, envMapIntensity: 1.1 },
+    '[Color M07]': { roughness: 0.4, metalness: 0.9 },
+    'Bronze Light': { color: '#b08d57', roughness: 0.4, metalness: 1.0 },
+  },
 };
 
 /**
@@ -325,6 +341,9 @@ export const MATERIAL_TWEAKS: Partial<Record<ObjectType, Record<string, Material
  */
 export const TIMBER_MATERIAL: Partial<Record<ObjectType, { materials: string[]; worktop: string; tint?: string }>> = {
   dining_table: { materials: ['b113_BS'], worktop: 'oak', tint: '#f3ebdd' },
+  // The round table's top came with a roughness of 0 under a metalness map
+  // - a mirror. Same oak as the rectangular table, so the two match.
+  dining_table_round: { materials: ['931,932, 2931, White Oak (verticaal)'], worktop: 'oak', tint: '#f3ebdd' },
 };
 
 /**
@@ -391,6 +410,7 @@ export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
   bar_stool_tall: true,
   dining_table: true,
   tv_unit: true,
+  dining_table_round: true,
   towel_heater: true,
   external_extraction_fan: true,
   bed: true,
@@ -566,6 +586,8 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   external_extraction_fan: 'External Extract Fan',
   dining_table: 'Dining Table',
   tv_unit: 'TV & Media Unit',
+  dining_table_round: 'Round Dining Table',
+  pendant_light: 'Pendant Light',
   bar_stool: 'Bar Stool',
   bar_stool_tall: 'Bar Stool (Tall)',
   toilet: 'Toilet',
