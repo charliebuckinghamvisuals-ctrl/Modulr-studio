@@ -320,22 +320,43 @@ export function createWorktopMaterial(def: WorktopDef) {
  * quarter so the grain runs along the piece rather than across it; the
  * textures are cloned for that because the loaded set is shared.
  */
-function dressVeneer(def: WorktopDef, grain: 'x' | 'z' = 'z') {
+function dressVeneer(def: WorktopDef, grain: 'x' | 'z' = 'z', seed?: string, side: THREE.Side = THREE.FrontSide) {
   const wood = new THREE.MeshPhysicalMaterial();
   dressWorktop(wood, def);
-  if (grain === 'x') {
-    const turn = (t: THREE.Texture | null) => {
+  /*
+   * Every piece reads from a different part of the sheet.
+   *
+   * Box projection starts at each mesh's own origin, so a run of six doors
+   * all showed the same figure in the same place - "the texture is all the
+   * same for each unit". Real veneered doors are cut from different parts
+   * of a leaf, so each instance's maps are offset by an amount hashed from
+   * its id, the way the paint grain is. Clones share the GPU image.
+   */
+  let du = 0, dv = 0;
+  if (seed) {
+    let h = 2166136261;
+    for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+    du = ((h >>> 0) % 1000) / 1000;
+    dv = (((h >>> 10) >>> 0) % 1000) / 1000;
+  }
+  if (grain === 'x' || seed) {
+    const adjust = (t: THREE.Texture | null) => {
       if (!t) return t;
       const c = t.clone();
       c.center.set(0.5, 0.5);
-      c.rotation = Math.PI / 2;
+      if (grain === 'x') c.rotation = Math.PI / 2;
+      c.offset.set(du, dv);
       c.needsUpdate = true;
       return c;
     };
-    wood.map = turn(wood.map);
-    wood.normalMap = turn(wood.normalMap);
-    wood.roughnessMap = turn(wood.roughnessMap);
+    wood.map = adjust(wood.map);
+    wood.normalMap = adjust(wood.normalMap);
+    wood.roughnessMap = adjust(wood.roughnessMap);
   }
+  // Keep the source's sidedness: the coffee table's top is a single plane
+  // whose normal points down, drawn double-sided by the exporter - as a
+  // front-face-only material it vanished.
+  wood.side = side;
   wood.roughness = 0.5;
   wood.clearcoat = 0.3;
   wood.clearcoatRoughness = 0.32;
@@ -641,7 +662,7 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         const def = veneer ? veneerById(veneer) : (timber.worktop ? worktopById(timber.worktop) : undefined);
         if (def) {
           boxProjectUVs(mesh.geometry, 1, true, worldScaleOf(mesh));
-          const wood = dressVeneer(def, timber.grain);
+          const wood = dressVeneer(def, timber.grain, seed, m.side === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide);
           if (!veneer && timber.tint) wood.color.set(timber.tint);
           wood.name = m.name;
           return wood;
@@ -668,7 +689,7 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         // and veneered doors came up with a 100mm grid of tiny oak.
         mesh.geometry = mesh.geometry.clone();
         boxProjectUVs(mesh.geometry, 1, true, worldScaleOf(mesh));
-        const wood = dressVeneer(veneerById(finish_)!, 'z');
+        const wood = dressVeneer(veneerById(finish_)!, 'z', seed, m.side === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide);
         wood.name = m.name;
         bodyMats.push(wood);
         return wood;

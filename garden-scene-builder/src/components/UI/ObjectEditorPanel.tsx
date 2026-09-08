@@ -1,7 +1,7 @@
 import { useStore } from '../../store';
 import { useEffect, useState } from 'react';
 import { Trash2, RotateCw, Copy, ChevronDown, ChevronUp } from 'lucide-react';
-import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS, hasTimber, VENEERS } from '../../modelRegistry';
+import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS, hasTimber, VENEERS, isVeneerFinish } from '../../modelRegistry';
 import { DimensionSlider } from '../DimensionSlider';
 import { useSavedColours, addSavedColour, removeSavedColour } from '../../utils/savedColours';
 import { resumeWalking } from '../../utils/walk';
@@ -323,6 +323,36 @@ export function ObjectEditorPanel() {
             }}
           />
         )}
+
+        {/* Wood grain under the colours, on the cabinet itself - Charlie
+            wanted it here, not only on the Kitchen tab. The door finish is
+            kitchen-wide (see UNIT_FINISHES), so a veneer picked on one unit
+            veneers the run, and Paint hands the colours above back. */}
+        {TINT_MATERIAL[obj.type] && family && (() => {
+          const current = scene.room.unitFinish;
+          const veneered = isVeneerFinish(current);
+          return (
+            <div className="flex items-start gap-3">
+              <span className="text-xs font-semibold text-gray-700 shrink-0 pt-1">Wood</span>
+              <div className="flex gap-1.5 flex-wrap items-center">
+                <button
+                  title="Painted doors"
+                  onClick={() => { updateRoom({ unitFinish: 'satin' }); afterPick(); }}
+                  className={'px-2 h-7 rounded-md border text-[10px] font-semibold transition-all ' + (!veneered ? 'bg-[#3b4d4a] text-white border-transparent' : 'bg-white text-gray-600 border-black/15 hover:bg-gray-50')}
+                >Paint</button>
+                {VENEERS.map(v => (
+                  <button
+                    key={v.id}
+                    title={v.name}
+                    onClick={() => { updateRoom({ unitFinish: v.id }); afterPick(); }}
+                    style={{ backgroundImage: 'url(textures/' + v.prefix + '_color.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
+                    className={'w-7 h-7 rounded-md border transition-all ' + (current === v.id ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20 scale-110' : 'border-black/15 hover:scale-110')}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Lamp colour temperature. Warm or cool changes how the whole room
             reads, so it belongs on the fitting rather than buried in a menu. */}
