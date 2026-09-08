@@ -54,6 +54,12 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   end_panel_tall: 'models/end_panel_tall.glb',
   end_panel_base: 'models/end_panel_base.glb',
   end_panel_wall: 'models/end_panel_wall.glb',
+  basin_tap_mixer: 'models/basin_tap_mixer.glb',
+  basin_tap_widespread: 'models/basin_tap_widespread.glb',
+  basin_tap_wall: 'models/basin_tap_wall.glb',
+  heater_small: 'models/heater_small.glb',
+  heater_large: 'models/heater_large.glb',
+  boiler: 'models/boiler.glb',
   towel_heater: 'models/towel_heater.glb',
   external_extraction_fan: 'models/external_extraction_fan.glb',
   spot_light: 'models/spot_light.glb',
@@ -270,6 +276,10 @@ export const TINT_MATERIAL: Partial<Record<ObjectType, string>> = {
   end_panel_base: 'M04_Stone_Frost',
   end_panel_tall: 'M04_Stone_Frost',
   end_panel_wall: 'M04_Stone_Frost',
+  // Panel heaters come in white or anthracite; the case is the unnamed
+  // material, the grille keeps its own.
+  heater_small: '',
+  heater_large: '',
   // The cabinet. It was exported with NO material at all, so nothing could
   // reach it by name; vanity.glb was patched to give that mesh this one.
   // The basin, tap and top keep their own finishes.
@@ -299,6 +309,15 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   kitchen_wall_unit_600: 1390,
   kitchen_wall_unit_1200: 1390,
   end_panel_wall: 1390,
+  // Basin taps stand on the vanity, whose top measures 834mm; the wall tap
+  // is fixed above the basin at 1000. Panel heaters hang 150mm off the
+  // floor; the combi boiler is hung so its case tops out just under 1.95m.
+  basin_tap_mixer: 834,
+  basin_tap_widespread: 834,
+  basin_tap_wall: 1000,
+  heater_small: 150,
+  heater_large: 150,
+  boiler: 900,
   // A towel rail is fixed clear of the floor.
   towel_heater: 300,
   // The extract terminal goes high on the OUTSIDE wall. Not an interior type,
@@ -368,6 +387,12 @@ export const MATERIAL_TWEAKS: Partial<Record<ObjectType, Record<string, Material
   },
   // The pendant: a black shade, a brushed-steel rod, bronze filament
   // supports. The bulb glass is the emissive (see EMISSIVE_MATERIAL).
+  // The boiler's case is white plastic-coated steel; its flow and return
+  // pipes are bare metal.
+  boiler: {
+    'M00_Soft_Cloud': { color: '#f2f2f0', roughness: 0.45, metalness: 0.05 },
+    '[Metal_Corrogated_Shiny]3': { roughness: 0.35, metalness: 1.0, dropMap: true, color: '#c9c9cc' },
+  },
   pendant_light: {
     // Matt black shade. With any metalness the HDR turned it silver.
     'M08_Obsidian_Black': { color: '#141414', roughness: 0.55, metalness: 0.05 },
@@ -439,6 +464,11 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
   // material with the tray, which is moved to 'ShowerTray' at load (see
   // MESH_MATERIALS in utils/materialFixes) so the empty name is metal only.
   shower_small: ['[Metal_Aluminum_Anodized]1', '[Metal_Seamed]', ''],
+  // Charlie's basin taps (8 Sep). The mixer was exported with no material at
+  // all - one unnamed mesh - so the empty name is the whole tap.
+  basin_tap_mixer: [''],
+  basin_tap_widespread: ['Metal_06_1K'],
+  basin_tap_wall: ['<auto>1', '*'],
 };
 
 /**
@@ -476,6 +506,9 @@ export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
   dining_table: true,
   tv_unit: true,
   dining_table_round: true,
+  heater_small: true,
+  heater_large: true,
+  boiler: true,
   towel_heater: true,
   external_extraction_fan: true,
   bed: true,
@@ -658,6 +691,12 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   end_panel_base: 'End Panel (Base)',
   end_panel_tall: 'End Panel (Tall)',
   end_panel_wall: 'End Panel (Wall)',
+  basin_tap_mixer: 'Basin Mixer Tap',
+  basin_tap_widespread: 'Basin Tap (3-hole)',
+  basin_tap_wall: 'Basin Tap (Wall)',
+  heater_small: 'Electric Heater (650)',
+  heater_large: 'Electric Heater (850)',
+  boiler: 'Combi Boiler',
   bar_stool: 'Bar Stool',
   bar_stool_tall: 'Bar Stool (Tall)',
   toilet: 'Toilet',

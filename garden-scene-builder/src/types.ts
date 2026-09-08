@@ -21,7 +21,9 @@ export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 
  | 'kitchen_wall_unit_600' | 'kitchen_wall_unit_1200'
  | 'bar_stool' | 'bar_stool_tall' | 'towel_heater' | 'external_extraction_fan'
  | 'spot_light' | 'tv_unit' | 'dining_table_round' | 'pendant_light'
- | 'end_panel_tall' | 'end_panel_base' | 'end_panel_wall';
+ | 'end_panel_tall' | 'end_panel_base' | 'end_panel_wall'
+ | 'basin_tap_mixer' | 'basin_tap_widespread' | 'basin_tap_wall'
+ | 'heater_small' | 'heater_large' | 'boiler';
 
 /** 'solid' is doors-only (entrance door); the window UI never offers it. */
 export type GlazingStyle = 'standard' | 'crittall' | 'solid';
