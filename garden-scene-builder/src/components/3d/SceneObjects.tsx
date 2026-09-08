@@ -6,9 +6,9 @@ import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
-import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish } from '../../modelRegistry';
+import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel } from '../../modelRegistry';
 import { applyModelMaterials, retintModel, resurfaceWorktop, refinishUnits } from '../../utils/materialFixes';
-import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS } from '../../utils/placement';
+import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS, snapEndPanel } from '../../utils/placement';
 import { wallpaperProps } from '../../utils/wallpaper';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
 import { RotateCw, Copy, Trash2 } from 'lucide-react';
@@ -388,7 +388,16 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
            * that actually touch. So a snapped unit shows one continuous top,
            * and an unsnapped one shows a break. That break is the tell.
            */
-          if (hasWorktop(obj.type)) {
+          if (isEndPanel(obj.type)) {
+            // End panels: 3mm off the end of the nearest run of their family,
+            // backs in line, turned to the run - see snapEndPanel.
+            const all = useStore.getState().scene.objects;
+            const s = snapEndPanel(obj.type, nx, nz, all, obj.id);
+            if (s) {
+              nx = s.x; nz = s.z;
+              if (Math.abs(s.rot - (obj.rot ?? 0)) > 0.001) useStore.getState().updateObject(obj.id, { rot: s.rot });
+            }
+          } else if (hasWorktop(obj.type)) {
             const all = useStore.getState().scene.objects;
             const myW = (obj.widthMm ?? NATIVE_WIDTH_MM[obj.type] ?? 600) / 1000;
             const rot = obj.rot ?? 0;
@@ -398,7 +407,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
             const UNIT_MAG = 0.12;
             let best: { dist: number; x: number; z: number } | null = null;
             for (const n of all) {
-              if (n.id === obj.id || !hasWorktop(n.type)) continue;
+              if (n.id === obj.id || !hasWorktop(n.type) || isEndPanel(n.type)) continue;
               const dRot = Math.abs(((n.rot ?? 0) - rot) % (Math.PI * 2));
               if (Math.min(dRot, Math.PI * 2 - dRot) > 0.02) continue;
               const nW = (n.widthMm ?? NATIVE_WIDTH_MM[n.type] ?? 600) / 1000;

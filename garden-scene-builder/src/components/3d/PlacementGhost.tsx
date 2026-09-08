@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { useGLTF } from '@react-three/drei';
 import { useStore } from '../../store';
 import { MODEL_URLS, MODEL_SCALES, mountHeight, CEILING_MOUNTED, isCeilingMounted } from '../../modelRegistry';
-import { isInteriorType, clampToRoomInterior, interiorCeilingHeight } from '../../utils/placement';
+import { isInteriorType, clampToRoomInterior, interiorCeilingHeight, snapEndPanel } from '../../utils/placement';
+import { isEndPanel } from '../../modelRegistry';
 
 /** Semi-transparent clone of a GLB model, used as the placement preview. */
 function GhostGlb({ url }: { url: string }) {
@@ -80,7 +81,10 @@ export function PlacementGhost() {
     if (!posRef.current) return;
     const st = useStore.getState();
     st.saveState();
-    st.addObject(type, posRef.current.x, posRef.current.z, rot);
+    // An end panel placed near the end of a run lands on it, 3mm off.
+    const snap = isEndPanel(type) ? snapEndPanel(type, posRef.current.x, posRef.current.z, st.scene.objects) : null;
+    if (snap) st.addObject(type, snap.x, snap.z, snap.rot);
+    else st.addObject(type, posRef.current.x, posRef.current.z, rot);
     st.setActivePlacementType(null);
   };
 

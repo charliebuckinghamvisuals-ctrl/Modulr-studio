@@ -243,37 +243,50 @@ function grainFor(seed?: string) {
  * it is exactly right, with no stretching. Units are metres, so the paint
  * grain comes out the same physical size on a drawer front and a tall unit.
  */
-function boxProjectUVs(geometry: THREE.BufferGeometry, metresPerTile: number, force = false, worldScale?: THREE.Vector3) {
+function boxProjectUVs(geometry: THREE.BufferGeometry, metresPerTile: number, force = false, world?: THREE.Matrix4) {
   if (geometry.getAttribute('uv') && !force) return;
-  // Vertex positions are in the EXPORTER'S units, not metres: the tall units
-  // are modelled in inches, with the 0.0254 on a parent node. Projecting the
-  // raw positions put 39 tiles of veneer where one belonged - a grid of tiny
-  // oak - so the mesh's world scale is applied first. Keyed on both.
-  const ws = worldScale ?? new THREE.Vector3(1, 1, 1);
-  const key = `${metresPerTile}|${ws.x.toFixed(5)},${ws.y.toFixed(5)},${ws.z.toFixed(5)}`;
+  /*
+   * Projected in the MODEL'S upright frame, not the mesh's own.
+   *
+   * Two things live on a mesh's ancestors in these exports: the unit
+   * conversion (the tall units are in inches, 0.0254 on a parent - raw
+   * positions put 39 tiles of veneer where one belonged) and the Z-up to
+   * Y-up turn. Projecting in local axes with that turn above it, a unit's
+   * SIDE face - world X-facing, local X-facing - took its V from local Y,
+   * which is world depth: the grain lay down across the side while the door
+   * fronts, world Z-facing but local Y-facing, happened to come out upright.
+   * Positions and normals are taken through the mesh's world matrix first,
+   * so every vertical face reads V along world Y: grain always up.
+   */
+  const m = world ?? new THREE.Matrix4();
+  const key = `${metresPerTile}|${m.elements.map(e => e.toFixed(4)).join(',')}`;
   if ((geometry as any).__boxProjected === key) return;
   (geometry as any).__boxProjected = key;
   const pos = geometry.getAttribute('position');
   const nor = geometry.getAttribute('normal');
   if (!pos || !nor) return;
+  const nm = new THREE.Matrix3().getNormalMatrix(m);
+  const p = new THREE.Vector3(), n = new THREE.Vector3();
   const uv = new Float32Array(pos.count * 2);
   for (let i = 0; i < pos.count; i++) {
-    const nx = Math.abs(nor.getX(i)), ny = Math.abs(nor.getY(i)), nz = Math.abs(nor.getZ(i));
-    const px = pos.getX(i) * ws.x, py = pos.getY(i) * ws.y, pz = pos.getZ(i) * ws.z;
+    p.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(m);
+    n.set(nor.getX(i), nor.getY(i), nor.getZ(i)).applyMatrix3(nm);
+    const nx = Math.abs(n.x), ny = Math.abs(n.y), nz = Math.abs(n.z);
     let u: number, v: number;
-    if (nx >= ny && nx >= nz) { u = pz; v = py; }       // facing X
-    else if (ny >= nx && ny >= nz) { u = px; v = pz; }  // facing Y
-    else { u = px; v = py; }                            // facing Z
+    if (nx >= ny && nx >= nz) { u = p.z; v = p.y; }       // facing X
+    else if (ny >= nx && ny >= nz) { u = p.x; v = p.z; }  // facing Y
+    else { u = p.x; v = p.y; }                            // facing Z
     uv[i * 2] = u / metresPerTile;
     uv[i * 2 + 1] = v / metresPerTile;
   }
   geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
 }
 
-/** The scale a mesh's vertices are drawn at, from the exporter's unit
- *  conversion on its ancestors. Needs matrixWorld up to date. */
+/** The mesh's transform within its model - unit conversion and Z-up turn
+ *  included. Needs matrixWorld up to date (the model root is at identity
+ *  while it is being dressed, so this is model space). */
 function worldScaleOf(mesh: THREE.Mesh) {
-  return mesh.getWorldScale(new THREE.Vector3());
+  return mesh.matrixWorld;
 }
 
 /**

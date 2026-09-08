@@ -1,4 +1,47 @@
-import type { ObjectType, Room } from '../types';
+import type { ObjectType, Room, SceneObject } from '../types';
+import { UNIT_FAMILY, NATIVE_WIDTH_MM, END_PANELS, END_PANEL_T, END_PANEL_GAP, isEndPanel } from '../modelRegistry';
+
+/**
+ * Where an end panel lands against the nearest run of its own family.
+ *
+ * A panel dragged or placed within reach of a base, wall or tall unit's free
+ * end jumps to that end: 3mm off the unit's side (the fitter's shadow line),
+ * its back in line with the unit's back, turned to the unit's angle. Returns
+ * null when nothing is in reach, and the caller keeps the raw position.
+ */
+export function snapEndPanel(
+  type: ObjectType, x: number, z: number, objects: SceneObject[], selfId?: string,
+): { x: number; z: number; rot: number } | null {
+  const spec = END_PANELS[type];
+  const fam = UNIT_FAMILY[type];
+  if (!spec || !fam) return null;
+  const REACH = 0.25;
+  let best: { x: number; z: number; rot: number; dist: number } | null = null;
+  for (const n of objects) {
+    if (n.id === selfId || UNIT_FAMILY[n.type] !== fam || isEndPanel(n.type)) continue;
+    const rot = n.rot ?? 0;
+    // The run's direction and its across-vector, as the unit magnet uses.
+    const dx = Math.cos(rot), dz = -Math.sin(rot);
+    const px = Math.sin(rot), pz = Math.cos(rot);
+    const nW = (n.widthMm ?? NATIVE_WIDTH_MM[n.type] ?? 600) / 1000;
+    const vx = x - n.x, vz = z - n.z;
+    const t = vx * dx + vz * dz;
+    const s = vx * px + vz * pz;
+    if (Math.abs(s) > 0.35) continue;
+    for (const side of [1, -1]) {
+      const target = side * (nW / 2 + END_PANEL_GAP + END_PANEL_T / 2);
+      const dist = Math.abs(t - target);
+      if (dist < REACH && (!best || dist < best.dist)) {
+        best = {
+          x: n.x + dx * target + px * spec.backOffset,
+          z: n.z + dz * target + pz * spec.backOffset,
+          rot, dist,
+        };
+      }
+    }
+  }
+  return best;
+}
 
 /** Object types that live INSIDE the room: they stand on the finished floor
  *  and are clamped to the interior when placed or dragged. */
@@ -17,6 +60,7 @@ export const INTERIOR_TYPES: ObjectType[] = [
   'kitchen_wall_unit_600', 'kitchen_wall_unit_1200',
   'bar_stool', 'bar_stool_tall', 'towel_heater', 'spot_light', 'tv_unit',
   'dining_table_round', 'pendant_light',
+  'end_panel_tall', 'end_panel_base', 'end_panel_wall',
   // external_extraction_fan is deliberately NOT here - it is the outside
   // terminal of the extract run, so it has to be placeable on an outside wall.
 ];

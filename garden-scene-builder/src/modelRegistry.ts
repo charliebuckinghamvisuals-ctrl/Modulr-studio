@@ -51,6 +51,9 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   tv_unit: 'models/tv_unit.glb',
   dining_table_round: 'models/dining_table_round.glb',
   pendant_light: 'models/pendant_light.glb',
+  end_panel_tall: 'models/end_panel_tall.glb',
+  end_panel_base: 'models/end_panel_base.glb',
+  end_panel_wall: 'models/end_panel_wall.glb',
   towel_heater: 'models/towel_heater.glb',
   external_extraction_fan: 'models/external_extraction_fan.glb',
   spot_light: 'models/spot_light.glb',
@@ -118,7 +121,29 @@ export const UNIT_FAMILY: Partial<Record<ObjectType, UnitFamily>> = {
   kitchen_tall_oven_single: 'tall',
   kitchen_tall_oven_double: 'tall',
   kitchen_tall_larder: 'tall',
+  // End panels belong to the run they close, so they take its colour, sheen
+  // or veneer with it.
+  end_panel_base: 'base',
+  end_panel_wall: 'wall',
+  end_panel_tall: 'tall',
 };
+
+/**
+ * End panels - Charlie's, 8 Sep 2026: 18mm slabs, 2208 / 870 / 818 high,
+ * as deep as the unit they close. They snap to either end of a run with a
+ * 3mm gap, which is the shadow line a fitter leaves, backs in line with the
+ * units' backs. backOffset is where the panel's centre sits across the run
+ * relative to the unit's, from the measured unit backs (base -320, tall
+ * -310, wall -156) and the panels' half depths.
+ */
+export const END_PANEL_T = 0.018;
+export const END_PANEL_GAP = 0.003;
+export const END_PANELS: Partial<Record<ObjectType, { backOffset: number }>> = {
+  end_panel_base: { backOffset: -0.010 },
+  end_panel_tall: { backOffset: 0 },
+  end_panel_wall: { backOffset: 0.011 },
+};
+export const isEndPanel = (type: ObjectType) => END_PANELS[type] !== undefined;
 
 export const FAMILY_LABEL: Record<UnitFamily, string> = {
   base: 'Base units',
@@ -192,6 +217,8 @@ export const familyTypes = (f: UnitFamily) =>
  * slider is deliberately bounded rather than open-ended.
  */
 export const NATIVE_WIDTH_MM: Partial<Record<ObjectType, number>> = {
+  // The base end panel's width along the run, so the worktop slab counts it.
+  end_panel_base: 18,
   kitchen_unit_600: 600,
   kitchen_unit_1200: 1203,
   kitchen_sink_1200: 1203,
@@ -240,6 +267,9 @@ export const TINT_MATERIAL: Partial<Record<ObjectType, string>> = {
   // they recolour cleanly with the run of base units beneath them.
   kitchen_wall_unit_600: 'M03_Pewter_Shine',
   kitchen_wall_unit_1200: 'M03_Pewter_Shine',
+  end_panel_base: 'M04_Stone_Frost',
+  end_panel_tall: 'M04_Stone_Frost',
+  end_panel_wall: 'M04_Stone_Frost',
   // The cabinet. It was exported with NO material at all, so nothing could
   // reach it by name; vanity.glb was patched to give that mesh this one.
   // The basin, tap and top keep their own finishes.
@@ -268,6 +298,7 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   // over the 900mm worktop. They were at 1500, topping out above the ovens.
   kitchen_wall_unit_600: 1390,
   kitchen_wall_unit_1200: 1390,
+  end_panel_wall: 1390,
   // A towel rail is fixed clear of the floor.
   towel_heater: 300,
   // The extract terminal goes high on the OUTSIDE wall. Not an interior type,
@@ -515,7 +546,9 @@ export const worktopById = (id: string | undefined) =>
 
 /** True for anything that has a worktop to re-surface. */
 export const hasWorktop = (type: ObjectType) =>
-  type.startsWith('kitchen_unit') || type.startsWith('kitchen_sink') || type.startsWith('kitchen_drawer');
+  type.startsWith('kitchen_unit') || type.startsWith('kitchen_sink') || type.startsWith('kitchen_drawer')
+  // A base end panel sits under the worktop: the slab runs out over it.
+  || type === 'end_panel_base';
 
 export const FABRIC_COLOURS: { name: string; hex: string }[] = [
   { name: 'Natural', hex: '#ffffff' },
@@ -622,6 +655,9 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   tv_unit: 'TV & Media Unit',
   dining_table_round: 'Round Dining Table',
   pendant_light: 'Pendant Light',
+  end_panel_base: 'End Panel (Base)',
+  end_panel_tall: 'End Panel (Tall)',
+  end_panel_wall: 'End Panel (Wall)',
   bar_stool: 'Bar Stool',
   bar_stool_tall: 'Bar Stool (Tall)',
   toilet: 'Toilet',

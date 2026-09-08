@@ -1217,6 +1217,7 @@ export function Sidebar() {
                   'kitchen_unit_600', 'kitchen_unit_1200', 'kitchen_sink_1200',
                   'kitchen_drawer_2', 'kitchen_drawer_3', 'kitchen_tall_larder',
                   'kitchen_wall_unit_600', 'kitchen_wall_unit_1200',
+                  'end_panel_base', 'end_panel_tall', 'end_panel_wall',
                   'kitchen_hob_gas', 'kitchen_hob_induction', 'kitchen_extractor',
                   'external_extraction_fan',
                   'kitchen_tall_fridge', 'kitchen_tall_oven_single', 'kitchen_tall_oven_double',
