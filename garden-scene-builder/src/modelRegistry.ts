@@ -1,4 +1,4 @@
-import type { ObjectType } from './types';
+import type { ObjectType, InteriorDoorStyle } from './types';
 
 /**
  * GLB-backed placeable objects - the single place new SketchUp models get
@@ -251,6 +251,17 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   // A wall-hung pan hangs clear of the floor - it was sitting on it. 100mm
   // under this pan puts its seat at 477mm, comfort height.
   toilet: 100,
+};
+
+/**
+ * Internal door sets for the partition walls - not objects, they live in a
+ * wall's opening (see InteriorDoorModel). One GLB, Charlie's oak country
+ * door; the white option is the same door painted.
+ */
+export const INTERIOR_DOOR_URL = 'models/interior_door_country.glb';
+export const INTERIOR_DOOR_STYLES: Record<InteriorDoorStyle, { name: string; paint?: string }> = {
+  oak_country: { name: 'Oak country' },
+  white_country: { name: 'White country', paint: '#f1efe9' },
 };
 
 /** The extractor's flue is a separate model so it can be stretched to meet

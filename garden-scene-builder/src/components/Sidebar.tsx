@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 import { gableCeilingMaxMm } from '../utils/placement';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
-import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS } from '../modelRegistry';
+import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS, INTERIOR_DOOR_STYLES } from '../modelRegistry';
 import { ObjectTile } from './UI/ObjectTile';
 import { KitchenPanel } from './UI/KitchenPanel';
 import { TemplatesSection } from './UI/TemplatesSection';
@@ -1065,6 +1065,12 @@ export function Sidebar() {
                             onChange={(e) => wrap(store.updatePartitionDoor)(part.id, dr.id, { heightMm: Math.max(1600, Number(e.target.value) || 2000) })}
                             className="w-16 bg-white border border-gray-200 rounded px-1.5 py-1 text-[10px] text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#3b4d4a]" />
                           <span className="text-[9px] text-gray-400">h</span>
+                          <select value={dr.style || ''} title="Door style"
+                            onChange={(e) => wrap(store.updatePartitionDoor)(part.id, dr.id, { style: (e.target.value || undefined) as any })}
+                            className="bg-white border border-gray-200 rounded px-1 py-1 text-[10px] text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#3b4d4a]">
+                            <option value="">Opening</option>
+                            {Object.entries(INTERIOR_DOOR_STYLES).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
+                          </select>
                           <button onClick={(e) => { e.stopPropagation(); wrap(store.removePartitionDoor)(part.id, dr.id); }} className="ml-auto text-red-400 hover:text-red-500">
                             <Trash2 size={12} />
                           </button>

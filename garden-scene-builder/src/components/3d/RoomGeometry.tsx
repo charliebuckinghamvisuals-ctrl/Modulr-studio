@@ -17,6 +17,7 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { DragHandle } from './DragHandles';
 import { GABLE_CEILING_T } from '../../utils/placement';
+import { InteriorDoorModel } from './InteriorDoorModel';
 
 /** Apex liner thickness: enough to sit clear of the gable face without
  *  z-fighting, thin enough to read as paint rather than a second wall. */
@@ -843,12 +844,24 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
         </mesh>
       )}
 
-      {/* Door frames for this wall's own doors, main run and leg. */}
+      {/* Door frames for this wall's own doors, main run and leg. A door
+          with a STYLE is a modelled door set - lining, leaf, ironmongery -
+          standing on the floor in the opening, in place of the painted
+          frame. */}
       {mainDoors.map((dr: any) => {
         const dW = dr.widthMm / 1000;
         const dH = doorHeight(dr);
         const ox = dr.offsetMm / 1000;
         const oy = dH / 2 - boxH / 2;
+        if (dr.style) {
+          return (
+            <group key={`frame-${dr.id}`} position={[ox, -boxH / 2, 0]}>
+              <Suspense fallback={null}>
+                <InteriorDoorModel style={dr.style} widthMm={dr.widthMm} heightMm={Math.round(dH * 1000)} thicknessM={pT} />
+              </Suspense>
+            </group>
+          );
+        }
         return (
           <group key={`frame-${dr.id}`} position={[ox, oy, 0]}>
             <mesh position={[-dW / 2 + 0.015, 0, 0]} castShadow><boxGeometry args={[0.03, dH, pT + 0.02]} /><meshStandardMaterial color="#e8e2d8" roughness={0.7} /></mesh>
@@ -861,6 +874,15 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
         const dW = dr.widthMm / 1000;
         const dH = doorHeight(dr);
         const c = legDoorCentre(dr);
+        if (dr.style) {
+          return (
+            <group key={`frame-${dr.id}`} position={[c[0], -boxH / 2, c[2]]} rotation={[0, Math.PI / 2, 0]}>
+              <Suspense fallback={null}>
+                <InteriorDoorModel style={dr.style} widthMm={dr.widthMm} heightMm={Math.round(dH * 1000)} thicknessM={pT} />
+              </Suspense>
+            </group>
+          );
+        }
         return (
           <group key={`frame-${dr.id}`} position={[c[0], dH / 2 - boxH / 2, c[2]]} rotation={[0, Math.PI / 2, 0]}>
             <mesh position={[-dW / 2 + 0.015, 0, 0]} castShadow><boxGeometry args={[0.03, dH, pT + 0.02]} /><meshStandardMaterial color="#e8e2d8" roughness={0.7} /></mesh>

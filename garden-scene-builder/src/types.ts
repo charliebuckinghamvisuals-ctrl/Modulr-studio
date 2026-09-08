@@ -69,8 +69,14 @@ export interface InteriorDoorData {
 /** A doorway belonging to an internal wall. Offset is measured along the
  *  wall from its CENTRE, so doors travel with the wall when it moves -
  *  the old world-positioned interior doors got left behind. */
+/** What fills an internal wall's doorway. Undefined = a plain opening with
+ *  a painted frame; the others are modelled door sets (see
+ *  INTERIOR_DOOR_STYLES in modelRegistry). */
+export type InteriorDoorStyle = 'oak_country' | 'white_country';
+
 export interface PartitionDoor {
   id: string;
+  style?: InteriorDoorStyle;
   /** On the main run: from the wall's centre along its local +X. On the leg
    *  (onLeg): the distance from the corner along the leg to the door's near
    *  edge - the number a person actually sets out with. */
