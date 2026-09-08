@@ -116,6 +116,11 @@ export function InteriorDoorModel({ doorId, style, ironmongery, swing = 1, width
     root.add(hinge);
     root.updateMatrixWorld(true);
     if (leaf) hinge.attach(leaf);
+    // The hinge is then lifted OUT of the root so the leaf is not inside the
+    // lining's scale - see the render below. Its transform relative to the
+    // root is kept as-is: the root is rendered at the origin of the same
+    // group the hinge is placed in.
+    root.remove(hinge);
     return { root, hinge, metals };
   }, [scene, style]);
 
@@ -140,15 +145,29 @@ export function InteriorDoorModel({ doorId, style, ironmongery, swing = 1, width
     h.rotation.y += diff * Math.min(1, dt * 6);
   });
 
-  // To open the other way the whole set is turned round in its opening, so
-  // the hinges sit on that face instead. (Handing follows: a door hung on
-  // the right, opening towards you, is hung on the left from the other side.)
+  /*
+   * Two scales, on purpose.
+   *
+   * The lining is stretched to the opening's width and height and squashed
+   * to the wall's thickness - three different factors. The leaf must NOT
+   * live inside that: a leaf lying along X while closed and along Z once
+   * open would take the X factor in one and the Z factor in the other, so
+   * it visibly shrank as it swung. The leaf hangs from its own pivot, placed
+   * where the hinge line lands after the lining's scale, and is scaled by
+   * the width factor in every horizontal direction so it keeps its
+   * proportions through the whole arc.
+   *
+   * To open the other way the whole set is turned round in its opening, so
+   * the hinges sit on that face instead. (Handing follows: a door hung on
+   * the right, opening towards you, is hung on the left from the other side.)
+   */
+  const sx = widthMm / 1000 / MODEL_W;
+  const sy = heightMm / 1000 / MODEL_H;
+  const sz = Math.min(1.2, Math.max(0.7, thicknessM / MODEL_D));
   return (
     <group rotation={[0, swing === -1 ? Math.PI : 0, 0]}>
-      <primitive
-        object={model.root}
-        scale={[widthMm / 1000 / MODEL_W, heightMm / 1000 / MODEL_H, Math.min(1.2, Math.max(0.7, thicknessM / MODEL_D))]}
-      />
+      <primitive object={model.root} scale={[sx, sy, sz]} />
+      <primitive object={model.hinge} position={[HINGE_X * sx, 0, HINGE_Z * sz]} scale={[sx, sy, sx]} />
     </group>
   );
 }

@@ -1261,7 +1261,7 @@ export function Sidebar() {
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Tables & Storage</label>
               <div className="grid grid-cols-2 gap-2.5">
-                {(['dining_table', 'coffee_table', 'coffee_table_black', 'desk', 'wardrobe', 'bedside_table'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['dining_table', 'coffee_table', 'coffee_table_black', 'tv_unit', 'desk', 'wardrobe', 'bedside_table'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
