@@ -112,7 +112,7 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
      * definition of "what am I pointing at" - the HUD can never promise a
      * paint target the click would resolve differently.
      */
-    const resolveTarget = (ndc: THREE.Vector2): { kind: 'object' | 'floor' | 'wall' | 'opening'; id?: string } | null => {
+    const resolveTarget = (ndc: THREE.Vector2): { kind: 'object' | 'floor' | 'wall' | 'opening' | 'partition'; id?: string } | null => {
       // Live camera - see the note at the top of the component.
       picker.setFromCamera(ndc, get().camera);
       for (const hit of picker.intersectObjects(scene.children, true)) {
@@ -135,6 +135,9 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
           // A window or door - frame, sash or glass - before the wall it sits
           // in, because the opening group is nested inside the shell group.
           if (node.userData?.openingId) return { kind: 'opening', id: node.userData.openingId as string };
+          // An internal wall, door set included - its doors are edited from
+          // the wall, not the room's own frame panel.
+          if (node.userData?.partitionId) return { kind: 'partition', id: node.userData.partitionId as string };
           if (node.userData?.isFloor) return { kind: 'floor' };
           if (node.userData?.isShell) return { kind: 'wall' };
           node = node.parent;
@@ -216,6 +219,7 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
         st.setWalkFloorOpen(false);
         st.setWalkWallOpen(false);
         st.setWalkFrameOpen(false);
+        st.setWalkDoorOpen(false);
         st.setWalkPending({ ...target, sx, sy });
         if (locked) document.exitPointerLock();
       } else if (!locked) {

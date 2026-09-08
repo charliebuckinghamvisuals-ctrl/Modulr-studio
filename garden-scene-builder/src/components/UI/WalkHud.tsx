@@ -33,7 +33,7 @@ export function WalkHud() {
   const pending = useStore(s => s.walkPending);
   // A finish panel is open when the brush was clicked; the big
   // 'click to look around' card would sit right on top of it.
-  const editing = useStore(s => s.selectedObjectId !== null || s.walkFloorOpen || s.walkWallOpen || s.walkFrameOpen);
+  const editing = useStore(s => s.selectedObjectId !== null || s.walkFloorOpen || s.walkWallOpen || s.walkFrameOpen || s.walkDoorOpen);
 
   if (viewMode !== 'walking') return null;
 
@@ -57,6 +57,7 @@ export function WalkHud() {
       pending.kind === 'object' ? 'Change finish'
       : pending.kind === 'floor' ? 'Change floor'
       : pending.kind === 'opening' ? 'Change frame colour'
+      : pending.kind === 'partition' ? 'Internal door'
       : 'Change wall colour';
     return (
       <div className="absolute inset-0 z-30 pointer-events-none">
@@ -76,6 +77,8 @@ export function WalkHud() {
               st.setWalkWallOpen(pending.kind === 'wall');
               st.setWalkFrameOpen(pending.kind === 'opening');
               st.setWalkFrameId(pending.kind === 'opening' ? pending.id ?? null : null);
+              st.setWalkDoorOpen(pending.kind === 'partition');
+              st.setWalkDoorPartId(pending.kind === 'partition' ? pending.id ?? null : null);
               st.setWalkPending(null);
             }}
             className="pointer-events-auto w-12 h-12 rounded-full bg-white shadow-[0_2px_14px_rgba(0,0,0,0.5)] ring-2 ring-white/70 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 cursor-pointer"

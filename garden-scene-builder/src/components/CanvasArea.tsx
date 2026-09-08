@@ -13,6 +13,7 @@ import { WalkHud } from './UI/WalkHud';
 import { WalkFloorPanel } from './UI/WalkFloorPanel';
 import { WalkWallPanel } from './UI/WalkWallPanel';
 import { WalkFramePanel } from './UI/WalkFramePanel';
+import { WalkDoorPanel } from './UI/WalkDoorPanel';
 import { useRef, useState, useEffect } from 'react';
 import { useProgress } from '@react-three/drei';
 import * as THREE from 'three';
@@ -182,6 +183,7 @@ export function CanvasArea() {
       <WalkFloorPanel />
       <WalkWallPanel />
       <WalkFramePanel />
+      <WalkDoorPanel />
       <ObjectEditorPanel />
       <ElementEditorPanel />
       <ActionButtons />

@@ -776,6 +776,7 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
     <group
       position={[pX, boxH / 2, pZ]}
       rotation={[0, rotAngle, 0]}
+      userData={{ partitionId: part.id }}
       onPointerOver={(e: any) => { e.stopPropagation(); useStore.getState().setHoveredElementId(`part-${part.id}`); }}
       onPointerOut={() => useStore.getState().setHoveredElementId(null)}
     >
@@ -857,7 +858,7 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
           return (
             <group key={`frame-${dr.id}`} position={[ox, -boxH / 2, 0]}>
               <Suspense fallback={null}>
-                <InteriorDoorModel style={dr.style} widthMm={dr.widthMm} heightMm={Math.round(dH * 1000)} thicknessM={pT} />
+                <InteriorDoorModel doorId={dr.id} style={dr.style} ironmongery={dr.ironmongery} widthMm={dr.widthMm} heightMm={Math.round(dH * 1000)} thicknessM={pT} />
               </Suspense>
             </group>
           );
@@ -878,7 +879,7 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
           return (
             <group key={`frame-${dr.id}`} position={[c[0], -boxH / 2, c[2]]} rotation={[0, Math.PI / 2, 0]}>
               <Suspense fallback={null}>
-                <InteriorDoorModel style={dr.style} widthMm={dr.widthMm} heightMm={Math.round(dH * 1000)} thicknessM={pT} />
+                <InteriorDoorModel doorId={dr.id} style={dr.style} ironmongery={dr.ironmongery} widthMm={dr.widthMm} heightMm={Math.round(dH * 1000)} thicknessM={pT} />
               </Suspense>
             </group>
           );

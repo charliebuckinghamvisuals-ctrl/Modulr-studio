@@ -65,8 +65,19 @@ interface AppState {
    * cue. Now the default is a bare dot and free movement, and the brush only
    * appears once you have actually picked something out.
    */
-  walkPending: { kind: 'object' | 'floor' | 'wall' | 'opening'; id?: string; sx?: number; sy?: number } | null;
-  setWalkPending: (t: { kind: 'object' | 'floor' | 'wall' | 'opening'; id?: string; sx?: number; sy?: number } | null) => void;
+  walkPending: { kind: 'object' | 'floor' | 'wall' | 'opening' | 'partition'; id?: string; sx?: number; sy?: number } | null;
+  setWalkPending: (t: { kind: 'object' | 'floor' | 'wall' | 'opening' | 'partition'; id?: string; sx?: number; sy?: number } | null) => void;
+  /** Internal-door panel, opened by clicking an internal wall in the
+   *  walkthrough; walkDoorPartId is that wall. */
+  walkDoorOpen: boolean;
+  setWalkDoorOpen: (open: boolean) => void;
+  walkDoorPartId: string | null;
+  setWalkDoorPartId: (id: string | null) => void;
+  /** Internal doors swung open one at a time from the walkthrough panel -
+   *  a look, not part of the design, so not saved with it. The Open Doors
+   *  button still swings every door at once. */
+  openDoorIds: string[];
+  toggleDoorOpen: (id: string) => void;
   setIsExporting: (exporting: boolean) => void;
   setCapturedImage: (image: string | null) => void;
   setUploadedBgImage: (image: string | null) => void;
@@ -378,6 +389,14 @@ export const useStore = create<AppState>((set, get) => ({
   setWalkFrameId: (id) => set({ walkFrameId: id }),
   walkPending: null,
   setWalkPending: (t) => set({ walkPending: t }),
+  walkDoorOpen: false,
+  setWalkDoorOpen: (open) => set({ walkDoorOpen: open }),
+  walkDoorPartId: null,
+  setWalkDoorPartId: (id) => set({ walkDoorPartId: id }),
+  openDoorIds: [],
+  toggleDoorOpen: (id) => set((state) => ({
+    openDoorIds: state.openDoorIds.includes(id) ? state.openDoorIds.filter(x => x !== id) : [...state.openDoorIds, id],
+  })),
   setIsExporting: (exporting) => set({ isExporting: exporting }),
   setCapturedImage: (image) => set({ capturedImage: image }),
   setUploadedBgImage: (image) => set({ uploadedBgImage: image }),

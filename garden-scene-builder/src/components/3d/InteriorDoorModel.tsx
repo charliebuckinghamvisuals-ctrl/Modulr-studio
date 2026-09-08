@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore } from '../../store';
-import { INTERIOR_DOOR_URL, INTERIOR_DOOR_STYLES } from '../../modelRegistry';
+import { INTERIOR_DOOR_URL, INTERIOR_DOOR_STYLES, METAL_FINISHES } from '../../modelRegistry';
 import type { InteriorDoorStyle } from '../../types';
 
 /**
@@ -18,10 +18,12 @@ import type { InteriorDoorStyle } from '../../types';
  *
  * The "open" copy in Charlie's export is not used: the leaf is swung about
  * its own hinge line here, so it follows the Open Doors button with the
- * exterior doors and can stop at any angle.
+ * exterior doors, can be opened on its own from the walkthrough panel, and
+ * can stop at any angle.
  *
  * The white option is the same door painted: both oak materials are
- * replaced with a satin white, the ironmongery kept.
+ * replaced with a satin white, the ironmongery kept. The ironmongery takes
+ * the tap finishes - chrome, brass, black and so on - per door.
  */
 
 /** Model-space geometry, measured from the cleaned GLB. */
@@ -33,22 +35,35 @@ const MODEL_D = 0.17;
 const HINGE_X = 0.336;
 const HINGE_Z = 0.05;
 const LEAF_NODE = 'Door+hinges';
+const HANDLE_NODE = 'DoorHandle_1';
+/** The lever was modelled 207mm long - a big one. Scaled about the rose,
+ *  which stays where it was fixed to the door. */
+const HANDLE_SCALE = 0.72;
 const OAK_MATERIALS = ['Oak,French', '941,942, 2941, Corn Oak (horizontaal)'];
 const IRONMONGERY = ['[Steel Brushed Stainless]', '*9', '*5', '<LightGray>'];
 
-export function InteriorDoorModel({ style, widthMm, heightMm, thicknessM }: {
+const finishFor = (hex?: string) => {
+  const h = (hex ?? '').toLowerCase();
+  return METAL_FINISHES.find(f => f.hex.toLowerCase() === h) ?? METAL_FINISHES[0];
+};
+
+export function InteriorDoorModel({ doorId, style, ironmongery, widthMm, heightMm, thicknessM }: {
+  doorId: string;
   style: InteriorDoorStyle;
+  ironmongery?: string;
   widthMm: number;
   heightMm: number;
   thicknessM: number;
 }) {
   const { scene } = useGLTF(INTERIOR_DOOR_URL);
   const areDoorsOpen = useStore(s => s.areDoorsOpen);
+  const thisOpen = useStore(s => s.openDoorIds.includes(doorId));
   const pivot = useRef<THREE.Group | null>(null);
 
   const model = useMemo(() => {
     const root = scene.clone(true);
     const spec = INTERIOR_DOOR_STYLES[style];
+    const metals: THREE.MeshStandardMaterial[] = [];
     root.traverse(o => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
@@ -70,11 +85,15 @@ export function InteriorDoorModel({ style, widthMm, heightMm, thicknessM }: {
           mesh.material = m;
         }
       } else if (IRONMONGERY.includes(src.name)) {
-        const m = new THREE.MeshStandardMaterial({ color: '#d6d7d9', metalness: 1, roughness: 0.3, envMapIntensity: 1.1 });
+        const m = new THREE.MeshStandardMaterial({ metalness: 1, roughness: 0.3, envMapIntensity: 1.1 });
         m.name = src.name;
         mesh.material = m;
+        metals.push(m);
       }
     });
+
+    // Smaller handle, both sides.
+    root.traverse(o => { if (o.name === HANDLE_NODE) o.scale.multiplyScalar(HANDLE_SCALE); });
 
     // Re-hang the leaf on a pivot at its hinge line so it can swing.
     let leaf: THREE.Object3D | null = null;
@@ -88,16 +107,23 @@ export function InteriorDoorModel({ style, widthMm, heightMm, thicknessM }: {
       hinge.add(leaf);
       (leaf as THREE.Object3D).position.sub(new THREE.Vector3(HINGE_X, 0, HINGE_Z));
     }
-    return { root, hinge };
+    return { root, hinge, metals };
   }, [scene, style]);
 
   useEffect(() => { pivot.current = model.hinge; }, [model]);
 
+  // The finish is a colour change on the metals, not a rebuild.
+  useEffect(() => {
+    const f = finishFor(ironmongery);
+    model.metals.forEach(m => { m.color.set(f.hex); m.roughness = f.roughness; m.needsUpdate = true; });
+  }, [model, ironmongery]);
+
   // Swing like the exterior leaves: eased toward the target each frame.
+  const open = areDoorsOpen || thisOpen;
   useFrame((_, dt) => {
     const h = pivot.current;
     if (!h) return;
-    const target = areDoorsOpen ? -Math.PI / 2 : 0;
+    const target = open ? -Math.PI / 2 : 0;
     const diff = target - h.rotation.y;
     if (Math.abs(diff) < 0.001) { h.rotation.y = target; return; }
     h.rotation.y += diff * Math.min(1, dt * 6);

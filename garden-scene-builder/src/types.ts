@@ -77,6 +77,8 @@ export type InteriorDoorStyle = 'oak_country' | 'white_country';
 export interface PartitionDoor {
   id: string;
   style?: InteriorDoorStyle;
+  /** Hinge and handle finish - a METAL_FINISHES hex. Undefined = chrome. */
+  ironmongery?: string;
   /** On the main run: from the wall's centre along its local +X. On the leg
    *  (onLeg): the distance from the corner along the leg to the door's near
    *  edge - the number a person actually sets out with. */
