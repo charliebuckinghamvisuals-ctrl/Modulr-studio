@@ -22,6 +22,28 @@ import { GABLE_CEILING_T } from '../../utils/placement';
  *  z-fighting, thin enough to read as paint rather than a second wall. */
 const GABLE_LINER_T = 0.012;
 
+/**
+ * A piece of floor the size of one opening's reveal, with its UVs written in
+ * the main slab's parametrisation - so the boards continue across the joint
+ * as if the slab had simply been cut larger. The slab is a plain box whose
+ * UVs run 0..1 across its whole (w - 2t) x (d - 2t) top, and the floor
+ * material's repeat is set for that (see useRealMaterial's isFloor branch);
+ * this piece is mapped into the same 0..1 space from its position.
+ * cx/cz are the piece's centre in the slab's frame; sw/sd the slab's size.
+ */
+function floorTongueGeometry(width: number, depth: number, cx: number, cz: number, sw: number, sd: number) {
+  const g = new THREE.BoxGeometry(width, 0.01, depth);
+  const pos = g.getAttribute('position');
+  const uv = g.getAttribute('uv');
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i) + cx;
+    const z = pos.getZ(i) + cz;
+    uv.setXY(i, (x + sw / 2) / sw, 1 - (z + sd / 2) / sd);
+  }
+  uv.needsUpdate = true;
+  return g;
+}
+
 function DimText({ value, onValueChange, position, rotation, children, isDraggable, hideOnExport, hideIfZero }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState(String(value));
@@ -1094,6 +1116,32 @@ export function RoomGeometry() {
   const texDecking = useRealMaterial(resolveDeckingKey(room.deckingMaterial, room.cladding), baseW, deckFront, 0);
   const texFloor = useRealMaterial(resolveFloorKey(room.interiorFloorType), w, d, 0);
 
+  /**
+   * One floor tongue per door and per floor-level window: the reveal between
+   * the slab's edge (inner wall face) and the frame's inner face (the frame
+   * is frameDepth deep, on the outer face). Sized exactly - it touches the
+   * slab rather than overlapping it, so nothing is coplanar - and keyed by
+   * the opening so a moved door gets a fresh piece under it.
+   */
+  const floorTongues = useMemo(() => {
+    const sw = w - wallThickness * 2, sd = d - wallThickness * 2;
+    const reveal = wallThickness - frameDepth;
+    if (reveal <= 0.001) return [];
+    const openings = [
+      ...(room.doors || []).map(o => ({ key: `door-${o.id}`, wall: o.wall, offset: o.offsetMm / 1000, width: o.widthMm / 1000 })),
+      ...(room.windows || []).filter(o => (o.sillMm ?? 0) < 1).map(o => ({ key: `win-${o.id}`, wall: o.wall, offset: (o.offsetMm ?? 0) / 1000, width: o.widthMm / 1000 })),
+    ];
+    return openings.map(o => {
+      // The piece's centre: half a reveal inside the inner wall face.
+      let x = 0, z = 0, gw = o.width, gd = reveal;
+      if (o.wall === 'front') { x = o.offset; z = d/2 - wallThickness + reveal/2; }
+      else if (o.wall === 'back') { x = o.offset; z = -(d/2 - wallThickness + reveal/2); }
+      else if (o.wall === 'left') { x = -(w/2 - wallThickness + reveal/2); z = o.offset; gw = reveal; gd = o.width; }
+      else { x = w/2 - wallThickness + reveal/2; z = o.offset; gw = reveal; gd = o.width; }
+      return { key: o.key, x, z, geom: floorTongueGeometry(gw, gd, x, z, sw, sd) };
+    });
+  }, [room.doors, room.windows, w, d, wallThickness, frameDepth]);
+
   const isVert = room.claddingOrientation !== 'vertical';
   const geomFrontWall = useMemo(() => createCladdingGeometry(w, frontH, isVert), [w, frontH, isVert]);
   const geomBackWall = useMemo(() => createCladdingGeometry(w, backH, isVert), [w, backH, isVert]);
@@ -1702,23 +1750,30 @@ export function RoomGeometry() {
               const winH = win.heightMm / 1000;
               const sill = (win.sillMm ?? 0) / 1000;
               const offset = (win.offsetMm ?? 0) / 1000;
-              
-              let pos: [number, number, number] = [0, sill + winH/2, 0];
-              let size: [number, number, number] = [winW, winH, wallThickness * 3];
+              // A window on the floor is cut BELOW the floor, like a door: a
+              // cut that stops exactly at floor level leaves the wall's cut
+              // face lying on the plinth top, and two faces at one height
+              // flicker. The floor tongue covers what the deeper cut exposes.
+              const below = sill < 0.001 ? 0.1 : 0;
+              const cutY = sill + winH/2 - below/2;
+              const cutH = winH + below;
+
+              let pos: [number, number, number] = [0, cutY, 0];
+              let size: [number, number, number] = [winW, cutH, wallThickness * 3];
 
               // Windows mapping
               if (win.wall === 'front') {
-                pos = [offset, sill + winH/2, d/2];
-                size = [winW, winH, wallThickness * 3];
+                pos = [offset, cutY, d/2];
+                size = [winW, cutH, wallThickness * 3];
               } else if (win.wall === 'back') {
-                pos = [offset, sill + winH/2, -d/2];
-                size = [winW, winH, wallThickness * 3];
+                pos = [offset, cutY, -d/2];
+                size = [winW, cutH, wallThickness * 3];
               } else if (win.wall === 'left') {
-                pos = [-w/2, sill + winH/2, offset];
-                size = [wallThickness * 3, winH, winW];
+                pos = [-w/2, cutY, offset];
+                size = [wallThickness * 3, cutH, winW];
               } else { // right
-                pos = [w/2, sill + winH/2, offset];
-                size = [wallThickness * 3, winH, winW];
+                pos = [w/2, cutY, offset];
+                size = [wallThickness * 3, cutH, winW];
               }
 
               return (
@@ -1826,10 +1881,28 @@ export function RoomGeometry() {
                   <boxGeometry args={[cutW + 0.2, 0.02, cutD + 0.2]} />
                 </Subtraction>
              )}
-             
-             
+
+
           </Geometry>
         </mesh>
+
+        {/*
+          The floor runs INTO each opening, up to the frame.
+          The slab above stops at the inner wall face and the frame sits at
+          the outer face, so under every door and full-height window there
+          was a strip of wall thickness with nothing of the room's in it -
+          just the plinth top, with the wall's own cut face lying exactly on
+          it. Two surfaces at one height is a flicker, and it flickered. A
+          real floor is laid through to the frame; so is this one. The UVs
+          are rewritten in the slab's own parametrisation so the boards run
+          straight through with no seam.
+        */}
+        {!isPlanView && floorTongues.map(t => (
+          <mesh key={t.key} position={[t.x, 0.005, t.z]} receiveShadow userData={{ isFloor: true }}>
+            <primitive object={t.geom} attach="geometry" />
+            <meshStandardMaterial {...texFloor} bumpScale={0.05} roughness={0.7} />
+          </mesh>
+        ))}
 
         {/* Internal Ceiling */}
         {/* For the side orientation the whole assembly (built along X) is
