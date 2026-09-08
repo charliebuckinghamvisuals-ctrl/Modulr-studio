@@ -1392,7 +1392,11 @@ export function RoomGeometry() {
   // A 100mm lip was previously baked in here (+0.2), so even with every
   // overhang at 0 the roof was never flush — overhang is now entirely the
   // user's Overhangs & Canopy setting.
-  const roofFlatGeom = useMemo(() => createWorldScaleBoxGeometry(roofW, roofH, roofD, false, 0, 0, 0), [roofW, roofH, roofD]);
+  // Six material groups, one per face: the fascia takes each elevation's own
+  // cladding when set to match, and with a single group the boolean below
+  // painted every edge with material 0 - the right-hand side's cladding -
+  // so a corrugated back wall got a cedar fascia.
+  const roofFlatGeom = useMemo(() => createWorldScaleBoxGeometry(roofW, roofH, roofD, true, 0, 0, 0), [roofW, roofH, roofD]);
   // The slab thickness IS the visible fascia (bargeboard) depth on a gable -
   // user-adjustable, 100mm by default. Every roof edge overhangs 50mm: the
   // slabs run 50mm past both gable ends and 50mm past the eaves, like a real
@@ -2063,7 +2067,10 @@ export function RoomGeometry() {
             rotation={[isPitched && !isGable ? roofPitch : 0, 0, 0]}
           >
             <mesh castShadow receiveShadow position={[0, 0, 0]}>
-              
+              {/* The six face materials go on the BASE brush, not the mesh:
+                  with useGroups the boolean hands the mesh a material array
+                  built from its brushes, and a brush with no material of its
+                  own is plain white. */}
               {(() => {
                 const getFasciaMat = (side) => {
                   const matKey = 'fascia-flat-' + side + '-' + room.fasciaMaterial + '-' + room.cladding + '-' + room.claddingOrientation;
@@ -2084,7 +2091,7 @@ export function RoomGeometry() {
                     return <meshStandardMaterial key={matKey} color="#2d3032" roughness={0.6} metalness={0.2} />; // anthracite default
                   }
                 };
-                return [
+                const faceMats = [
                   React.cloneElement(getFasciaMat('right'), { key: 'mat-0', attach: 'material-0' }),
                   React.cloneElement(getFasciaMat('left'), { key: 'mat-1', attach: 'material-1' }),
                   <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
@@ -2092,32 +2099,43 @@ export function RoomGeometry() {
                   React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }),
                   React.cloneElement(getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }),
                 ];
-              })()}
-              <Geometry>
+                return (
+              /* useGroups keeps the six face materials through the boolean.
+                 Every brush then needs a material of its own for the faces
+                 it cuts: the inner corner of an L takes the front elevation's
+                 fascia, a skylight's reveal the roof colour. */
+              <Geometry useGroups>
                 <Base>
                   {room.fasciaMaterial === 'match_cladding' ? <primitive object={roofFlatGeom} attach="geometry" /> : <boxGeometry args={[roofW, roofH, roofD]} />}
+                  {faceMats}
                 </Base>
                 {isLShape && (
                   <Subtraction position={[cutBoxPosX, 0, cutBoxPosZ]}>
                     <boxGeometry args={[cutBoxSize, roofH + 0.5, cutBoxSize]} />
+                    {room.fasciaMaterial === 'match_cladding'
+                      ? <meshStandardMaterial color={texFront.color} map={texFront.map} normalMap={texFront.normalMap} roughnessMap={texFront.roughnessMap} roughness={texFront.roughness} metalness={0.05} bumpScale={0.1} />
+                      : <meshStandardMaterial color={room.fasciaMaterial === 'white' ? '#ffffff' : room.fasciaMaterial === 'grey' ? '#6a6d70' : room.fasciaMaterial === 'black' ? '#1a1a1a' : '#2d3032'} roughness={0.6} metalness={0.2} />}
                   </Subtraction>
                 )}
-                
-                
                 {isGable && (
                   <>
                     <Subtraction position={[-w/4 - roofX - Math.sin(gablePitch)*(w)/2, Math.cos(gablePitch)*(w)/2, -roofZ]} rotation={[0, 0, gablePitch]}><boxGeometry args={[w*2, w, roofD + 2]} />
+                      <meshStandardMaterial color={roofColorHex} metalness={0.3} roughness={0.6} />
                     </Subtraction>
                     <Subtraction position={[w/4 - roofX + Math.sin(gablePitch)*(w)/2, Math.cos(gablePitch)*(w)/2, -roofZ]} rotation={[0, 0, -gablePitch]}><boxGeometry args={[w*2, w, roofD + 2]} />
+                      <meshStandardMaterial color={roofColorHex} metalness={0.3} roughness={0.6} />
                     </Subtraction>
                   </>
                 )}
                 {(room.skylights || []).map(sky => (
                   <Subtraction key={sky.id} position={[sky.offsetX/1000 - roofX, 0, sky.offsetZ/1000 - roofZ]}>
                     <boxGeometry args={[sky.widthMm/1000, roofH + 0.5, sky.lengthMm/1000]} />
+                    <meshStandardMaterial color={roofColorHex} metalness={0.3} roughness={0.6} />
                   </Subtraction>
                 ))}
               </Geometry>
+                );
+              })()}
             </mesh>
           {/* Metal Flashing Trim */}
           <mesh position={[0, roofH/2 + 0.01, 0]}>
