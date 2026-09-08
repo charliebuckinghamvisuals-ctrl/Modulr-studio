@@ -96,18 +96,26 @@ export function InteriorDoorModel({ doorId, style, ironmongery, swing = 1, width
     // Smaller handle, both sides.
     root.traverse(o => { if (o.name === HANDLE_NODE) o.scale.multiplyScalar(HANDLE_SCALE); });
 
-    // Re-hang the leaf on a pivot at its hinge line so it can swing.
+    /*
+     * Re-hang the leaf on a pivot at its hinge line so it can swing.
+     *
+     * The pivot lives in the model ROOT's frame - upright, metres, the frame
+     * the hinge line was measured in. The leaf's own parent still carries the
+     * exporter's Z-up, inch-scaled transform (only the subtree root was baked
+     * when the door was cut out of Charlie's file), so a pivot placed there
+     * and turned about its Y spun the leaf about the wrong axis: it dipped
+     * into the floor instead of swinging. `attach` keeps the leaf exactly
+     * where it is while moving it under the pivot, and from then on
+     * hinge.rotation.y is a turn about the vertical hinge edge, as on a door.
+     */
     let leaf: THREE.Object3D | null = null;
     root.traverse(o => { if (!leaf && o.name === LEAF_NODE) leaf = o; });
     const hinge = new THREE.Group();
     hinge.name = 'hinge';
-    if (leaf) {
-      const parent = (leaf as THREE.Object3D).parent!;
-      hinge.position.set(HINGE_X, 0, HINGE_Z);
-      parent.add(hinge);
-      hinge.add(leaf);
-      (leaf as THREE.Object3D).position.sub(new THREE.Vector3(HINGE_X, 0, HINGE_Z));
-    }
+    hinge.position.set(HINGE_X, 0, HINGE_Z);
+    root.add(hinge);
+    root.updateMatrixWorld(true);
+    if (leaf) hinge.attach(leaf);
     return { root, hinge, metals };
   }, [scene, style]);
 
