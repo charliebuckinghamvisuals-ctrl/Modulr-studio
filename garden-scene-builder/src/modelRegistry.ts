@@ -238,12 +238,11 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   kitchen_hob_induction: 900,
   // 600mm clearance over the hob is the standard extraction height.
   kitchen_extractor: 1500,
-  // Wall cupboards hang so their TOPS meet the tall units' at 2000mm - the
-  // line a kitchen is set out to - which with the 575mm reduced-height unit
-  // (see MODEL_SCALES) puts their underside 525mm over the 900mm worktop.
-  // They were at 1500 with an 818mm unit, topping out 318mm above the ovens.
-  kitchen_wall_unit_600: 1425,
-  kitchen_wall_unit_1200: 1425,
+  // Wall cupboards hang so their TOPS meet the tall units' at 2208mm - the
+  // line a kitchen is set out to. 818mm high, so the underside sits 490mm
+  // over the 900mm worktop. They were at 1500, topping out above the ovens.
+  kitchen_wall_unit_600: 1390,
+  kitchen_wall_unit_1200: 1390,
   // A towel rail is fixed clear of the floor.
   towel_heater: 300,
   // The extract terminal goes high on the OUTSIDE wall. Not an interior type,
@@ -498,20 +497,13 @@ export const MODEL_SCALES: Partial<Record<ObjectType, [number, number, number]>>
   // Shower enclosures modelled taller than a standard room - capped to 2.0m.
   shower: [1, 2.0 / 2.515, 1],
   shower_small: [1, 2.0 / 2.335, 1],
-  // Tall kitchen units were modelled 2.208m; the default room is 2.05m
-  // internally, so they are squashed on Y only - uniform scaling would
-  // narrow them off the 600mm module the base units line up on.
-  kitchen_tall_fridge: [1, 2.0 / 2.208, 1],
-  kitchen_tall_oven_single: [1, 2.0 / 2.208, 1],
-  kitchen_tall_oven_double: [1, 2.0 / 2.208, 1],
-  kitchen_tall_larder: [1, 2.0 / 2.208, 1],
-  // Wall units were modelled 818mm high. With the tall units capped at 2.0m
-  // a full-height wall unit cannot both meet their top line and clear the
-  // worktop, so these are the 575mm reduced-height unit every range makes
-  // for low ceilings: top at 2000 with the tall units, underside 525 over
-  // the worktop. Y only, so they stay on the 600 module.
-  kitchen_wall_unit_600: [1, 0.575 / 0.818, 1],
-  kitchen_wall_unit_1200: [1, 0.575 / 0.818, 1],
+  // Tall kitchen units are used at their modelled 2.208m, and wall units at
+  // their modelled 818mm. They WERE squashed to 2.0m to clear the default
+  // room's 2.03m ceiling, but that forced the wall units down to a squat
+  // 575mm reduced-height unit to meet their top line - Charlie, 8 Sep: "they
+  // need to be 2208 what they were when they were imported". A tall unit in
+  // a room under 2.25m now runs into the ceiling; that is the room being
+  // too low for a tall unit, which is true of the real thing too.
   // The bezel was modelled at 60mm. Correct for the real fitting, but on a
   // ceiling two and a half metres away it is a speck - too small to read as a
   // layout and too small to grab. 100mm reads properly and is still a size
