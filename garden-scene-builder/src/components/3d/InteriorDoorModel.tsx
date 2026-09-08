@@ -47,10 +47,11 @@ const finishFor = (hex?: string) => {
   return METAL_FINISHES.find(f => f.hex.toLowerCase() === h) ?? METAL_FINISHES[0];
 };
 
-export function InteriorDoorModel({ doorId, style, ironmongery, widthMm, heightMm, thicknessM }: {
+export function InteriorDoorModel({ doorId, style, ironmongery, swing = 1, widthMm, heightMm, thicknessM }: {
   doorId: string;
   style: InteriorDoorStyle;
   ironmongery?: string;
+  swing?: 1 | -1;
   widthMm: number;
   heightMm: number;
   thicknessM: number;
@@ -119,21 +120,28 @@ export function InteriorDoorModel({ doorId, style, ironmongery, widthMm, heightM
   }, [model, ironmongery]);
 
   // Swing like the exterior leaves: eased toward the target each frame.
+  // The hinges are on the leaf's +Z face, so the leaf opens towards +Z -
+  // out of the lining, the way a hinge allows - never through it.
   const open = areDoorsOpen || thisOpen;
   useFrame((_, dt) => {
     const h = pivot.current;
     if (!h) return;
-    const target = open ? -Math.PI / 2 : 0;
+    const target = open ? Math.PI / 2 : 0;
     const diff = target - h.rotation.y;
     if (Math.abs(diff) < 0.001) { h.rotation.y = target; return; }
     h.rotation.y += diff * Math.min(1, dt * 6);
   });
 
+  // To open the other way the whole set is turned round in its opening, so
+  // the hinges sit on that face instead. (Handing follows: a door hung on
+  // the right, opening towards you, is hung on the left from the other side.)
   return (
-    <primitive
-      object={model.root}
-      scale={[widthMm / 1000 / MODEL_W, heightMm / 1000 / MODEL_H, Math.min(1.2, Math.max(0.7, thicknessM / MODEL_D))]}
-    />
+    <group rotation={[0, swing === -1 ? Math.PI : 0, 0]}>
+      <primitive
+        object={model.root}
+        scale={[widthMm / 1000 / MODEL_W, heightMm / 1000 / MODEL_H, Math.min(1.2, Math.max(0.7, thicknessM / MODEL_D))]}
+      />
+    </group>
   );
 }
 

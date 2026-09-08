@@ -48,6 +48,7 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   bar_stool: 'models/bar_stool.glb',
   bar_stool_tall: 'models/bar_stool_tall.glb',
   dining_table: 'models/dining_table.glb',
+  tv_unit: 'models/tv_unit.glb',
   towel_heater: 'models/towel_heater.glb',
   external_extraction_fan: 'models/external_extraction_fan.glb',
   spot_light: 'models/spot_light.glb',
@@ -304,6 +305,12 @@ const OVEN_TWEAKS: Record<string, MaterialTweak> = {
 export const MATERIAL_TWEAKS: Partial<Record<ObjectType, Record<string, MaterialTweak>>> = {
   kitchen_tall_oven_single: OVEN_TWEAKS,
   kitchen_tall_oven_double: OVEN_TWEAKS,
+  // Charlie's TV and media unit (8 Sep): the screen is a gloss black panel,
+  // the bezel satin; the exporter had both as flat half-metal black.
+  tv_unit: {
+    '[0137_Black]': { color: '#050506', roughness: 0.12, metalness: 0.4, envMapIntensity: 1.2 },
+    'M08_Obsidian_Black': { roughness: 0.35, metalness: 0.2 },
+  },
 };
 
 /**
@@ -383,6 +390,7 @@ export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
   bar_stool: true,
   bar_stool_tall: true,
   dining_table: true,
+  tv_unit: true,
   towel_heater: true,
   external_extraction_fan: true,
   bed: true,
@@ -557,6 +565,7 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   kitchen_wall_unit_1200: 'Wall Unit (Double)',
   external_extraction_fan: 'External Extract Fan',
   dining_table: 'Dining Table',
+  tv_unit: 'TV & Media Unit',
   bar_stool: 'Bar Stool',
   bar_stool_tall: 'Bar Stool (Tall)',
   toilet: 'Toilet',

@@ -1,5 +1,6 @@
-import { Paintbrush } from 'lucide-react';
+import { Paintbrush, DoorOpen, DoorClosed } from 'lucide-react';
 import { useStore } from '../../store';
+import { useShallow } from 'zustand/react/shallow';
 import { resumeWalking } from '../../utils/walk';
 
 /** One key on the little WASD diagram. */
@@ -31,6 +32,16 @@ export function WalkHud() {
   const viewMode = useStore(s => s.viewMode);
   const locked = useStore(s => s.walkPointerLocked);
   const pending = useStore(s => s.walkPending);
+  // The clicked internal wall's door sets, for the open/close button beside
+  // the brush - the quickest thing anyone wants from a door is to see it open.
+  // useShallow: this selector builds a new array, and a store selector that
+  // returns a fresh reference on every call re-renders forever (React 185).
+  const pendingDoors = useStore(useShallow(s => {
+    if (s.walkPending?.kind !== 'partition') return [] as string[];
+    const part = (s.scene.room.partitions || []).find(p => p.id === s.walkPending?.id);
+    return (part?.doors || []).filter(d => d.style).map(d => d.id);
+  }));
+  const openIds = useStore(s => s.openDoorIds);
   // A finish panel is open when the brush was clicked; the big
   // 'click to look around' card would sit right on top of it.
   const editing = useStore(s => s.selectedObjectId !== null || s.walkFloorOpen || s.walkWallOpen || s.walkFrameOpen || s.walkDoorOpen);
@@ -90,6 +101,31 @@ export function WalkHud() {
             {label}
           </span>
         </div>
+        {pendingDoors.length > 0 && (() => {
+          const anyOpen = pendingDoors.some(id => openIds.includes(id));
+          return (
+            <div
+              className="absolute flex flex-col items-center gap-2 animate-[fadeIn_120ms_ease-out] -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `calc(${(pending.sx ?? 0.5) * 100}% + 68px)`, top: `${(pending.sy ?? 0.5) * 100}%` }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  const st = useStore.getState();
+                  // One state for the wall: if any leaf is open, close them all.
+                  pendingDoors.forEach(id => { if (st.openDoorIds.includes(id) === anyOpen) st.toggleDoorOpen(id); });
+                }}
+                className="pointer-events-auto w-12 h-12 rounded-full bg-white shadow-[0_2px_14px_rgba(0,0,0,0.5)] ring-2 ring-white/70 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+                aria-label={anyOpen ? 'Close door' : 'Open door'}
+              >
+                {anyOpen ? <DoorClosed size={20} className="text-[#3b4d4a]" /> : <DoorOpen size={20} className="text-[#3b4d4a]" />}
+              </button>
+              <span className="px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-semibold tracking-wide">
+                {anyOpen ? 'Close door' : 'Open door'}
+              </span>
+            </div>
+          );
+        })()}
       </div>
     );
   }

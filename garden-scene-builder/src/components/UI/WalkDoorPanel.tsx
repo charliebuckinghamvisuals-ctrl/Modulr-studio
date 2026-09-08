@@ -18,6 +18,28 @@ import type { InteriorDoorStyle } from '../../types';
  * Picks do NOT close the panel: comparing oak against white, or chrome
  * against brass, is exactly the moment you want to keep looking.
  */
+/**
+ * Which side of a door's wall the walker is standing on, +1 or -1 in the
+ * door's own frame - so the swing chips can say "towards me" and "away from
+ * me" rather than a wall-relative side nobody can picture.
+ */
+function walkerSide(part: { xMm: number; zMm: number; rotation: 0 | 90; lengthMm: number; thicknessMm: number; legEnd?: 1 | -1 }, onLeg?: boolean): 1 | -1 {
+  const cam = (window as any).__modulrCamera;
+  if (!cam) return 1;
+  const a = part.rotation === 90 ? Math.PI / 2 : 0;
+  const wx = cam.position.x - part.xMm / 1000;
+  const wz = cam.position.z - part.zMm / 1000;
+  // World to the wall's local frame (the inverse of its Y rotation).
+  const lx = wx * Math.cos(a) - wz * Math.sin(a);
+  const lz = wx * Math.sin(a) + wz * Math.cos(a);
+  if (!onLeg) return lz >= 0 ? 1 : -1;
+  // A leg door's group is turned a quarter, so its +Z is the wall's +X,
+  // measured from where the leg stands.
+  const le = part.legEnd === -1 ? -1 : 1;
+  const legX = le * (part.lengthMm / 2000 - part.thicknessMm / 2000);
+  return lx - legX >= 0 ? 1 : -1;
+}
+
 export function WalkDoorPanel() {
   const open = useStore(s => s.walkDoorOpen);
   const setOpen = useStore(s => s.setWalkDoorOpen);
@@ -80,6 +102,17 @@ export function WalkDoorPanel() {
                     <button key={k} onClick={() => updatePartitionDoor(part.id, dr.id, { style: k })} className={chip(dr.style === k)}>{v.name}</button>
                   ))}
                 </div>
+                {dr.style && (() => {
+                  const me = walkerSide(part as any, dr.onLeg);
+                  const swing = dr.swing ?? 1;
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 w-14">Opens</span>
+                      <button onClick={() => updatePartitionDoor(part.id, dr.id, { swing: me })} className={chip(swing === me)}>Towards me</button>
+                      <button onClick={() => updatePartitionDoor(part.id, dr.id, { swing: (me * -1) as 1 | -1 })} className={chip(swing !== me)}>Away from me</button>
+                    </div>
+                  );
+                })()}
                 {dr.style && (
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 w-14">Handle</span>

@@ -17,7 +17,7 @@ export type FrameColorType = 'anthracite' | 'black' | 'white' | 'silver';
 export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 'planter' | 'bench' | 'slab' | 'patio' | 'toilet' | 'sink' | 'shower' | 'shower_corner' | 'shower_small' | 'vanity' | 'interior_wall' | 'interior_door' | 'desk' | 'sofa' | 'sofa_2seater' | 'sofa_l' | 'footstool' | 'armchair' | 'dining_table' | 'rug' | 'tv' | 'bed' | 'bedside_table' | 'bookshelf' | 'dressing_table' | 'wardrobe' | 'exterior_wall_light' | 'drop_light' | 'coffee_table' | 'coffee_table_black' | 'indoor_plant' | 'kitchen_island' | 'kitchen_unit_600' | 'kitchen_unit_1200' | 'kitchen_sink_1200' | 'kitchen_tall_fridge' | 'kitchen_tall_oven_single' | 'kitchen_tall_oven_double' | 'kitchen_tap_straight' | 'kitchen_tap_curved' | 'kitchen_drawer_2' | 'kitchen_drawer_3' | 'kitchen_tall_larder' | 'kitchen_hob_gas' | 'kitchen_hob_induction' | 'kitchen_extractor'
  | 'kitchen_wall_unit_600' | 'kitchen_wall_unit_1200'
  | 'bar_stool' | 'bar_stool_tall' | 'towel_heater' | 'external_extraction_fan'
- | 'spot_light';
+ | 'spot_light' | 'tv_unit';
 
 /** 'solid' is doors-only (entrance door); the window UI never offers it. */
 export type GlazingStyle = 'standard' | 'crittall' | 'solid';
@@ -79,6 +79,10 @@ export interface PartitionDoor {
   style?: InteriorDoorStyle;
   /** Hinge and handle finish - a METAL_FINISHES hex. Undefined = chrome. */
   ironmongery?: string;
+  /** Which side of the wall the leaf swings into: +1 (default) is the
+   *  wall's local +Z face, -1 the other. The set is turned round with it,
+   *  so the hinges are always on the face the door opens towards. */
+  swing?: 1 | -1;
   /** On the main run: from the wall's centre along its local +X. On the leg
    *  (onLeg): the distance from the corner along the leg to the door's near
    *  edge - the number a person actually sets out with. */
