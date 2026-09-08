@@ -1,10 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CanvasArea } from '../components/CanvasArea';
 import { Sidebar } from '../components/Sidebar';
+import { useStore } from '../store';
 import { ChevronRight, ChevronLeft, ChevronUp, ChevronDown } from 'lucide-react';
 
 export default function BuilderPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const viewMode = useStore(s => s.viewMode);
+
+  /**
+   * The walkthrough gets the whole screen.
+   *
+   * Entering Walk tucks the sidebar away - its panels are for building, and
+   * the walkthrough has its own controls in the room - and leaving Walk
+   * puts it back the way it was. The toggle still works inside Walk for
+   * anyone who wants the sidebar there.
+   */
+  const prevMode = useRef(viewMode);
+  const openBeforeWalk = useRef(true);
+  useEffect(() => {
+    const prev = prevMode.current;
+    prevMode.current = viewMode;
+    if (viewMode === 'walking' && prev !== 'walking') {
+      openBeforeWalk.current = isSidebarOpen;
+      setIsSidebarOpen(false);
+    } else if (prev === 'walking' && viewMode !== 'walking') {
+      setIsSidebarOpen(openBeforeWalk.current);
+    }
+    // isSidebarOpen is read, not reacted to: only a change of mode matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode]);
 
   return (
     <div className="flex flex-col h-[100dvh] w-full bg-[#fafaf9] text-[#1d1d1f] overflow-hidden font-sans antialiased selection:bg-[#3b4d4a]/30">
