@@ -1,7 +1,7 @@
 import { useStore } from '../../store';
 import { useEffect, useState } from 'react';
 import { Trash2, RotateCw, Copy, ChevronDown, ChevronUp } from 'lucide-react';
-import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS } from '../../modelRegistry';
+import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS, hasTimber, VENEERS } from '../../modelRegistry';
 import { DimensionSlider } from '../DimensionSlider';
 import { useSavedColours, addSavedColour, removeSavedColour } from '../../utils/savedColours';
 import { resumeWalking } from '../../utils/walk';
@@ -284,6 +284,29 @@ export function ObjectEditorPanel() {
                   onClick={() => { updateObject(obj.id, { worktopMaterial: wt.id }); afterPick(); }}
                   style={{ backgroundImage: 'url(textures/' + wt.prefix + '_color.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
                   className={'w-7 h-7 rounded-md border transition-all ' + ((obj.worktopMaterial ?? scene.room.worktopMaterial ?? 'carrara') === wt.id ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20 scale-110' : 'border-black/15 hover:scale-110')}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Wood on a timber piece: its own finish, or one of the veneers. */}
+        {hasTimber(obj.type) && (
+          <div className="flex items-start gap-3">
+            <span className="text-xs font-semibold text-gray-700 shrink-0 pt-1">Wood</span>
+            <div className="flex gap-1.5 flex-wrap items-center">
+              <button
+                title="As modelled"
+                onClick={() => { updateObject(obj.id, { veneer: undefined }); afterPick(); }}
+                className={'px-2 h-7 rounded-md border text-[10px] font-semibold transition-all ' + (!obj.veneer ? 'bg-[#3b4d4a] text-white border-transparent' : 'bg-white text-gray-600 border-black/15 hover:bg-gray-50')}
+              >Natural</button>
+              {VENEERS.map(v => (
+                <button
+                  key={v.id}
+                  title={v.name}
+                  onClick={() => { updateObject(obj.id, { veneer: v.id }); afterPick(); }}
+                  style={{ backgroundImage: 'url(textures/' + v.prefix + '_color.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
+                  className={'w-7 h-7 rounded-md border transition-all ' + (obj.veneer === v.id ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20 scale-110' : 'border-black/15 hover:scale-110')}
                 />
               ))}
             </div>

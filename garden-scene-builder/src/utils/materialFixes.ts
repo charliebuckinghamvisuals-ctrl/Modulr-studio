@@ -4,6 +4,7 @@ import {
   TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH, FORCE_DIELECTRIC,
   EMISSIVE_MATERIAL, LIGHT_COLOURS, UNMIRROR_NORMALS, finishSpec,
   FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById, TIMBER_MATERIAL,
+  veneerById, isVeneerFinish,
 } from '../modelRegistry';
 import type { WorktopDef } from '../modelRegistry';
 
@@ -242,24 +243,37 @@ function grainFor(seed?: string) {
  * it is exactly right, with no stretching. Units are metres, so the paint
  * grain comes out the same physical size on a drawer front and a tall unit.
  */
-function boxProjectUVs(geometry: THREE.BufferGeometry, metresPerTile: number, force = false) {
+function boxProjectUVs(geometry: THREE.BufferGeometry, metresPerTile: number, force = false, worldScale?: THREE.Vector3) {
   if (geometry.getAttribute('uv') && !force) return;
-  if ((geometry as any).__boxProjected === metresPerTile) return;
-  (geometry as any).__boxProjected = metresPerTile;
+  // Vertex positions are in the EXPORTER'S units, not metres: the tall units
+  // are modelled in inches, with the 0.0254 on a parent node. Projecting the
+  // raw positions put 39 tiles of veneer where one belonged - a grid of tiny
+  // oak - so the mesh's world scale is applied first. Keyed on both.
+  const ws = worldScale ?? new THREE.Vector3(1, 1, 1);
+  const key = `${metresPerTile}|${ws.x.toFixed(5)},${ws.y.toFixed(5)},${ws.z.toFixed(5)}`;
+  if ((geometry as any).__boxProjected === key) return;
+  (geometry as any).__boxProjected = key;
   const pos = geometry.getAttribute('position');
   const nor = geometry.getAttribute('normal');
   if (!pos || !nor) return;
   const uv = new Float32Array(pos.count * 2);
   for (let i = 0; i < pos.count; i++) {
     const nx = Math.abs(nor.getX(i)), ny = Math.abs(nor.getY(i)), nz = Math.abs(nor.getZ(i));
+    const px = pos.getX(i) * ws.x, py = pos.getY(i) * ws.y, pz = pos.getZ(i) * ws.z;
     let u: number, v: number;
-    if (nx >= ny && nx >= nz) { u = pos.getZ(i); v = pos.getY(i); }       // facing X
-    else if (ny >= nx && ny >= nz) { u = pos.getX(i); v = pos.getZ(i); }  // facing Y
-    else { u = pos.getX(i); v = pos.getY(i); }                            // facing Z
+    if (nx >= ny && nx >= nz) { u = pz; v = py; }       // facing X
+    else if (ny >= nx && ny >= nz) { u = px; v = pz; }  // facing Y
+    else { u = px; v = py; }                            // facing Z
     uv[i * 2] = u / metresPerTile;
     uv[i * 2 + 1] = v / metresPerTile;
   }
   geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+}
+
+/** The scale a mesh's vertices are drawn at, from the exporter's unit
+ *  conversion on its ancestors. Needs matrixWorld up to date. */
+function worldScaleOf(mesh: THREE.Mesh) {
+  return mesh.getWorldScale(new THREE.Vector3());
 }
 
 /**
@@ -295,6 +309,39 @@ export function createWorktopMaterial(def: WorktopDef) {
   const m = new THREE.MeshStandardMaterial();
   dressWorktop(m, def);
   return m;
+}
+
+/**
+ * A veneered surface: the wood set under a light lacquer.
+ *
+ * Veneered doors and table tops are not raw timber - they are sealed, and
+ * the seal is what returns the room as a soft reflection. Clearcoat does
+ * that without making the wood itself glossy. grain 'x' turns the maps a
+ * quarter so the grain runs along the piece rather than across it; the
+ * textures are cloned for that because the loaded set is shared.
+ */
+function dressVeneer(def: WorktopDef, grain: 'x' | 'z' = 'z') {
+  const wood = new THREE.MeshPhysicalMaterial();
+  dressWorktop(wood, def);
+  if (grain === 'x') {
+    const turn = (t: THREE.Texture | null) => {
+      if (!t) return t;
+      const c = t.clone();
+      c.center.set(0.5, 0.5);
+      c.rotation = Math.PI / 2;
+      c.needsUpdate = true;
+      return c;
+    };
+    wood.map = turn(wood.map);
+    wood.normalMap = turn(wood.normalMap);
+    wood.roughnessMap = turn(wood.roughnessMap);
+  }
+  wood.roughness = 0.5;
+  wood.clearcoat = 0.3;
+  wood.clearcoatRoughness = 0.32;
+  wood.envMapIntensity = 1.0;
+  wood.userData.veneer = true;
+  return wood;
 }
 
 /** Apply a worktop surface to an already-built material, in place. */
@@ -486,7 +533,7 @@ function splitIslandsFor(type: ObjectType, root: THREE.Object3D) {
   }
 }
 
-export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, color?: string, worktop?: string, hideWorktop = false, finish_?: string, seed?: string) {
+export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, color?: string, worktop?: string, hideWorktop = false, finish_?: string, seed?: string, veneer?: string) {
   const tintName = TINT_MATERIAL[type];
   const metalNames = METAL_MATERIALS[type];
   const tweaks = MATERIAL_TWEAKS[type];
@@ -553,7 +600,7 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         // Box-projected in metres so the veining is the same physical size on
         // a 600mm unit and a 1200mm one, and forced over the exporter's own
         // UVs, which are in arbitrary units.
-        boxProjectUVs(mesh.geometry, 1, true);
+        boxProjectUVs(mesh.geometry, 1, true, worldScaleOf(mesh));
         const top = new THREE.MeshStandardMaterial();
         top.name = m.name;
         dressWorktop(top, worktopDef);
@@ -587,14 +634,18 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
 
       const timber = TIMBER_MATERIAL[type];
       if (timber && timber.materials.includes(m.name)) {
-        // See TIMBER_MATERIAL: the worktop wood set, projected in metres over
-        // whatever UVs the exporter wrote, so the grain is life-size.
-        boxProjectUVs(mesh.geometry, 1, true);
-        const wood = new THREE.MeshStandardMaterial();
-        dressWorktop(wood, worktopById(timber.worktop));
-        if (timber.tint) wood.color.set(timber.tint);
-        wood.name = m.name;
-        return wood;
+        // See TIMBER_MATERIAL: a wood set projected in metres over whatever
+        // UVs the exporter wrote, so the grain is life-size. A chosen veneer
+        // wins; otherwise the piece's default dressing, if it has one; and
+        // failing that the model's own material stands.
+        const def = veneer ? veneerById(veneer) : (timber.worktop ? worktopById(timber.worktop) : undefined);
+        if (def) {
+          boxProjectUVs(mesh.geometry, 1, true, worldScaleOf(mesh));
+          const wood = dressVeneer(def, timber.grain);
+          if (!veneer && timber.tint) wood.color.set(timber.tint);
+          wood.name = m.name;
+          return wood;
+        }
       }
 
       const fabricRepeat = FABRIC_REPEAT[type];
@@ -603,6 +654,24 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         fab.name = m.name;
         bodyMats.push(fab as unknown as THREE.MeshPhysicalMaterial);
         return fab;
+      }
+
+      if (tintName && m.name === tintName && isVeneerFinish(finish_)) {
+        // A veneered door instead of a painted one. Projected in METRES
+        // (the paint projects at its own tile size), so the grain is real
+        // size and runs UP the door - the projection's V axis is world Y on
+        // a vertical face, and the texture's grain runs along V.
+        //
+        // On a COPY of the geometry. The cached scene's geometry is shared by
+        // every instance and by the picker thumbnails, which are dressed as
+        // paint at the paint's 60mm tile: the last projection to run won,
+        // and veneered doors came up with a 100mm grid of tiny oak.
+        mesh.geometry = mesh.geometry.clone();
+        boxProjectUVs(mesh.geometry, 1, true, worldScaleOf(mesh));
+        const wood = dressVeneer(veneerById(finish_)!, 'z');
+        wood.name = m.name;
+        bodyMats.push(wood);
+        return wood;
       }
 
       if (tintName && m.name === tintName) {
@@ -616,7 +685,7 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         // respecting them put the peel at a different size on every unit -
         // invisible on one door, a coarse grid on the next. Box projection in
         // metres is exact for these flat panels and the same on all of them.
-        boxProjectUVs(mesh.geometry, PAINT_TILE_METRES, true);
+        boxProjectUVs(mesh.geometry, PAINT_TILE_METRES, true, worldScaleOf(mesh));
         // Matt, satin or gloss - three real products, not a slider. See
         // UNIT_FINISHES for what each number is doing.
         const fin = finishSpec(finish_);
@@ -698,6 +767,8 @@ export function refinishUnits(
   const f = finishSpec(finish);
   handles.bodyMats.forEach(mat => {
     if (!(mat as any).isMeshPhysicalMaterial) return;
+    // A veneered door is its own finish; the paint sheens do not apply.
+    if (mat.userData.veneer) return;
     mat.roughness = f.roughness;
     mat.clearcoat = f.clearcoat;
     mat.clearcoatRoughness = f.clearcoatRoughness;
@@ -730,7 +801,8 @@ export function retintModel(
   handles: { bodyMats: THREE.MeshPhysicalMaterial[]; metalMats: THREE.MeshStandardMaterial[]; lampMats?: THREE.MeshStandardMaterial[] },
   color: string,
 ) {
-  handles.bodyMats.forEach(m => { m.color.set(color); m.needsUpdate = true; });
+  // A veneer is not a colour: a run's paint colour leaves veneered doors alone.
+  handles.bodyMats.forEach(m => { if (m.userData.veneer) return; m.color.set(color); m.needsUpdate = true; });
   // A lamp's colour is the light it gives off, not the colour of its glass,
   // so it lands on the emissive - and the spot light beside it takes the same
   // hex, keeping lens and beam the same temperature.

@@ -1,7 +1,7 @@
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import {
-  UNIT_COLOURS, UNIT_FINISHES, WORKTOPS, FAMILY_LABEL, UNIT_FAMILY,
+  UNIT_COLOURS, UNIT_FINISHES, VENEERS, WORKTOPS, FAMILY_LABEL, UNIT_FAMILY,
   type UnitFamily,
 } from '../../modelRegistry';
 import { useSavedColours, addSavedColour } from '../../utils/savedColours';
@@ -69,6 +69,21 @@ export function KitchenPanel() {
                 finish === f.id ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'
               }`}
             >{f.name}</button>
+          ))}
+        </div>
+        {/* Or a veneer instead of paint: the doors take the wood, grain up,
+            and the colour rows below no longer apply to them. */}
+        <div className="grid grid-cols-3 gap-1.5">
+          {VENEERS.map(v => (
+            <button
+              key={v.id}
+              title={v.name}
+              onClick={() => updateRoom({ unitFinish: v.id })}
+              style={{ backgroundImage: 'url(textures/' + v.prefix + '_color.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
+              className={`h-9 rounded-lg border text-[9px] font-bold uppercase tracking-wide text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.7)] transition-all ${
+                finish === v.id ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20' : 'border-black/10 hover:scale-[1.03]'
+              }`}
+            >{v.name}</button>
           ))}
         </div>
       </div>

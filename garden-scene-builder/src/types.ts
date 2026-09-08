@@ -168,7 +168,7 @@ export interface Room {
   worktopMaterial?: string;
   /** Cabinet door finish - matt, satin or gloss. Kitchen-wide, like the
    *  worktop: mixing finishes across one run is not a thing people spec. */
-  unitFinish?: 'matt' | 'satin' | 'gloss';
+  unitFinish?: 'matt' | 'satin' | 'gloss' | 'oak_veneer' | 'walnut_veneer' | 'silver_oak_veneer';
   /** Board-size multiplier for the interior floor: 1 = the material's real
    *  scale, 2 = planks twice as wide. */
   floorScale?: number;
@@ -227,6 +227,9 @@ export interface SceneObject {
   independent?: boolean;
   /** Worktop override for a bespoke unit. Falls back to the room's. */
   worktopMaterial?: string;
+  /** Wood veneer on a timber piece (a VENEERS id). Unset = the model's own
+   *  finish, or its default oak dressing. */
+  veneer?: string;
   /** Objects laid out together as one run - a row of downlights. They move as
    *  a unit, because dragging six spots one at a time to shift a row 200mm is
    *  exactly the tedium the layout tool exists to remove. */

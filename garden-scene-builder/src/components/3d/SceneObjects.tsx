@@ -6,7 +6,7 @@ import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
-import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS } from '../../modelRegistry';
+import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish } from '../../modelRegistry';
 import { applyModelMaterials, retintModel, resurfaceWorktop, refinishUnits } from '../../utils/materialFixes';
 import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS } from '../../utils/placement';
 import { wallpaperProps } from '../../utils/wallpaper';
@@ -21,7 +21,7 @@ import { PartitionOpenings } from './PartitionOpenings';
  * (served at the site root) and inside the /3d-config/ iframe, where an
  * absolute path would miss.
  */
-function GlbModel({ url, type, color, worktop, finish, seed }: { url: string; type: SceneObject['type']; color?: string; worktop?: string; finish?: string; seed?: string }) {
+function GlbModel({ url, type, color, worktop, finish, seed, veneer }: { url: string; type: SceneObject['type']; color?: string; worktop?: string; finish?: string; seed?: string; veneer?: string }) {
     const { scene } = useGLTF(url);
 
     // Clone per instance. useGLTF caches one scene graph, so placing two of
@@ -32,9 +32,16 @@ function GlbModel({ url, type, color, worktop, finish, seed }: { url: string; ty
     const cloned = useRef<THREE.Object3D | null>(null);
     const matHandles = useRef<ReturnType<typeof applyModelMaterials> | null>(null);
 
-    if (!cloned.current) {
+    // Colour, sheen and worktop are changed in place below. A change of WOOD
+    // - a veneer on a table, or veneered doors in place of painted ones - is
+    // a different material with different maps and UVs, so the model is
+    // re-dressed from the cached scene instead.
+    const variant = `${veneer ?? ''}|${isVeneerFinish(finish) ? finish : 'paint'}`;
+    const variantRef = useRef(variant);
+    if (!cloned.current || variantRef.current !== variant) {
+        variantRef.current = variant;
         cloned.current = scene.clone(true);
-        matHandles.current = applyModelMaterials(type, cloned.current, color, worktop, true, finish, seed);
+        matHandles.current = applyModelMaterials(type, cloned.current, color, worktop, true, finish, seed, veneer);
     }
 
     // Recolour on demand without rebuilding the model.
@@ -492,6 +499,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
               color={obj.color}
               worktop={room.worktopMaterial}
               finish={room.unitFinish}
+              veneer={obj.veneer}
             />
             {/* The extractor's flue is its own model, stretched on Y so its
                 top always lands on the ceiling. A duct that stops short

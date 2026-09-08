@@ -134,7 +134,24 @@ export const FAMILY_LABEL: Record<UnitFamily, string> = {
  * roughness plus the clearcoat over the colour: a matt door scatters and shows
  * its own texture, a gloss door mirrors the room and hides it.
  */
-export type UnitFinish = 'matt' | 'satin' | 'gloss';
+export type UnitFinish = 'matt' | 'satin' | 'gloss' | VeneerId;
+
+/**
+ * Wood veneers - Poly Haven (CC0), 1K, added 8 Sep 2026 at Charlie's ask.
+ * Used two ways: as a kitchen DOOR finish in place of paint, grain running
+ * up the door at real size with a slight clearcoat; and as a wood choice on
+ * timber furniture (see TIMBER_MATERIAL). Same file layout as the worktop
+ * sets so one loader serves both. tileMetres is the real width the texture
+ * covers, from the asset page.
+ */
+export type VeneerId = 'oak_veneer' | 'walnut_veneer' | 'silver_oak_veneer';
+export const VENEERS: (WorktopDef & { id: VeneerId })[] = [
+  { id: 'oak_veneer', name: 'Oak Veneer', prefix: 'wt_oak_veneer', tileMetres: 1.8, roughness: 0.45 },
+  { id: 'walnut_veneer', name: 'Walnut Veneer', prefix: 'wt_walnut_veneer', tileMetres: 1.8, roughness: 0.45 },
+  { id: 'silver_oak_veneer', name: 'Silver Oak', prefix: 'wt_silver_oak_veneer', tileMetres: 1.0, roughness: 0.45 },
+];
+export const veneerById = (id?: string) => VENEERS.find(v => v.id === id);
+export const isVeneerFinish = (id?: string): id is VeneerId => !!veneerById(id);
 
 export const UNIT_FINISHES: {
   id: UnitFinish; name: string;
@@ -339,12 +356,29 @@ export const MATERIAL_TWEAKS: Partial<Record<ObjectType, Record<string, Material
  * the grain is the same real size on the top, the legs and the chairs. The
  * tint multiplies through the texture, for a paler or darker species.
  */
-export const TIMBER_MATERIAL: Partial<Record<ObjectType, { materials: string[]; worktop: string; tint?: string }>> = {
-  dining_table: { materials: ['b113_BS'], worktop: 'oak', tint: '#f3ebdd' },
+export const TIMBER_MATERIAL: Partial<Record<ObjectType, {
+  materials: string[];
+  /** Worktop set to dress with by default. Unset = the model's own material
+   *  until the customer picks a veneer. */
+  worktop?: string;
+  tint?: string;
+  /** Which way the grain runs on the piece's top: 'x' turns the texture a
+   *  quarter so it runs along a table's length. Default 'z' - which on a
+   *  vertical face is UP, right for doors and drawer fronts. */
+  grain?: 'x' | 'z';
+}>> = {
+  dining_table: { materials: ['b113_BS'], worktop: 'oak', tint: '#f3ebdd', grain: 'x' },
   // The round table's top came with a roughness of 0 under a metalness map
   // - a mirror. Same oak as the rectangular table, so the two match.
   dining_table_round: { materials: ['931,932, 2931, White Oak (verticaal)'], worktop: 'oak', tint: '#f3ebdd' },
+  // These keep their own finish until a veneer is chosen for them.
+  tv_unit: { materials: ['991, 992, 2991, Espresso Oak (horizontaal)'], grain: 'x' },
+  coffee_table: { materials: ['chair_john+table_Orient_06 - Default'] },
+  desk: { materials: [''], grain: 'x' },
+  wardrobe: { materials: ['wood v', 'wood h'] },
+  bedside_table: { materials: ['[Color A01]'] },
 };
+export const hasTimber = (type: ObjectType) => TIMBER_MATERIAL[type] !== undefined;
 
 /**
  * Materials that represent the tap's metalwork, per tap model. These get a
