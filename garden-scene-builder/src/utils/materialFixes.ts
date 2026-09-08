@@ -3,7 +3,7 @@ import type { ObjectType } from '../types';
 import {
   TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH, FORCE_DIELECTRIC,
   EMISSIVE_MATERIAL, LIGHT_COLOURS, UNMIRROR_NORMALS, finishSpec,
-  FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById,
+  FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById, TIMBER_MATERIAL,
 } from '../modelRegistry';
 import type { WorktopDef } from '../modelRegistry';
 
@@ -583,6 +583,18 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         lamp.toneMapped = false;
         lampMats.push(lamp);
         return lamp;
+      }
+
+      const timber = TIMBER_MATERIAL[type];
+      if (timber && timber.materials.includes(m.name)) {
+        // See TIMBER_MATERIAL: the worktop wood set, projected in metres over
+        // whatever UVs the exporter wrote, so the grain is life-size.
+        boxProjectUVs(mesh.geometry, 1, true);
+        const wood = new THREE.MeshStandardMaterial();
+        dressWorktop(wood, worktopById(timber.worktop));
+        if (timber.tint) wood.color.set(timber.tint);
+        wood.name = m.name;
+        return wood;
       }
 
       const fabricRepeat = FABRIC_REPEAT[type];

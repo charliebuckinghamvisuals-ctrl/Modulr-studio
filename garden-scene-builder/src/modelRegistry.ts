@@ -238,10 +238,12 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   kitchen_hob_induction: 900,
   // 600mm clearance over the hob is the standard extraction height.
   kitchen_extractor: 1500,
-  // Wall cupboards hang at the same height as the hood, so a run of them
-  // lines up with it across the wall.
-  kitchen_wall_unit_600: 1500,
-  kitchen_wall_unit_1200: 1500,
+  // Wall cupboards hang so their TOPS meet the tall units' at 2000mm - the
+  // line a kitchen is set out to - which with the 575mm reduced-height unit
+  // (see MODEL_SCALES) puts their underside 525mm over the 900mm worktop.
+  // They were at 1500 with an 818mm unit, topping out 318mm above the ovens.
+  kitchen_wall_unit_600: 1425,
+  kitchen_wall_unit_1200: 1425,
   // A towel rail is fixed clear of the floor.
   towel_heater: 300,
   // The extract terminal goes high on the OUTSIDE wall. Not an interior type,
@@ -292,6 +294,20 @@ const OVEN_TWEAKS: Record<string, MaterialTweak> = {
 export const MATERIAL_TWEAKS: Partial<Record<ObjectType, Record<string, MaterialTweak>>> = {
   kitchen_tall_oven_single: OVEN_TWEAKS,
   kitchen_tall_oven_double: OVEN_TWEAKS,
+};
+
+/**
+ * Timber parts re-dressed with one of the worktop wood sets.
+ *
+ * The dining table's top came out of SketchUp with a 313 x 230 pixel wood
+ * image stretched ONCE across a 1.7m top - a blur at any distance you would
+ * sit at. Repeating that image just tiled its edges. The oak worktop set is
+ * seamless and colour/normal/roughness, and is box-projected in metres, so
+ * the grain is the same real size on the top, the legs and the chairs. The
+ * tint multiplies through the texture, for a paler or darker species.
+ */
+export const TIMBER_MATERIAL: Partial<Record<ObjectType, { materials: string[]; worktop: string; tint?: string }>> = {
+  dining_table: { materials: ['b113_BS'], worktop: 'oak', tint: '#f3ebdd' },
 };
 
 /**
@@ -489,6 +505,13 @@ export const MODEL_SCALES: Partial<Record<ObjectType, [number, number, number]>>
   kitchen_tall_oven_single: [1, 2.0 / 2.208, 1],
   kitchen_tall_oven_double: [1, 2.0 / 2.208, 1],
   kitchen_tall_larder: [1, 2.0 / 2.208, 1],
+  // Wall units were modelled 818mm high. With the tall units capped at 2.0m
+  // a full-height wall unit cannot both meet their top line and clear the
+  // worktop, so these are the 575mm reduced-height unit every range makes
+  // for low ceilings: top at 2000 with the tall units, underside 525 over
+  // the worktop. Y only, so they stay on the 600 module.
+  kitchen_wall_unit_600: [1, 0.575 / 0.818, 1],
+  kitchen_wall_unit_1200: [1, 0.575 / 0.818, 1],
   // The bezel was modelled at 60mm. Correct for the real fitting, but on a
   // ceiling two and a half metres away it is a speck - too small to read as a
   // layout and too small to grab. 100mm reads properly and is still a size
