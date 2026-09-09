@@ -2477,6 +2477,14 @@ ${lines.join('\n')}
             const json = await r.json().catch(() => ({}));
             if (!r.ok) {
                 console.error('[OPENAI] image edit failed', r.status, JSON.stringify(json).slice(0, 500));
+                // The reasons a trial hits are account-side and fixable; say
+                // which, in our own words - never OpenAI's raw text.
+                const msg = String(json?.error?.message || '');
+                let clientMessage = null;
+                if (/verified/i.test(msg)) clientMessage = 'OpenAI needs the organisation verified before the GPT Image 2.5 models will answer: platform.openai.com, Settings, Organization, Verify Organization. Allow up to 15 minutes after verifying, or switch the engine to Gemini.';
+                else if (r.status === 429 || /quota|billing|balance/i.test(msg)) clientMessage = 'The OpenAI account has no credit left, or is being rate limited. Top up at platform.openai.com or switch the engine to Gemini.';
+                else if (r.status === 401) clientMessage = 'OpenAI rejected the API key on the server. Check OPENAI_API_KEY, or switch the engine to Gemini.';
+                if (clientMessage) throw Object.assign(new Error('openai refused: ' + r.status), { clientMessage });
                 return null;
             }
             const b64 = json?.data?.[0]?.b64_json || null;
@@ -2746,6 +2754,8 @@ ${failures.map(f => `      - ${f}`).join('\n')}
         return res.json({ result: b64Data, verification: { ...verification, refined, imageEngine } });
     } catch (error) {
         console.error("Render error in /api/renderBuilding:", error, error.stack);
+        // A refusal we can explain in our own words (see runOpenAIEdit).
+        if (error && error.clientMessage) return res.status(400).json({ error: error.clientMessage });
         // Log the real error above; never echo internals to the client.
         res.status(500).json({ error: 'The render could not be completed. Please try again in a moment.' });
     }
