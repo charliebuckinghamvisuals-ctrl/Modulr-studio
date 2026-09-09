@@ -191,9 +191,9 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
 
   if (!configMode) {
     return (
-      {/* The site's drafting-paper surface, not a black void - the chooser
-          is a page of the app, and every other page sits on this grid. */}
       <div className="w-full h-[calc(100dvh-6rem)] flex flex-col items-center justify-center render-grid px-6">
+        {/* The site's drafting-paper surface, not a black void - the chooser
+            is a page of the app, and every other page sits on this grid. */}
         <h2 className="text-[#3b4d4a] text-xl font-bold mb-1">3D Configurator</h2>
         <p className="text-slate-500 text-sm mb-8">Choose which version to open.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full max-w-3xl">
