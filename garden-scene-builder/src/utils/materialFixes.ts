@@ -4,7 +4,7 @@ import {
   TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH, FORCE_DIELECTRIC,
   EMISSIVE_MATERIAL, LIGHT_COLOURS, UNMIRROR_NORMALS, finishSpec,
   FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById, TIMBER_MATERIAL,
-  veneerById, isVeneerFinish, UNIT_FAMILY, metalUsesColour, HORIZONTAL_VENEER,
+  veneerById, isVeneerFinish, UNIT_FAMILY, metalUsesColour, HORIZONTAL_VENEER, DOUBLE_SIDED_METAL,
 } from '../modelRegistry';
 import type { WorktopDef } from '../modelRegistry';
 
@@ -784,6 +784,8 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
           roughness: finish.roughness,
           metalness: 1,
           envMapIntensity: 1.2,
+          // See DOUBLE_SIDED_METAL: inside-out columns on the 3-hole tap.
+          side: DOUBLE_SIDED_METAL[type] ? THREE.DoubleSide : THREE.FrontSide,
         });
         metal.name = m.name;
         metalMats.push(metal);

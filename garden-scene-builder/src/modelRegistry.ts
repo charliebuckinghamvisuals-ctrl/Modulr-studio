@@ -535,6 +535,20 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
 };
 
 /**
+ * Metalwork drawn from both sides.
+ *
+ * The widespread basin tap's two valve columns were exported with their
+ * triangles wound inside-out: with back faces culled, the front of each
+ * column vanished and you looked through it at the inside of its back wall
+ * - "invisible on the front pipes" (9 Sep), plainest in brass. Drawing the
+ * metal double-sided shows the column whichever way it is wound. Per type,
+ * because on a large open shell double-sided means z-fighting.
+ */
+export const DOUBLE_SIDED_METAL: Partial<Record<ObjectType, true>> = {
+  basin_tap_widespread: true,
+};
+
+/**
  * Whether a model's metal finish is stored in `color` (the older, metal-only
  * models: taps, showers, the towel rail) or in its own `metal` field. A model
  * that also has a painted body, a lamp colour or upholstery uses `color` for
