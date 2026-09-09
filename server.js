@@ -2458,11 +2458,29 @@ ${lines.join('\n')}
             return table[r] || '2048x1152';
         };
 
+        /**
+         * The hard rules, first. The edit endpoint's prompt is a single
+         * field and the first lines carry the most weight; buried in the
+         * middle of the long house-style prompt the door type was ignored -
+         * Charlie's first Sunburst render was perfect except that a solid
+         * door came back glazed, because the flat CAD source shows a solid
+         * door as a dark rectangle that looks like glass.
+         */
+        const openAiHardRules = () => {
+            const rules = [
+                'HARD RULES - these override everything below.',
+                'Edit the input image only: keep its exact camera, framing, crop, building geometry, roof form and every opening exactly where it is. Add nothing, remove nothing, move nothing.',
+                'The input is a flat-shaded CAD view. A dark door panel in it is an OPAQUE SOLID door, not glass - render it as a plain flush panel with no glazing unless the specification below says that door is glazed.',
+            ];
+            if (specFacts) rules.push('SPECIFICATION (ground truth for door type): ' + specFacts);
+            return rules.join('\n') + '\n\n';
+        };
+
         /** One OpenAI edit of the SOURCE image with the render prompt. */
         const runOpenAIEdit = async (promptText) => {
             const form = new FormData();
             form.append('model', OPENAI_IMAGE_MODELS[imageEngine]);
-            form.append('prompt', promptText);
+            form.append('prompt', openAiHardRules() + promptText);
             form.append('image', new Blob([Buffer.from(base64Image, 'base64')], { type: 'image/jpeg' }), 'source.jpg');
             form.append('size', openAiSize());
             // Accuracy runs the higher quality tier; Speed the medium one.
@@ -2619,6 +2637,47 @@ ${lines.join('\n')}
             }
         };
 
+        /**
+         * A second, single-question look at SOLID doors, on a stronger judge.
+         *
+         * The lite inspector passed a render in which a specified-solid door
+         * had come back glazed: asked six things at once about two images, it
+         * missed the glass. When the specification lists a solid door, this
+         * asks one question of the render alone - is any door glazed - on the
+         * full flash model. Only runs when there is a solid door to protect,
+         * so it costs nothing on the common glazed-door design.
+         */
+        const inspectSolidDoors = async (renderB64) => {
+            if (!/SOLID/.test(specFacts)) return null;
+            qaCalls++;
+            try {
+                const resp = await ai.models.generateContent({
+                    model: 'gemini-3.5-flash',
+                    contents: {
+                        parts: [
+                            fileToGenerativePart(renderB64, "image/jpeg"),
+                            { text: 'This is a render of a garden building. The client ordered: ' + specFacts + ' Look only at the doors that are visible. Report anyGlazedSolidDoor = true if any door that the order lists as SOLID shows glass, glazing panels, a window in the leaf, or see-through panes - a reflection on a flat opaque panel is NOT glazing. Report false if every solid door is an opaque panel leaf. Name the offending door in problem, or leave it empty.' }
+                        ]
+                    },
+                    config: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: Type.OBJECT,
+                            properties: {
+                                anyGlazedSolidDoor: { type: Type.BOOLEAN, description: "true if a door ordered as SOLID shows glass" },
+                                problem: { type: Type.STRING, description: "which door, and what it shows; empty if none" },
+                            },
+                            required: ["anyGlazedSolidDoor"]
+                        }
+                    }
+                });
+                return JSON.parse(resp.text);
+            } catch (e) {
+                console.warn('[VERIFY] solid-door check errored:', e.message || e);
+                return null;
+            }
+        };
+
         /** Pass 2: the pro model finishes the surfaces of a pass-1 render. */
         const runMaterialsPass = async (pass1B64) => {
             const response = await ai.models.generateContent({
@@ -2676,6 +2735,15 @@ ${lines.join('\n')}
                 if (seen.doorStyleMatch === false) failures.push(`the render changed a door's type${why}. A solid, unglazed door in the source stays a solid, unglazed panel with no glass; a glazed door stays glazed`);
                 if (checkFraming && seen.sameViewpoint === false) {
                     failures.push(`the render changed the camera${why}. The source image's exact camera position, angle, framing and crop are MANDATORY: same side of the building, same distance, nothing the source shows cropped out`);
+                }
+                // The dedicated solid-door look, only when the first pass did
+                // not already catch a door-type change.
+                if (seen.doorStyleMatch !== false) {
+                    const solid = await inspectSolidDoors(renderB64);
+                    if (solid && solid.anyGlazedSolidDoor === true) {
+                        const which = solid.problem ? ` (${sanitizeString(String(solid.problem), 160)})` : '';
+                        failures.push(`a door ordered as SOLID has been rendered with glass${which}. Render that door as an opaque, unglazed, flush panel leaf in the frame colour - no glazing, no panes, no window in the leaf`);
+                    }
                 }
                 return failures;
             };
