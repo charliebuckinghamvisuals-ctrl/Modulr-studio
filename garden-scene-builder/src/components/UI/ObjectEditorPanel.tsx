@@ -133,6 +133,12 @@ export function ObjectEditorPanel() {
   // Declared before the early return below so the hook order never shifts.
   const [collapsed, setCollapsed] = useState(false);
   const { selectedObjectId, scene, updateObject, removeObject, viewMode, updateRoom, recolourUnits } = useStore();
+  // A drag in progress parks the camera controls; the panel gets out of the
+  // way for the same span. Docked bottom-centre it sat over any object
+  // being moved through the middle of the room - a unit vanished under it
+  // for the length of the drag. Hidden, not unmounted, so its collapsed
+  // state and scope survive the move.
+  const dragging = useStore(s => !s.controlsEnabled);
   // Defaults to the selected unit's own run - the usual intent. Reset when a
   // different family is selected so it never silently paints the wrong run.
   const [scope, setScope] = useState<any>(null);
@@ -165,7 +171,7 @@ export function ObjectEditorPanel() {
     // Docked bottom-centre so it never covers the object being edited - the
     // old floating top-right card sat over the scene. Frequent actions
     // (rotate / duplicate / delete) live in the mini toolbar at the object.
-    <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-2xl border border-black/5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] rounded-2xl px-5 py-3 z-20 w-80 text-[#3b4d4a]">
+    <div className={`absolute bottom-24 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-2xl border border-black/5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] rounded-2xl px-5 py-3 z-20 w-80 text-[#3b4d4a] transition-opacity duration-150 ${dragging && !finishesOnly ? 'opacity-0 pointer-events-none' : ''}`}>
       <div className={`flex justify-between items-center ${collapsed ? '' : 'mb-2'}`}>
         <div className="flex items-center gap-2">
           {/* Minimise to the header only. Docked bottom-centre, this panel
