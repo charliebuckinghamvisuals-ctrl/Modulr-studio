@@ -798,7 +798,7 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         // dielectric a ~14% specular at normal incidence instead of glass's
         // 4%, which is what a screen's coated front actually returns.
         const copy: any = tweak.glass
-          ? new THREE.MeshPhysicalMaterial({ name: m.name, ior: 1.9, clearcoat: 1, clearcoatRoughness: 0.03, side: m.side })
+          ? new THREE.MeshPhysicalMaterial({ name: m.name, ior: tweak.ior ?? 1.9, specularIntensity: tweak.specular ?? 1, clearcoat: tweak.clearcoat ?? 1, clearcoatRoughness: 0.03, side: m.side })
           : m.clone();
         if (tweak.color !== undefined) copy.color = new THREE.Color(tweak.color);
         if (tweak.roughness !== undefined) copy.roughness = tweak.roughness;

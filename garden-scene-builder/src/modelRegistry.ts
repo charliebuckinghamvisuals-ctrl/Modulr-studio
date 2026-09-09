@@ -402,6 +402,17 @@ export type MaterialTweak = {
    *  way a switched-off TV does. Metalness would make it DARKER - a metal's
    *  reflection is its own colour, and this one is black. */
   glass?: true;
+  /** Clearcoat on a glass surface - a second, sharper reflection over the
+   *  first. Default 1. Zero for a horizontal pane, which already mirrors
+   *  the sky through its base layer. */
+  clearcoat?: number;
+  /** Index of refraction for a glass surface. Default 1.9 (a coated screen). */
+  ior?: number;
+  /** How much of the environment a glass surface returns, 0-1. This is the
+   *  ONLY working dimmer: envMapIntensity is ignored by three r184 on any
+   *  material lit by the scene environment (WebGLRenderer overwrites it
+   *  with scene.environmentIntensity), which is every material here. */
+  specular?: number;
 };
 
 const OVEN_TWEAKS: Record<string, MaterialTweak> = {
@@ -419,6 +430,19 @@ const OVEN_TWEAKS: Record<string, MaterialTweak> = {
 export const MATERIAL_TWEAKS: Partial<Record<ObjectType, Record<string, MaterialTweak>>> = {
   kitchen_tall_oven_single: OVEN_TWEAKS,
   kitchen_tall_oven_double: OVEN_TWEAKS,
+  // Induction hob (9 Sep): the ceramic top is the big unnamed-looking
+  // 'Standardmaterial8' panel (found by colouring it in the scene); the ring
+  // markings and controls are separate textured meshes lying on it and keep
+  // their own maps. Same coated black glass as the ovens and the TV. The
+  // 'Steel' is the bevelled frame.
+  kitchen_hob_induction: {
+    // Softer than the vertical screens: a horizontal pane mirrors the sky
+    // in the environment map, and at full strength the hob came out blue.
+    // Dimmed through `specular` - see MaterialTweak: envMapIntensity does
+    // nothing on these materials, which cost an afternoon to find out.
+    'Standardmaterial8': { color: '#050506', roughness: 0.15, metalness: 0, dropMap: true, glass: true, clearcoat: 0, ior: 1.5, specular: 0.4 },
+    'Steel': { color: '#b9babb', roughness: 0.3, metalness: 1.0, envMapIntensity: 1.1 },
+  },
   // Charlie's TV and media unit (8 Sep). Which material is which was found
   // by colouring them in the scene (9 Sep): M08 is the SCREEN, the big
   // panel; [0137_Black] is the bezel edge. The screen is black glass - the
