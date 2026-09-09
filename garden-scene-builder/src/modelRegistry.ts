@@ -405,9 +405,11 @@ export type MaterialTweak = {
 };
 
 const OVEN_TWEAKS: Record<string, MaterialTweak> = {
-  // The door front: gloss black glass like the appliance brochures - the
-  // baked dot texture is what made it look lilac.
-  'PDM Black glass03 Miele_series': { color: '#0a0a0c', roughness: 0.06, metalness: 0.85, dropMap: true, envMapIntensity: 1.3 },
+  // The door front: black glass like the appliance brochures - the baked
+  // dot texture is what made it look lilac. Was a black METAL (metalness
+  // 0.85), which reflects only its own darkness; now the same coated glass
+  // as the TV screen (9 Sep), so the kitchen shows in the door.
+  'PDM Black glass03 Miele_series': { color: '#050506', roughness: 0.04, metalness: 0, dropMap: true, envMapIntensity: 1.1, glass: true },
   'PDM Black02 Miele_series': { color: '#111113', roughness: 0.2, metalness: 0.4, dropMap: true },
   // Handles and trim.
   'PDM Stainless steel': { roughness: 0.28, metalness: 1.0, envMapIntensity: 1.1 },
