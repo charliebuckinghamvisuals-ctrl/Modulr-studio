@@ -251,6 +251,28 @@ export const describeGarden = async (base64Image?: string, notes?: string): Prom
     return res.json();
 };
 
+/**
+ * Which model draws the render - a trial setting, 9 Sep 2026.
+ *
+ * 'gemini' is the proven two-pass path. 'sunburst' and 'flare' are OpenAI's
+ * GPT Image 2.5 editing models: Accuracy and Speed in the UI. Kept as a
+ * module setting like the config spec, so no call site changes, and
+ * remembered in localStorage so a choice survives a reload.
+ */
+export type ImageEngine = 'gemini' | 'sunburst' | 'flare';
+const IMAGE_ENGINE_KEY = 'modulr_image_engine';
+let currentImageEngine: ImageEngine = (() => {
+  try {
+    const v = localStorage.getItem(IMAGE_ENGINE_KEY);
+    return v === 'sunburst' || v === 'flare' ? v : 'gemini';
+  } catch { return 'gemini'; }
+})();
+export const getImageEngine = (): ImageEngine => currentImageEngine;
+export const setImageEngine = (engine: ImageEngine) => {
+  currentImageEngine = engine;
+  try { localStorage.setItem(IMAGE_ENGINE_KEY, engine); } catch { /* private mode */ }
+};
+
 export const renderBuilding = async (
   base64Image: string,
   materials: MaterialConfig,
@@ -270,7 +292,7 @@ export const renderBuilding = async (
     const response = await fetch(`${API_BASE_URL}/renderBuilding`, {
       method: 'POST',
       headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground, isBatchSequence, seed, cameraEffects, configSpec: currentConfigSpec || undefined, sceneContext: currentSceneContext || undefined })
+      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground, isBatchSequence, seed, cameraEffects, imageEngine: currentImageEngine, configSpec: currentConfigSpec || undefined, sceneContext: currentSceneContext || undefined })
     });
 
     if (!response.ok) {

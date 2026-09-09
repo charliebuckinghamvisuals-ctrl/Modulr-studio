@@ -2432,8 +2432,61 @@ ${lines.join('\n')}
 
         const prompt = isSketchUpMode ? sketchUpPrompt : standardPrompt;
 
+        /**
+         * IMAGE ENGINE - which model draws the render.
+         *
+         * 'gemini' (default): the proven two-pass Gemini path below.
+         * 'sunburst' / 'flare': OpenAI GPT Image 2.5, added 9 Sep 2026 for
+         * Charlie to trial locally - Sunburst is the editing-precision model
+         * ("Accuracy"), Flare the fast one ("Speed"). One edit call replaces
+         * both Gemini passes; the QA inspection and corrective retry stay
+         * exactly as they are, judging the output against the source. The
+         * source image goes in as the edit input, so the geometry lock is
+         * the model's job just as it is for Gemini. Needs OPENAI_API_KEY.
+         */
+        const OPENAI_IMAGE_MODELS = { sunburst: 'gpt-image-2.5-sunburst', flare: 'gpt-image-2.5-flare' };
+        const imageEngine = OPENAI_IMAGE_MODELS[req.body.imageEngine] ? req.body.imageEngine : 'gemini';
+        if (imageEngine !== 'gemini' && !process.env.OPENAI_API_KEY) {
+            return res.status(400).json({ error: 'The Sunburst and Flare engines need an OpenAI API key on the server (OPENAI_API_KEY). Switch the engine back to Gemini or add the key.' });
+        }
+
+        /** The OpenAI edit size for this render: 2K on the long edge, matching
+         *  the source's aspect. Edges must be multiples of 16. */
+        const openAiSize = () => {
+            const table = { '16:9': '2048x1152', '4:3': '2048x1536', '3:2': '2048x1360', '1:1': '2048x2048', '9:16': '1152x2048', '3:4': '1536x2048', '2:3': '1360x2048' };
+            const r = isSketchUpMode ? (ratio || '16:9') : '16:9';
+            return table[r] || '2048x1152';
+        };
+
+        /** One OpenAI edit of the SOURCE image with the render prompt. */
+        const runOpenAIEdit = async (promptText) => {
+            const form = new FormData();
+            form.append('model', OPENAI_IMAGE_MODELS[imageEngine]);
+            form.append('prompt', promptText);
+            form.append('image', new Blob([Buffer.from(base64Image, 'base64')], { type: 'image/jpeg' }), 'source.jpg');
+            form.append('size', openAiSize());
+            // Accuracy runs the higher quality tier; Speed the medium one.
+            form.append('quality', imageEngine === 'sunburst' ? 'high' : 'medium');
+            form.append('output_format', 'jpeg');
+            const t0 = Date.now();
+            const r = await fetch('https://api.openai.com/v1/images/edits', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+                body: form,
+            });
+            const json = await r.json().catch(() => ({}));
+            if (!r.ok) {
+                console.error('[OPENAI] image edit failed', r.status, JSON.stringify(json).slice(0, 500));
+                return null;
+            }
+            const b64 = json?.data?.[0]?.b64_json || null;
+            console.log(`[OPENAI] ${OPENAI_IMAGE_MODELS[imageEngine]} edit in ${((Date.now() - t0) / 1000).toFixed(1)}s`, json?.usage ? JSON.stringify(json.usage) : '');
+            return b64;
+        };
+
         /** Run one generation pass; returns the image as base64, or null. */
         const runRender = async (promptText) => {
+            if (imageEngine !== 'gemini') return runOpenAIEdit(promptText);
             const response = await ai.models.generateContent({
                 /**
                  * FLASH-IMAGE, ON PURPOSE. This was switched to the "best"
@@ -2650,7 +2703,9 @@ ${failures.map(f => `      - ${f}`).join('\n')}
          * ships instead. It can improve a render, never make one worse.
          */
         let refined = false;
-        if (isSketchUpMode && b64Data) {
+        // The OpenAI engines finish the surfaces in their one pass; the Gemini
+        // materials pass would only give the Pro model a chance to drift.
+        if (isSketchUpMode && b64Data && imageEngine === 'gemini') {
             try {
                 const finished = await runMaterialsPass(b64Data);
                 if (finished) {
@@ -2671,8 +2726,9 @@ ${failures.map(f => `      - ${f}`).join('\n')}
             }
         }
 
-        logRender(req, 'renderBuilding', 'gemini-3.1-flash-image', '2K', {
+        logRender(req, 'renderBuilding', imageEngine === 'gemini' ? 'gemini-3.1-flash-image' : OPENAI_IMAGE_MODELS[imageEngine], '2K', {
             sketchUpMode: isSketchUpMode,
+            imageEngine,
             verified: verification.checked ? verification.passed : null,
             retried: !!verification.retried,
             // Billable calls this render actually made, so the log prices
@@ -2687,7 +2743,7 @@ ${failures.map(f => `      - ${f}`).join('\n')}
             failures: (verification.failures || []).map(f => String(f).slice(0, 300)),
         });
 
-        return res.json({ result: b64Data, verification: { ...verification, refined } });
+        return res.json({ result: b64Data, verification: { ...verification, refined, imageEngine } });
     } catch (error) {
         console.error("Render error in /api/renderBuilding:", error, error.stack);
         // Log the real error above; never echo internals to the client.

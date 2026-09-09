@@ -106,7 +106,10 @@ check('render engine is NOT on the re-composing pro model', !renderCall.includes
 const pass2 = src.slice(src.indexOf('const runMaterialsPass = async'), src.indexOf('let b64Data = await runRender(prompt);'));
 check('materials pass uses the pro image model', pass2.includes("model: 'gemini-3-pro-image'"));
 check('materials pass prompt locks geometry', src.includes('PIXEL-LEVEL GEOMETRY LOCK'));
-check('materials pass only runs on CGI sources', src.includes('if (isSketchUpMode && b64Data) {'));
+check('materials pass only runs on CGI sources', src.includes("if (isSketchUpMode && b64Data && imageEngine === 'gemini') {"));
+// The OpenAI engines are a single edit pass, so the Gemini materials pass must not follow them.
+check('materials pass never follows an OpenAI engine', src.includes("imageEngine === 'gemini') {"));
+check('OpenAI engines refuse cleanly without a key', src.includes('OPENAI_API_KEY') && src.includes("status(400)"));
 check('materials pass is inspected against the ORIGINAL source', src.includes('inspectRenderFidelity(base64Image, finished, specFacts)'));
 check('materials pass never replaces pass 1 when it drifts', src.includes('keeping pass 1'));
 check('standard renders are 2K, not 1K', !src.includes('imageSize: isHighQuality ? "4K" : "1K"'));

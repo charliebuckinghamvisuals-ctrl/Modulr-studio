@@ -1,6 +1,7 @@
 import React from 'react';
 import { Zap, Grid, Layers, Sparkles, PenTool, Image as ImageIcon, Settings, History, ChevronDown, Loader2, Upload, CloudSun, Aperture } from 'lucide-react';
 import { ToggleSwitch } from './components/ToggleSwitch';
+import { getImageEngine, setImageEngine, type ImageEngine } from './services/geminiService';
 import { Toaster, toast } from 'react-hot-toast';
 import { AppShell } from './components/AppShell';
 // StartupLoader (the fake 2.5s percentage bar) is retired: the instant green
@@ -47,6 +48,7 @@ const App: React.FC = () => {
     const { hasApiAccess } = useCredits();
     const [maskImage, setMaskImage] = React.useState<string | null>(null);
     const [selectedBatchIndex, setSelectedBatchIndex] = React.useState(0);
+    const [imageEngine, setImageEngineState] = React.useState<ImageEngine>(getImageEngine());
     // "Save to Project" - which finished image is being filed, and as what.
     const [projectSave, setProjectSave] = React.useState<{ image: string; kind: ProjectAssetKind; name: string } | null>(null);
     const [openCategoryDropdown, setOpenCategoryDropdown] = React.useState<string | null>(null);
@@ -150,9 +152,39 @@ const App: React.FC = () => {
         />
     );
 
+    /**
+     * Image engine trial, 9 Sep 2026. Accuracy is OpenAI's GPT Image 2.5
+     * Sunburst, Speed is Flare, Gemini is the proven two-pass path and the
+     * one to switch back to if the trial disappoints. Server-side the two
+     * OpenAI engines need OPENAI_API_KEY; without it a render says so.
+     */
+    const ENGINE_OPTIONS: { id: ImageEngine; label: string; hint: string }[] = [
+        { id: 'sunburst', label: 'Accuracy', hint: 'GPT Image 2.5 Sunburst - editing precision' },
+        { id: 'flare', label: 'Speed', hint: 'GPT Image 2.5 Flare - fastest' },
+        { id: 'gemini', label: 'Gemini', hint: 'Gemini 3.1 Flash + 3 Pro, two passes' },
+    ];
+    const EngineChips = () => (
+        <div className="w-full">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Engine</div>
+            <div className="flex gap-1.5">
+                {ENGINE_OPTIONS.map(o => (
+                    <button
+                        key={o.id}
+                        title={o.hint}
+                        onClick={() => { setImageEngine(o.id); setImageEngineState(o.id); }}
+                        className={`flex-1 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide rounded-lg border transition-colors ${
+                            imageEngine === o.id ? 'bg-accent text-white border-transparent' : 'bg-white text-slate-500 border-black/10 hover:bg-slate-50'
+                        }`}
+                    >{o.label}</button>
+                ))}
+            </div>
+        </div>
+    );
+
     const renderEngineControls = (
         <>
             <div className="flex flex-col gap-2 w-full">
+                <EngineChips />
                 <ProModelToggle />
                 <CameraEffectsToggle />
                 <ToggleSwitch 
