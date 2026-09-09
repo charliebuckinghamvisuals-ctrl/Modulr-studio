@@ -191,9 +191,11 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
 
   if (!configMode) {
     return (
-      <div className="w-full h-[calc(100dvh-6rem)] flex flex-col items-center justify-center bg-[#0F1110] px-6">
-        <h2 className="text-white text-xl font-bold mb-1">3D Configurator</h2>
-        <p className="text-slate-400 text-sm mb-8">Choose which version to open.</p>
+      {/* The site's drafting-paper surface, not a black void - the chooser
+          is a page of the app, and every other page sits on this grid. */}
+      <div className="w-full h-[calc(100dvh-6rem)] flex flex-col items-center justify-center render-grid px-6">
+        <h2 className="text-[#3b4d4a] text-xl font-bold mb-1">3D Configurator</h2>
+        <p className="text-slate-500 text-sm mb-8">Choose which version to open.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full max-w-3xl">
           <button
             onClick={() => setConfigMode('public')}
@@ -206,9 +208,9 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
           </button>
           <button
             onClick={() => { if (canUseBusinessConfig) setConfigMode('business'); else engine.setActiveStage(AppStage.PRICING); }}
-            className={`text-left rounded-3xl p-7 shadow-2xl border transition-transform hover:-translate-y-0.5 ${canUseBusinessConfig ? 'bg-[#3b4d4a] border-transparent' : 'bg-[#1a1d1c] border-white/10'}`}
+            className={`text-left rounded-3xl p-7 shadow-2xl border transition-transform hover:-translate-y-0.5 ${canUseBusinessConfig ? 'bg-[#3b4d4a] border-transparent' : 'bg-[#2d3a38] border-transparent'}`}
           >
-            <span className={`inline-block text-[10px] font-bold uppercase tracking-widest rounded-full px-2.5 py-1 mb-4 ${canUseBusinessConfig ? 'text-white bg-white/15' : 'text-amber-300 bg-amber-300/10'}`}>
+            <span className={`inline-block text-[10px] font-bold uppercase tracking-widest rounded-full px-2.5 py-1 mb-4 ${canUseBusinessConfig ? 'text-white bg-white/15' : 'text-amber-200 bg-amber-200/15'}`}>
               {canUseBusinessConfig ? 'Included in your plan' : 'Business plan'}
             </span>
             <h3 className="text-lg font-bold text-white mb-2">Business</h3>
