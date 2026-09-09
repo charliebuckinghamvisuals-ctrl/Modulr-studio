@@ -31,6 +31,9 @@ export const BUILDING_STEPS = [
 function CollapsibleSection({ title, children, defaultOpen = false, step }: { title: string, children: React.ReactNode, defaultOpen?: boolean, step?: string }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const activeStep = useContext(StepContext);
+  // The public configurator has no interior step at all.
+  const isPublic = useStore(s => s.configMode === 'public');
+  if (isPublic && step === 'interior') return null;
   if (step && activeStep && step !== activeStep) return null;
   return (
     <div className="border-b border-black/5 last:border-0 pb-4 mb-4">
@@ -79,6 +82,8 @@ export function Sidebar() {
   const wrap = (fn: any) => (...args: any[]) => { store.saveState(); fn(...args); };
   // Reactive read so the selected wall's card highlights as selection changes.
   const selectedElementId = useStore(s => s.selectedElementId);
+  // Free public configurator: exterior only. See configMode in the store.
+  const isPublic = useStore(s => s.configMode === 'public');
 
   const { room, scene, env, viewMode, areDoorsOpen, toggleDoors, newDesign } = useStore(useShallow(s => ({
     room: s.scene.room,
@@ -196,14 +201,22 @@ export function Sidebar() {
       </div>
 
       <div className="p-3 border-b border-black/5 bg-white space-y-2">
-        <div className="flex bg-gray-100 p-1 rounded-lg border border-black/5">
+        {/* Public: the Building tab only - the exterior is the free product;
+            objects, kitchens and interiors are the Business one. */}
+        {!isPublic && <div className="flex bg-gray-100 p-1 rounded-lg border border-black/5">
           <button onClick={() => setTab('building')} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${tab === 'building' ? 'bg-white shadow-sm text-[#1d1d1f]' : 'text-gray-400 hover:text-gray-600'}`}>Building</button>
           <button onClick={() => setTab('objects')} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${tab === 'objects' ? 'bg-white shadow-sm text-[#1d1d1f]' : 'text-gray-400 hover:text-gray-600'}`}>Objects</button>
           {/* Kitchen gets its own tab. It was a section inside Objects, which
               meant scrolling past the sofas to find a worktop, and the units
               were in one place while their colours were in another. */}
           <button onClick={() => setTab('kitchen')} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${tab === 'kitchen' ? 'bg-white shadow-sm text-[#1d1d1f]' : 'text-gray-400 hover:text-gray-600'}`}>Kitchen</button>
-        </div>
+        </div>}
+        {isPublic && (
+          <div className="flex items-center justify-between bg-[#3b4d4a]/5 border border-[#3b4d4a]/10 rounded-lg px-3 py-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#3b4d4a]">Free configurator</span>
+            <span className="text-[10px] text-gray-500">Exterior design</span>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -272,7 +285,7 @@ export function Sidebar() {
                 of these buildings, in order. */}
             <div className="sticky top-0 z-10 -mx-6 px-6 pt-1 pb-3 mb-4 bg-[#FAFAF8]/95 backdrop-blur border-b border-black/5">
               <div className="flex gap-1">
-                {BUILDING_STEPS.map((s, i) => (
+                {BUILDING_STEPS.filter(s => !(isPublic && s.id === 'interior')).map((s, i) => (
                   <button
                     key={s.id}
                     onClick={() => setStep(s.id)}
@@ -1347,7 +1360,23 @@ export function Sidebar() {
       </div>
       
       <div className="p-4 border-t border-black/10 bg-white shrink-0 shadow-lg z-20">
-        <button 
+        {isPublic ? (
+          /* No renders on the free configurator - each one costs real money.
+             What the Business version adds is spelled out, and the button
+             asks the host app to show the plan. */
+          <div className="space-y-2">
+            <p className="text-[11px] text-gray-500 leading-snug">
+              <span className="font-bold text-[#3b4d4a]">Business</span> adds AI renders, interiors, kitchens, the walkthrough and lighting plan.
+            </p>
+            <button
+              onClick={() => window.parent.postMessage({ type: 'OPEN_PRICING' }, window.location.origin)}
+              className="w-full bg-[#3b4d4a] hover:bg-[#2d3a38] text-white py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-lg cursor-pointer"
+            >
+              See the Business plan
+            </button>
+          </div>
+        ) : (
+        <button
           onClick={() => {
             const canvas = document.querySelector('canvas');
             if (canvas) {
@@ -1362,6 +1391,7 @@ export function Sidebar() {
         >
           Send to Render Engine
         </button>
+        )}
       </div>
     </div>
   );

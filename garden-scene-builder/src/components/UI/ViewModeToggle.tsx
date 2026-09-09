@@ -4,6 +4,8 @@ import { Layers, Cuboid, LocateFixed, Footprints, RotateCw, Lightbulb } from 'lu
 
 export function ViewModeToggle() {
   const { viewMode, setViewMode } = useStore();
+  // The public configurator is exterior-only: no walkthrough, no lighting plan.
+  const isPublic = useStore(s => s.configMode === 'public');
 
   if (viewMode === 'capture' || viewMode === 'render') return null;
 
@@ -18,7 +20,7 @@ export function ViewModeToggle() {
         <Cuboid size={16} />
         3D View
       </button>
-      <button
+      {!isPublic && <button
         onClick={() => {
           setViewMode('walking');
           /*
@@ -39,7 +41,7 @@ export function ViewModeToggle() {
       >
         <Footprints size={16} />
         Walk
-      </button>
+      </button>}
       <button
         onClick={() => {
           setViewMode('plan');
@@ -52,7 +54,7 @@ export function ViewModeToggle() {
         <Layers size={16} />
         Plan View
       </button>
-      <button
+      {!isPublic && <button
         onClick={() => {
           setViewMode('lighting');
           window.dispatchEvent(new CustomEvent('reset-plan-view'));
@@ -63,7 +65,7 @@ export function ViewModeToggle() {
       >
         <Lightbulb size={16} />
         Lighting
-      </button>
+      </button>}
       {viewMode === '3d' && (
         <>
           <div className="w-px h-4 bg-black/10 mx-2"></div>

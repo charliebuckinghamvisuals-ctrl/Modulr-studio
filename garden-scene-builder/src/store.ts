@@ -38,6 +38,18 @@ interface AppState {
   /** True while the walkthrough has captured the mouse pointer. Drives the
    *  on-screen prompt: locked = crosshair + key hints, unlocked = "click to
    *  look around". */
+  /**
+   * Which configurator this is.
+   *
+   * 'public' is the free one anyone can open: the building's exterior -
+   * size, roof, cladding, doors and windows, extras - in 3D and plan, with
+   * the PDF. No interior step, no objects or kitchen, no walkthrough or
+   * lighting plan, and no Send to Render Engine. 'business' is everything.
+   * Set from ?mode= on the URL and by the host app after load; defaults to
+   * public so a direct visit to the page never hands out the paid version.
+   */
+  configMode: 'public' | 'business';
+  setConfigMode: (mode: 'public' | 'business') => void;
   walkPointerLocked: boolean;
   setWalkPointerLocked: (locked: boolean) => void;
   /** True when the walkthrough floor-finish panel is open. */
@@ -382,6 +394,13 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   setControlsEnabled: (enabled) => set({ controlsEnabled: enabled }),
+  configMode: (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'business') ? 'business' : 'public',
+  setConfigMode: (mode) => set((state) => ({
+    configMode: mode,
+    // Leaving business mode also leaves its views: public has no walk or
+    // lighting plan, and a stale one would show an empty toolbar.
+    viewMode: mode === 'public' && (state.viewMode === 'walking' || state.viewMode === 'lighting') ? '3d' : state.viewMode,
+  })),
   walkPointerLocked: false,
   setWalkPointerLocked: (locked) => set({ walkPointerLocked: locked }),
   walkFloorOpen: false,

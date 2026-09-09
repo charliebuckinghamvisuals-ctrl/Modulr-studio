@@ -22,6 +22,8 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
   const [saveName, setSaveName] = useState('');
   // '__new__' or an existing project id to attach the design to.
   const [saveTarget, setSaveTarget] = useState('__new__');
+  // Read by the message handler, which is bound once per engine.
+  const configModeRef = useRef<'public' | 'business' | null>(null);
 
   const confirmSave = async () => {
     if (!pendingSave) return;
@@ -99,7 +101,16 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
         return;
       }
 
+      // The free configurator's upsell button: show the plans.
+      if (event.data && event.data.type === 'OPEN_PRICING') {
+        engine.setActiveStage(AppStage.PRICING);
+        return;
+      }
+
       if (event.data && event.data.type === 'RENDER_3D_SCENE') {
+        // The public configurator has no render button; a message claiming
+        // otherwise is not honoured. Renders are also gated on the server.
+        if (configModeRef.current !== 'business') return;
         const dataUrl = event.data.image;
         // Hard-constraint spec for the render prompt — the server turns this
         // into "exactly N doors, style X, cladding Y" so the render matches
@@ -154,13 +165,58 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
     };
   }, [engine]);
 
-  const { plan, loading } = useCredits();
+  const { plan, loading, canUseProjects } = useCredits();
+
+  /**
+   * Which configurator to open.
+   *
+   * Two tiles first: the free Public one - the building's exterior in 3D
+   * and plan, no interiors, no renders, costs nothing to serve - and the
+   * Business one, which is everything. Business is gated on the same
+   * server-decided entitlement as Projects (business, master, tester, beta),
+   * so the client never keeps its own plan list. The iframe gets the mode in
+   * its URL and again by message, and it defaults to public on its own.
+   */
+  const [configMode, setConfigMode] = useState<'public' | 'business' | null>(null);
+  configModeRef.current = configMode;
+  const canUseBusinessConfig = canUseProjects === true;
 
   if (loading) {
     return (
         <div className="w-full h-[100dvh] flex flex-col bg-[#0F1110] items-center justify-center">
             <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin"></div>
         </div>
+    );
+  }
+
+  if (!configMode) {
+    return (
+      <div className="w-full h-[calc(100dvh-6rem)] flex flex-col items-center justify-center bg-[#0F1110] px-6">
+        <h2 className="text-white text-xl font-bold mb-1">3D Configurator</h2>
+        <p className="text-slate-400 text-sm mb-8">Choose which version to open.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full max-w-3xl">
+          <button
+            onClick={() => setConfigMode('public')}
+            className="text-left bg-white rounded-3xl p-7 shadow-2xl border border-black/5 hover:-translate-y-0.5 transition-transform"
+          >
+            <span className="inline-block text-[10px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50 rounded-full px-2.5 py-1 mb-4">Free</span>
+            <h3 className="text-lg font-bold text-[#3b4d4a] mb-2">Public</h3>
+            <p className="text-sm text-slate-500 leading-relaxed mb-5">Design the outside of a garden room: size, roof, cladding, doors and windows, in 3D and plan, with a PDF.</p>
+            <span className="text-xs font-bold uppercase tracking-wider text-[#3b4d4a]">Open &rarr;</span>
+          </button>
+          <button
+            onClick={() => { if (canUseBusinessConfig) setConfigMode('business'); else engine.setActiveStage(AppStage.PRICING); }}
+            className={`text-left rounded-3xl p-7 shadow-2xl border transition-transform hover:-translate-y-0.5 ${canUseBusinessConfig ? 'bg-[#3b4d4a] border-transparent' : 'bg-[#1a1d1c] border-white/10'}`}
+          >
+            <span className={`inline-block text-[10px] font-bold uppercase tracking-widest rounded-full px-2.5 py-1 mb-4 ${canUseBusinessConfig ? 'text-white bg-white/15' : 'text-amber-300 bg-amber-300/10'}`}>
+              {canUseBusinessConfig ? 'Included in your plan' : 'Business plan'}
+            </span>
+            <h3 className="text-lg font-bold text-white mb-2">Business</h3>
+            <p className="text-sm text-white/70 leading-relaxed mb-5">Everything: interiors, kitchens, furniture, the walkthrough, lighting plan and AI renders of the finished design.</p>
+            <span className="text-xs font-bold uppercase tracking-wider text-white">{canUseBusinessConfig ? 'Open →' : 'See the Business plan →'}</span>
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -243,9 +299,11 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
       )}
       <iframe
         ref={iframeRef}
-        src="/3d-config/index.html"
+        src={`/3d-config/index.html?mode=${configMode}`}
         onLoad={() => {
           setConfigLoaded(true);
+          // Belt and braces with the URL: tell the configurator which one it is.
+          iframeRef.current?.contentWindow?.postMessage({ type: 'SET_CONFIG_MODE', mode: configMode }, window.location.origin);
           // A design opened from the Projects page is waiting to be shown.
           // The iframe's app needs a beat to mount its message listener, and
           // LOAD_3D_DESIGN is idempotent, so post it a few times.

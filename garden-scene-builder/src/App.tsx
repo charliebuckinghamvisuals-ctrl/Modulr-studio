@@ -20,6 +20,11 @@ export default function App() {
       if (event.data && event.data.type === 'LOAD_3D_DESIGN' && event.data.room && typeof event.data.room === 'object') {
         useStore.getState().loadRoom(event.data.room);
       }
+      // The host app says which configurator this is - the free public one
+      // or the Business one - once it knows the account's plan.
+      if (event.data && event.data.type === 'SET_CONFIG_MODE' && (event.data.mode === 'public' || event.data.mode === 'business')) {
+        useStore.getState().setConfigMode(event.data.mode);
+      }
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
