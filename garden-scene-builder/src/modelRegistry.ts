@@ -397,6 +397,11 @@ export type MaterialTweak = {
   metalness?: number;
   dropMap?: boolean;
   envMapIntensity?: number;
+  /** Rebuild as glass: a physical material with a high index of refraction,
+   *  so a black surface still returns the room as a sharp reflection the
+   *  way a switched-off TV does. Metalness would make it DARKER - a metal's
+   *  reflection is its own colour, and this one is black. */
+  glass?: true;
 };
 
 const OVEN_TWEAKS: Record<string, MaterialTweak> = {
@@ -412,11 +417,13 @@ const OVEN_TWEAKS: Record<string, MaterialTweak> = {
 export const MATERIAL_TWEAKS: Partial<Record<ObjectType, Record<string, MaterialTweak>>> = {
   kitchen_tall_oven_single: OVEN_TWEAKS,
   kitchen_tall_oven_double: OVEN_TWEAKS,
-  // Charlie's TV and media unit (8 Sep): the screen is a gloss black panel,
-  // the bezel satin; the exporter had both as flat half-metal black.
+  // Charlie's TV and media unit (8 Sep). Which material is which was found
+  // by colouring them in the scene (9 Sep): M08 is the SCREEN, the big
+  // panel; [0137_Black] is the bezel edge. The screen is black glass - the
+  // room reflects in it - and the bezel a satin black.
   tv_unit: {
-    '[0137_Black]': { color: '#050506', roughness: 0.12, metalness: 0.4, envMapIntensity: 1.2 },
-    'M08_Obsidian_Black': { roughness: 0.35, metalness: 0.2 },
+    'M08_Obsidian_Black': { color: '#040405', roughness: 0.04, metalness: 0, envMapIntensity: 1.1, dropMap: true, glass: true },
+    '[0137_Black]': { color: '#0a0a0b', roughness: 0.35, metalness: 0.1 },
   },
   // The pendant: a black shade, a brushed-steel rod, bronze filament
   // supports. The bulb glass is the emissive (see EMISSIVE_MATERIAL).
@@ -524,8 +531,13 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
   bedside_table: ['[Color M09]'],
   // The sink bowl, in a painted carcass.
   kitchen_sink_1200: ['blackened steel'],
-  // Canopy body and the chimney (the flue model shares the material name).
-  kitchen_extractor: ['*7', '[Color M08]'],
+  // The whole hood: filter frames, the front control strip and the chimney
+  // top ([Color M08]), the canopy shell and the chimney body (the two
+  // 'Screen Shot' materials - a photo of brushed steel, in the export). The
+  // flue model shares the names, so it takes the same finish. Charlie, 9
+  // Sep: "you can change metal ... only top and bottom" - the shells were
+  // missing from this list.
+  kitchen_extractor: ['*7', '[Color M08]', 'Screen Shot 2015-08-14 at 17.08.07', 'Screen Shot 2015-08-14 at 17.10.37'],
   // The frame under the black glass top.
   coffee_table_black: ['spec_#d3d3d3_21_blackmtlsss1_wf_42_BRSD1836'],
   // Rod, ceiling rose and bulb holder; the shade stays matt black.
@@ -546,6 +558,9 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
  */
 export const DOUBLE_SIDED_METAL: Partial<Record<ObjectType, true>> = {
   basin_tap_widespread: true,
+  // The chimney's top section lost its front face once it became metal:
+  // the export drew it double-sided, so its winding was never checked.
+  kitchen_extractor: true,
 };
 
 /**

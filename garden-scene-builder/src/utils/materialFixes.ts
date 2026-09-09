@@ -794,7 +794,12 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
 
       const tweak = tweaks?.[m.name];
       if (tweak) {
-        const copy = m.clone();
+        // See MaterialTweak.glass: a TV screen. ior 2.2 gives a black
+        // dielectric a ~14% specular at normal incidence instead of glass's
+        // 4%, which is what a screen's coated front actually returns.
+        const copy: any = tweak.glass
+          ? new THREE.MeshPhysicalMaterial({ name: m.name, ior: 1.9, clearcoat: 1, clearcoatRoughness: 0.03, side: m.side })
+          : m.clone();
         if (tweak.color !== undefined) copy.color = new THREE.Color(tweak.color);
         if (tweak.roughness !== undefined) copy.roughness = tweak.roughness;
         if (tweak.metalness !== undefined) copy.metalness = tweak.metalness;

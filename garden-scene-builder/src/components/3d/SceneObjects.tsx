@@ -535,7 +535,10 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
                * a wall, and the ceiling above a wall is the eaves, not the
                * ridge - and lower still if a flat ceiling has been boarded in.
                */
-              const needed = interiorCeilingHeight(room) - mountHeight(obj.type) - EXTRACTOR_CANOPY_H;
+              // Stops 4mm short of the ceiling: with its top face exactly ON
+              // the ceiling plane the two fought for the pixels and the top
+              // of the chimney flashed.
+              const needed = interiorCeilingHeight(room) - mountHeight(obj.type) - EXTRACTOR_CANOPY_H - 0.004;
               const s = Math.max(0.02, needed / EXTRACTOR_FLUE_H);
               return (
                 <group position={[0, EXTRACTOR_CANOPY_H, 0]} scale={[1, s, 1]}>
