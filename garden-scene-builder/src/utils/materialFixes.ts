@@ -4,7 +4,7 @@ import {
   TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH, FORCE_DIELECTRIC,
   EMISSIVE_MATERIAL, LIGHT_COLOURS, UNMIRROR_NORMALS, finishSpec,
   FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById, TIMBER_MATERIAL,
-  veneerById, isVeneerFinish, UNIT_FAMILY,
+  veneerById, isVeneerFinish, UNIT_FAMILY, metalUsesColour, HORIZONTAL_VENEER,
 } from '../modelRegistry';
 import type { WorktopDef } from '../modelRegistry';
 
@@ -243,7 +243,7 @@ function grainFor(seed?: string) {
  * it is exactly right, with no stretching. Units are metres, so the paint
  * grain comes out the same physical size on a drawer front and a tall unit.
  */
-function boxProjectUVs(geometry: THREE.BufferGeometry, metresPerTile: number, force = false, world?: THREE.Matrix4) {
+export function boxProjectUVs(geometry: THREE.BufferGeometry, metresPerTile: number, force = false, world?: THREE.Matrix4) {
   if (geometry.getAttribute('uv') && !force) return;
   /*
    * Projected in the MODEL'S upright frame, not the mesh's own.
@@ -567,11 +567,60 @@ function splitIslandsFor(type: ObjectType, root: THREE.Object3D) {
   }
 }
 
-export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, color?: string, worktop?: string, hideWorktop = false, finish_?: string, seed?: string, veneer?: string) {
+/**
+ * A sprayed-lacquer door material - the paint the kitchen units wear.
+ *
+ * Shared by the units themselves (below) and the back panel of an island
+ * (WorktopRuns), so an island's back is the same paint as its doors rather
+ * than a flat colour beside them. The caller box-projects the geometry at
+ * PAINT_TILE_METRES; this only builds the material.
+ */
+export function createPaintMaterial(color: THREE.Color | string | undefined, finish_?: string, seed?: string) {
+  const grain = grainFor(seed);
+  // Matt, satin or gloss - three real products, not a slider. See
+  // UNIT_FINISHES for what each number is doing.
+  const fin = finishSpec(finish_);
+  return new THREE.MeshPhysicalMaterial({
+    color: color instanceof THREE.Color ? color : new THREE.Color(color ?? '#d4d4d4'),
+    roughness: fin.roughness,
+    metalness: 0,
+    normalMap: grain.normalMap,
+    normalScale: new THREE.Vector2(fin.normalScale, fin.normalScale),
+    roughnessMap: grain.roughnessMap,
+    clearcoat: fin.clearcoat,
+    clearcoatRoughness: fin.clearcoatRoughness,
+    // The peel goes on the LACQUER, not just the paint under it. With
+    // the coat left perfectly smooth the reflection was a flawless
+    // mirror over a lumpy base - backwards from a real door, where it
+    // is the reflection rippling across the coat that sells it.
+    clearcoatNormalMap: grain.normalMap,
+    clearcoatNormalScale: new THREE.Vector2(fin.coatNormalScale, fin.coatNormalScale),
+    // The room's HDR is what a door actually reflects, and a gloss door
+    // reflects a great deal more of it than a matt one.
+    envMapIntensity: fin.env,
+  });
+}
+
+/**
+ * What a kitchen unit's body is dressed in under the current door finish:
+ * paint, or one of the veneers. For panels built in the scene rather than
+ * loaded from a model - an island's back. Returns the tile size the
+ * geometry must be box-projected at, since paint and veneer differ.
+ */
+export function createUnitBodyMaterial(color: string | undefined, finish_?: string, seed?: string): { material: THREE.Material; tileMetres: number } {
+  if (isVeneerFinish(finish_)) {
+    return { material: dressVeneer(veneerById(finish_)!, 'z', seed), tileMetres: 1 };
+  }
+  return { material: createPaintMaterial(color, finish_, seed), tileMetres: PAINT_TILE_METRES };
+}
+
+export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, color?: string, worktop?: string, hideWorktop = false, finish_?: string, seed?: string, veneer?: string, metal?: string) {
   const tintName = TINT_MATERIAL[type];
   const metalNames = METAL_MATERIALS[type];
   const tweaks = MATERIAL_TWEAKS[type];
-  const finish = finishFor(type, color);
+  // A metal-only model keeps its finish in `color`; anything with a painted
+  // body, lamp or fabric has it in `metal` - see metalUsesColour.
+  const finish = finishFor(type, metal ?? (metalUsesColour(type) ? color : undefined));
   const worktopDef = worktopById(worktop);
 
   // Parts exported without a material of their own - see ISLAND_SPLITS.
@@ -705,7 +754,8 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         // and veneered doors came up with a 100mm grid of tiny oak.
         mesh.geometry = mesh.geometry.clone();
         boxProjectUVs(mesh.geometry, 1, true, worldScaleOf(mesh));
-        const wood = dressVeneer(veneerById(finish_)!, 'z', seed, m.side === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide);
+        // Drawer fronts run the grain across; doors and tall units run it up.
+        const wood = dressVeneer(veneerById(finish_)!, HORIZONTAL_VENEER[type] ? 'x' : 'z', seed, m.side === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide);
         wood.name = m.name;
         bodyMats.push(wood);
         return wood;
@@ -715,36 +765,14 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         // Painted door/carcass, as a real sprayed lacquer: a diffuse colour
         // under a clearcoat, carrying fine orange-peel relief and slightly
         // uneven sheen. Flat colour alone is what made these look like
-        // untextured CG - see paintTextures above.
-        const grain = grainFor(seed);
+        // untextured CG - see createPaintMaterial.
         // FORCED over any UVs the exporter wrote. Some floor units carry a
         // TEXCOORD_0 in arbitrary units and the wall units carry none, so
         // respecting them put the peel at a different size on every unit -
         // invisible on one door, a coarse grid on the next. Box projection in
         // metres is exact for these flat panels and the same on all of them.
         boxProjectUVs(mesh.geometry, PAINT_TILE_METRES, true, worldScaleOf(mesh));
-        // Matt, satin or gloss - three real products, not a slider. See
-        // UNIT_FINISHES for what each number is doing.
-        const fin = finishSpec(finish_);
-        const paint = new THREE.MeshPhysicalMaterial({
-          color: color ? new THREE.Color(color) : m.color?.clone() ?? new THREE.Color('#d4d4d4'),
-          roughness: fin.roughness,
-          metalness: 0,
-          normalMap: grain.normalMap,
-          normalScale: new THREE.Vector2(fin.normalScale, fin.normalScale),
-          roughnessMap: grain.roughnessMap,
-          clearcoat: fin.clearcoat,
-          clearcoatRoughness: fin.clearcoatRoughness,
-          // The peel goes on the LACQUER, not just the paint under it. With
-          // the coat left perfectly smooth the reflection was a flawless
-          // mirror over a lumpy base - backwards from a real door, where it
-          // is the reflection rippling across the coat that sells it.
-          clearcoatNormalMap: grain.normalMap,
-          clearcoatNormalScale: new THREE.Vector2(fin.coatNormalScale, fin.coatNormalScale),
-          // The room's HDR is what a door actually reflects, and a gloss door
-          // reflects a great deal more of it than a matt one.
-          envMapIntensity: fin.env,
-        });
+        const paint = createPaintMaterial(color ? new THREE.Color(color) : m.color?.clone() ?? new THREE.Color('#d4d4d4'), finish_, seed);
         paint.name = m.name;
         bodyMats.push(paint);
         return paint;
@@ -844,12 +872,22 @@ export function retintModel(
   // so it lands on the emissive - and the spot light beside it takes the same
   // hex, keeping lens and beam the same temperature.
   handles.lampMats?.forEach(m => { m.emissive.set(color); m.needsUpdate = true; });
-  if (handles.metalMats.length) {
-    const finish = finishFor(type, color);
-    handles.metalMats.forEach(m => {
-      m.color.set(finish.hex);
-      m.roughness = finish.roughness;
-      m.needsUpdate = true;
-    });
-  }
+  // Only a metal-only model reads its finish from `color`. On a vanity the
+  // colour is the paint, and its handles are set by refinishMetal.
+  if (metalUsesColour(type)) refinishMetal(type, handles, color);
+}
+
+/** Change the metal finish on an already-instanced model. */
+export function refinishMetal(
+  type: ObjectType,
+  handles: { metalMats: THREE.MeshStandardMaterial[] },
+  hex: string | undefined,
+) {
+  if (!handles.metalMats.length) return;
+  const finish = finishFor(type, hex);
+  handles.metalMats.forEach(m => {
+    m.color.set(finish.hex);
+    m.roughness = finish.roughness;
+    m.needsUpdate = true;
+  });
 }

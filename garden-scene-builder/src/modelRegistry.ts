@@ -182,13 +182,31 @@ export type UnitFinish = 'matt' | 'satin' | 'gloss' | VeneerId;
  * sets so one loader serves both. tileMetres is the real width the texture
  * covers, from the asset page.
  */
-export type VeneerId = 'oak_veneer' | 'walnut_veneer' | 'silver_oak_veneer';
+export type VeneerId = 'oak_veneer' | 'walnut_veneer' | 'dark_walnut_veneer' | 'silver_oak_veneer';
 export const VENEERS: (WorktopDef & { id: VeneerId })[] = [
   { id: 'oak_veneer', name: 'Oak Veneer', prefix: 'wt_oak_veneer', tileMetres: 1.8, roughness: 0.45 },
   { id: 'walnut_veneer', name: 'Walnut Veneer', prefix: 'wt_walnut_veneer', tileMetres: 1.8, roughness: 0.45 },
+  // The walnut leaf stained dark (9 Sep: "the ones we have now are all
+  // mostly light"). Same normal and roughness maps as the walnut; only the
+  // colour map is derived, so the grain figure is identical and the two
+  // read as the same species in two stains.
+  { id: 'dark_walnut_veneer', name: 'Dark Walnut', prefix: 'wt_dark_walnut_veneer', tileMetres: 1.8, roughness: 0.45 },
   { id: 'silver_oak_veneer', name: 'Silver Oak', prefix: 'wt_silver_oak_veneer', tileMetres: 1.0, roughness: 0.45 },
 ];
 export const veneerById = (id?: string) => VENEERS.find(v => v.id === id);
+
+/**
+ * Units whose veneered fronts run the grain ACROSS rather than up.
+ *
+ * A drawer front is wide and shallow, and a veneered drawer stack is cut so
+ * the grain runs along each front - that is how they are made, and it is
+ * what tells a drawer stack from a door at a glance (Charlie, 9 Sep). Doors
+ * and tall units stay vertical.
+ */
+export const HORIZONTAL_VENEER: Partial<Record<ObjectType, true>> = {
+  kitchen_drawer_2: true,
+  kitchen_drawer_3: true,
+};
 export const isVeneerFinish = (id?: string): id is VeneerId => !!veneerById(id);
 
 export const UNIT_FINISHES: {
@@ -409,11 +427,9 @@ export const MATERIAL_TWEAKS: Partial<Record<ObjectType, Record<string, Material
     '[Metal_Corrogated_Shiny]3': { roughness: 0.35, metalness: 1.0, dropMap: true, color: '#c9c9cc' },
   },
   pendant_light: {
-    // Matt black shade. With any metalness the HDR turned it silver.
+    // Matt black shade. With any metalness the HDR turned it silver. The
+    // rod, rose and bulb holder are in METAL_MATERIALS and take a finish.
     'M08_Obsidian_Black': { color: '#141414', roughness: 0.55, metalness: 0.05 },
-    '[Metal Corrugated Shiny]': { roughness: 0.35, metalness: 1.0, envMapIntensity: 1.1 },
-    '[Color M07]': { roughness: 0.4, metalness: 0.9 },
-    'Bronze Light': { color: '#b08d57', roughness: 0.4, metalness: 1.0 },
   },
 };
 
@@ -451,6 +467,8 @@ export const TIMBER_MATERIAL: Partial<Record<ObjectType, {
   chest_of_drawers: { materials: [''], grain: 'x' },
   desk_single: { materials: [''], grain: 'x' },
   bed_2: { materials: ['Veneer A02 120cm'], grain: 'x' },
+  // The low stool's legs are turned oak ("Eiken" in the export), not metal.
+  bar_stool: { materials: ['033132_S_Eiken_Stroken'] },
 };
 export const hasTimber = (type: ObjectType) => TIMBER_MATERIAL[type] !== undefined;
 
@@ -488,7 +506,44 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
   basin_tap_widespread: ['Metal_06_1K'],
   basin_tap_wall: ['<auto>1', '*'],
   shelving_unit: ['[Steel Brushed Stainless]'],
+  // 9 Sep: "anything that has metal in it needs to be able to be changed".
+  // Each of these was identified by colouring the model's materials one at
+  // a time in the scene, not by name - the names are the exporter's.
+  // The vanity's two drawer handles. Its cabinet is painted (TINT_MATERIAL),
+  // so the finish is stored apart from the paint - see SceneObject.metal.
+  vanity: ['[Mirror 01]'],
+  // The tall stool's stem, footring and base; the seat keeps its own.
+  bar_stool_tall: ['cnwhc.com_草图联盟_690'],
+  // Star base and arm frames.
+  office_chair: ['*2'],
+  // The wire chairs around the round table, frame and shell as one.
+  dining_table_round: ['[Color_C10]'],
+  // Sliding-door frames and rails.
+  wardrobe: ['Aluminum'],
+  // The drawer pull.
+  bedside_table: ['[Color M09]'],
+  // The sink bowl, in a painted carcass.
+  kitchen_sink_1200: ['blackened steel'],
+  // Canopy body and the chimney (the flue model shares the material name).
+  kitchen_extractor: ['*7', '[Color M08]'],
+  // The frame under the black glass top.
+  coffee_table_black: ['spec_#d3d3d3_21_blackmtlsss1_wf_42_BRSD1836'],
+  // Rod, ceiling rose and bulb holder; the shade stays matt black.
+  pendant_light: ['[Metal Corrugated Shiny]', '[Color M07]', 'Bronze Light'],
+  // The bezel ring around the lens.
+  spot_light: ['Metal_06_1K2'],
 };
+
+/**
+ * Whether a model's metal finish is stored in `color` (the older, metal-only
+ * models: taps, showers, the towel rail) or in its own `metal` field. A model
+ * that also has a painted body, a lamp colour or upholstery uses `color` for
+ * that, so its metalwork needs the separate slot - otherwise repainting a
+ * vanity would reset its handles to chrome, which is what happened.
+ */
+export const metalUsesColour = (type: ObjectType) =>
+  METAL_MATERIALS[type] !== undefined && TINT_MATERIAL[type] === undefined
+  && FABRIC_REPEAT[type] === undefined && EMISSIVE_MATERIAL[type] === undefined;
 
 /**
  * Types whose imported materials should be forced DIELECTRIC (metalness 0).
@@ -621,7 +676,13 @@ export const FABRIC_COLOURS: { name: string; hex: string }[] = [
 ];
 
 export const METAL_FINISHES: { name: string; hex: string; roughness: number }[] = [
-  { name: 'Chrome', hex: '#e6e7e9', roughness: 0.05 },
+  // Chrome WAS #e6e7e9 at roughness 0.05 - a near-perfect mirror at an albedo
+  // brighter than real chrome (which reflects about 60%, not 80%). In a white
+  // bathroom a perfect mirror of a white wall IS white: the widespread basin
+  // tap "was mostly invisible", only its edges showing (9 Sep). Real chrome
+  // reflectance, with enough roughness to blur the wall into a gradient, so
+  // the body of a tap reads as a cylinder against white.
+  { name: 'Chrome', hex: '#cfd1d4', roughness: 0.12 },
   { name: 'Stainless Steel', hex: '#c8c9c7', roughness: 0.3 },
   { name: 'Brushed Brass', hex: '#c8a35f', roughness: 0.32 },
   { name: 'Polished Brass', hex: '#d9b44a', roughness: 0.1 },
@@ -634,9 +695,21 @@ export const METAL_FINISHES: { name: string; hex: string; roughness: number }[] 
 /** Finish used before the customer picks one - the curved tap was modelled
  *  as a gold design, so it starts on brass. */
 export const DEFAULT_FINISH: Partial<Record<ObjectType, string>> = {
-  kitchen_tap_straight: '#e6e7e9',
+  kitchen_tap_straight: '#cfd1d4',
   kitchen_tap_curved: '#c8a35f',
-  toilet: '#e6e7e9',
+  toilet: '#cfd1d4',
+  // Starting finishes chosen to match how each model was exported, so an
+  // existing design looks the same until someone picks otherwise.
+  bar_stool_tall: '#c8c9c7',
+  office_chair: '#c8c9c7',
+  wardrobe: '#c8c9c7',
+  kitchen_extractor: '#c8c9c7',
+  pendant_light: '#c8c9c7',
+  spot_light: '#c8c9c7',
+  dining_table_round: '#26262a',
+  bedside_table: '#26262a',
+  kitchen_sink_1200: '#26262a',
+  coffee_table_black: '#26262a',
 };
 
 export const hasMetalFinish = (type: ObjectType) => METAL_MATERIALS[type] !== undefined;

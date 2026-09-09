@@ -1,7 +1,7 @@
 import { useStore } from '../../store';
 import { useEffect, useState } from 'react';
 import { Trash2, RotateCw, Copy, ChevronDown, ChevronUp } from 'lucide-react';
-import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS, hasTimber, VENEERS, isVeneerFinish } from '../../modelRegistry';
+import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS, hasTimber, VENEERS, isVeneerFinish, metalUsesColour } from '../../modelRegistry';
 import { DimensionSlider } from '../DimensionSlider';
 import { useSavedColours, addSavedColour, removeSavedColour } from '../../utils/savedColours';
 import { resumeWalking } from '../../utils/walk';
@@ -404,19 +404,23 @@ export function ObjectEditorPanel() {
           />
         )}
 
-        {/* Metal finish, for taps. Same slot as the paint swatches - a tap
-            has no paintable body, so the two never appear together. */}
-        {hasMetalFinish(obj.type) && (
+        {/* Metal finish. A tap is all metal and keeps it in `color`; a
+            vanity, pendant or sink unit has paint or a lamp colour there,
+            so its metalwork is stored apart - see metalUsesColour. */}
+        {hasMetalFinish(obj.type) && (() => {
+          const viaColour = metalUsesColour(obj.type);
+          const current = (obj.metal ?? (viaColour ? obj.color : undefined) ?? DEFAULT_FINISH[obj.type] ?? METAL_FINISHES[0].hex).toLowerCase();
+          return (
           <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold text-gray-700 shrink-0">Finish</span>
+            <span className="text-xs font-semibold text-gray-700 shrink-0">{viaColour ? 'Finish' : 'Metal'}</span>
             <div className="flex gap-1.5 flex-wrap">
               {METAL_FINISHES.map(f => {
-                const active = (obj.color ?? DEFAULT_FINISH[obj.type] ?? METAL_FINISHES[0].hex).toLowerCase() === f.hex.toLowerCase();
+                const active = current === f.hex.toLowerCase();
                 return (
                   <button
                     key={f.hex}
                     title={f.name}
-                    onClick={() => { updateObject(obj.id, { color: f.hex }); afterPick(); }}
+                    onClick={() => { updateObject(obj.id, viaColour ? { color: f.hex } : { metal: f.hex }); afterPick(); }}
                     style={{ background: `linear-gradient(135deg, ${f.hex} 30%, #ffffff88 48%, ${f.hex} 62%)`, backgroundColor: f.hex }}
                     className={`w-6 h-6 rounded-full border transition-all ${
                       active ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20 scale-110' : 'border-black/15 hover:scale-110'
@@ -424,6 +428,51 @@ export function ObjectEditorPanel() {
                   />
                 );
               })}
+            </div>
+          </div>
+          );
+        })()}
+
+        {/* An island, and a breakfast-bar overhang. Both are properties of
+            the RUN - a slab and a back panel span every unit in it - so
+            setting them on one unit sets them for the run it stands in
+            (WorktopRuns takes the widest overhang and any island flag).
+            Layout, not finish, so not offered in the walkthrough. */}
+        {!finishesOnly && hasWorktop(obj.type) && !obj.type.startsWith('end_panel') && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-700">
+                Island
+                <span className="block text-[10px] font-normal text-gray-400 leading-tight">
+                  {obj.island ? 'Finished back panel, no upstand' : 'Against a wall: upstand, open back'}
+                </span>
+              </span>
+              <button
+                onClick={() => updateObject(obj.id, obj.island
+                  ? { island: false, overhangMm: 0 }
+                  // An island nearly always seats people on the far side.
+                  : { island: true, overhangMm: obj.overhangMm || 300 })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all shrink-0 ${obj.island ? 'bg-emerald-500' : 'bg-gray-300/60'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all shadow-md ${obj.island ? 'translate-x-[24px]' : 'translate-x-[3px]'}`} />
+              </button>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-gray-700 shrink-0" title="Worktop overhang beyond the back of the units - a breakfast bar">Overhang</span>
+              <div className="flex gap-1 flex-wrap">
+                {[0, 150, 250, 300, 400].map(mm => (
+                  <button
+                    key={mm}
+                    onClick={() => updateObject(obj.id, { overhangMm: mm })}
+                    className={`px-2 py-1 text-[10px] font-semibold rounded-md uppercase tracking-wide transition-colors ${
+                      (obj.overhangMm ?? 0) === mm ? 'bg-[#3b4d4a] text-white' : 'bg-black/5 text-gray-600 hover:bg-black/10'
+                    }`}
+                  >
+                    {mm === 0 ? 'None' : `${mm}`}
+                  </button>
+                ))}
+                <span className="text-[10px] text-gray-400 self-center">mm</span>
+              </div>
             </div>
           </div>
         )}

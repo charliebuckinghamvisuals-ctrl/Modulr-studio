@@ -240,6 +240,16 @@ export interface SceneObject {
   /** Wood veneer on a timber piece (a VENEERS id). Unset = the model's own
    *  finish, or its default oak dressing. */
   veneer?: string;
+  /** Metal finish (a METAL_FINISHES hex) on a model that ALSO has a painted
+   *  body, lamp colour or fabric in `color`. Metal-only models (taps,
+   *  showers) keep their finish in `color` - see metalUsesColour. */
+  metal?: string;
+  /** Worktop overhang beyond the BACK of a kitchen unit, in mm - a breakfast
+   *  bar. Applies to the whole run the unit is in. */
+  overhangMm?: number;
+  /** An island: the run gets a finished back panel in the unit colour and no
+   *  upstand, since there is no wall behind it. */
+  island?: boolean;
   /** Objects laid out together as one run - a row of downlights. They move as
    *  a unit, because dragging six spots one at a time to shift a row 200mm is
    *  exactly the tedium the layout tool exists to remove. */

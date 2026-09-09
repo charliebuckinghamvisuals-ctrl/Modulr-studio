@@ -6,8 +6,8 @@ import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
-import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel } from '../../modelRegistry';
-import { applyModelMaterials, retintModel, resurfaceWorktop, refinishUnits } from '../../utils/materialFixes';
+import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel, metalUsesColour } from '../../modelRegistry';
+import { applyModelMaterials, retintModel, resurfaceWorktop, refinishUnits, refinishMetal } from '../../utils/materialFixes';
 import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS, snapEndPanel } from '../../utils/placement';
 import { wallpaperProps } from '../../utils/wallpaper';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
@@ -21,7 +21,7 @@ import { PartitionOpenings } from './PartitionOpenings';
  * (served at the site root) and inside the /3d-config/ iframe, where an
  * absolute path would miss.
  */
-function GlbModel({ url, type, color, worktop, finish, seed, veneer }: { url: string; type: SceneObject['type']; color?: string; worktop?: string; finish?: string; seed?: string; veneer?: string }) {
+function GlbModel({ url, type, color, worktop, finish, seed, veneer, metal }: { url: string; type: SceneObject['type']; color?: string; worktop?: string; finish?: string; seed?: string; veneer?: string; metal?: string }) {
     const { scene } = useGLTF(url);
 
     // Clone per instance. useGLTF caches one scene graph, so placing two of
@@ -41,7 +41,7 @@ function GlbModel({ url, type, color, worktop, finish, seed, veneer }: { url: st
     if (!cloned.current || variantRef.current !== variant) {
         variantRef.current = variant;
         cloned.current = scene.clone(true);
-        matHandles.current = applyModelMaterials(type, cloned.current, color, worktop, true, finish, seed, veneer);
+        matHandles.current = applyModelMaterials(type, cloned.current, color, worktop, true, finish, seed, veneer, metal);
     }
 
     // Recolour on demand without rebuilding the model.
@@ -49,6 +49,13 @@ function GlbModel({ url, type, color, worktop, finish, seed, veneer }: { url: st
         if (!color || !matHandles.current) return;
         retintModel(type, matHandles.current, color);
     }, [color, type]);
+
+    // Metalwork finish on a model whose colour is something else (a painted
+    // vanity's handles, a pendant's rod) - see SceneObject.metal.
+    useEffect(() => {
+        if (!matHandles.current || metalUsesColour(type)) return;
+        refinishMetal(type, matHandles.current, metal);
+    }, [metal, type]);
 
     // Matt / satin / gloss, applied without rebuilding the model.
     useEffect(() => {
@@ -509,6 +516,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
               worktop={room.worktopMaterial}
               finish={room.unitFinish}
               veneer={obj.veneer}
+              metal={obj.metal}
             />
             {/* The extractor's flue is its own model, stretched on Y so its
                 top always lands on the ceiling. A duct that stops short
@@ -532,7 +540,8 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
               return (
                 <group position={[0, EXTRACTOR_CANOPY_H, 0]} scale={[1, s, 1]}>
                   <group position={[0, -EXTRACTOR_CANOPY_H, 0]}>
-                    <GlbModel key="flue" url={EXTRACTOR_FLUE_URL} type={obj.type} />
+                    {/* The chimney takes the canopy's finish - one hood, one metal. */}
+                    <GlbModel key="flue" url={EXTRACTOR_FLUE_URL} type={obj.type} color={obj.color} metal={obj.metal} />
                   </group>
                 </group>
               );

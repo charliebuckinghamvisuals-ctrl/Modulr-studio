@@ -4,7 +4,7 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { SceneObject } from '../../types';
 import { NATIVE_WIDTH_MM, hasWorktop, worktopById } from '../../modelRegistry';
-import { createWorktopMaterial } from '../../utils/materialFixes';
+import { createWorktopMaterial, createUnitBodyMaterial, boxProjectUVs } from '../../utils/materialFixes';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
 import { roomLocal } from '../../utils/placement';
 
@@ -60,26 +60,43 @@ const WALL_REACH = 0.08;
 
 type Seg = { cx: number; cz: number; w: number; d: number };
 
+/**
+ * An island's back: a decor panel the full length and height of the run,
+ * in the unit paint or veneer, standing just behind the carcasses - which
+ * are open at the back, being made to go against a wall. Real islands are
+ * closed with exactly this panel.
+ */
+const BACK_PANEL_T = 0.018;
+
 const unitWidth = (o: SceneObject) =>
   (o.widthMm ?? NATIVE_WIDTH_MM[o.type] ?? 600) / 1000;
 
-/** Slab pieces for one run, routed around any sink holes. */
-function segmentsFor(runLength: number, holes: { cx: number; w: number }[]): Seg[] {
+/**
+ * Slab pieces for one run, routed around any sink holes.
+ *
+ * `extra` is a breakfast-bar overhang: the slab runs that much further out
+ * behind the units (units face +z, so the back is -z). The front edge and
+ * the sink hole stay where they are; only the back strip grows.
+ */
+function segmentsFor(runLength: number, holes: { cx: number; w: number }[], extra = 0): Seg[] {
   const half = runLength / 2;
   const segs: Seg[] = [];
   const sorted = [...holes].sort((a, b) => a.cx - b.cx);
   let cursor = -half;
-  const backD = (DEPTH - SINK_HOLE_D) / 2;
+  const fullD = DEPTH + extra;
+  const fullCz = -extra / 2;
+  const backD = (DEPTH - SINK_HOLE_D) / 2 + extra;
+  const frontD = (DEPTH - SINK_HOLE_D) / 2;
   for (const h of sorted) {
     const x0 = h.cx - h.w / 2, x1 = h.cx + h.w / 2;
     // Full-depth slab up to the hole.
-    if (x0 - cursor > 0.001) segs.push({ cx: (cursor + x0) / 2, cz: 0, w: x0 - cursor, d: DEPTH });
+    if (x0 - cursor > 0.001) segs.push({ cx: (cursor + x0) / 2, cz: fullCz, w: x0 - cursor, d: fullD });
     // Narrow strips behind and in front of the bowl.
-    segs.push({ cx: h.cx, cz: -(DEPTH / 2) + backD / 2, w: h.w, d: backD });
-    segs.push({ cx: h.cx, cz: (DEPTH / 2) - backD / 2, w: h.w, d: backD });
+    segs.push({ cx: h.cx, cz: -(DEPTH / 2) - extra + backD / 2, w: h.w, d: backD });
+    segs.push({ cx: h.cx, cz: (DEPTH / 2) - frontD / 2, w: h.w, d: frontD });
     cursor = x1;
   }
-  if (half - cursor > 0.001) segs.push({ cx: (cursor + half) / 2, cz: 0, w: half - cursor, d: DEPTH });
+  if (half - cursor > 0.001) segs.push({ cx: (cursor + half) / 2, cz: fullCz, w: half - cursor, d: fullD });
   return segs;
 }
 
@@ -117,7 +134,7 @@ export function WorktopRuns() {
       (byAngle.get(key) ?? byAngle.set(key, []).get(key)!).push(o);
     });
 
-    const out: { pos: [number, number, number]; rot: number; length: number; segs: Seg[]; upstand: boolean; ownerId: string; worktop?: string }[] = [];
+    const out: { pos: [number, number, number]; rot: number; length: number; segs: Seg[]; upstand: boolean; ownerId: string; worktop?: string; island: boolean; extra: number; color?: string }[] = [];
     const Y = new THREE.Vector3(0, 1, 0);
 
     byAngle.forEach(group => {
@@ -159,17 +176,26 @@ export function WorktopRuns() {
           // return leg against the side wall both count.
           const back = centre.clone().addScaledVector(perp, -DEPTH / 2);
           const rl = roomLocal(room, back.x, back.z);
-          const upstand =
+          // Island and overhang belong to the run: any unit flagged makes
+          // the run an island, and the widest overhang asked for is the one
+          // laid, since a slab cannot step. Behind an island's back panel
+          // the overhang starts from the panel face, not the carcass.
+          const island = current.some(p => p.o.island);
+          const extra = Math.max(0, ...current.map(p => (p.o.overhangMm ?? 0) / 1000)) + (island ? BACK_PANEL_T : 0);
+          // No upstand on an island, nor where a bar overhang runs out the
+          // back - neither has a wall behind it.
+          const upstand = !island && extra === 0 && (
             (rl.hx - Math.abs(rl.lx)) < WALL_REACH ||
-            (rl.hz - Math.abs(rl.lz)) < WALL_REACH;
+            (rl.hz - Math.abs(rl.lz)) < WALL_REACH);
 
           // The run answers to one of its own units, so clicking the worktop
           // in the walkthrough opens that unit's finishes rather than falling
           // through to whatever is behind it.
           // A bespoke unit carries its own worktop, so an island can be
           // topped in something different from the run against the wall.
-          out.push({ pos: [centre.x, 0, centre.z], rot, length, segs: segmentsFor(length, holes), upstand,
-                     ownerId: current[0].o.id, worktop: current[0].o.worktopMaterial });
+          out.push({ pos: [centre.x, 0, centre.z], rot, length, segs: segmentsFor(length, holes, extra), upstand,
+                     ownerId: current[0].o.id, worktop: current[0].o.worktopMaterial,
+                     island, extra, color: current[0].o.color });
           current = [];
         };
         line.forEach(p => {
@@ -197,9 +223,28 @@ export function WorktopRuns() {
             <SlabPiece key={j} seg={seg} material={materialFor(run.worktop)} y={TOP_Y + THICKNESS / 2} />
           ))}
           {run.upstand && <Upstand length={run.length} material={materialFor(run.worktop)} />}
+          {run.island && <IslandBack length={run.length} color={run.color} finish={room.unitFinish} seed={run.ownerId + ':back'} />}
         </group>
       ))}
     </group>
+  );
+}
+
+/**
+ * The decor panel closing an island's back - see BACK_PANEL_T. Dressed in
+ * the same paint or veneer as the doors, box-projected at that finish's own
+ * tile size so the orange peel or the grain is the size it is on the doors.
+ */
+function IslandBack({ length, color, finish, seed }: { length: number; color?: string; finish?: string; seed: string }) {
+  const { material, geom } = useMemo(() => {
+    const body = createUnitBodyMaterial(color, finish, seed);
+    const g = new THREE.BoxGeometry(length, TOP_Y, BACK_PANEL_T);
+    boxProjectUVs(g, body.tileMetres, true);
+    return { material: body.material, geom: g };
+  }, [length, color, finish, seed]);
+  const cz = -DEPTH / 2 - BACK_PANEL_T / 2;
+  return (
+    <mesh position={[0, TOP_Y / 2, cz]} geometry={geom} material={material} castShadow receiveShadow />
   );
 }
 
