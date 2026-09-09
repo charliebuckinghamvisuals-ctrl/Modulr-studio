@@ -182,16 +182,24 @@ export type UnitFinish = 'matt' | 'satin' | 'gloss' | VeneerId;
  * sets so one loader serves both. tileMetres is the real width the texture
  * covers, from the asset page.
  */
-export type VeneerId = 'oak_veneer' | 'walnut_veneer' | 'dark_walnut_veneer' | 'silver_oak_veneer';
+export type VeneerId = 'oak_veneer' | 'natural_oak_veneer' | 'silver_oak_veneer' | 'teak_veneer' | 'walnut_veneer' | 'dark_walnut_veneer' | 'espresso_veneer';
 export const VENEERS: (WorktopDef & { id: VeneerId })[] = [
   { id: 'oak_veneer', name: 'Oak Veneer', prefix: 'wt_oak_veneer', tileMetres: 1.8, roughness: 0.45 },
+  // ambientCG (CC0) sets Charlie picked on 9 Sep: Wood049, Wood066 and
+  // Wood051, 1K, GL normals. Wood049 was authored with the grain running
+  // ACROSS the image, so its three maps were turned upright on import
+  // (normal map channels turned with it) - every veneer here runs its
+  // grain along V. tileMetres is the asset page's real size.
+  { id: 'natural_oak_veneer', name: 'Natural Oak', prefix: 'wt_natural_oak_veneer', tileMetres: 0.8, roughness: 0.5 },
+  { id: 'silver_oak_veneer', name: 'Silver Oak', prefix: 'wt_silver_oak_veneer', tileMetres: 1.0, roughness: 0.45 },
+  { id: 'teak_veneer', name: 'Teak', prefix: 'wt_teak_veneer', tileMetres: 0.4, roughness: 0.42 },
   { id: 'walnut_veneer', name: 'Walnut Veneer', prefix: 'wt_walnut_veneer', tileMetres: 1.8, roughness: 0.45 },
   // The walnut leaf stained dark (9 Sep: "the ones we have now are all
   // mostly light"). Same normal and roughness maps as the walnut; only the
   // colour map is derived, so the grain figure is identical and the two
   // read as the same species in two stains.
   { id: 'dark_walnut_veneer', name: 'Dark Walnut', prefix: 'wt_dark_walnut_veneer', tileMetres: 1.8, roughness: 0.45 },
-  { id: 'silver_oak_veneer', name: 'Silver Oak', prefix: 'wt_silver_oak_veneer', tileMetres: 1.0, roughness: 0.45 },
+  { id: 'espresso_veneer', name: 'Espresso', prefix: 'wt_espresso_veneer', tileMetres: 0.8, roughness: 0.38 },
 ];
 export const veneerById = (id?: string) => VENEERS.find(v => v.id === id);
 
