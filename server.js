@@ -2139,7 +2139,18 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                     const style = dr.style === 'crittall' ? 'black steel Crittall-style with a grid of slim glazing bars'
                         : dr.style === 'solid' ? 'SOLID UNGLAZED entrance door - an opaque flush panel leaf with NO glass anywhere in it; not a glazed set, not Crittall'
                         : 'standard glazed';
-                    lines.push(`  - Door ${i + 1}: ${Math.max(1, parseInt(dr.leaves) || 1)} leaf, ${mm(dr.widthMm) || 'unspecified width'} x ${mm(dr.heightMm) || 'unspecified height'}, ${style}, on the ${sanitizeString(String(dr.wall || ''), 10) || 'front'} elevation.${where(dr)}`);
+                    // The product, not just a leaf count: a 3-leaf bi-fold and a
+                    // 3-pane slider look nothing alike. Older designs carry no
+                    // kind, so it is read from the leaf count the way the
+                    // configurator does (utils/doors.ts).
+                    const leaves = Math.max(1, parseInt(dr.leaves) || 1);
+                    const kind = ['hinged', 'french', 'bifold', 'sliding'].includes(dr.kind) ? dr.kind
+                        : leaves <= 1 ? 'hinged' : leaves === 2 ? 'french' : 'bifold';
+                    const product = kind === 'hinged' ? 'single hinged door, 1 leaf'
+                        : kind === 'french' ? 'French doors - a pair of hinged leaves meeting in the middle, 2 leaves'
+                        : kind === 'bifold' ? `bi-fold door set of ${leaves} equal folding leaves in one frame, with the slim vertical mullions between the leaves that a bi-fold has`
+                        : `sliding door set of ${leaves} equal panes in one frame - large panes, slim vertical divisions, no folding hinges`;
+                    lines.push(`  - Door ${i + 1}: ${product}, ${mm(dr.widthMm) || 'unspecified width'} x ${mm(dr.heightMm) || 'unspecified height'}, ${style}, on the ${sanitizeString(String(dr.wall || ''), 10) || 'front'} elevation.${where(dr)}`);
                 });
                 const windows = Array.isArray(spec.windows) ? spec.windows.slice(0, 12) : [];
                 lines.push(windows.length

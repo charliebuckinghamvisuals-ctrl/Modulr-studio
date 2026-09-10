@@ -8,6 +8,8 @@ import { gableCeilingMaxMm } from '../utils/placement';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS, INTERIOR_DOOR_STYLES } from '../modelRegistry';
+import { DOOR_KINDS, LEAF_RANGE, doorKind, clampLeaves, changesForKind } from '../utils/doors';
+import type { DoorKind } from '../types';
 import { MATERIAL_DEF } from '../utils/materials';
 import { ObjectTile } from './UI/ObjectTile';
 import { KitchenPanel } from './UI/KitchenPanel';
@@ -660,12 +662,62 @@ export function Sidebar() {
                         <option value="right">Right</option>
                       </select>
                     </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-medium text-gray-700">Leaves</span>
-                      <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={door.leaves} onChange={e => wrap(store.updateDoor)(door.id, { leaves: parseInt(e.target.value) })}>
-                        {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n} Leaf</option>)}
-                      </select>
-                    </div>
+                    {/* The product: single, French, bi-fold or sliding. Each
+                        is made in its own leaf counts and opens its own way
+                        (Open Doors animates it) - see utils/doors. */}
+                    {(() => {
+                      const kind = doorKind(door);
+                      const [lo, hi] = LEAF_RANGE[kind];
+                      const counts = Array.from({ length: hi - lo + 1 }, (_, k) => lo + k);
+                      return (
+                        <>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-medium text-gray-700">Type</span>
+                            <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={kind} onChange={e => wrap(store.updateDoor)(door.id, changesForKind(door, e.target.value as DoorKind))}>
+                              {DOOR_KINDS.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
+                            </select>
+                          </div>
+                          {counts.length > 1 && (
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-medium text-gray-700">{kind === 'sliding' ? 'Panes' : 'Leaves'}</span>
+                              <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={clampLeaves(kind, door.leaves)} onChange={e => wrap(store.updateDoor)(door.id, { leaves: parseInt(e.target.value) })}>
+                                {counts.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </div>
+                          )}
+                          {kind !== 'sliding' && (
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-medium text-gray-700">Opens</span>
+                              <div className="flex gap-1">
+                                {([[1, 'Out'], [-1, 'In']] as const).map(([v, label]) => (
+                                  <button key={v} onClick={() => wrap(store.updateDoor)(door.id, { swing: v })} className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-md transition-colors ${(door.swing ?? 1) === v ? 'bg-[#3b4d4a] text-white' : 'bg-black/5 hover:bg-black/10 text-[#3b4d4a]'}`}>{label}</button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {kind === 'hinged' && (
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-medium text-gray-700" title="Viewed from outside">Hinges</span>
+                              <div className="flex gap-1">
+                                {(['left', 'right'] as const).map(v => (
+                                  <button key={v} onClick={() => wrap(store.updateDoor)(door.id, { hinge: v })} className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-md transition-colors ${(door.hinge ?? 'left') === v ? 'bg-[#3b4d4a] text-white' : 'bg-black/5 hover:bg-black/10 text-[#3b4d4a]'}`}>{v}</button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {(kind === 'bifold' || kind === 'sliding') && (
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-medium text-gray-700" title="Viewed from outside">{kind === 'bifold' ? 'Folds to' : 'Slides to'}</span>
+                              <div className="flex gap-1">
+                                {(['left', 'right', 'split'] as const).filter(v => v !== 'split' || door.leaves >= 3).map(v => (
+                                  <button key={v} onClick={() => wrap(store.updateDoor)(door.id, { stack: v })} className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-md transition-colors ${(door.stack ?? 'left') === v ? 'bg-[#3b4d4a] text-white' : 'bg-black/5 hover:bg-black/10 text-[#3b4d4a]'}`}>{v === 'split' ? 'Both' : v}</button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                     <div className="flex justify-between items-center text-xs">
                       <span className="font-medium text-gray-700">Style</span>
                       <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={door.style || 'standard'} onChange={e => wrap(store.updateDoor)(door.id, { style: e.target.value as any })}>

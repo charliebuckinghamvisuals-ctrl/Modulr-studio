@@ -30,6 +30,14 @@ export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 
 /** 'solid' is doors-only (entrance door); the window UI never offers it. */
 export type GlazingStyle = 'standard' | 'crittall' | 'solid';
 
+/**
+ * How an exterior door set opens - see utils/doors for the rules.
+ * hinged: one leaf on side hinges. french: a pair, both hinged at the jambs.
+ * bifold: leaves hinged to each other, concertina to a jamb. sliding: panes
+ * in parallel tracks, gliding behind a fixed pane.
+ */
+export type DoorKind = 'hinged' | 'french' | 'bifold' | 'sliding';
+
 export interface Door {
   id: string;
   wall: 'front' | 'back' | 'left' | 'right';
@@ -38,6 +46,15 @@ export interface Door {
   offsetMm: number;
   leaves: number;
   style?: GlazingStyle;
+  /** Unset on older designs: worked out from the leaf count (utils/doors). */
+  kind?: DoorKind;
+  /** Hinged, French and bifold: 1 opens OUT to the garden, -1 opens in. */
+  swing?: 1 | -1;
+  /** Hinged: which jamb the hinges are on, viewed from outside. */
+  hinge?: 'left' | 'right';
+  /** Bifold: the jamb the leaves fold back to. Sliding: the side the panes
+   *  slide toward (the fixed pane is there). 'split' halves them each way. */
+  stack?: 'left' | 'right' | 'split';
 }
 
 export type InteriorFloorType = 'oak_plank' | 'light_oak' | 'rustic_pine' | 'smoked_oak' | 'oak_herringbone' | 'walnut_parquet';

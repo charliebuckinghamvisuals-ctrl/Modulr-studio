@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../../store';
 import { jsPDF } from 'jspdf';
 import { Download, X, Loader2 } from 'lucide-react';
+import { DOOR_KIND_NAME, doorKind } from '../../utils/doors';
 
 interface ShotResult {
   dataUrl: string;
@@ -493,7 +494,7 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       // and window from the client's document.
       const openings: { key: string; size: string }[] = [
         ...(scene.room.doors || []).map(dr => ({
-          key: `${titleCase(String(dr.style || 'standard'))} Door (${dr.leaves} leaf)`,
+          key: `${titleCase(String(dr.style || 'standard'))} ${DOOR_KIND_NAME[doorKind(dr)]} (${dr.leaves} leaf)`,
           size: `${dr.widthMm} x ${dr.heightMm} mm`,
         })),
         ...(scene.room.windows || []).map(wn => ({

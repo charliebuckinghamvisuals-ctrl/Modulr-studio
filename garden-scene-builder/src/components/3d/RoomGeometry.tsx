@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMemo, useState, useRef, useEffect, useDeferredValue } from 'react';
-import { Room } from '../../types';
+import { Room, Door } from '../../types';
+import { doorKind } from '../../utils/doors';
 import { useFrame } from '@react-three/fiber';
 // SafeCsg = fork of @react-three/csg whose failed boolean evaluations keep
 // the previous geometry instead of blanking the mesh (see SafeCsg.tsx).
@@ -376,137 +377,248 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
   );
 }
 
-function AnimatedDoorLeaves({ door, frameColorHex, frameColorInnerHex, frameThickness, sashThickness, depth, room }: { door: any, frameColorHex: string, frameColorInnerHex: string, frameThickness: number, sashThickness: number, depth: number, room: Room }) {
+/**
+ * One leaf of an exterior door set, centred on its own origin: sash, panel
+ * (glass, or the solid entrance slab), Crittall bars, and a handle on the
+ * edge that opens. The set's mechanism (below) decides where it goes.
+ */
+function DoorLeaf({ leafW, doorH, frameThickness, sashThickness, depth, style, frameColorHex, frameColorInnerHex, handle }: {
+  leafW: number; doorH: number; frameThickness: number; sashThickness: number; depth: number;
+  style?: string; frameColorHex: string; frameColorInnerHex: string; handle: 'left' | 'right' | null;
+}) {
+  return (
+    <group>
+      {/* Leaf Frame (Sash) */}
+      <FrameBar position={[0, doorH/2 - frameThickness - sashThickness/2, 0]} args={[leafW, sashThickness, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
+      <FrameBar position={[0, -doorH/2 + frameThickness + sashThickness/2, 0]} args={[leafW, sashThickness, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
+      <FrameBar position={[-leafW/2 + sashThickness/2, 0, 0]} args={[sashThickness, doorH - frameThickness*2, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
+      <FrameBar position={[leafW/2 - sashThickness/2, 0, 0]} args={[sashThickness, doorH - frameThickness*2, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
+
+      {/* Door Handle, on the edge that opens */}
+      {handle && (
+        <group position={[handle === 'right' ? leafW/2 - sashThickness/2 - 0.03 : -leafW/2 + sashThickness/2 + 0.03, 0, depth*0.25 + 0.005]}>
+          {/* Backplate */}
+          <mesh position={[0, 0, 0]}><boxGeometry args={[0.04, 0.22, 0.01]} /><meshStandardMaterial color="#333" metalness={0.8} roughness={0.2} /></mesh>
+          {/* Handle lever */}
+          <mesh position={[handle === 'right' ? -0.04 : 0.04, 0, 0.03]}><boxGeometry args={[0.12, 0.02, 0.02]} /><meshStandardMaterial color="#333" metalness={0.8} roughness={0.2} /></mesh>
+        </group>
+      )}
+
+      {/*
+        No "Open Door" badge on the leaf.
+
+        It was an Html label welded to the leaf, so from inside the room
+        you read it back to front, and with one per door set they hung in
+        the glass across the whole elevation - the first thing a customer
+        saw on the walkthrough was floating UI, not their room. Doors are
+        still opened from Open Doors in the toolbar, which does the whole
+        set at once anyway.
+      */}
+      {/* Panel: glass, or a solid slab for the entrance-door style */}
+      {style === 'solid' ? (
+        <FrameBar position={[0, 0, 0]} args={[leafW - sashThickness*2, doorH - frameThickness*2 - sashThickness*2, 0.045]} outer={frameColorHex} inner={frameColorInnerHex} metalness={0.35} roughness={0.55} castShadow />
+      ) : (
+        <mesh>
+          <boxGeometry args={[leafW - sashThickness*2, doorH - frameThickness*2 - sashThickness*2, 0.02]} />
+          <meshPhysicalMaterial color="#aabed1" transmission={0.9} ior={1.5} thickness={0.05} roughness={0.1} clearcoat={1} envMapIntensity={3} />
+        </mesh>
+      )}
+      {style === 'crittall' && (
+        <CrittallBars
+          glassW={leafW - sashThickness*2}
+          glassH={doorH - frameThickness*2 - sashThickness*2}
+          depth={0.03}
+          color={frameColorHex}
+          innerColor={frameColorInnerHex}
+        />
+      )}
+    </group>
+  );
+}
+
+/**
+ * The leaves of an exterior door set, and how they open.
+ *
+ * Four mechanisms, each moving the way the real product does (see
+ * utils/doors): a hinged leaf swings on its jamb; French doors are two of
+ * those meeting in the middle; a bi-fold is a chain of leaves hinged to each
+ * other that concertinas back to a jamb, folding face to face; a slider's
+ * panes glide in parallel tracks behind a fixed pane. Everything is driven
+ * by one progress value, 0 closed to 1 open, eased toward its target each
+ * frame; the pose for any progress is computed outright, so the leaves are
+ * always exactly where the mechanism puts them, mid-swing included.
+ *
+ * Local frame: x along the wall, +z OUT to the garden (the door group is
+ * turned to face its wall), leaves closed at z = 0.
+ */
+function AnimatedDoorLeaves({ door, frameColorHex, frameColorInnerHex, frameThickness, sashThickness, depth, room }: { door: Door, frameColorHex: string, frameColorInnerHex: string, frameThickness: number, sashThickness: number, depth: number, room: Room }) {
   const { areDoorsOpen } = useStore();
-  const leavesRef = useRef<THREE.Group[]>([]);
+  const pivots = useRef<THREE.Group[]>([]);
+  const progress = useRef(0);
+
+  const kind = doorKind(door);
+  const n = Math.max(1, door.leaves);
+  const W = door.widthMm/1000 - frameThickness*1.5;
+  const leafW = W / n;
+  const doorH = door.heightMm/1000;
+  const swing = door.swing ?? 1;
+  const hinge = door.hinge ?? 'left';
+  const stack = door.stack ?? 'left';
+  // A leaf's thickness, hinge to hinge: what separates folded bi-fold
+  // leaves and the tracks of a slider.
+  const t = depth * 0.5 + 0.004;
+  const HALF = Math.PI / 2;
+
+  // Chains for a bi-fold: how many leaves fold to each jamb.
+  const leftChain = kind !== 'bifold' ? 0 : stack === 'left' ? n : stack === 'right' ? 0 : Math.ceil(n / 2);
+  const rightChain = kind === 'bifold' ? n - leftChain : 0;
+  // A slider's fixed pane(s).
+  const fixedLeft = stack === 'left' || (stack === 'split');
+  const fixedRight = stack === 'right' || (stack === 'split' && n > 2);
+  const closedX = (i: number) => -W/2 + leafW/2 + i * leafW;
+
+  /** Put every pivot where the mechanism has it at progress p. */
+  const pose = (p: number) => {
+    const g = pivots.current;
+    if (kind === 'hinged') {
+      if (g[0]) g[0].rotation.y = (hinge === 'left' ? -1 : 1) * swing * HALF * p;
+    } else if (kind === 'french') {
+      if (g[0]) g[0].rotation.y = -swing * HALF * p;
+      if (g[1]) g[1].rotation.y = swing * HALF * p;
+    } else if (kind === 'bifold') {
+      const th = HALF * p;
+      // Left chain: the jamb hinge turns the first leaf out; each hinge
+      // after it turns twice as far the other way, so the leaves zigzag and,
+      // at 90 degrees, lie face to face.
+      for (let k = 0; k < leftChain; k++) {
+        if (!g[k]) continue;
+        g[k].rotation.y = k === 0 ? -swing * th : (k % 2 ? 2 : -2) * swing * th;
+      }
+      // Right chain, mirrored, indexed from the right jamb inward.
+      for (let k = 0; k < rightChain; k++) {
+        const i = n - 1 - k;
+        if (!g[i]) continue;
+        g[i].rotation.y = k === 0 ? swing * th : (k % 2 ? -2 : 2) * swing * th;
+      }
+    } else {
+      // Sliding: each pane glides toward the fixed pane on its side.
+      for (let i = 0; i < n; i++) {
+        if (!g[i]) continue;
+        const half = Math.ceil(n / 2);
+        const toLeft = stack === 'left' || (stack === 'split' && i < half);
+        const target = toLeft ? closedX(0) : closedX(n - 1);
+        g[i].position.x = closedX(i) + (target - closedX(i)) * p;
+      }
+    }
+  };
 
   /**
-   * True once every leaf has reached its target, so the loop can stop working.
-   *
-   * lerp approaches its target asymptotically and never quite arrives, so
-   * without this the door maths ran for every leaf of every door on every
-   * frame, for the entire session, long after the doors had visibly stopped
-   * moving. Reset whenever the target changes.
+   * True once the set has reached its target, so the loop can stop working -
+   * the easing approaches asymptotically and never quite arrives, and without
+   * this the door maths ran on every frame for the whole session. Reset
+   * whenever anything about the set changes.
    */
   const settledRef = useRef(false);
-  useEffect(() => { settledRef.current = false; }, [areDoorsOpen, door?.leaves, door?.widthMm]);
+  useEffect(() => { settledRef.current = false; }, [areDoorsOpen, kind, n, door.widthMm, swing, hinge, stack]);
 
   useFrame((_, delta) => {
-    if (!door || settledRef.current) return;
-
-    // Sliders mostly open by pushing all but one leaf to one side
-    const leafW = (door.widthMm/1000 - frameThickness*1.5) / door.leaves;
-    const isSingle = door.leaves === 1;
-    let moving = false;
-
-    leavesRef.current.forEach((leaf, i) => {
-      if (!leaf) return;
-
-      const targetX = areDoorsOpen && !isSingle 
-        ? - (door.widthMm/1000 - frameThickness*1.5)/2 + (leafW/2) + Math.min(i, 0.5) * leafW * 0.2 // Cascade to left
-        : - (door.widthMm/1000 - frameThickness*1.5)/2 + (leafW/2) + i * leafW;
-      
-      const targetRotY = areDoorsOpen && isSingle 
-        ? Math.PI / 2 // Swing 90 deg
-        : 0;
-
-      // Sub-millimetre at this scale, and well under a pixel on screen.
-      if (Math.abs(leaf.position.x - targetX) > 0.0005 || Math.abs(leaf.rotation.y - targetRotY) > 0.0005) {
-          moving = true;
-      }
-
-      // Animate position
-      leaf.position.x = THREE.MathUtils.lerp(leaf.position.x, targetX, 5 * delta);
-      // Animate rotation (important for swing)
-      leaf.rotation.y = THREE.MathUtils.lerp(leaf.rotation.y, targetRotY, 5 * delta);
-
-      // Pivot offset for swinging doors
-      if (isSingle) {
-         leaf.position.x = targetX + Math.sin(leaf.rotation.y) * leafW/2;
-         leaf.position.z = Math.cos(leaf.rotation.y) * leafW/2 - leafW/2;
-      }
-    });
-
-    // Snap to the exact target on the last frame, so parking the animation can
-    // never leave a leaf a fraction out of place.
-    if (!moving) {
-      leavesRef.current.forEach((leaf, i) => {
-        if (!leaf) return;
-        leaf.position.x = areDoorsOpen && !isSingle
-          ? - (door.widthMm/1000 - frameThickness*1.5)/2 + (leafW/2) + Math.min(i, 0.5) * leafW * 0.2
-          : - (door.widthMm/1000 - frameThickness*1.5)/2 + (leafW/2) + i * leafW;
-        leaf.rotation.y = areDoorsOpen && isSingle ? Math.PI / 2 : 0;
-        if (isSingle) {
-          leaf.position.x += Math.sin(leaf.rotation.y) * leafW/2;
-          leaf.position.z = Math.cos(leaf.rotation.y) * leafW/2 - leafW/2;
-        }
-      });
+    if (settledRef.current) return;
+    const target = areDoorsOpen ? 1 : 0;
+    const next = THREE.MathUtils.lerp(progress.current, target, Math.min(1, 5 * delta));
+    if (Math.abs(next - target) < 0.002) {
+      progress.current = target;
+      pose(target);
       settledRef.current = true;
+      return;
     }
+    progress.current = next;
+    pose(next);
   });
 
-  if (!door) return null;
+  const setPivot = (i: number) => (el: THREE.Group | null) => { if (el) pivots.current[i] = el; };
+  const leafProps = { leafW, doorH, frameThickness, sashThickness, depth, style: door.style, frameColorHex, frameColorInnerHex };
+  const handles = room.hasDoorHandles;
 
+  if (kind === 'hinged') {
+    const left = hinge === 'left';
+    return (
+      <group position={[left ? -W/2 : W/2, 0, 0]} ref={setPivot(0)}>
+        <group position={[left ? leafW/2 : -leafW/2, 0, 0]}>
+          <DoorLeaf {...leafProps} handle={handles ? (left ? 'right' : 'left') : null} />
+        </group>
+      </group>
+    );
+  }
+
+  if (kind === 'french') {
+    return (
+      <>
+        <group position={[-W/2, 0, 0]} ref={setPivot(0)}>
+          <group position={[leafW/2, 0, 0]}><DoorLeaf {...leafProps} handle={handles ? 'right' : null} /></group>
+        </group>
+        <group position={[W/2, 0, 0]} ref={setPivot(1)}>
+          <group position={[-leafW/2, 0, 0]}><DoorLeaf {...leafProps} handle={handles ? 'left' : null} /></group>
+        </group>
+      </>
+    );
+  }
+
+  if (kind === 'bifold') {
+    /*
+     * A chain of nested pivots. The hinges alternate faces - outside face,
+     * inside face, outside - so folded leaves stack a thickness apart
+     * rather than through each other. In the frame of pivot k the next
+     * pivot sits a leaf along and a thickness across, and the leaf itself
+     * hangs half a thickness the other way so that, closed, every leaf
+     * lies at z = 0.
+     */
+    const chain = (count: number, fromLeft: boolean): JSX.Element | null => {
+      const dir = fromLeft ? 1 : -1;
+      const s = swing;
+      const build = (k: number): JSX.Element | null => {
+        if (k >= count) return null;
+        const i = fromLeft ? k : n - 1 - k;
+        const sign = k % 2 ? -1 : 1;
+        const isLast = k === count - 1;
+        const handle = handles && isLast && count > 0 ? (fromLeft ? 'right' : 'left') : null;
+        return (
+          <group
+            position={k === 0 ? [fromLeft ? -W/2 : W/2, 0, s * t / 2] : [dir * leafW, 0, s * t * sign]}
+            ref={setPivot(i)}
+          >
+            <group position={[dir * leafW/2, 0, -s * t / 2 * sign]}>
+              <DoorLeaf {...leafProps} handle={handle} />
+            </group>
+            {build(k + 1)}
+          </group>
+        );
+      };
+      return build(0);
+    };
+    return (
+      <>
+        {chain(leftChain, true)}
+        {chain(rightChain, false)}
+      </>
+    );
+  }
+
+  // Sliding: panes in parallel tracks, stepping inward from the fixed pane
+  // so each can pass the next. The pane beside a fixed one carries the
+  // handle on its leading edge.
+  const half = Math.ceil(n / 2);
   return (
     <>
-      {Array.from({ length: door.leaves }).map((_, i) => {
-        const leafW = (door.widthMm/1000 - frameThickness*1.5) / door.leaves;
-        const xPos = - (door.widthMm/1000 - frameThickness*1.5)/2 + (leafW/2) + i * leafW;
-        // Slightly offset alternating leaves to look like bifolds or sliders
-        const zOffset = (i % 2 === 0) ? -0.01 : 0.01;
-        
+      {Array.from({ length: n }).map((_, i) => {
+        const toLeft = stack === 'left' || (stack === 'split' && i < half);
+        const lane = toLeft ? i : n - 1 - i;
+        const isFixed = (toLeft && i === 0 && fixedLeft) || (!toLeft && i === n - 1 && fixedRight);
+        const handle = handles && !isFixed && lane === 1 ? (toLeft ? 'left' : 'right') : null;
         return (
-          <group 
-            key={`leaf-${i}`} 
-            position={[xPos, 0, zOffset]}
-            ref={el => { if(el) leavesRef.current[i] = el; }}
-          >
-            {/* Leaf Frame (Sash) */}
-            <FrameBar position={[0, (door.heightMm/1000)/2 - frameThickness - sashThickness/2, 0]} args={[leafW, sashThickness, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
-            <FrameBar position={[0, -(door.heightMm/1000)/2 + frameThickness + sashThickness/2, 0]} args={[leafW, sashThickness, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
-            <FrameBar position={[-leafW/2 + sashThickness/2, 0, 0]} args={[sashThickness, door.heightMm/1000 - frameThickness*2, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
-            <FrameBar position={[leafW/2 - sashThickness/2, 0, 0]} args={[sashThickness, door.heightMm/1000 - frameThickness*2, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
-            
-            {/* Door Handle */}
-            {room.hasDoorHandles && (
-              <group position={[i === 0 ? leafW/2 - sashThickness/2 - 0.03 : -leafW/2 + sashThickness/2 + 0.03, 0, depth*0.25 + 0.005]}>
-                {/* Backplate */}
-                <mesh position={[0, 0, 0]}><boxGeometry args={[0.04, 0.22, 0.01]} /><meshStandardMaterial color="#333" metalness={0.8} roughness={0.2} /></mesh>
-                {/* Handle lever */}
-                <mesh position={[i === 0 ? -0.04 : 0.04, 0, 0.03]}><boxGeometry args={[0.12, 0.02, 0.02]} /><meshStandardMaterial color="#333" metalness={0.8} roughness={0.2} /></mesh>
-              </group>
-            )}
-
-            {/*
-              No "Open Door" badge on the leaf.
-
-              It was an Html label welded to the leaf, so from inside the room
-              you read it back to front, and with one per door set they hung in
-              the glass across the whole elevation - the first thing a customer
-              saw on the walkthrough was floating UI, not their room. Doors are
-              still opened from Open Doors in the toolbar, which does the whole
-              set at once anyway.
-            */}
-            {/* Panel: glass, or a solid slab for the entrance-door style */}
-            {door.style === 'solid' ? (
-              <FrameBar position={[0, 0, 0]} args={[leafW - sashThickness*2, door.heightMm/1000 - frameThickness*2 - sashThickness*2, 0.045]} outer={frameColorHex} inner={frameColorInnerHex} metalness={0.35} roughness={0.55} castShadow />
-            ) : (
-              <mesh>
-                <boxGeometry args={[leafW - sashThickness*2, door.heightMm/1000 - frameThickness*2 - sashThickness*2, 0.02]} />
-                <meshPhysicalMaterial color="#aabed1" transmission={0.9} ior={1.5} thickness={0.05} roughness={0.1} clearcoat={1} envMapIntensity={3} />
-              </mesh>
-            )}
-            {door.style === 'crittall' && (
-              <CrittallBars
-                glassW={leafW - sashThickness*2}
-                glassH={door.heightMm/1000 - frameThickness*2 - sashThickness*2}
-                depth={0.03}
-                color={frameColorHex}
-                innerColor={frameColorInnerHex}
-              />
-            )}
+          <group key={`pane-${i}`} position={[closedX(i), 0, -lane * (t + 0.006)]} ref={setPivot(i)}>
+            <DoorLeaf {...leafProps} handle={handle} />
           </group>
-        )
+        );
       })}
     </>
   );

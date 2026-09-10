@@ -65,6 +65,24 @@ check('frame colour stated from the spec', ordered.includes('frames: ANTHRACITE'
 check('door position stated as blank wall to each corner', ordered.includes('leaving 50mm of blank wall to the left-hand corner and 3050mm to the right-hand corner'));
 check('QA inspector receives the order, not just the shading', src.includes('inspectRenderFidelity(base64Image, renderB64, specFacts)'));
 
+// Door kinds (10 Sep 2026): the prompt names the product, not just a leaf
+// count, and older designs with no kind are read the way the configurator
+// reads them - 1 leaf hinged, 2 French, more bi-fold.
+const kinds = buildConfigSpecBlock({
+    widthMm: 6000, depthMm: 4000, shape: 'Flat',
+    doors: [
+        { leaves: 4, widthMm: 3600, heightMm: 2100, style: 'standard', wall: 'front', kind: 'bifold' },
+        { leaves: 3, widthMm: 3000, heightMm: 2100, style: 'standard', wall: 'left', kind: 'sliding' },
+        { leaves: 2, widthMm: 1800, heightMm: 2100, style: 'standard', wall: 'right' },
+        { leaves: 1, widthMm: 900, heightMm: 2100, style: 'solid', wall: 'back', kind: 'hinged' },
+    ],
+    windows: [],
+});
+check('bifold door named as a bi-fold set', /Door 1: bi-fold door set of 4/.test(kinds));
+check('sliding door named as a sliding set', /Door 2: sliding door set of 3/.test(kinds));
+check('two leaves with no kind read as French doors', /Door 3: French doors/.test(kinds));
+check('single leaf named as a hinged door', /Door 4: single hinged door/.test(kinds));
+
 const perFace = buildConfigSpecBlock({
     widthMm: 6000, depthMm: 4000, shape: 'Flat',
     cladding: 'black_composite', claddingFront: 'cedar_composite',
