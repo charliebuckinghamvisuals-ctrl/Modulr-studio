@@ -67,7 +67,7 @@ export function PlacementGhost() {
 
   const moveGhost = (e: any) => {
     let x = e.point.x, z = e.point.z;
-    if (interior) { const c = clampToRoomInterior(room, x, z); x = c.x; z = c.z; }
+    if (interior) { const c = clampToRoomInterior(room, x, z, 0.05, type); x = c.x; z = c.z; }
     posRef.current = { x, z };
     if (groupRef.current) {
       groupRef.current.position.set(x, y, z);
@@ -105,7 +105,7 @@ export function PlacementGhost() {
           if (!one.isEmpty()) bb.union(one);
         });
         if (!bb.isEmpty()) {
-          const s = settleAgainstWalls(room, x, z, { minX: bb.min.x - g.position.x, maxX: bb.max.x - g.position.x, minZ: bb.min.z - g.position.z, maxZ: bb.max.z - g.position.z });
+          const s = settleAgainstWalls(room, x, z, { minX: bb.min.x - g.position.x, maxX: bb.max.x - g.position.x, minZ: bb.min.z - g.position.z, maxZ: bb.max.z - g.position.z }, type);
           x = s.x; z = s.z; settled = true;
         }
       }

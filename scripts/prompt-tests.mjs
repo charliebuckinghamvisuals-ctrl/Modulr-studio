@@ -83,6 +83,19 @@ check('sliding door named as a sliding set', /Door 2: sliding door set of 3/.tes
 check('two leaves with no kind read as French doors', /Door 3: French doors/.test(kinds));
 check('single leaf named as a hinged door', /Door 4: single hinged door/.test(kinds));
 
+// The outdoor section (10 Sep 2026): named as part of the same building,
+// open-fronted, with its side, width and post - and absent when unset.
+const withBay = buildConfigSpecBlock({
+    widthMm: 6000, depthMm: 4000, shape: 'Flat',
+    bay: { side: 'left', widthMm: 2400, floor: 'decking', post: 'frame', screen: 'solid' },
+    doors: [{ leaves: 3, widthMm: 2400, heightMm: 2100, style: 'standard', wall: 'front', kind: 'bifold' }],
+    windows: [],
+});
+check('outdoor section named with its side and width', /COVERED OUTDOOR SECTION at the LEFT end of the building, 2400mm wide of the 6000mm total/.test(withBay));
+check('outdoor section is open-fronted under the same roof', withBay.includes('NO front wall') && withBay.includes('SAME continuous roof'));
+check('outdoor section has its corner post', withBay.includes('corner post'));
+check('no outdoor section when unset', !windowless.includes('OUTDOOR SECTION'));
+
 const perFace = buildConfigSpecBlock({
     widthMm: 6000, depthMm: 4000, shape: 'Flat',
     cladding: 'black_composite', claddingFront: 'cedar_composite',

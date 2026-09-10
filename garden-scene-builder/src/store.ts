@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { SceneState, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { isInteriorType, clampToRoomInterior } from './utils/placement';
+import { bayRange } from './utils/bay';
 import { UNIT_FAMILY } from './modelRegistry';
 
 // Debug/E2E hook: lets automated tests drive the store directly (drag
@@ -273,6 +274,9 @@ const initialState: SceneState = {
     basePricePerSqm: 1200,
     canopyPricePerSqm: 300,
     deckingPricePerSqm: 180,
+    // The outdoor section: its decked floor, lined soffit, corner post and
+    // the dividing wall, over what the shell already costs.
+    bayPricePerSqm: 350,
     doorLeafPrice: 650,
     windowPricePerSqm: 450,
     skylightPrice: 1200,
@@ -910,7 +914,7 @@ export const useStore = create<AppState>((set, get) => ({
     // already settled by its faces keeps its position: the centre clamp's
     // 50mm margin would lift a wall-hung tap's plate off the wall.
     if (isInteriorType(type) && !settled) {
-      const c = clampToRoomInterior(state.scene.room, x, z);
+      const c = clampToRoomInterior(state.scene.room, x, z, 0.05, type);
       x = c.x; z = c.z;
     }
     return {
@@ -1009,7 +1013,7 @@ export const useStore = create<AppState>((set, get) => ({
     const src = objects.find(o => o.id === id);
     if (!src) return {};
     const room = state.scene.room;
-    const target = isInteriorType(src.type) ? clampToRoomInterior(room, x, z) : { x, z };
+    const target = isInteriorType(src.type) ? clampToRoomInterior(room, x, z, 0.05, src.type) : { x, z };
     const mates = (!solo && src.groupId) ? objects.filter(o => o.groupId === src.groupId && o.id !== id) : [];
     if (!mates.length) {
       return { scene: { ...state.scene, objects: objects.map(o => o.id === id ? { ...o, x: target.x, z: target.z } : o) } };
@@ -1017,7 +1021,7 @@ export const useStore = create<AppState>((set, get) => ({
     // Whichever member hits a wall first sets how far the run can go.
     let dx = target.x - src.x, dz = target.z - src.z;
     for (const o of mates) {
-      const c = clampToRoomInterior(room, o.x + dx, o.z + dz);
+      const c = clampToRoomInterior(room, o.x + dx, o.z + dz, 0.05, o.type);
       const mx = c.x - o.x, mz = c.z - o.z;
       if (Math.abs(mx) < Math.abs(dx)) dx = mx;
       if (Math.abs(mz) < Math.abs(dz)) dz = mz;
@@ -1065,7 +1069,7 @@ export const useStore = create<AppState>((set, get) => ({
     if (!src) return {};
     const copy = { ...src, id: uuidv4(), x: src.x + 0.4, z: src.z + 0.4 };
     if (isInteriorType(copy.type)) {
-      const c = clampToRoomInterior(state.scene.room, copy.x, copy.z);
+      const c = clampToRoomInterior(state.scene.room, copy.x, copy.z, 0.05, copy.type);
       copy.x = c.x; copy.z = c.z;
     }
     return {
@@ -1166,7 +1170,12 @@ export const useStore = create<AppState>((set, get) => ({
 
     const baseStructure = floorArea * pricing.basePricePerSqm;
 
-    return baseStructure + claddingPrice + floorPrice + roofPrice + doorPrice + windowsPrice + skylightsPrice + partitionsPrice + deckingPrice + pictureFramePrice;
+    // The outdoor section, by its floor area. Designs saved before it
+    // existed carry no rate for it, hence the fallback.
+    const bay = bayRange(room);
+    const bayPrice = bay ? bay.width * (d - 2 * ((room.wallThicknessMm ?? 150) / 1000)) * ((pricing as any).bayPricePerSqm ?? 350) : 0;
+
+    return baseStructure + claddingPrice + floorPrice + roofPrice + doorPrice + windowsPrice + skylightsPrice + partitionsPrice + deckingPrice + pictureFramePrice + bayPrice;
   }
 }));
 

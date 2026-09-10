@@ -1,5 +1,6 @@
 import type { ObjectType, Room, SceneObject } from '../types';
 import { UNIT_FAMILY, NATIVE_WIDTH_MM, END_PANELS, END_PANEL_T, END_PANEL_GAP, isEndPanel } from '../modelRegistry';
+import { zoneX } from './bay';
 
 /**
  * Settle an object against the room's inner wall faces by its FACES.
@@ -14,17 +15,20 @@ import { UNIT_FAMILY, NATIVE_WIDTH_MM, END_PANELS, END_PANEL_T, END_PANEL_GAP, i
 export function settleAgainstWalls(
   room: Room, x: number, z: number,
   ext: { minX: number; maxX: number; minZ: number; maxZ: number },
+  type?: ObjectType,
 ): { x: number; z: number } {
   const wt = (room.wallThicknessMm ?? 150) / 1000;
-  const innerX = room.widthMm / 2000 - wt;
+  // The x walls are the ZONE's: the room's own, or the bay's end wall and
+  // the divider for something that lives in the outdoor section.
+  const { x0, x1 } = zoneX(room, type);
   const innerZ = room.depthMm / 2000 - wt;
   const MAG = 0.12;
   let nx = x, nz = z;
-  if (Math.abs(innerX - (nx + ext.maxX)) < MAG) nx = innerX - ext.maxX;
-  else if (Math.abs((nx + ext.minX) + innerX) < MAG) nx = -innerX - ext.minX;
+  if (Math.abs(x1 - (nx + ext.maxX)) < MAG) nx = x1 - ext.maxX;
+  else if (Math.abs((nx + ext.minX) - x0) < MAG) nx = x0 - ext.minX;
   if (Math.abs(innerZ - (nz + ext.maxZ)) < MAG) nz = innerZ - ext.maxZ;
   else if (Math.abs((nz + ext.minZ) + innerZ) < MAG) nz = -innerZ - ext.minZ;
-  nx = Math.min(innerX - ext.maxX, Math.max(-innerX - ext.minX, nx));
+  nx = Math.min(x1 - ext.maxX, Math.max(x0 - ext.minX, nx));
   nz = Math.min(innerZ - ext.maxZ, Math.max(-innerZ - ext.minZ, nz));
   return { x: nx, z: nz };
 }
@@ -92,6 +96,9 @@ export const INTERIOR_TYPES: ObjectType[] = [
   'basin_tap_mixer', 'basin_tap_widespread', 'basin_tap_wall',
   'heater_small', 'heater_large', 'boiler',
   'shelving_unit', 'chest_of_drawers', 'desk_single', 'bed_2', 'office_chair', 'aircon_indoor',
+  // Stands on the finished floor like the rest, but in the outdoor section -
+  // see OUTDOOR_TYPES in utils/bay for where it is allowed to go.
+  'hot_tub',
   // aircon_outdoor is the condenser on the OUTSIDE wall, like the extract terminal.
   // external_extraction_fan is deliberately NOT here - it is the outside
   // terminal of the extract run, so it has to be placeable on an outside wall.
@@ -116,6 +123,7 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
   dining_table: 1.2, towel_heater: 0.45, external_extraction_fan: 0.35,
   // A 60mm bezel - anything like a normal ring would swallow the ceiling.
   spot_light: 0.16,
+  hot_tub: 1.3,
 };
 
 /**
@@ -123,7 +131,7 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
  * a small margin), respecting the room's position and rotation. Used so
  * interior objects can never be placed or dragged outside the building.
  */
-export function clampToRoomInterior(room: Room, x: number, z: number, margin = 0.05): { x: number; z: number } {
+export function clampToRoomInterior(room: Room, x: number, z: number, margin = 0.05, type?: ObjectType): { x: number; z: number } {
   const rx = (room.x ?? 0) / 1000;
   const rz = (room.z ?? 0) / 1000;
   const rot = room.rot ?? 0;
@@ -131,9 +139,12 @@ export function clampToRoomInterior(room: Room, x: number, z: number, margin = 0
   let lx = (x - rx) * cos - (z - rz) * sin;
   let lz = (x - rx) * sin + (z - rz) * cos;
   const wallT = (room.wallThicknessMm ?? 150) / 1000;
-  const hx = Math.max(0.1, room.widthMm / 2000 - wallT - margin);
+  // Along x the limit is the object's ZONE - the enclosed room, or the
+  // outdoor bay for the things that belong there (utils/bay). Without a
+  // type it is the room, which is what the walkthrough camera wants.
+  const zone = zoneX(room, type);
   const hz = Math.max(0.1, room.depthMm / 2000 - wallT - margin);
-  lx = Math.max(-hx, Math.min(hx, lx));
+  lx = Math.max(zone.x0 + margin, Math.min(zone.x1 - margin, lx));
   lz = Math.max(-hz, Math.min(hz, lz));
   const c2 = Math.cos(rot), s2 = Math.sin(rot);
   return { x: rx + lx * c2 - lz * s2, z: rz + lx * s2 + lz * c2 };

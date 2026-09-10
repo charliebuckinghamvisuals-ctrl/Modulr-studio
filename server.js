@@ -2109,6 +2109,23 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                 }
 
                 /**
+                 * The outdoor section (configurator utils/bay): one end of the
+                 * building open at the front under the same roof. Without this
+                 * the engines closed it in or drew a separate lean-to.
+                 */
+                if (spec.bay && typeof spec.bay === 'object' && (spec.bay.side === 'left' || spec.bay.side === 'right') && Number(spec.bay.widthMm) > 0) {
+                    const side = spec.bay.side;
+                    const bw = Math.round(Number(spec.bay.widthMm));
+                    const total = mm(spec.widthMm);
+                    const floor = spec.bay.floor === 'porcelain' ? 'porcelain paving slabs' : 'timber decking boards';
+                    const end = spec.bay.screen === 'slatted' ? `its ${side} end is a screen of slim vertical timber slats`
+                        : spec.bay.screen === 'open' ? `its ${side} end is fully open too`
+                        : `its ${side} end wall is the building's own clad wall`;
+                    const post = spec.bay.post === 'none' ? 'no post' : `a slim 100mm square corner post${spec.bay.post === 'timber' ? ' in natural timber' : ' in the frame colour'} carrying the roof at its outer front corner`;
+                    lines.push(`- COVERED OUTDOOR SECTION at the ${side.toUpperCase()} end of the building, ${bw}mm wide${total ? ` of the ${total} total width` : ''}, the full depth of the building, under the SAME continuous roof, fascia and cladding line - it is part of this one building, not a lean-to or a separate structure. It has NO front wall: it is open to the garden along its whole front, with ${post}. Its back wall is the building's back wall, clad on the inside face; ${end}. A dividing wall, clad on the section's side, separates it from the enclosed room. Floor: ${floor}, level with the room floor. The enclosed room with every door and window listed below is the rest of the width, to the ${side === 'left' ? 'right' : 'left'} of it. Do NOT put any door or window across the open section, and do NOT close it in with glazing.`);
+                }
+
+                /**
                  * WHERE on the wall. Counting openings is not enough: a door a
                  * fifth of the way along a long blank wall came back next to
                  * the glazing with the blank run gone, on a building that had

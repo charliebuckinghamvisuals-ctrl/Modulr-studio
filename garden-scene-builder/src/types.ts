@@ -25,7 +25,9 @@ export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 
  | 'basin_tap_mixer' | 'basin_tap_widespread' | 'basin_tap_wall'
  | 'heater_small' | 'heater_large' | 'boiler'
  | 'shelving_unit' | 'chest_of_drawers' | 'desk_single' | 'bed_2' | 'office_chair'
- | 'aircon_indoor' | 'aircon_outdoor';
+ | 'aircon_indoor' | 'aircon_outdoor'
+ // Outdoor section (utils/bay). A placeholder until Charlie's model arrives.
+ | 'hot_tub';
 
 /** 'solid' is doors-only (entrance door); the window UI never offers it. */
 export type GlazingStyle = 'standard' | 'crittall' | 'solid';
@@ -222,6 +224,24 @@ export interface Room {
   overhangBackMm?: number;
   lShapeCutoutWidthMm?: number;
   lShapeCutoutDepthMm?: number;
+  /** The covered outdoor section - see utils/bay. Unset = none. */
+  bay?: BayData;
+}
+
+/**
+ * A covered outdoor section at one end of the building: open at the front
+ * under the same roof, for a hot tub or an outdoor kitchen.
+ */
+export interface BayData {
+  side: 'left' | 'right';
+  /** Clear width, end wall to the dividing wall. */
+  widthMm: number;
+  floor: 'decking' | 'porcelain';
+  /** The post at the open front corner. */
+  post: 'frame' | 'timber' | 'none';
+  /** The end wall of the bay: the building's own clad wall, a slatted
+   *  timber screen, or nothing at all. */
+  screen: 'solid' | 'slatted' | 'open';
 }
 
 export interface SceneObject {

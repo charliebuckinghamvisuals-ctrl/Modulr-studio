@@ -1057,6 +1057,49 @@ export function Sidebar() {
               )}
             </CollapsibleSection>
 
+            {/* The covered outdoor section - one end of the building left
+                open under the same roof, for a hot tub or outdoor kitchen.
+                See utils/bay for what it does to the shell. */}
+            <CollapsibleSection title="Outdoor Section" step="extras">
+              <div className="flex items-center justify-between p-4 bg-white border border-black/5 rounded-xl shadow-sm">
+                <span className="text-xs font-medium text-gray-700">
+                  Covered outdoor section
+                  <span className="block text-[10px] font-normal text-gray-400 leading-tight">One end open to the garden, under the same roof</span>
+                </span>
+                <button
+                  onClick={() => updateRoom({ bay: room.bay ? undefined : { side: 'left', widthMm: 2400, floor: 'decking', post: 'frame', screen: 'solid' } })}
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 shrink-0 ${room.bay ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300/60'}`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${room.bay ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
+                </button>
+              </div>
+              {room.bay && (() => {
+                const bay = room.bay;
+                const wt = room.wallThicknessMm ?? 150;
+                const maxW = Math.max(1200, room.widthMm - 3 * wt - 1500);
+                const chips = <T extends string>(label: string, value: T, options: [T, string][], onPick: (v: T) => void) => (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-medium text-gray-700">{label}</span>
+                    <div className="flex gap-1">
+                      {options.map(([v, name]) => (
+                        <button key={v} onClick={() => onPick(v)} className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-md transition-colors ${value === v ? 'bg-[#3b4d4a] text-white' : 'bg-black/5 hover:bg-black/10 text-[#3b4d4a]'}`}>{name}</button>
+                      ))}
+                    </div>
+                  </div>
+                );
+                return (
+                  <div className="mt-3 p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-3">
+                    {chips('Which end', bay.side, [['left', 'Left'], ['right', 'Right']], side => updateRoom({ bay: { ...bay, side } }))}
+                    <DimensionSlider label="Width" min={1200} max={maxW} step={100} value={Math.min(bay.widthMm, maxW)} onChange={(v) => updateRoom({ bay: { ...bay, widthMm: v } })} />
+                    {chips('Floor', bay.floor, [['decking', 'Decking'], ['porcelain', 'Porcelain']], floor => updateRoom({ bay: { ...bay, floor } }))}
+                    {chips('Corner post', bay.post, [['frame', 'Frame colour'], ['timber', 'Timber'], ['none', 'None']], post => updateRoom({ bay: { ...bay, post } }))}
+                    {chips('End wall', bay.screen, [['solid', 'Clad'], ['slatted', 'Slatted'], ['open', 'Open']], screen => updateRoom({ bay: { ...bay, screen, post: screen === 'solid' ? bay.post : (bay.post === 'none' ? 'frame' : bay.post) } }))}
+                    <p className="text-[10px] text-gray-400 leading-snug">Doors and windows on the front wall over the section are removed - it has no front wall. Put the hot tub and outdoor furniture in from the Objects tab.</p>
+                  </div>
+                );
+              })()}
+            </CollapsibleSection>
+
             <CollapsibleSection title="Skylights" step="openings">
               <div className="flex justify-end mb-4">
                 <button onClick={wrap(store.addSkylight)} className="text-[10px] font-semibold text-[#3b4d4a] hover:text-blue-600 transition-colors">+ Add New</button>
@@ -1367,6 +1410,16 @@ export function Sidebar() {
                 {(['toilet', 'vanity', 'basin_tap_mixer', 'basin_tap_widespread', 'basin_tap_wall', 'shower', 'shower_corner', 'shower_small', 'towel_heater'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
+              </div>
+            </section>
+
+            {/* Things for the outdoor section. They can only be placed in
+                the bay (utils/bay), so the picker says so when there is none. */}
+            <section>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-1 block">Outdoor</label>
+              {!room.bay && <p className="text-[10px] text-gray-400 mb-2 leading-snug">Add an Outdoor Section on the Extras step first - these go in it.</p>}
+              <div className="grid grid-cols-2 gap-2.5">
+                <ObjectTile type="hot_tub" label="Hot Tub" />
               </div>
             </section>
 

@@ -8,7 +8,7 @@ import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
 import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel, metalUsesColour } from '../../modelRegistry';
 import { applyModelMaterials, retintModel, resurfaceWorktop, refinishUnits, refinishMetal } from '../../utils/materialFixes';
-import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS, snapEndPanel } from '../../utils/placement';
+import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS, snapEndPanel, settleAgainstWalls } from '../../utils/placement';
 import { wallpaperProps } from '../../utils/wallpaper';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
 import { RotateCw, Copy, Trash2 } from 'lucide-react';
@@ -371,16 +371,10 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
            */
           const ext = dragExt.current;
           if (ext) {
-            const wt = (room.wallThicknessMm ?? 150) / 1000;
-            const innerX = room.widthMm / 2000 - wt;
-            const innerZ = room.depthMm / 2000 - wt;
-            const MAG = 0.12;
-            if (Math.abs(innerX - (nx + ext.maxX)) < MAG) nx = innerX - ext.maxX;
-            else if (Math.abs((nx + ext.minX) + innerX) < MAG) nx = -innerX - ext.minX;
-            if (Math.abs(innerZ - (nz + ext.maxZ)) < MAG) nz = innerZ - ext.maxZ;
-            else if (Math.abs((nz + ext.minZ) + innerZ) < MAG) nz = -innerZ - ext.minZ;
-            nx = Math.min(innerX - ext.maxX, Math.max(-innerX - ext.minX, nx));
-            nz = Math.min(innerZ - ext.maxZ, Math.max(-innerZ - ext.minZ, nz));
+            // The zone's walls: the room's, or the bay's end wall and the
+            // divider for something that lives in the outdoor section.
+            const s = settleAgainstWalls(room, nx, nz, ext, obj.type);
+            nx = s.x; nz = s.z;
           }
 
           /**
@@ -437,7 +431,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
           }
 
           // Never draggable out through a wall
-          const c = clampToRoomInterior(room, nx, nz);
+          const c = clampToRoomInterior(room, nx, nz, 0.05, obj.type);
           nx = c.x; nz = c.z;
         }
         /*
@@ -1098,6 +1092,45 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
              <mesh castShadow><cylinderGeometry args={[0.15, 0.15, 0.04, 32]} /><meshStandardMaterial color="#d4b595" /></mesh>
              <mesh position={[0, -0.17, 0]} castShadow><cylinderGeometry args={[0.02, 0.02, 0.34]} /><meshStandardMaterial color="#222" /></mesh>
           </group>
+        </group>
+      );
+    }
+
+    if (obj.type === 'hot_tub') {
+      /*
+       * Placeholder hot tub, until Charlie's model arrives: a 2.1m square
+       * cabinet with a rounded top rim, water level 80mm down, and a step.
+       * Sized like a real 5-6 seater so the outdoor section can be laid out
+       * around the real footprint now.
+       */
+      return (
+        <group>
+          {/* Cabinet */}
+          <mesh position={[0, 0.4, 0]} castShadow receiveShadow>
+            <boxGeometry args={[2.1, 0.8, 2.1]} />
+            <meshStandardMaterial color="#4a4d4f" roughness={0.75} />
+          </mesh>
+          {/* Acrylic shell: a rim around the top with the water inside it. */}
+          {([[0, -0.98], [0, 0.98], [-0.98, 0], [0.98, 0]] as const).map(([rx, rz], i) => (
+            <mesh key={`rim-${i}`} position={[rx, 0.84, rz]} castShadow>
+              <boxGeometry args={[rx === 0 ? 2.14 : 0.18, 0.08, rz === 0 ? 2.14 : 0.18]} />
+              <meshStandardMaterial color="#e9e6df" roughness={0.3} />
+            </mesh>
+          ))}
+          <mesh position={[0, 0.805, 0]}>
+            <boxGeometry args={[1.8, 0.01, 1.8]} />
+            <meshStandardMaterial color="#d9d6cf" roughness={0.35} />
+          </mesh>
+          {/* Water, 20mm below the rim */}
+          <mesh position={[0, 0.86, 0]}>
+            <boxGeometry args={[1.8, 0.01, 1.8]} />
+            <meshPhysicalMaterial color="#5fa9c4" roughness={0.04} metalness={0} transmission={0.5} thickness={0.2} ior={1.33} clearcoat={1} transparent opacity={0.85} />
+          </mesh>
+          {/* Step */}
+          <mesh position={[0, 0.18, 1.25]} castShadow receiveShadow>
+            <boxGeometry args={[1.0, 0.36, 0.4]} />
+            <meshStandardMaterial color="#4a4d4f" roughness={0.75} />
+          </mesh>
         </group>
       );
     }
