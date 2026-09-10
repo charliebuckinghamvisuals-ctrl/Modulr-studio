@@ -507,12 +507,25 @@ export const FACE_SPLITS: Partial<Record<ObjectType, {
    *  (model metres) - the outer skin, not the seats inside. */
   minRadius?: number;
 }>> = {
-  // Nothing at present. The hot tub used this for one afternoon, cutting
-  // its cabinet out of a shell that also held the rim and the seats - a
-  // guess that left a sawtooth at the rim. Charlie re-exported it with the
-  // cabinet under its own material instead, which is the right fix: put
-  // the material in the model, not a rule in here.
+  // The kitchen units' PLINTHS: every vertical face of the body material
+  // that lies wholly under 140mm - the kickboard band below the doors -
+  // moves to its own material, so a veneered kitchen can run the grain
+  // along the plinth (Charlie, 10 Sep) while the doors run it up. Door and
+  // side faces are single quads centred well above the band, so they stay.
+  // (The hot tub once used this to cut its cabinet out of a shell that
+  // also held the rim - a guess that left a sawtooth. That was fixed in the
+  // model. This use is safe because the band is a clean horizontal line.)
+  ...Object.fromEntries(
+    (['kitchen_unit_600', 'kitchen_unit_1200', 'kitchen_sink_1200', 'kitchen_drawer_2', 'kitchen_drawer_3',
+      'kitchen_tall_fridge', 'kitchen_tall_oven_single', 'kitchen_tall_oven_double', 'kitchen_tall_larder',
+      'kitchen_corner_unit'] as ObjectType[])
+      .map(t => [t, { material: TINT_MATERIAL[t]!, into: 'Plinth', maxY: 0.14 }]),
+  ),
 };
+
+/** The plinth material the split above creates. Painted or veneered like
+ *  the doors, with the grain running ALONG it. */
+export const PLINTH_MATERIAL = 'Plinth';
 
 export const TIMBER_MATERIAL: Partial<Record<ObjectType, {
   materials: string[];

@@ -4,7 +4,7 @@ import {
   TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH, FORCE_DIELECTRIC,
   EMISSIVE_MATERIAL, LIGHT_COLOURS, UNMIRROR_NORMALS, finishSpec,
   FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById, TIMBER_MATERIAL,
-  veneerById, isVeneerFinish, UNIT_FAMILY, metalUsesColour, HORIZONTAL_VENEER, DOUBLE_SIDED_METAL, FACE_SPLITS,
+  veneerById, isVeneerFinish, UNIT_FAMILY, metalUsesColour, HORIZONTAL_VENEER, DOUBLE_SIDED_METAL, FACE_SPLITS, PLINTH_MATERIAL,
 } from '../modelRegistry';
 import type { WorktopDef } from '../modelRegistry';
 
@@ -832,7 +832,9 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
       // Kitchen units only: the door finish is a KITCHEN setting and reaches
       // every model, but the vanity is a painted bathroom cabinet - veneering
       // it put wood on the basin's inner sides, which share its material.
-      if (tintName && m.name === tintName && isVeneerFinish(finish_) && UNIT_FAMILY[type]) {
+      // The body material, or the plinth cut out of it (FACE_SPLITS).
+      const isBody = !!tintName && (m.name === tintName || m.name === PLINTH_MATERIAL);
+      if (isBody && isVeneerFinish(finish_) && UNIT_FAMILY[type]) {
         // A veneered door instead of a painted one. Projected in METRES
         // (the paint projects at its own tile size), so the grain is real
         // size and runs UP the door - the projection's V axis is world Y on
@@ -844,14 +846,16 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         // and veneered doors came up with a 100mm grid of tiny oak.
         mesh.geometry = mesh.geometry.clone();
         boxProjectUVs(mesh.geometry, 1, true, worldScaleOf(mesh));
-        // Drawer fronts run the grain across; doors and tall units run it up.
-        const wood = dressVeneer(veneerById(finish_)!, HORIZONTAL_VENEER[type] ? 'x' : 'z', seed, m.side === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide);
+        // Drawer fronts and plinths run the grain across; doors and tall
+        // units run it up.
+        const across = HORIZONTAL_VENEER[type] || m.name === PLINTH_MATERIAL;
+        const wood = dressVeneer(veneerById(finish_)!, across ? 'x' : 'z', seed, m.side === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide);
         wood.name = m.name;
         bodyMats.push(wood);
         return wood;
       }
 
-      if (tintName && m.name === tintName) {
+      if (isBody) {
         // Painted door/carcass, as a real sprayed lacquer: a diffuse colour
         // under a clearcoat, carrying fine orange-peel relief and slightly
         // uneven sheen. Flat colour alone is what made these look like
