@@ -604,16 +604,20 @@ function AnimatedDoorLeaves({ door, frameColorHex, frameColorInnerHex, frameThic
   }
 
   // Sliding: panes in parallel tracks, stepping inward from the fixed pane
-  // so each can pass the next. The pane beside a fixed one carries the
-  // handle on its leading edge.
+  // so each can pass the next. The handle is on the pane you actually pull -
+  // the moving pane furthest from the fixed one, on its lock stile, the edge
+  // that closes against the jamb (or, on a set that opens both ways, against
+  // the other half). So a set that slides right has its handle on the LEFT
+  // pane's left edge (Charlie, 10 Sep).
   const half = Math.ceil(n / 2);
   return (
     <>
       {Array.from({ length: n }).map((_, i) => {
         const toLeft = stack === 'left' || (stack === 'split' && i < half);
         const lane = toLeft ? i : n - 1 - i;
+        const groupSize = stack === 'split' ? (toLeft ? half : n - half) : n;
         const isFixed = (toLeft && i === 0 && fixedLeft) || (!toLeft && i === n - 1 && fixedRight);
-        const handle = handles && !isFixed && lane === 1 ? (toLeft ? 'left' : 'right') : null;
+        const handle = handles && !isFixed && lane === groupSize - 1 ? (toLeft ? 'right' : 'left') : null;
         return (
           <group key={`pane-${i}`} position={[closedX(i), 0, -lane * (t + 0.006)]} ref={setPivot(i)}>
             <DoorLeaf {...leafProps} handle={handle} />

@@ -57,7 +57,9 @@ export function InteriorDoorModel({ doorId, style, ironmongery, swing = 1, width
   thicknessM: number;
 }) {
   const { scene } = useGLTF(INTERIOR_DOOR_URL);
-  const areDoorsOpen = useStore(s => s.areDoorsOpen);
+  // Only its own button opens it (the walkthrough's door panel). Open Doors
+  // in the 3D view is for the exterior sets - it used to swing every
+  // internal door in the house too (Charlie, 10 Sep).
   const thisOpen = useStore(s => s.openDoorIds.includes(doorId));
   const pivot = useRef<THREE.Group | null>(null);
 
@@ -135,7 +137,7 @@ export function InteriorDoorModel({ doorId, style, ironmongery, swing = 1, width
   // Swing like the exterior leaves: eased toward the target each frame.
   // The hinges are on the leaf's +Z face, so the leaf opens towards +Z -
   // out of the lining, the way a hinge allows - never through it.
-  const open = areDoorsOpen || thisOpen;
+  const open = thisOpen;
   useFrame((_, dt) => {
     const h = pivot.current;
     if (!h) return;
