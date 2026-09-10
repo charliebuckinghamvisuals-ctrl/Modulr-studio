@@ -2138,7 +2138,8 @@ export function RoomGeometry() {
             screens, floor, soffit, lights and post. See BayParts. */}
         {bay && (
           <BayParts room={room} bay={bay} w={w} d={d} h={h} wallThickness={wallThickness} frameColorHex={frameColorHex} roofColorHex={roofColorHex} paper={paper}
-            texFront={texFront} texBack={texBack} texLeft={texLeft} texRight={texRight} texRoof={texRoof} isVertical={isVertical} isNight={isNight} isPlanView={isPlanView} />
+            texFront={texFront} texBack={texBack} texLeft={texLeft} texRight={texRight} texRoof={texRoof} isVertical={isVertical} isNight={isNight} isPlanView={isPlanView}
+            ceilingY={isPitched && !isGable ? (frontH + backH) / 2 : h} pitch={isPitched && !isGable ? roofPitch : 0} />
         )}
 
         {/* Internal Ceiling */}
