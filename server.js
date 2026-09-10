@@ -2147,6 +2147,9 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                  */
                 const wallLen = (wall) => (wall === 'left' || wall === 'right') ? spec.depthMm : spec.widthMm;
                 const where = (op) => {
+                    // A door in the outdoor section's divider is not on an
+                    // elevation at all; its wording is handled where it is listed.
+                    if (op.wall === 'bay') return '';
                     const L = wallLen(op.wall), off = op.offsetMm, w = op.widthMm;
                     if (![L, off, w].every(v => typeof v === 'number' && isFinite(v)) || L <= 0) return '';
                     const rightIsPositive = op.wall === 'front' || op.wall === 'left';
@@ -2178,7 +2181,10 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                         : kind === 'french' ? 'French doors - a pair of hinged leaves meeting in the middle, 2 leaves'
                         : kind === 'bifold' ? `bi-fold door set of ${leaves} equal folding leaves in one frame, with the slim vertical mullions between the leaves that a bi-fold has`
                         : `sliding door set of ${leaves} equal panes in one frame - large panes, slim vertical divisions, no folding hinges`;
-                    lines.push(`  - Door ${i + 1}: ${product}, ${mm(dr.widthMm) || 'unspecified width'} x ${mm(dr.heightMm) || 'unspecified height'}, ${style}, on the ${sanitizeString(String(dr.wall || ''), 10) || 'front'} elevation.${where(dr)}`);
+                    const placeWords = dr.wall === 'bay'
+                        ? 'in the dividing wall between the enclosed room and the covered outdoor section, opening into the section - it is INSIDE the section, seen only through its open front, never on an outside elevation'
+                        : `on the ${sanitizeString(String(dr.wall || ''), 10) || 'front'} elevation`;
+                    lines.push(`  - Door ${i + 1}: ${product}, ${mm(dr.widthMm) || 'unspecified width'} x ${mm(dr.heightMm) || 'unspecified height'}, ${style}, ${placeWords}.${where(dr)}`);
                 });
                 const windows = Array.isArray(spec.windows) ? spec.windows.slice(0, 12) : [];
                 lines.push(windows.length

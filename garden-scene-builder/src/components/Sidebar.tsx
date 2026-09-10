@@ -660,6 +660,11 @@ export function Sidebar() {
                         <option value="back">Back</option>
                         <option value="left">Left</option>
                         <option value="right">Right</option>
+                        {/* The divider between room and outdoor section,
+                            once there is one. A door already set there
+                            keeps its option if the section is turned off,
+                            so it can be moved rather than lost. */}
+                        {(room.bay || door.wall === 'bay') && <option value="bay">{room.bay ? 'Into outdoor section' : 'Outdoor section (off)'}</option>}
                       </select>
                     </div>
                     {/* The product: single, French, bi-fold or sliding. Each

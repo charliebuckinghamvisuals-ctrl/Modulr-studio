@@ -1275,6 +1275,8 @@ export function RoomGeometry() {
    * it cannot hang in mid-air across the open section.
    */
   const openingInBay = (o: { wall: string; offsetMm?: number; widthMm: number }) => {
+    // A door IN the divider exists only while the bay does.
+    if (o.wall === 'bay') return !bay;
     if (!bay) return false;
     const half = o.widthMm / 2000, c = (o.offsetMm ?? 0) / 1000;
     if (o.wall === 'front') return c + half > bay.x0 - wallThickness && c - half < bay.x1 + wallThickness;
@@ -1313,7 +1315,8 @@ export function RoomGeometry() {
     const reveal = wallThickness - frameDepth;
     if (reveal <= 0.001) return [];
     const openings = [
-      ...(room.doors || []).filter(o => !openingInBay(o)).map(o => ({ key: `door-${o.id}`, wall: o.wall, offset: o.offsetMm / 1000, width: o.widthMm / 1000 })),
+      // Divider doors have their own threshold; the slab does not run into them.
+      ...(room.doors || []).filter(o => !openingInBay(o) && o.wall !== 'bay').map(o => ({ key: `door-${o.id}`, wall: o.wall, offset: o.offsetMm / 1000, width: o.widthMm / 1000 })),
       ...(room.windows || []).filter(o => (o.sillMm ?? 0) < 1 && !openingInBay(o)).map(o => ({ key: `win-${o.id}`, wall: o.wall, offset: (o.offsetMm ?? 0) / 1000, width: o.widthMm / 1000 })),
     ];
     return openings.map(o => {
@@ -1889,8 +1892,9 @@ export function RoomGeometry() {
               </Subtraction>
             )}
 
-            {/* Doors Cutouts */}
-            {(deferredDoors || []).filter(dr => !openingInBay(dr)).map(door => {
+            {/* Doors Cutouts. A door in the bay's divider is cut from the
+                divider itself (BayParts), not from the shell. */}
+            {(deferredDoors || []).filter(dr => !openingInBay(dr) && dr.wall !== 'bay').map(door => {
               const doorW = door.widthMm / 1000;
               const doorH = door.heightMm / 1000;
               const offset = door.offsetMm / 1000;
@@ -2630,9 +2634,19 @@ export function RoomGeometry() {
         const isDraggingThis = selectedElementId === door.id && !controlsEnabled;
         const dragZOffset = isDraggingThis ? 0.015 : 0;
 
-        if (door.wall === 'front') { pos = [offset, doorH/2, frameZ + dragZOffset]; } 
-        else if (door.wall === 'back') { pos = [offset, doorH/2, -frameZ - dragZOffset]; rot = [0, Math.PI, 0]; } 
-        else if (door.wall === 'left') { pos = [-frameX - dragZOffset, doorH/2, offset]; rot = [0, -Math.PI/2, 0]; } 
+        if (door.wall === 'front') { pos = [offset, doorH/2, frameZ + dragZOffset]; }
+        else if (door.wall === 'back') { pos = [offset, doorH/2, -frameZ - dragZOffset]; rot = [0, Math.PI, 0]; }
+        else if (door.wall === 'left') { pos = [-frameX - dragZOffset, doorH/2, offset]; rot = [0, -Math.PI/2, 0]; }
+        else if (door.wall === 'bay' && bay) {
+          // In the divider between room and outdoor section. The set's
+          // "outside" is the section, so the frame sits flush with the
+          // divider's bay face and the leaves open out into the section.
+          // offsetMm runs along the divider from its midpoint.
+          const left = bay.side === 'left';
+          const faceX = bay.dividerX + (left ? -wallThickness/2 + frameDepth/2 : wallThickness/2 - frameDepth/2);
+          pos = [faceX + (left ? -dragZOffset : dragZOffset), doorH/2, (bay.z0 + d/2) / 2 + offset];
+          rot = [0, left ? -Math.PI/2 : Math.PI/2, 0];
+        }
         else { pos = [frameX + dragZOffset, doorH/2, offset]; rot = [0, Math.PI/2, 0]; }
 
         return (

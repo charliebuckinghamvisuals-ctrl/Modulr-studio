@@ -5,6 +5,7 @@ import type { BayRange } from '../../utils/bay';
 import { useRealMaterial, resolveDeckingKey } from '../../utils/materials';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
 import { createDeckingGeometry } from '../../utils/geometryUtils';
+import { Geometry, Base, Subtraction } from './SafeCsg';
 
 type Tex = ReturnType<typeof useRealMaterial>;
 
@@ -151,6 +152,23 @@ export function BayParts({ room, bay, w, d, h, wallThickness, frameColorHex, roo
     for (let v = from + 0.06; v < to - 0.06; v += 0.09) out.push(v);
     return out;
   };
+  // Doors set in the divider, and the divider itself - memoised, because a
+  // fresh geometry every render would tear the boolean down each frame.
+  const bayDoors = (room.doors || []).filter(dr => dr.wall === 'bay');
+  const dividerGeom = useMemo(
+    () => slopedWallGeometry(wt, len, bay.dividerX, cz, wallTop, isVertical),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [wt, len, bay.dividerX, cz, ceilingY, pitch, isVertical],
+  );
+  const dividerMats = [
+    left ? paperMat('div-0', 'material-0') : wallMat(texFront, 'div-0', 'material-0'),
+    left ? wallMat(texFront, 'div-1', 'material-1') : paperMat('div-1', 'material-1'),
+    paperMat('div-2', 'material-2'),
+    paperMat('div-3', 'material-3'),
+    claddingMat(texFront, 'div-4', 'material-4'),
+    paperMat('div-5', 'material-5'),
+  ];
+
   const endSlats = screen === 'slatted' ? slatsAlong(bay.z0, d / 2 - 0.06) : [];
   const backSlats = backWall === 'slatted' ? slatsAlong(bay.x0, bay.x1) : [];
   const soffitSlats = soffit === 'slats' ? (() => { const o: number[] = []; for (let x = bay.x0 + 0.05; x < bay.x1 - 0.03; x += 0.1) o.push(x); return o; })() : [];
@@ -159,16 +177,31 @@ export function BayParts({ room, bay, w, d, h, wallThickness, frameColorHex, roo
     <group>
       {/* Dividing wall. Box face order: +x, -x, +y, -y, +z, -z. With the bay
           on the LEFT its face is -x. The +z end shows outside, so it is the
-          front elevation's cladding either way. */}
-      <mesh position={[bay.dividerX, 0, cz]} castShadow receiveShadow userData={{ openingId: 'bay-divider' }}>
-        <primitive object={slopedWallGeometry(wt, len, bay.dividerX, cz, wallTop, isVertical)} attach="geometry" />
-        {left ? paperMat('div-0', 'material-0') : wallMat(texFront, 'div-0', 'material-0')}
-        {left ? wallMat(texFront, 'div-1', 'material-1') : paperMat('div-1', 'material-1')}
-        {paperMat('div-2', 'material-2')}
-        {paperMat('div-3', 'material-3')}
-        {claddingMat(texFront, 'div-4', 'material-4')}
-        {paperMat('div-5', 'material-5')}
-      </mesh>
+          front elevation's cladding either way. Doors set in it (Door.wall
+          'bay') are cut out here, with the same boolean the shell uses;
+          the geometry is memoised so the boolean only re-runs when the
+          wall or its doors actually change. */}
+      {bayDoors.length ? (
+        <mesh position={[bay.dividerX, 0, cz]} castShadow receiveShadow userData={{ openingId: 'bay-divider' }}>
+          <Geometry useGroups>
+            <Base>
+              <primitive object={dividerGeom} attach="geometry" />
+              {dividerMats}
+            </Base>
+            {bayDoors.map(dr => (
+              <Subtraction key={dr.id} position={[0, dr.heightMm / 2000 - 0.05, dr.offsetMm / 1000]}>
+                <boxGeometry args={[wt * 3, dr.heightMm / 1000 + 0.1, dr.widthMm / 1000]} />
+                {paperMat('cut-' + dr.id)}
+              </Subtraction>
+            ))}
+          </Geometry>
+        </mesh>
+      ) : (
+        <mesh position={[bay.dividerX, 0, cz]} castShadow receiveShadow userData={{ openingId: 'bay-divider' }}>
+          <primitive object={dividerGeom} attach="geometry" />
+          {dividerMats}
+        </mesh>
+      )}
 
       {/* Return wall closing a corner bay: bay finish on its +z face, the
           room's paper behind. Runs end wall to divider. */}

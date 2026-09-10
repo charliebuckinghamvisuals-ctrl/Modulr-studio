@@ -95,6 +95,14 @@ check('outdoor section named with its side and width', /COVERED OUTDOOR SECTION 
 check('outdoor section is open-fronted under the same roof', withBay.includes('NO front wall') && withBay.includes('SAME continuous roof'));
 check('outdoor section has its corner post', withBay.includes('corner post'));
 check('no outdoor section when unset', !windowless.includes('OUTDOOR SECTION'));
+const bayDoor = buildConfigSpecBlock({
+    widthMm: 6000, depthMm: 4000, shape: 'Flat',
+    bay: { side: 'left', widthMm: 2400, floor: 'decking', post: 'frame', screen: 'solid' },
+    doors: [{ leaves: 2, widthMm: 1800, heightMm: 2100, style: 'standard', wall: 'bay', kind: 'french' }],
+    windows: [],
+});
+check('door in the divider is described as inside the section', /Door 1: French doors[^\n]*dividing wall between the enclosed room and the covered outdoor section/.test(bayDoor));
+check('door in the divider is not put on an elevation', !/Door 1:[^\n]*on the bay elevation/.test(bayDoor) && !/Door 1:[^\n]*Position, viewed from outside/.test(bayDoor));
 
 const perFace = buildConfigSpecBlock({
     widthMm: 6000, depthMm: 4000, shape: 'Flat',

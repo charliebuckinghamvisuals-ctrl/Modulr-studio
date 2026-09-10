@@ -44,7 +44,10 @@ export type DoorKind = 'hinged' | 'french' | 'bifold' | 'sliding';
 
 export interface Door {
   id: string;
-  wall: 'front' | 'back' | 'left' | 'right';
+  /** 'bay' is the dividing wall between the room and the outdoor section
+   *  (utils/bay): the door opens from the room into the section. Hidden
+   *  while there is no section. */
+  wall: 'front' | 'back' | 'left' | 'right' | 'bay';
   widthMm: number;
   heightMm: number;
   offsetMm: number;
