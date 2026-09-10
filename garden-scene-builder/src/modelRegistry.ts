@@ -809,20 +809,18 @@ export const hasWorktop = (type: ObjectType) =>
  */
 export const isCornerUnit = (type: ObjectType) => type === 'kitchen_corner_unit';
 /**
- * As modelled the legs were 568 and 595 deep against the 620 of every
- * straight carcass, so a run snapped to a leg stood its doors 50-70mm proud
- * of the corner's, and its back short of the wall - no upstand. The model
- * is stretched in plan (MODEL_SCALES) so both legs are 620 deep; these are
- * the stretched sizes. A run's centre line is 320mm off its wall, so each
- * leg's line is 320mm in from the corner's outer face.
+ * Sizes AFTER the plan stretch in MODEL_SCALES, which brings the legs to
+ * the 620 depth of every straight carcass so a run's doors sit flush with
+ * the corner's. A run's centre line is 320mm off its wall, so each leg's
+ * line is 320mm in from the corner's outer face.
  */
 export const CORNER_UNIT = {
-  width: 1.271,   // along x (1220 x 1.042)
-  depth: 1.283,   // along z (1175 x 1.0915)
+  width: 1.22 * (620 / 595),    // along x
+  depth: 1.175 * (620 / 600),   // along z
   /** Legs: centre offset in the unit's frame and their length. A straight
    *  unit meeting the leg end-on lines up on the leg's centre line. */
-  back: { cx: 0, cz: -1.283 / 2 + 0.32, length: 1.271 },
-  side: { cx: 1.271 / 2 - 0.32, cz: 0, length: 1.283 },
+  back: { cx: 0, cz: -(1.175 * (620 / 600)) / 2 + 0.32, length: 1.22 * (620 / 595) },
+  side: { cx: (1.22 * (620 / 595)) / 2 - 0.32, cz: 0, length: 1.175 * (620 / 600) },
 };
 
 export const FABRIC_COLOURS: { name: string; hex: string }[] = [
@@ -908,9 +906,10 @@ export const MODEL_SCALES: Partial<Record<ObjectType, [number, number, number]>>
   // layout and too small to grab. 100mm reads properly and is still a size
   // downlights are actually made in.
   spot_light: [1.7, 1.7, 1.7],
-  // Legs brought out to the 620 depth of the straight carcasses - see
-  // CORNER_UNIT. Height untouched (already corrected in the file).
-  kitchen_corner_unit: [1.042, 1, 1.0915],
+  // Charlie's corrected model (10 Sep) has 600 and 595 deep legs against
+  // the 620 of the straight carcasses; this brings the door faces flush.
+  // Height is right as exported (origin moved to its base on import).
+  kitchen_corner_unit: [620 / 595, 1, 620 / 600],
   // A low platform bed: measured mattress top at 0.57m over a 2.46 x 2.22m
   // footprint, which reads as a mattress on the floor. Stretched on Y only
   // to ~0.69m - hotel height - so the footprint the room was laid out around
