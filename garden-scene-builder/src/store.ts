@@ -559,8 +559,25 @@ export const useStore = create<AppState>((set, get) => ({
        }
     }
 
+    const room = { ...state.scene.room, ...finalUpdates };
+    let objects = state.scene.objects;
+    /*
+     * The outdoor section changed: nothing may be left standing where the
+     * room no longer is. Every object is re-clamped into its zone under the
+     * new bay - furniture out of the bay and into the room, the hot tub
+     * into the bay - so switching a bay on over a bedroom moves the bed
+     * rather than leaving it in the open air (Charlie, 10 Sep).
+     */
+    if ('bay' in finalUpdates && objects.some(o => isInteriorType(o.type))) {
+      objects = objects.map(o => {
+        if (!isInteriorType(o.type)) return o;
+        const c = clampToRoomInterior(room, o.x, o.z, 0.05, o.type);
+        return (c.x === o.x && c.z === o.z) ? o : { ...o, x: c.x, z: c.z };
+      });
+    }
+
     return {
-      scene: { ...state.scene, room: { ...state.scene.room, ...finalUpdates } }
+      scene: { ...state.scene, room, objects }
     };
   });
   },
@@ -1173,7 +1190,7 @@ export const useStore = create<AppState>((set, get) => ({
     // The outdoor section, by its floor area. Designs saved before it
     // existed carry no rate for it, hence the fallback.
     const bay = bayRange(room);
-    const bayPrice = bay ? bay.width * (d - 2 * ((room.wallThicknessMm ?? 150) / 1000)) * ((pricing as any).bayPricePerSqm ?? 350) : 0;
+    const bayPrice = bay ? bay.width * bay.depth * ((pricing as any).bayPricePerSqm ?? 350) : 0;
 
     return baseStructure + claddingPrice + floorPrice + roofPrice + doorPrice + windowsPrice + skylightsPrice + partitionsPrice + deckingPrice + pictureFramePrice + bayPrice;
   }

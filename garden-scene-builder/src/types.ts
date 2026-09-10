@@ -236,12 +236,36 @@ export interface BayData {
   side: 'left' | 'right';
   /** Clear width, end wall to the dividing wall. */
   widthMm: number;
-  floor: 'decking' | 'porcelain';
+  /** Clear depth from the building's front face. Unset = the full depth;
+   *  set, the bay is a corner and the room wraps round it in an L. */
+  depthMm?: number;
+  /** 'base' leaves the plinth's own surface showing. */
+  floor: 'decking' | 'porcelain' | 'base';
+  /** Decking key for the bay's deck (a DeckingMaterialType or a composite
+   *  key). Unset = the building's own decking, or its cladding's match. */
+  deckingMaterial?: string;
+  /** Porcelain colour. */
+  floorColour?: string;
   /** The post at the open front corner. */
-  post: 'frame' | 'timber' | 'none';
-  /** The end wall of the bay: the building's own clad wall, a slatted
-   *  timber screen, or nothing at all. */
-  screen: 'solid' | 'slatted' | 'open';
+  post: 'frame' | 'timber' | 'black' | 'white' | 'none';
+  /** The end wall of the bay: the building's own wall, a slatted timber
+   *  screen, a frameless glass screen, or nothing at all. */
+  screen: 'solid' | 'slatted' | 'glass' | 'open';
+  /** The back wall, full-depth bays only: the building's own wall, slats,
+   *  or open to the garden behind. */
+  backWall?: 'solid' | 'slatted' | 'open';
+  /** What the bay's wall faces are finished in: the elevation's own cladding,
+   *  a different cladding, or painted render. */
+  wallFinish?: 'match' | 'cladding' | 'render';
+  wallCladding?: CladdingType;
+  wallColour?: string;
+  /** The ceiling over the bay. Unset = 'roof': the underside of the roof in
+   *  its own material - an outdoor section is not a painted room. */
+  soffit?: 'roof' | 'white' | 'cladding' | 'slats';
+  /** Colour of any timber slats - screen, back or soffit. */
+  slatColour?: string;
+  /** Soffit downlights, 0-4. Unset = 3. */
+  lights?: number;
 }
 
 export interface SceneObject {

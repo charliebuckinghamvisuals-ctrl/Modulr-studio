@@ -1,6 +1,6 @@
 import type { ObjectType, Room, SceneObject } from '../types';
 import { UNIT_FAMILY, NATIVE_WIDTH_MM, END_PANELS, END_PANEL_T, END_PANEL_GAP, isEndPanel } from '../modelRegistry';
-import { zoneX } from './bay';
+import { zoneX, clampInZone } from './bay';
 
 /**
  * Settle an object against the room's inner wall faces by its FACES.
@@ -132,20 +132,23 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
  * interior objects can never be placed or dragged outside the building.
  */
 export function clampToRoomInterior(room: Room, x: number, z: number, margin = 0.05, type?: ObjectType): { x: number; z: number } {
+  // Against the bay's block the object's whole footprint counts, not just
+  // its centre - see clampInZone. FOOTPRINT_RADIUS is generous (it is the
+  // rotate ring), which errs on the side of nothing poking through a wall.
+  const blockMargin = type ? (FOOTPRINT_RADIUS[type] ?? 0.5) : margin;
   const rx = (room.x ?? 0) / 1000;
   const rz = (room.z ?? 0) / 1000;
   const rot = room.rot ?? 0;
   const cos = Math.cos(-rot), sin = Math.sin(-rot);
   let lx = (x - rx) * cos - (z - rz) * sin;
   let lz = (x - rx) * sin + (z - rz) * cos;
-  const wallT = (room.wallThicknessMm ?? 150) / 1000;
-  // Along x the limit is the object's ZONE - the enclosed room, or the
-  // outdoor bay for the things that belong there (utils/bay). Without a
-  // type it is the room, which is what the walkthrough camera wants.
-  const zone = zoneX(room, type);
-  const hz = Math.max(0.1, room.depthMm / 2000 - wallT - margin);
-  lx = Math.max(zone.x0 + margin, Math.min(zone.x1 - margin, lx));
-  lz = Math.max(-hz, Math.min(hz, lz));
+  // The limit is the object's ZONE - the room, or the outdoor bay for the
+  // things that belong there, with the bay's block kept out of the room's
+  // zone (utils/bay). Without a type it is the room, which is what the
+  // walkthrough camera wants.
+  const zone = clampInZone(room, lx, lz, margin, type, blockMargin);
+  lx = zone.lx;
+  lz = zone.lz;
   const c2 = Math.cos(rot), s2 = Math.sin(rot);
   return { x: rx + lx * c2 - lz * s2, z: rz + lx * s2 + lz * c2 };
 }

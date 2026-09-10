@@ -1075,26 +1075,70 @@ export function Sidebar() {
               </div>
               {room.bay && (() => {
                 const bay = room.bay;
+                const set = (patch: Partial<typeof bay>) => updateRoom({ bay: { ...bay, ...patch } });
                 const wt = room.wallThicknessMm ?? 150;
                 const maxW = Math.max(1200, room.widthMm - 3 * wt - 1500);
+                const maxD = Math.max(1200, room.depthMm - wt - 1200);
+                const fullDepth = !bay.depthMm;
+                const usesSlats = bay.screen === 'slatted' || bay.backWall === 'slatted' || bay.soffit === 'slats';
                 const chips = <T extends string>(label: string, value: T, options: [T, string][], onPick: (v: T) => void) => (
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-medium text-gray-700">{label}</span>
-                    <div className="flex gap-1">
+                  <div className="flex justify-between items-center gap-2 text-xs">
+                    <span className="font-medium text-gray-700 shrink-0">{label}</span>
+                    <div className="flex gap-1 flex-wrap justify-end">
                       {options.map(([v, name]) => (
-                        <button key={v} onClick={() => onPick(v)} className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-md transition-colors ${value === v ? 'bg-[#3b4d4a] text-white' : 'bg-black/5 hover:bg-black/10 text-[#3b4d4a]'}`}>{name}</button>
+                        <button key={v} onClick={() => onPick(v)} className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wide rounded-md transition-colors ${value === v ? 'bg-[#3b4d4a] text-white' : 'bg-black/5 hover:bg-black/10 text-[#3b4d4a]'}`}>{name}</button>
                       ))}
                     </div>
                   </div>
                 );
+                const colour = (label: string, value: string, onPick: (hex: string) => void) => (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-medium text-gray-700">{label}</span>
+                    <input type="color" value={value} onChange={(e) => onPick(e.target.value)} className="w-8 h-7 rounded-md cursor-pointer border-0 shadow-sm overflow-hidden" />
+                  </div>
+                );
+                const heading = (t: string) => <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 pt-1">{t}</div>;
                 return (
                   <div className="mt-3 p-4 bg-white border border-black/5 rounded-xl shadow-sm space-y-3">
-                    {chips('Which end', bay.side, [['left', 'Left'], ['right', 'Right']], side => updateRoom({ bay: { ...bay, side } }))}
-                    <DimensionSlider label="Width" min={1200} max={maxW} step={100} value={Math.min(bay.widthMm, maxW)} onChange={(v) => updateRoom({ bay: { ...bay, widthMm: v } })} />
-                    {chips('Floor', bay.floor, [['decking', 'Decking'], ['porcelain', 'Porcelain']], floor => updateRoom({ bay: { ...bay, floor } }))}
-                    {chips('Corner post', bay.post, [['frame', 'Frame colour'], ['timber', 'Timber'], ['none', 'None']], post => updateRoom({ bay: { ...bay, post } }))}
-                    {chips('End wall', bay.screen, [['solid', 'Clad'], ['slatted', 'Slatted'], ['open', 'Open']], screen => updateRoom({ bay: { ...bay, screen, post: screen === 'solid' ? bay.post : (bay.post === 'none' ? 'frame' : bay.post) } }))}
-                    <p className="text-[10px] text-gray-400 leading-snug">Doors and windows on the front wall over the section are removed - it has no front wall. Put the hot tub and outdoor furniture in from the Objects tab.</p>
+                    {heading('Size')}
+                    {chips('Which end', bay.side, [['left', 'Left'], ['right', 'Right']], side => set({ side }))}
+                    <DimensionSlider label="Width" min={1200} max={maxW} step={100} value={Math.min(bay.widthMm, maxW)} onChange={(v) => set({ widthMm: v })} />
+                    {chips('Depth', fullDepth ? 'full' : 'part', [['full', 'Full depth'], ['part', 'Corner']], v => set({ depthMm: v === 'full' ? undefined : Math.min(maxD, Math.max(1200, Math.round(room.depthMm * 0.6 / 100) * 100)), backWall: v === 'full' ? bay.backWall : undefined }))}
+                    {!fullDepth && <DimensionSlider label="Depth" min={1200} max={maxD} step={100} value={Math.min(bay.depthMm!, maxD)} onChange={(v) => set({ depthMm: v })} />}
+
+                    {heading('Walls')}
+                    {chips('End wall', bay.screen, [['solid', 'Wall'], ['slatted', 'Slats'], ['glass', 'Glass'], ['open', 'Open']], screen => set({ screen, post: screen === 'solid' ? bay.post : (bay.post === 'none' ? 'frame' : bay.post) }))}
+                    {fullDepth && chips('Back wall', bay.backWall ?? 'solid', [['solid', 'Wall'], ['slatted', 'Slats'], ['open', 'Open']], backWall => set({ backWall }))}
+                    {chips('Wall finish', bay.wallFinish ?? 'match', [['match', 'Cladding'], ['cladding', 'Other cladding'], ['render', 'Painted']], wallFinish => set({ wallFinish }))}
+                    {bay.wallFinish === 'cladding' && (
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-medium text-gray-700">Cladding</span>
+                        <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={bay.wallCladding ?? 'cedar_composite'} onChange={e => set({ wallCladding: e.target.value as any })}>
+                          {[['cedar_composite', 'Cedar Composite'], ['oak_composite', 'Oak Composite'], ['light_oak_composite', 'Light Oak'], ['black_composite', 'Black'], ['dark_grey_composite', 'Dark Grey'], ['light_grey_composite', 'Light Grey'], ['white_composite', 'White'], ['slate_blue_composite', 'Slate Blue'], ['sage_composite', 'Sage Green'], ['clay_composite', 'Clay'], ['corrugated_iron', 'Corrugated Steel']].map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {bay.wallFinish === 'render' && colour('Paint', bay.wallColour ?? '#e8e4dc', wallColour => set({ wallColour }))}
+
+                    {heading('Ceiling & floor')}
+                    {chips('Ceiling', bay.soffit ?? 'roof', [['roof', 'Roof'], ['white', 'White'], ['cladding', 'Cladding'], ['slats', 'Timber slats']], soffit => set({ soffit }))}
+                    {chips('Downlights', String(bay.lights ?? 3), [['0', 'None'], ['2', '2'], ['3', '3'], ['4', '4']], n => set({ lights: Number(n) }))}
+                    {chips('Floor', bay.floor, [['decking', 'Decking'], ['porcelain', 'Porcelain'], ['base', 'Plain']], floor => set({ floor }))}
+                    {bay.floor === 'decking' && (
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-medium text-gray-700">Boards</span>
+                        <select className="bg-gray-50 border border-black/5 rounded-lg px-2 py-1 outline-none text-[#3b4d4a] font-semibold focus:ring-2 focus:ring-[#3b4d4a]" value={bay.deckingMaterial ?? ''} onChange={e => set({ deckingMaterial: e.target.value || undefined })}>
+                          <option value="">Same as the base</option>
+                          {[['timber', 'Timber'], ['composite_cedar', 'Cedar composite'], ['composite_oak', 'Oak composite'], ['composite_black', 'Black composite'], ['composite_dark_grey', 'Dark grey composite'], ['composite_grey', 'Grey composite'], ['composite_brown', 'Brown composite']].map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {bay.floor === 'porcelain' && colour('Tile colour', bay.floorColour ?? '#d8d6d0', floorColour => set({ floorColour }))}
+
+                    {heading('Details')}
+                    {chips('Corner post', bay.post, [['frame', 'Frame'], ['timber', 'Timber'], ['black', 'Black'], ['white', 'White'], ['none', 'None']], post => set({ post }))}
+                    {usesSlats && colour('Slat colour', bay.slatColour ?? '#9a7a52', slatColour => set({ slatColour }))}
+                    <p className="text-[10px] text-gray-400 leading-snug">Openings that fall in the section are hidden while it is on. Furniture in its footprint is moved into the room. Put the hot tub and outdoor pieces in from the Objects tab.</p>
                   </div>
                 );
               })()}

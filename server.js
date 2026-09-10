@@ -2117,12 +2117,23 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                     const side = spec.bay.side;
                     const bw = Math.round(Number(spec.bay.widthMm));
                     const total = mm(spec.widthMm);
-                    const floor = spec.bay.floor === 'porcelain' ? 'porcelain paving slabs' : 'timber decking boards';
+                    const floor = spec.bay.floor === 'porcelain' ? 'porcelain paving slabs' : spec.bay.floor === 'base' ? 'the plain base' : 'timber decking boards';
+                    const bd = Number(spec.bay.depthMm) > 0 ? Math.round(Number(spec.bay.depthMm)) : 0;
+                    const depthWords = bd ? `${bd}mm deep from the front face - a CORNER of the building, with the enclosed room wrapping round behind it` : 'the full depth of the building';
                     const end = spec.bay.screen === 'slatted' ? `its ${side} end is a screen of slim vertical timber slats`
+                        : spec.bay.screen === 'glass' ? `its ${side} end is a frameless clear glass screen`
                         : spec.bay.screen === 'open' ? `its ${side} end is fully open too`
-                        : `its ${side} end wall is the building's own clad wall`;
-                    const post = spec.bay.post === 'none' ? 'no post' : `a slim 100mm square corner post${spec.bay.post === 'timber' ? ' in natural timber' : ' in the frame colour'} carrying the roof at its outer front corner`;
-                    lines.push(`- COVERED OUTDOOR SECTION at the ${side.toUpperCase()} end of the building, ${bw}mm wide${total ? ` of the ${total} total width` : ''}, the full depth of the building, under the SAME continuous roof, fascia and cladding line - it is part of this one building, not a lean-to or a separate structure. It has NO front wall: it is open to the garden along its whole front, with ${post}. Its back wall is the building's back wall, clad on the inside face; ${end}. A dividing wall, clad on the section's side, separates it from the enclosed room. Floor: ${floor}, level with the room floor. The enclosed room with every door and window listed below is the rest of the width, to the ${side === 'left' ? 'right' : 'left'} of it. Do NOT put any door or window across the open section, and do NOT close it in with glazing.`);
+                        : `its ${side} end wall is the building's own wall`;
+                    const back = !bd && spec.bay.backWall === 'slatted' ? ' Its back is a screen of vertical timber slats.'
+                        : !bd && spec.bay.backWall === 'open' ? ' Its back is open too - you can see straight through it to the garden behind.'
+                        : '';
+                    const finish = spec.bay.wallFinish === 'render' ? `painted render${/^#[0-9a-fA-F]{6}$/.test(String(spec.bay.wallColour || '')) ? ` in ${String(spec.bay.wallColour).toLowerCase()}` : ''}`
+                        : spec.bay.wallFinish === 'cladding' && spec.bay.wallCladding ? (look(spec.bay.wallCladding) || 'a contrasting cladding')
+                        : 'the same cladding as the outside of the building';
+                    const soffit = spec.bay.soffit === 'cladding' ? 'clad to match the walls' : spec.bay.soffit === 'slats' ? 'lined with timber slats' : spec.bay.soffit === 'white' ? 'lined white' : "the exposed underside of the roof, in the roof's own dark material";
+                    const postColour = spec.bay.post === 'timber' ? ' in natural timber' : spec.bay.post === 'black' ? ' in black' : spec.bay.post === 'white' ? ' in white' : ' in the frame colour';
+                    const post = spec.bay.post === 'none' ? 'no post' : `a slim 100mm square corner post${postColour} carrying the roof at its outer front corner`;
+                    lines.push(`- COVERED OUTDOOR SECTION at the ${side.toUpperCase()} end of the building, ${bw}mm wide${total ? ` of the ${total} total width` : ''}, ${depthWords}, under the SAME continuous roof, fascia and cladding line - it is part of this one building, not a lean-to or a separate structure. It has NO front wall: it is open to the garden along its whole front, with ${post}. The wall faces inside it are finished in ${finish}; ${end}.${back} Its ceiling is ${soffit}. A dividing wall separates it from the enclosed room. Floor: ${floor}, level with the room floor. The enclosed room with every door and window listed below is the rest of the width, to the ${side === 'left' ? 'right' : 'left'} of it. Do NOT put any door or window across the open section, and do NOT close it in with glazing.`);
                 }
 
                 /**

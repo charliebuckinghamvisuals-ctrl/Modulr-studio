@@ -3,6 +3,7 @@ import { useMemo, useState, useRef, useEffect, useDeferredValue } from 'react';
 import { Room, Door } from '../../types';
 import { doorKind } from '../../utils/doors';
 import { bayRange, enclosedRange } from '../../utils/bay';
+import { BayParts } from './BayParts';
 import { useFrame } from '@react-three/fiber';
 // SafeCsg = fork of @react-three/csg whose failed boolean evaluations keep
 // the previous geometry instead of blanking the mesh (see SafeCsg.tsx).
@@ -1265,8 +1266,7 @@ export function RoomGeometry() {
   const encCx = (enc.x0 + enc.x1) / 2;
   const bayW = bay ? bay.width : 1;
   const bayCx = bay ? (bay.x0 + bay.x1) / 2 : 0;
-  const bayD = d - wallThickness * 2;
-  const bayKey = bay ? `${bay.side}:${bay.width.toFixed(3)}:${room.bay?.screen ?? 'solid'}` : '';
+  const bayKey = bay ? `${bay.side}:${bay.width.toFixed(3)}:${bay.depth.toFixed(3)}:${room.bay?.screen ?? 'solid'}:${room.bay?.backWall ?? 'solid'}` : '';
   /**
    * An opening that would sit in wall the bay has removed: on the front
    * wall over the bay (or its divider), or anywhere on the end wall once
@@ -1278,13 +1278,20 @@ export function RoomGeometry() {
     if (!bay) return false;
     const half = o.widthMm / 2000, c = (o.offsetMm ?? 0) / 1000;
     if (o.wall === 'front') return c + half > bay.x0 - wallThickness && c - half < bay.x1 + wallThickness;
-    if (o.wall === bay.side) return (room.bay?.screen ?? 'solid') !== 'solid';
+    // The end wall: gone entirely once it is a screen or open; otherwise an
+    // opening in the bay's stretch of it would open into the bay, which is
+    // outside - so it is hidden there too.
+    if (o.wall === bay.side) {
+      if ((room.bay?.screen ?? 'solid') !== 'solid') return true;
+      return c + half > bay.z0 - wallThickness;
+    }
+    if (o.wall === 'back' && bay.full) {
+      if ((room.bay?.backWall ?? 'solid') !== 'solid') return c + half > bay.x0 - wallThickness && c - half < bay.x1 + wallThickness;
+      return c + half > bay.x0 - wallThickness && c - half < bay.x1 + wallThickness;
+    }
     return false;
   };
   const texFloor = useRealMaterial(resolveFloorKey(room.interiorFloorType), encW, d, 0);
-  // The bay's deck, in the decking the base already uses.
-  const texBayDeck = useRealMaterial(resolveDeckingKey(room.deckingMaterial, room.cladding), bayW, bayD, 0);
-  const bayDeckGeom = useMemo(() => createDeckingGeometry(bayW, bayD), [bayW, bayD]);
 
   /**
    * One floor tongue per door and per floor-level window: the reveal between
@@ -1909,16 +1916,38 @@ export function RoomGeometry() {
                 its end wall too when the end is a screen or open. The back
                 wall stays, and so does everything above - the roof runs on.
                 See utils/bay. */}
-            {bay && (
-              <Subtraction position={[bayCx, h/2, d/2]}>
-                <primitive object={interiorCut(bayW, h + 1, wallThickness * 3)} attach="geometry" />
-                <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
+            {/* The cut faces these leave - the end of the end wall at the
+                open front, the wall tops - are OUTSIDE faces now, so the
+                brushes carry cladding, not the room's paper: a white reveal
+                on a black building was the first thing that looked wrong. */}
+            {bay && (() => {
+              // With the end wall kept, the cut stops at its inner face and
+              // the wall's front end stays as the corner. With the end a
+              // screen or open, the cut runs out through the corner too -
+              // otherwise a stub of clad wall stood where the post is, and
+              // the post disappeared into it (Charlie, 10 Sep).
+              const through = (room.bay?.screen ?? 'solid') !== 'solid';
+              const outer = bay.side === 'left' ? -w/2 - 0.1 : w/2 + 0.1;
+              const inner = bay.side === 'left' ? bay.x1 : bay.x0;
+              const lo = through ? Math.min(outer, inner) : bay.x0;
+              const hi = through ? Math.max(outer, inner) : bay.x1;
+              return (
+                <Subtraction position={[(lo + hi) / 2, h/2, d/2]}>
+                  <primitive object={interiorCut(hi - lo, h + 1, wallThickness * 3)} attach="geometry" />
+                  <meshStandardMaterial color="#ffffff" metalness={0.1} {...texFront} bumpScale={0.1} />
+                </Subtraction>
+              );
+            })()}
+            {bay && room.bay?.screen && room.bay.screen !== 'solid' && (
+              <Subtraction position={[bay.side === 'left' ? -w/2 : w/2, h/2, (bay.z0 + d/2) / 2]}>
+                <primitive object={interiorCut(wallThickness * 3, h + 1, d/2 - bay.z0)} attach="geometry" />
+                <meshStandardMaterial color="#ffffff" metalness={0.1} {...(bay.side === 'left' ? texLeft : texRight)} bumpScale={0.1} />
               </Subtraction>
             )}
-            {bay && room.bay?.screen && room.bay.screen !== 'solid' && (
-              <Subtraction position={[bay.side === 'left' ? -w/2 : w/2, h/2, wallThickness / 2]}>
-                <primitive object={interiorCut(wallThickness * 3, h + 1, d - wallThickness)} attach="geometry" />
-                <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
+            {bay && bay.full && room.bay?.backWall && room.bay.backWall !== 'solid' && (
+              <Subtraction position={[bayCx, h/2, -d/2]}>
+                <primitive object={interiorCut(bayW, h + 1, wallThickness * 3)} attach="geometry" />
+                <meshStandardMaterial color="#ffffff" metalness={0.1} {...texBack} bumpScale={0.1} />
               </Subtraction>
             )}
 
@@ -2063,13 +2092,20 @@ export function RoomGeometry() {
           </group>
         )}
 
-        {/* Internal Floor - the ENCLOSED room's; the bay has its own deck. */}
+        {/* Internal Floor - the ENCLOSED room's; the bay has its own deck.
+            A corner bay is cut out of it, divider and return wall included,
+            so the room's boards stop at the bay's walls. */}
         <mesh position={[encCx, 0.005, 0]} receiveShadow userData={{ isFloor: true }}>
           <meshStandardMaterial {...texFloor}  bumpScale={0.05} roughness={0.7} />
           <Geometry>
              <Base>
                <boxGeometry args={[encW, 0.01, d - wallThickness*2]} />
              </Base>
+             {bay && !bay.full && (
+                <Subtraction position={[(bay.side === 'left' ? (bay.x1 + wallThickness - (w/2 + 0.1)) / 2 : (bay.x0 - wallThickness + (w/2 + 0.1)) / 2) - encCx, 0, (bay.z0 - wallThickness + d/2 + 0.1) / 2]}>
+                  <boxGeometry args={[bay.side === 'left' ? (bay.x1 + wallThickness) + (w/2 + 0.1) : (w/2 + 0.1) - (bay.x0 - wallThickness), 0.02, d/2 + 0.1 - (bay.z0 - wallThickness)]} />
+                </Subtraction>
+             )}
              {isLShape && (
                 <Subtraction position={[w/2 - cutW/2 + 0.1, 0, d/2 - cutD/2 + 0.1]}>
                   <boxGeometry args={[cutW + 0.2, 0.02, cutD + 0.2]} />
@@ -2098,97 +2134,12 @@ export function RoomGeometry() {
           </mesh>
         ))}
 
-        {/*
-          The outdoor section's own parts - see utils/bay.
-
-          The shell above has had its front wall cut away over the bay. What
-          stands in the bay is built here, outside the boolean: the DIVIDING
-          wall between bay and room (cladding on the bay face, the room's
-          paper on the other), cladding laid over the inside faces of the
-          back and end walls so the bay reads as outside, a deck or porcelain
-          floor, the corner post carrying the roof at the open corner, the
-          slatted screen when the end is open, and three soffit downlights.
-        */}
-        {bay && (() => {
-          const left = bay.side === 'left';
-          const screen = room.bay?.screen ?? 'solid';
-          const post = room.bay?.post ?? 'frame';
-          const floor = room.bay?.floor ?? 'decking';
-          const innerZ = d/2 - wallThickness;
-          const skin = 0.006;
-          const divLen = d - wallThickness; // back wall inner face to the front face
-          const divCz = wallThickness / 2;
-          const endX = left ? -(w/2 - wallThickness) : (w/2 - wallThickness);
-          const timber = '#9a7a52';
-          const postColour = post === 'timber' ? timber : frameColorHex;
-          const slats: number[] = [];
-          if (screen === 'slatted') for (let z = -innerZ + 0.06; z < d/2 - 0.12; z += 0.09) slats.push(z);
-          const claddingMat = (tex: typeof texFront, key: string, attach?: string) => (
-            <meshStandardMaterial key={key} attach={attach} color="#ffffff" metalness={0.1} {...tex} bumpScale={0.1} />
-          );
-          const paperMat = (key: string, attach?: string) => <meshStandardMaterial key={key} attach={attach} {...paper} color={room.interiorColor || '#ffffff'} />;
-          return (
-            <group>
-              {/* Dividing wall: six faces, so the bay side can be clad and
-                  the room side papered. Group order of a box: +x, -x, +y,
-                  -y, +z, -z. With the bay on the LEFT its face is -x. */}
-              <mesh position={[bay.dividerX, h/2, divCz]} castShadow receiveShadow userData={{ openingId: 'bay-divider' }}>
-                <primitive object={createWorldScaleBoxGeometry(wallThickness, h, divLen, true, bay.dividerX, 0, divCz)} attach="geometry" />
-                {left ? paperMat('div-0', 'material-0') : claddingMat(texFront, 'div-0', 'material-0')}
-                {left ? claddingMat(texFront, 'div-1', 'material-1') : paperMat('div-1', 'material-1')}
-                {paperMat('div-2', 'material-2')}
-                {paperMat('div-3', 'material-3')}
-                {claddingMat(texFront, 'div-4', 'material-4')}
-                {paperMat('div-5', 'material-5')}
-              </mesh>
-              {/* Cladding over the inside of the back wall within the bay. */}
-              <mesh position={[bayCx, h/2, -innerZ + skin/2]} receiveShadow>
-                <primitive object={createWorldScaleBoxGeometry(bayW, h, skin, false, bayCx, 0, -innerZ + skin/2)} attach="geometry" />
-                {claddingMat(texBack, 'bay-back')}
-              </mesh>
-              {/* ...and the inside of the end wall, when it is the clad wall. */}
-              {screen === 'solid' && (
-                <mesh position={[endX + (left ? skin/2 : -skin/2), h/2, 0]} receiveShadow>
-                  <primitive object={createWorldScaleBoxGeometry(skin, h, bayD, false, endX, 0, 0)} attach="geometry" />
-                  {claddingMat(left ? texLeft : texRight, 'bay-end')}
-                </mesh>
-              )}
-              {/* Slatted screen along the open end. */}
-              {screen === 'slatted' && slats.map((z, i) => (
-                <mesh key={`slat-${i}`} position={[endX + (left ? -wallThickness/2 : wallThickness/2), h/2, z]} castShadow receiveShadow>
-                  <boxGeometry args={[0.045, h, 0.045]} />
-                  <meshStandardMaterial color={timber} roughness={0.8} />
-                </mesh>
-              ))}
-              {/* The floor: decking boards, or porcelain slabs. */}
-              {floor === 'decking' ? (
-                <mesh position={[bayCx, 0.0125 + 0.004, 0]} receiveShadow userData={{ isFloor: true }}>
-                  <primitive object={bayDeckGeom} attach="geometry" />
-                  <meshStandardMaterial color={texBayDeck.color} map={texBayDeck.map} roughnessMap={texBayDeck.roughnessMap} normalMap={texBayDeck.normalMap} aoMap={texBayDeck.aoMap} />
-                </mesh>
-              ) : (
-                <mesh position={[bayCx, 0.01, 0]} receiveShadow userData={{ isFloor: true }}>
-                  <boxGeometry args={[bayW, 0.02, bayD]} />
-                  <meshStandardMaterial color="#d8d6d0" roughness={0.45} metalness={0.02} />
-                </mesh>
-              )}
-              {/* Corner post at the open front corner, carrying the roof. */}
-              {post !== 'none' && (
-                <mesh position={[left ? -w/2 + 0.05 : w/2 - 0.05, h/2 + 0.025, d/2 - 0.05]} castShadow receiveShadow>
-                  <boxGeometry args={[0.1, h + 0.05, 0.1]} />
-                  <meshStandardMaterial color={postColour} roughness={post === 'timber' ? 0.8 : 0.4} metalness={post === 'timber' ? 0 : 0.5} />
-                </mesh>
-              )}
-              {/* Soffit downlights - three across the bay, lit. */}
-              {!isPlanView && [0, 1, 2].map(i => (
-                <mesh key={`bay-spot-${i}`} position={[bay.x0 + bayW * (i + 0.5) / 3, h - 0.013, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                  <cylinderGeometry args={[0.045, 0.045, 0.004, 24]} />
-                  <meshStandardMaterial color="#fff4e0" emissive="#ffe8c4" emissiveIntensity={isNight ? 2.5 : 1.2} toneMapped={false} />
-                </mesh>
-              ))}
-            </group>
-          );
-        })()}
+        {/* The outdoor section's own parts - divider, return wall, finishes,
+            screens, floor, soffit, lights and post. See BayParts. */}
+        {bay && (
+          <BayParts room={room} bay={bay} w={w} d={d} h={h} wallThickness={wallThickness} frameColorHex={frameColorHex} roofColorHex={roofColorHex} paper={paper}
+            texFront={texFront} texBack={texBack} texLeft={texLeft} texRight={texRight} texRoof={texRoof} isVertical={isVertical} isNight={isNight} isPlanView={isPlanView} />
+        )}
 
         {/* Internal Ceiling */}
         {/* For the side orientation the whole assembly (built along X) is
