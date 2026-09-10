@@ -501,9 +501,11 @@ export const FACE_SPLITS: Partial<Record<ObjectType, {
    *  (model metres) - the outer skin, not the seats inside. */
   minRadius?: number;
 }>> = {
-  // The tub's outer skin is cabinet sides, acrylic rim AND the seat shell
-  // in one material; only the perimeter below the rim is clad.
-  hot_tub: { material: '[Color_000]', into: 'TubCabinet', maxY: 0.69, minRadius: 0.95 },
+  // Nothing at present. The hot tub used this for one afternoon, cutting
+  // its cabinet out of a shell that also held the rim and the seats - a
+  // guess that left a sawtooth at the rim. Charlie re-exported it with the
+  // cabinet under its own material instead, which is the right fix: put
+  // the material in the model, not a rule in here.
 };
 
 export const TIMBER_MATERIAL: Partial<Record<ObjectType, {
@@ -516,6 +518,9 @@ export const TIMBER_MATERIAL: Partial<Record<ObjectType, {
   /** The piece's `color` tints the wood - a neutral composite texture in
    *  any of the cladding colours. Shown as a Colour row in the editor. */
   tintable?: boolean;
+  /** Project the grain per face rather than per vertex - for a rounded
+   *  piece whose smoothed normals would otherwise skew the boards. */
+  faceProject?: boolean;
   tint?: string;
   /** Which way the grain runs on the piece's top: 'x' turns the texture a
    *  quarter so it runs along a table's length. Default 'z' - which on a
@@ -537,16 +542,18 @@ export const TIMBER_MATERIAL: Partial<Record<ObjectType, {
   bed_2: { materials: ['Veneer A02 120cm'], grain: 'x' },
   // The low stool's legs are turned oak ("Eiken" in the export), not metal.
   bar_stool: { materials: ['033132_S_Eiken_Stroken'] },
-  // The hot tub cabinet (10 Sep, Charlie's flat-sided model): composite
-  // cladding boards, the same colour-neutral texture the composite walls
-  // use, projected in metres with the boards running up and tinted to any
-  // of the cladding colours from the Colour row. 34 boards across the
-  // texture at 100mm = 3.4m per tile. Dark grey until a colour is picked.
+  // The hot tub cabinet (10 Sep, Charlie's re-export with the cabinet under
+  // its own 'M06_Steel_Smoke' material): composite cladding boards, the
+  // same colour-neutral texture the composite walls use, projected in
+  // metres with the boards running up and tinted to any of the cladding
+  // colours from the Composite row. 34 boards across the texture at 100mm
+  // = 3.4m per tile. Dark grey until a colour is picked.
   hot_tub: {
-    materials: ['TubCabinet'],
+    materials: ['M06_Steel_Smoke'],
     def: { id: 'composite_cladding', name: 'Composite Cladding', prefix: 'synthetic_wood_neutral', tileMetres: 3.4, roughness: 0.65 },
     tint: '#4a5057',
     tintable: true,
+    faceProject: true,
   },
 };
 

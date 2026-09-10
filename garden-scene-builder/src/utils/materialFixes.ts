@@ -268,16 +268,37 @@ export function boxProjectUVs(geometry: THREE.BufferGeometry, metresPerTile: num
   const nm = new THREE.Matrix3().getNormalMatrix(m);
   const p = new THREE.Vector3(), n = new THREE.Vector3();
   const uv = new Float32Array(pos.count * 2);
-  for (let i = 0; i < pos.count; i++) {
+  const project = (i: number, axisN: THREE.Vector3) => {
     p.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(m);
-    n.set(nor.getX(i), nor.getY(i), nor.getZ(i)).applyMatrix3(nm);
-    const nx = Math.abs(n.x), ny = Math.abs(n.y), nz = Math.abs(n.z);
+    const nx = Math.abs(axisN.x), ny = Math.abs(axisN.y), nz = Math.abs(axisN.z);
     let u: number, v: number;
     if (nx >= ny && nx >= nz) { u = p.z; v = p.y; }       // facing X
     else if (ny >= nx && ny >= nz) { u = p.x; v = p.z; }  // facing Y
     else { u = p.x; v = p.y; }                            // facing Z
     uv[i * 2] = u / metresPerTile;
     uv[i * 2 + 1] = v / metresPerTile;
+  };
+  if (!geometry.index) {
+    /*
+     * Non-indexed: project per FACE, choosing the axis from the triangle's
+     * own normal. Per-vertex choice goes wrong on a rounded box - the hot
+     * tub cabinet - where the smoothed normals at a big flat triangle's
+     * corners lean different ways, so its three vertices pick different
+     * axes and the boards run diagonally across the whole side.
+     */
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    for (let t = 0; t < pos.count; t += 3) {
+      a.set(pos.getX(t), pos.getY(t), pos.getZ(t)).applyMatrix4(m);
+      b.set(pos.getX(t + 1), pos.getY(t + 1), pos.getZ(t + 1)).applyMatrix4(m);
+      c.set(pos.getX(t + 2), pos.getY(t + 2), pos.getZ(t + 2)).applyMatrix4(m);
+      n.subVectors(b, a).cross(c.sub(a));
+      project(t, n); project(t + 1, n); project(t + 2, n);
+    }
+  } else {
+    for (let i = 0; i < pos.count; i++) {
+      n.set(nor.getX(i), nor.getY(i), nor.getZ(i)).applyMatrix3(nm);
+      project(i, n);
+    }
   }
   geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
 }
@@ -766,6 +787,9 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         // failing that the model's own material stands.
         const def = veneer ? veneerById(veneer) : (timber.def ?? (timber.worktop ? worktopById(timber.worktop) : undefined));
         if (def) {
+          // A rounded piece is projected per face on an unshared copy of
+          // its geometry - see boxProjectUVs.
+          if (timber.faceProject && mesh.geometry.index) mesh.geometry = mesh.geometry.toNonIndexed();
           boxProjectUVs(mesh.geometry, 1, true, worldScaleOf(mesh));
           const wood = dressVeneer(def, timber.grain, seed, m.side === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide);
           if (!veneer && timber.tint) wood.color.set(timber.tint);
