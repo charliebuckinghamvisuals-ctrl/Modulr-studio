@@ -934,12 +934,18 @@ export const useStore = create<AppState>((set, get) => ({
       const c = clampToRoomInterior(state.scene.room, x, z, 0.05, type);
       x = c.x; z = c.z;
     }
+    // A new cabinet joins its run in the run's colour. It used to arrive in
+    // the default grey beside units already painted, and stayed that way
+    // until the next recolour of the whole family (Charlie, 10 Sep: a white
+    // corner unit between grey ones).
+    const fam = UNIT_FAMILY[type];
+    const sibling = fam ? state.scene.objects.find(o => UNIT_FAMILY[o.type] === fam && !o.independent && o.color) : undefined;
     return {
       scene: {
         ...state.scene,
         objects: [
           ...state.scene.objects,
-          { id: uuidv4(), type, x, z, rot, scale: 1 }
+          { id: uuidv4(), type, x, z, rot, scale: 1, ...(sibling ? { color: sibling.color } : {}) }
         ]
       }
     };

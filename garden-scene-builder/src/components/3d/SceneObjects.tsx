@@ -6,7 +6,7 @@ import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
-import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel, metalUsesColour, isCornerUnit, CORNER_UNIT } from '../../modelRegistry';
+import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel, metalUsesColour, isCornerUnit, CORNER_UNIT, UNIT_FAMILY } from '../../modelRegistry';
 import { applyModelMaterials, retintModel, resurfaceWorktop, refinishUnits, refinishMetal } from '../../utils/materialFixes';
 import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS, snapEndPanel, settleAgainstWalls } from '../../utils/placement';
 import { wallpaperProps } from '../../utils/wallpaper';
@@ -403,7 +403,9 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
               nx = s.x; nz = s.z;
               if (Math.abs(s.rot - (obj.rot ?? 0)) > 0.001) useStore.getState().updateObject(obj.id, { rot: s.rot });
             }
-          } else if (hasWorktop(obj.type) && !isCornerUnit(obj.type)) {
+          } else if ((hasWorktop(obj.type) || UNIT_FAMILY[obj.type] === 'tall') && !isCornerUnit(obj.type)) {
+            // Tall units are in the line too: a larder beside a run of base
+            // units snaps flush against them the same way.
             const all = useStore.getState().scene.objects;
             const myW = (obj.widthMm ?? NATIVE_WIDTH_MM[obj.type] ?? 600) / 1000;
             const rot = obj.rot ?? 0;
@@ -413,7 +415,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
             const UNIT_MAG = 0.12;
             let best: { dist: number; x: number; z: number } | null = null;
             for (const n of all) {
-              if (n.id === obj.id || !hasWorktop(n.type) || isEndPanel(n.type)) continue;
+              if (n.id === obj.id || !(hasWorktop(n.type) || UNIT_FAMILY[n.type] === 'tall') || isEndPanel(n.type)) continue;
               let nW: number;
               const nCentre = new THREE.Vector3(n.x, 0, n.z);
               if (isCornerUnit(n.type)) {
