@@ -19,7 +19,9 @@ import { applyModelMaterials } from './materialFixes';
 
 const SIZE = 256;
 // Bump when the render/framing changes so cached images are regenerated.
-const STORAGE_PREFIX = 'modulr_thumb_v3:';
+// v4: models re-exported under the same file name (corner unit, hot tub)
+// kept showing their old picture from the cache.
+const STORAGE_PREFIX = 'modulr_thumb_v4:';
 
 const memory = new Map<string, string>();
 const pending = new Map<string, Promise<string | null>>();
