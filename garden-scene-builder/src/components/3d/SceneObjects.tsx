@@ -6,7 +6,7 @@ import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
-import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel, metalUsesColour } from '../../modelRegistry';
+import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel, metalUsesColour, isCornerUnit, CORNER_UNIT } from '../../modelRegistry';
 import { applyModelMaterials, retintModel, resurfaceWorktop, refinishUnits, refinishMetal } from '../../utils/materialFixes';
 import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS, snapEndPanel, settleAgainstWalls } from '../../utils/placement';
 import { wallpaperProps } from '../../utils/wallpaper';
@@ -42,7 +42,9 @@ function GlbModel({ url, type, color, worktop, finish, seed, veneer, metal }: { 
     if (!cloned.current || variantRef.current !== variant) {
         variantRef.current = variant;
         cloned.current = scene.clone(true);
-        matHandles.current = applyModelMaterials(type, cloned.current, color, worktop, true, finish, seed, veneer, metal);
+        // Straight units lose their own tops to the continuous run slab
+        // (WorktopRuns); the corner unit keeps its L-shaped one.
+        matHandles.current = applyModelMaterials(type, cloned.current, color, worktop, !isCornerUnit(type), finish, seed, veneer, metal);
     }
 
     // Recolour on demand without rebuilding the model.
@@ -401,7 +403,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
               nx = s.x; nz = s.z;
               if (Math.abs(s.rot - (obj.rot ?? 0)) > 0.001) useStore.getState().updateObject(obj.id, { rot: s.rot });
             }
-          } else if (hasWorktop(obj.type)) {
+          } else if (hasWorktop(obj.type) && !isCornerUnit(obj.type)) {
             const all = useStore.getState().scene.objects;
             const myW = (obj.widthMm ?? NATIVE_WIDTH_MM[obj.type] ?? 600) / 1000;
             const rot = obj.rot ?? 0;
@@ -412,10 +414,26 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
             let best: { dist: number; x: number; z: number } | null = null;
             for (const n of all) {
               if (n.id === obj.id || !hasWorktop(n.type) || isEndPanel(n.type)) continue;
-              const dRot = Math.abs(((n.rot ?? 0) - rot) % (Math.PI * 2));
-              if (Math.min(dRot, Math.PI * 2 - dRot) > 0.02) continue;
-              const nW = (n.widthMm ?? NATIVE_WIDTH_MM[n.type] ?? 600) / 1000;
-              const v = new THREE.Vector3(nx - n.x, 0, nz - n.z);
+              let nW: number;
+              const nCentre = new THREE.Vector3(n.x, 0, n.z);
+              if (isCornerUnit(n.type)) {
+                // A corner unit is two legs at right angles. Whichever leg
+                // lies along my run is the neighbour: its own centre line
+                // and length, so I land flush on its end and in line with it.
+                const nRot = n.rot ?? 0;
+                const nX = new THREE.Vector3(1, 0, 0).applyAxisAngle(up, nRot);
+                const nZ = new THREE.Vector3(0, 0, 1).applyAxisAngle(up, nRot);
+                const alongX = Math.abs(dir.dot(nX)) > 0.9, alongZ = Math.abs(dir.dot(nZ)) > 0.9;
+                if (!alongX && !alongZ) continue;
+                const leg = alongX ? CORNER_UNIT.back : CORNER_UNIT.side;
+                nCentre.addScaledVector(nX, leg.cx).addScaledVector(nZ, leg.cz);
+                nW = leg.length;
+              } else {
+                const dRot = Math.abs(((n.rot ?? 0) - rot) % (Math.PI * 2));
+                if (Math.min(dRot, Math.PI * 2 - dRot) > 0.02) continue;
+                nW = (n.widthMm ?? NATIVE_WIDTH_MM[n.type] ?? 600) / 1000;
+              }
+              const v = new THREE.Vector3(nx - nCentre.x, 0, nz - nCentre.z);
               const t = v.dot(dir), s = v.dot(perp);
               if (Math.abs(s) > 0.15) continue;
               for (const side of [1, -1]) {
@@ -425,7 +443,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
                 if (dist < UNIT_MAG && (!best || dist < best.dist)) {
                   // Lands flush along the run AND on the neighbour's line, so
                   // a unit dragged in slightly skew still meets it square.
-                  const p = new THREE.Vector3(n.x, 0, n.z).addScaledVector(dir, target);
+                  const p = nCentre.clone().addScaledVector(dir, target);
                   best = { dist, x: p.x, z: p.z };
                 }
               }

@@ -87,7 +87,7 @@ export const INTERIOR_TYPES: ObjectType[] = [
   'kitchen_unit_600', 'kitchen_unit_1200', 'kitchen_sink_1200',
   'kitchen_tall_fridge', 'kitchen_tall_oven_single', 'kitchen_tall_oven_double',
   'kitchen_tap_straight', 'kitchen_tap_curved',
-  'kitchen_drawer_2', 'kitchen_drawer_3', 'kitchen_tall_larder',
+  'kitchen_drawer_2', 'kitchen_drawer_3', 'kitchen_tall_larder', 'kitchen_corner_unit',
   'kitchen_hob_gas', 'kitchen_hob_induction', 'kitchen_extractor',
   'kitchen_wall_unit_600', 'kitchen_wall_unit_1200',
   'bar_stool', 'bar_stool_tall', 'towel_heater', 'spot_light', 'tv_unit',
@@ -114,7 +114,7 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
   coffee_table: 0.7, coffee_table_black: 0.7,
   toilet: 0.5, vanity: 0.6, shower: 1.2, shower_corner: 0.8, shower_small: 0.9,
   kitchen_tall_fridge: 0.6, kitchen_tall_oven_single: 0.6, kitchen_tall_oven_double: 0.6,
-  kitchen_drawer_2: 0.6, kitchen_drawer_3: 0.6, kitchen_tall_larder: 0.6,
+  kitchen_drawer_2: 0.6, kitchen_drawer_3: 0.6, kitchen_tall_larder: 0.6, kitchen_corner_unit: 0.95,
   kitchen_hob_gas: 0.55, kitchen_hob_induction: 0.45, kitchen_extractor: 0.7,
   // Taps are tiny - a default-sized ring would swallow the sink unit.
   kitchen_tap_straight: 0.28, kitchen_tap_curved: 0.28,

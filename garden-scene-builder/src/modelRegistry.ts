@@ -71,6 +71,10 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   // centre. 22MB raw; simplified to 64k triangles with the textures as
   // 512px JPEGs (2.8MB) - see scratchpad glbtool simp2.cjs + tex2jpg.cjs.
   hot_tub: 'models/hot_tub.glb',
+  // Charlie's L-shaped corner base unit (10 Sep): 1220 x 1175 footprint,
+  // origin at the footprint centre, walls on its -z and +x sides, doors on
+  // the inside of the L. Its own L-shaped worktop is kept - see CORNER_UNIT.
+  kitchen_corner_unit: 'models/kitchen_corner_unit.glb',
   towel_heater: 'models/towel_heater.glb',
   external_extraction_fan: 'models/external_extraction_fan.glb',
   spot_light: 'models/spot_light.glb',
@@ -132,6 +136,7 @@ export const UNIT_FAMILY: Partial<Record<ObjectType, UnitFamily>> = {
   kitchen_sink_1200: 'base',
   kitchen_drawer_2: 'base',
   kitchen_drawer_3: 'base',
+  kitchen_corner_unit: 'base',
   kitchen_wall_unit_600: 'wall',
   kitchen_wall_unit_1200: 'wall',
   kitchen_tall_fridge: 'tall',
@@ -306,6 +311,7 @@ export const TINT_MATERIAL: Partial<Record<ObjectType, string>> = {
   kitchen_drawer_2: 'M03_Pewter_Shine',
   kitchen_drawer_3: 'M03_Pewter_Shine',
   kitchen_tall_larder: 'M03_Pewter_Shine',
+  kitchen_corner_unit: 'M05_Graphite_Haze',
   // The wall units came out of the export carrying ONLY this material, so
   // they recolour cleanly with the run of base units beneath them.
   kitchen_wall_unit_600: 'M03_Pewter_Shine',
@@ -789,7 +795,27 @@ export const worktopById = (id: string | undefined) =>
 export const hasWorktop = (type: ObjectType) =>
   type.startsWith('kitchen_unit') || type.startsWith('kitchen_sink') || type.startsWith('kitchen_drawer')
   // A base end panel sits under the worktop: the slab runs out over it.
-  || type === 'end_panel_base';
+  || type === 'end_panel_base'
+  || type === 'kitchen_corner_unit';
+
+/**
+ * The L-shaped corner base unit.
+ *
+ * Not part of a straight run: it keeps its own modelled L-shaped worktop
+ * (re-surfaced with the room's choice) and the runs on either side butt
+ * against it. For snapping and upstands it is two legs at right angles, in
+ * its own frame: the BACK leg runs along x against the wall at -z, the SIDE
+ * leg along z against the wall at +x. Measured from the model.
+ */
+export const isCornerUnit = (type: ObjectType) => type === 'kitchen_corner_unit';
+export const CORNER_UNIT = {
+  width: 1.22,   // along x
+  depth: 1.175,  // along z
+  /** Legs: centre offset in the unit's frame and their length. A straight
+   *  unit meeting the leg end-on lines up on the leg's centre line. */
+  back: { cx: 0, cz: -0.316, length: 1.22 },
+  side: { cx: 0.31, cz: 0, length: 1.175 },
+};
 
 export const FABRIC_COLOURS: { name: string; hex: string }[] = [
   { name: 'Natural', hex: '#ffffff' },
@@ -903,6 +929,7 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   kitchen_tap_curved: 'Curved Kitchen Tap',
   kitchen_drawer_2: 'Double Drawer Unit',
   kitchen_drawer_3: 'Three Drawer Unit',
+  kitchen_corner_unit: 'Corner Base Unit',
   kitchen_tall_larder: 'Tall Larder Unit',
   kitchen_hob_gas: 'Gas Hob',
   kitchen_hob_induction: 'Induction Hob',

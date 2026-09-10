@@ -26,8 +26,10 @@ export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 
  | 'heater_small' | 'heater_large' | 'boiler'
  | 'shelving_unit' | 'chest_of_drawers' | 'desk_single' | 'bed_2' | 'office_chair'
  | 'aircon_indoor' | 'aircon_outdoor'
- // Outdoor section (utils/bay). A placeholder until Charlie's model arrives.
- | 'hot_tub';
+ // Outdoor section (utils/bay).
+ | 'hot_tub'
+ // L-shaped corner base unit (10 Sep).
+ | 'kitchen_corner_unit';
 
 /** 'solid' is doors-only (entrance door); the window UI never offers it. */
 export type GlazingStyle = 'standard' | 'crittall' | 'solid';

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { SceneObject } from '../../types';
-import { NATIVE_WIDTH_MM, hasWorktop, worktopById } from '../../modelRegistry';
+import { NATIVE_WIDTH_MM, hasWorktop, worktopById, isCornerUnit, CORNER_UNIT } from '../../modelRegistry';
 import { createWorktopMaterial, createUnitBodyMaterial, boxProjectUVs } from '../../utils/materialFixes';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
 import { roomLocal } from '../../utils/placement';
@@ -123,8 +123,36 @@ export function WorktopRuns() {
   const materialFor = (id?: string) =>
     materials.get(id ?? '') ?? materials.get(room.worktopMaterial ?? '')!;
 
+  /**
+   * Corner units keep their own L-shaped tops; what they need from here is
+   * an upstand along each edge that meets a wall - the back leg's back
+   * (local -z) and the side leg's outer edge (local +x).
+   */
+  const cornerUpstands = useMemo(() => {
+    const out: { key: string; pos: [number, number, number]; rot: number; back: boolean; side: boolean; worktop?: string }[] = [];
+    const wt = (room.wallThicknessMm ?? 150) / 1000;
+    const Y = new THREE.Vector3(0, 1, 0);
+    objects.filter(o => isCornerUnit(o.type)).forEach(o => {
+      const rot = o.rot ?? 0;
+      const nX = new THREE.Vector3(1, 0, 0).applyAxisAngle(Y, rot);
+      const nZ = new THREE.Vector3(0, 0, 1).applyAxisAngle(Y, rot);
+      const nearWall = (p: THREE.Vector3) => {
+        const rl = roomLocal(room, p.x, p.z);
+        return (rl.hx - Math.abs(rl.lx)) < WALL_REACH || (rl.hz - Math.abs(rl.lz)) < WALL_REACH;
+      };
+      const c = new THREE.Vector3(o.x, 0, o.z);
+      const backEdge = c.clone().addScaledVector(nZ, -CORNER_UNIT.depth / 2);
+      const sideEdge = c.clone().addScaledVector(nX, CORNER_UNIT.width / 2);
+      const back = nearWall(backEdge), side = nearWall(sideEdge);
+      if (back || side) out.push({ key: o.id, pos: [o.x, 0, o.z], rot, back, side, worktop: o.worktopMaterial });
+      void wt;
+    });
+    return out;
+  }, [objects, room]);
+
   const runs = useMemo(() => {
-    const units = objects.filter(o => hasWorktop(o.type));
+    // Corner units are their own thing - see cornerUpstands.
+    const units = objects.filter(o => hasWorktop(o.type) && !isCornerUnit(o.type));
     if (!units.length) return [];
 
     // Same angle first - a return leg or an island is its own run.
@@ -226,8 +254,30 @@ export function WorktopRuns() {
           {run.island && <IslandBack length={run.length} color={run.color} finish={room.unitFinish} seed={run.ownerId + ':back'} />}
         </group>
       ))}
+      {cornerUpstands.map(cu => (
+        <group key={`cu-${cu.key}`} userData={{ objectId: cu.key }} position={[cu.pos[0], baseH, cu.pos[2]]} rotation={[0, cu.rot, 0]}>
+          {cu.back && <CornerUpstand along="x" length={CORNER_UNIT.width} at={-CORNER_UNIT.depth / 2} material={materialFor(cu.worktop)} />}
+          {cu.side && <CornerUpstand along="z" length={CORNER_UNIT.depth} at={CORNER_UNIT.width / 2} material={materialFor(cu.worktop)} />}
+        </group>
+      ))}
     </group>
   );
+}
+
+/** An upstand along one edge of a corner unit: along x at a given z (the
+ *  back), or along z at a given x (the side). Same height and thickness as
+ *  a run's. */
+function CornerUpstand({ along, length, at, material }: { along: 'x' | 'z'; length: number; at: number; material: THREE.Material }) {
+  const geom = useMemo(
+    () => along === 'x'
+      ? createWorldScaleBoxGeometry(length, UPSTAND_H, UPSTAND_T, false, 0, 0, at + UPSTAND_T / 2)
+      : createWorldScaleBoxGeometry(UPSTAND_T, UPSTAND_H, length, false, at - UPSTAND_T / 2, 0, 0),
+    [along, length, at],
+  );
+  const pos: [number, number, number] = along === 'x'
+    ? [0, TOP_Y + THICKNESS + UPSTAND_H / 2, at + UPSTAND_T / 2]
+    : [at - UPSTAND_T / 2, TOP_Y + THICKNESS + UPSTAND_H / 2, 0];
+  return <mesh position={pos} geometry={geom} material={material} castShadow receiveShadow />;
 }
 
 /**
