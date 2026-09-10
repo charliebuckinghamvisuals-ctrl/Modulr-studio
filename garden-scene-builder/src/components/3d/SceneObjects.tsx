@@ -13,6 +13,7 @@ import { wallpaperProps } from '../../utils/wallpaper';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
 import { RotateCw, Copy, Trash2 } from 'lucide-react';
 import { WorktopRuns } from './WorktopRuns';
+import { isOutdoorType, bayFloorTop } from '../../utils/bay';
 import { PartitionOpenings } from './PartitionOpenings';
 
 /**
@@ -276,7 +277,9 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
   // plinth, so its walkable top face is at 0.01 - not 0.005. Standing objects
   // on the centre buried the bottom 5mm of every one of them, which reads as
   // sunk on anything with a flat base sitting straight on the floor.
-  const baseH = isInterior ? ((room.baseHeightMm ?? 100) / 1000) + 0.01 : 0;
+  // Outdoor things stand on the bay's deck, which sits proud of the floor
+  // finish - a tub on the floor level was sunk 20mm into the boards.
+  const baseH = isInterior ? ((room.baseHeightMm ?? 100) / 1000) + (isOutdoorType(obj.type) && room.bay ? bayFloorTop(room) : 0.01) : 0;
   // Worktop-mounted objects (taps) sit on the 900mm sink unit rather than on
   // the floor, so they are lifted by their mount height as well.
   // A ceiling fitting hangs from the ceiling, which moves with the wall

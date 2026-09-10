@@ -72,6 +72,14 @@ export function enclosedRange(room: Room): { x0: number; x1: number } {
   return bay.side === 'left' ? { x0: bay.x1 + wt, x1: hx } : { x0: -hx, x1: bay.x0 - wt };
 }
 
+/** Height of the bay's walking surface above the plinth top: the deck
+ *  boards (25mm on 4mm), porcelain (20mm), or the bare plinth. Must match
+ *  the floor meshes in BayParts. */
+export function bayFloorTop(room: Room): number {
+  const floor = room.bay?.floor ?? 'decking';
+  return floor === 'decking' ? 0.029 : floor === 'porcelain' ? 0.02 : 0;
+}
+
 /** Things that live in the outdoor section, not the room. */
 export const OUTDOOR_TYPES: ObjectType[] = ['hot_tub'];
 export const isOutdoorType = (type?: ObjectType) => !!type && OUTDOOR_TYPES.includes(type);

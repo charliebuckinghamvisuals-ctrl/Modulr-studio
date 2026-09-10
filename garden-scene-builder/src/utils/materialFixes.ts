@@ -780,6 +780,21 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
       }
 
       const timber = TIMBER_MATERIAL[type];
+      if (timber && timber.flat && timber.materials.includes(m.name)) {
+        // A flat matt colour, recoloured through the object's colour.
+        const flat = new THREE.MeshStandardMaterial({
+          color: color ?? timber.tint ?? '#4a5057',
+          roughness: 0.8,
+          metalness: 0,
+          side: m.side === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide,
+        });
+        flat.name = m.name;
+        // Recolourable, but not a paint the door finishes should touch.
+        flat.userData.veneer = true;
+        flat.userData.tintable = true;
+        bodyMats.push(flat as unknown as THREE.MeshPhysicalMaterial);
+        return flat;
+      }
       if (timber && timber.materials.includes(m.name)) {
         // See TIMBER_MATERIAL: a wood set projected in metres over whatever
         // UVs the exporter wrote, so the grain is life-size. A chosen veneer

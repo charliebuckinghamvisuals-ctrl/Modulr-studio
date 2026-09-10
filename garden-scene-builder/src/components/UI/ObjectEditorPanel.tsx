@@ -297,7 +297,7 @@ export function ObjectEditorPanel() {
         )}
 
         {/* Wood on a timber piece: its own finish, or one of the veneers. */}
-        {hasTimber(obj.type) && (
+        {hasTimber(obj.type) && !TIMBER_MATERIAL[obj.type]?.flat && (
           <div className="flex items-start gap-3">
             <span className="text-xs font-semibold text-gray-700 shrink-0 pt-1">Wood</span>
             <div className="flex gap-1.5 flex-wrap items-center">
@@ -319,11 +319,11 @@ export function ObjectEditorPanel() {
           </div>
         )}
 
-        {/* Composite colour on a composite-clad piece (the hot tub cabinet):
-            the cladding swatches, tinting the same board texture. */}
+        {/* Colour on a tintable piece (the hot tub cabinet): the cladding
+            colours, as a flat finish. */}
         {isTintableTimber(obj.type) && !obj.veneer && (
           <ColourRow
-            label="Composite"
+            label="Colour"
             presets={COMPOSITE_COLOURS}
             current={(obj.color ?? TIMBER_MATERIAL[obj.type]?.tint ?? COMPOSITE_COLOURS[4].hex).toLowerCase()}
             onPick={(hex, settled) => { updateObject(obj.id, { color: hex }); if (settled) afterPick(); }}

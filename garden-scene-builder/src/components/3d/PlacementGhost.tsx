@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, Suspense } from 'react';
 import * as THREE from 'three';
 import { useGLTF } from '@react-three/drei';
+import { isOutdoorType, bayFloorTop } from '../../utils/bay';
 import { useStore } from '../../store';
 import { MODEL_URLS, MODEL_SCALES, mountHeight, CEILING_MOUNTED, isCeilingMounted } from '../../modelRegistry';
 import { isInteriorType, clampToRoomInterior, interiorCeilingHeight, snapEndPanel, settleAgainstWalls } from '../../utils/placement';
@@ -60,7 +61,7 @@ export function PlacementGhost() {
   // Matches the placed object exactly, so a tap previews at worktop
   // height instead of jumping up 900mm the moment it is dropped, and a
   // downlight previews on the ceiling rather than lying on the floor.
-  const floor = interior ? baseH + 0.01 : 0;
+  const floor = interior ? baseH + (isOutdoorType(type) && room.bay ? bayFloorTop(room) : 0.01) : 0;
   const y = isCeilingMounted(type)
     ? floor + interiorCeilingHeight(room) - (CEILING_MOUNTED[type] ?? 0)
     : floor + mountHeight(type);

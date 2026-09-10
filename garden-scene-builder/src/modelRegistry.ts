@@ -521,6 +521,8 @@ export const TIMBER_MATERIAL: Partial<Record<ObjectType, {
   /** Project the grain per face rather than per vertex - for a rounded
    *  piece whose smoothed normals would otherwise skew the boards. */
   faceProject?: boolean;
+  /** No texture at all: a flat matt colour (tintable), no veneers. */
+  flat?: boolean;
   tint?: string;
   /** Which way the grain runs on the piece's top: 'x' turns the texture a
    *  quarter so it runs along a table's length. Default 'z' - which on a
@@ -543,17 +545,15 @@ export const TIMBER_MATERIAL: Partial<Record<ObjectType, {
   // The low stool's legs are turned oak ("Eiken" in the export), not metal.
   bar_stool: { materials: ['033132_S_Eiken_Stroken'] },
   // The hot tub cabinet (10 Sep, Charlie's re-export with the cabinet under
-  // its own 'M06_Steel_Smoke' material): composite cladding boards, the
-  // same colour-neutral texture the composite walls use, projected in
-  // metres with the boards running up and tinted to any of the cladding
-  // colours from the Composite row. 34 boards across the texture at 100mm
-  // = 3.4m per tile. Dark grey until a colour is picked.
+  // its own 'M06_Steel_Smoke' material): a FLAT matt colour, any of the
+  // cladding colours from the Colour row, no board texture - a projected
+  // board texture never sat straight on the rounded cabinet (Charlie: "the
+  // cladding lines are not straight"). Dark grey until a colour is picked.
   hot_tub: {
     materials: ['M06_Steel_Smoke'],
-    def: { id: 'composite_cladding', name: 'Composite Cladding', prefix: 'synthetic_wood_neutral', tileMetres: 3.4, roughness: 0.65 },
     tint: '#4a5057',
     tintable: true,
-    faceProject: true,
+    flat: true,
   },
 };
 
