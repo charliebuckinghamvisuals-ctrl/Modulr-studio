@@ -488,11 +488,34 @@ export const MATERIAL_TWEAKS: Partial<Record<ObjectType, Record<string, Material
  * the grain is the same real size on the top, the legs and the chairs. The
  * tint multiplies through the texture, for a paler or darker species.
  */
+/**
+ * Materials whose VERTICAL faces are cut out into a material of their own at
+ * load - see splitFacesFor in utils/materialFixes. From then on the new name
+ * is a material like any other.
+ */
+export const FACE_SPLITS: Partial<Record<ObjectType, {
+  material: string; into: string;
+  /** Only faces whose centre is below this height (model metres). */
+  maxY?: number;
+  /** Only faces whose centre is at least this far from the model's axis
+   *  (model metres) - the outer skin, not the seats inside. */
+  minRadius?: number;
+}>> = {
+  // The tub's outer skin is cabinet sides, acrylic rim AND the seat shell
+  // in one material; only the perimeter below the rim is clad.
+  hot_tub: { material: '[Color_000]', into: 'TubCabinet', maxY: 0.69, minRadius: 0.95 },
+};
+
 export const TIMBER_MATERIAL: Partial<Record<ObjectType, {
   materials: string[];
   /** Worktop set to dress with by default. Unset = the model's own material
    *  until the customer picks a veneer. */
   worktop?: string;
+  /** Or a texture set of its own - a cladding, for a hot tub cabinet. */
+  def?: WorktopDef;
+  /** The piece's `color` tints the wood - a neutral composite texture in
+   *  any of the cladding colours. Shown as a Colour row in the editor. */
+  tintable?: boolean;
   tint?: string;
   /** Which way the grain runs on the piece's top: 'x' turns the texture a
    *  quarter so it runs along a table's length. Default 'z' - which on a
@@ -514,12 +537,34 @@ export const TIMBER_MATERIAL: Partial<Record<ObjectType, {
   bed_2: { materials: ['Veneer A02 120cm'], grain: 'x' },
   // The low stool's legs are turned oak ("Eiken" in the export), not metal.
   bar_stool: { materials: ['033132_S_Eiken_Stroken'] },
-  // The hot tub's slatted cabinet: exported with a floor-plank photo mapped
-  // at a different scale on every face - "the cladding material seems
-  // messed up" (10 Sep). Projected in metres instead, boards running up,
-  // so it reads as one cabinet; the Wood row can then re-dress it.
-  hot_tub: { materials: ['[Wood_Floor_Light]'], worktop: 'oak', tint: '#b99a72' },
+  // The hot tub cabinet (10 Sep, Charlie's flat-sided model): composite
+  // cladding boards, the same colour-neutral texture the composite walls
+  // use, projected in metres with the boards running up and tinted to any
+  // of the cladding colours from the Colour row. 34 boards across the
+  // texture at 100mm = 3.4m per tile. Dark grey until a colour is picked.
+  hot_tub: {
+    materials: ['TubCabinet'],
+    def: { id: 'composite_cladding', name: 'Composite Cladding', prefix: 'synthetic_wood_neutral', tileMetres: 3.4, roughness: 0.65 },
+    tint: '#4a5057',
+    tintable: true,
+  },
 };
+
+/** The composite cladding colours, for anything clad in composite that is
+ *  not a wall - the same swatches the cladding picker offers. */
+export const COMPOSITE_COLOURS: { name: string; hex: string }[] = [
+  { name: 'Cedar', hex: '#b0764b' },
+  { name: 'Oak', hex: '#c9a173' },
+  { name: 'Light Oak', hex: '#dcc09a' },
+  { name: 'Black', hex: '#1f2123' },
+  { name: 'Dark Grey', hex: '#4a5057' },
+  { name: 'Light Grey', hex: '#a9aeb2' },
+  { name: 'White', hex: '#e8e6e1' },
+  { name: 'Slate Blue', hex: '#7c93a6' },
+  { name: 'Sage Green', hex: '#7e8c74' },
+  { name: 'Clay', hex: '#9a6b58' },
+];
+export const isTintableTimber = (type: ObjectType) => !!TIMBER_MATERIAL[type]?.tintable;
 export const hasTimber = (type: ObjectType) => TIMBER_MATERIAL[type] !== undefined;
 
 /**
@@ -644,6 +689,10 @@ export const metalUsesColour = (type: ObjectType) =>
  */
 export const UNMIRROR_NORMALS: Partial<Record<ObjectType, true>> = {
   bed: true,
+  // The cabinet is eight panels, four of them mirrored copies - alternate
+  // panels shaded dark, which read as "four different claddings" even in
+  // one flat colour (10 Sep).
+  hot_tub: true,
 };
 
 export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {

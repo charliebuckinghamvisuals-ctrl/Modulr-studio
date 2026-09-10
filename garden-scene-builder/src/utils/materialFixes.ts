@@ -4,7 +4,7 @@ import {
   TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH, FORCE_DIELECTRIC,
   EMISSIVE_MATERIAL, LIGHT_COLOURS, UNMIRROR_NORMALS, finishSpec,
   FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById, TIMBER_MATERIAL,
-  veneerById, isVeneerFinish, UNIT_FAMILY, metalUsesColour, HORIZONTAL_VENEER, DOUBLE_SIDED_METAL,
+  veneerById, isVeneerFinish, UNIT_FAMILY, metalUsesColour, HORIZONTAL_VENEER, DOUBLE_SIDED_METAL, FACE_SPLITS,
 } from '../modelRegistry';
 import type { WorktopDef } from '../modelRegistry';
 
@@ -556,6 +556,48 @@ function renameMeshMaterials(type: ObjectType, root: THREE.Object3D) {
   });
 }
 
+/**
+ * Cut the VERTICAL faces of a material out into a material of their own.
+ *
+ * The hot tub's outer skin - cabinet sides and the acrylic rim on top - is
+ * one material in the export. The sides want cladding boards and the rim
+ * does not, and they are one connected surface so islands cannot separate
+ * them. Faces are picked by their world normal instead: anything within
+ * about 35 degrees of horizontal is a side.
+ */
+function splitFacesFor(type: ObjectType, root: THREE.Object3D) {
+  const rule = FACE_SPLITS[type];
+  if (!rule) return;
+  root.updateMatrixWorld(true);
+  const meshes: THREE.Mesh[] = [];
+  root.traverse(o => {
+    const m = o as THREE.Mesh;
+    if (m.isMesh && !Array.isArray(m.material) && m.material?.name === rule.material && !m.userData.__islandSplit) meshes.push(m);
+  });
+  const nm = new THREE.Matrix3();
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3();
+  for (const mesh of meshes) {
+    const g = mesh.geometry;
+    const pos = g.getAttribute('position');
+    const index = g.getIndex();
+    const total = index ? index.count / 3 : pos.count / 3;
+    nm.getNormalMatrix(mesh.matrixWorld);
+    const tris: number[] = [];
+    for (let t = 0; t < total; t++) {
+      const i0 = index ? index.getX(t * 3) : t * 3, i1 = index ? index.getX(t * 3 + 1) : t * 3 + 1, i2 = index ? index.getX(t * 3 + 2) : t * 3 + 2;
+      a.fromBufferAttribute(pos, i0); b.fromBufferAttribute(pos, i1); c.fromBufferAttribute(pos, i2);
+      // Centre in model space (the root is at identity while dressing).
+      const centre = a.clone().add(b).add(c).multiplyScalar(1 / 3).applyMatrix4(mesh.matrixWorld);
+      n.subVectors(b, a).cross(c.sub(a)).applyMatrix3(nm).normalize();
+      if (Math.abs(n.y) >= 0.6) continue;
+      if (rule.maxY !== undefined && centre.y > rule.maxY) continue;
+      if (rule.minRadius !== undefined && Math.max(Math.abs(centre.x), Math.abs(centre.z)) < rule.minRadius) continue;
+      tris.push(t);
+    }
+    if (tris.length) detachIsland(mesh, { tris, min: new THREE.Vector3(), max: new THREE.Vector3() }, rule.into);
+  }
+}
+
 function splitIslandsFor(type: ObjectType, root: THREE.Object3D) {
   const rule = ISLAND_SPLITS[type];
   if (!rule) return;
@@ -626,6 +668,7 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
   // Parts exported without a material of their own - see ISLAND_SPLITS.
   // Before the traverse, so the new mesh is dressed with everything else.
   splitIslandsFor(type, root);
+  splitFacesFor(type, root);
   renameMeshMaterials(type, root);
 
   const bodyMats: THREE.MeshPhysicalMaterial[] = [];
@@ -721,12 +764,20 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         // UVs the exporter wrote, so the grain is life-size. A chosen veneer
         // wins; otherwise the piece's default dressing, if it has one; and
         // failing that the model's own material stands.
-        const def = veneer ? veneerById(veneer) : (timber.worktop ? worktopById(timber.worktop) : undefined);
+        const def = veneer ? veneerById(veneer) : (timber.def ?? (timber.worktop ? worktopById(timber.worktop) : undefined));
         if (def) {
           boxProjectUVs(mesh.geometry, 1, true, worldScaleOf(mesh));
           const wood = dressVeneer(def, timber.grain, seed, m.side === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide);
           if (!veneer && timber.tint) wood.color.set(timber.tint);
           wood.name = m.name;
+          // A tintable piece (a composite-clad tub cabinet) takes the
+          // object's colour, now and on every recolour - so it joins the
+          // body materials, marked so the veneer rule does not skip it.
+          if (!veneer && timber.tintable) {
+            if (color) wood.color.set(color);
+            wood.userData.tintable = true;
+            bodyMats.push(wood);
+          }
           return wood;
         }
       }
@@ -874,7 +925,7 @@ export function retintModel(
   color: string,
 ) {
   // A veneer is not a colour: a run's paint colour leaves veneered doors alone.
-  handles.bodyMats.forEach(m => { if (m.userData.veneer) return; m.color.set(color); m.needsUpdate = true; });
+  handles.bodyMats.forEach(m => { if (m.userData.veneer && !m.userData.tintable) return; m.color.set(color); m.needsUpdate = true; });
   // A lamp's colour is the light it gives off, not the colour of its glass,
   // so it lands on the emissive - and the spot light beside it takes the same
   // hex, keeping lens and beam the same temperature.

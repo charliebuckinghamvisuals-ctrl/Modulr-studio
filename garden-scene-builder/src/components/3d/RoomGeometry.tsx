@@ -1292,6 +1292,12 @@ export function RoomGeometry() {
     return false;
   };
   const texFloor = useRealMaterial(resolveFloorKey(room.interiorFloorType), encW, d, 0);
+  // The bay's wall finish, for the cut faces the bay's own cuts leave
+  // INSIDE it (the back corner where the end wall was) - see the brushes.
+  const texBayWall = useRealMaterial(room.bay?.wallFinish === 'cladding' && room.bay.wallCladding ? room.bay.wallCladding : (room.claddingBack || room.cladding || 'timber'), w, h, 0);
+  const bayWallBrushMat = room.bay?.wallFinish === 'render'
+    ? <meshStandardMaterial color={room.bay.wallColour ?? '#e8e4dc'} roughness={0.85} metalness={0} />
+    : <meshStandardMaterial color="#ffffff" metalness={0.1} {...texBayWall} bumpScale={0.1} />;
 
   /**
    * One floor tongue per door and per floor-level window: the reveal between
@@ -1938,16 +1944,20 @@ export function RoomGeometry() {
                 </Subtraction>
               );
             })()}
+            {/* The end and back cuts leave their faces INSIDE the bay - the
+                back wall's end where the end wall stood - so they carry the
+                bay's wall finish, not the elevation that was removed
+                (Charlie, 10 Sep: the back corner showed the end cladding). */}
             {bay && room.bay?.screen && room.bay.screen !== 'solid' && (
               <Subtraction position={[bay.side === 'left' ? -w/2 : w/2, h/2, (bay.z0 + d/2) / 2]}>
                 <primitive object={interiorCut(wallThickness * 3, h + 1, d/2 - bay.z0)} attach="geometry" />
-                <meshStandardMaterial color="#ffffff" metalness={0.1} {...(bay.side === 'left' ? texLeft : texRight)} bumpScale={0.1} />
+                {bayWallBrushMat}
               </Subtraction>
             )}
             {bay && bay.full && room.bay?.backWall && room.bay.backWall !== 'solid' && (
               <Subtraction position={[bayCx, h/2, -d/2]}>
                 <primitive object={interiorCut(bayW, h + 1, wallThickness * 3)} attach="geometry" />
-                <meshStandardMaterial color="#ffffff" metalness={0.1} {...texBack} bumpScale={0.1} />
+                {bayWallBrushMat}
               </Subtraction>
             )}
 
@@ -2017,7 +2027,7 @@ export function RoomGeometry() {
           isLShape, isTShape, isCornerCut, isGable, isPitched,
           cutW, cutD, frontH, backH, roofPitch,
           deferredDoors, deferredWindows,
-          bayKey, bayCx, bayW,
+          bayKey, bayCx, bayW, texBayWall.map, texBayWall.color, room.bay?.wallFinish, room.bay?.wallColour,
         ])}
 
         {/*

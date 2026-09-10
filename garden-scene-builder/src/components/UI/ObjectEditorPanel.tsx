@@ -1,7 +1,7 @@
 import { useStore } from '../../store';
 import { useEffect, useState } from 'react';
 import { Trash2, RotateCw, Copy, ChevronDown, ChevronUp } from 'lucide-react';
-import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS, hasTimber, VENEERS, isVeneerFinish, metalUsesColour } from '../../modelRegistry';
+import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS, hasTimber, VENEERS, isVeneerFinish, metalUsesColour, isTintableTimber, COMPOSITE_COLOURS, TIMBER_MATERIAL } from '../../modelRegistry';
 import { DimensionSlider } from '../DimensionSlider';
 import { useSavedColours, addSavedColour, removeSavedColour } from '../../utils/savedColours';
 import { resumeWalking } from '../../utils/walk';
@@ -317,6 +317,17 @@ export function ObjectEditorPanel() {
               ))}
             </div>
           </div>
+        )}
+
+        {/* Composite colour on a composite-clad piece (the hot tub cabinet):
+            the cladding swatches, tinting the same board texture. */}
+        {isTintableTimber(obj.type) && !obj.veneer && (
+          <ColourRow
+            label="Composite"
+            presets={COMPOSITE_COLOURS}
+            current={(obj.color ?? TIMBER_MATERIAL[obj.type]?.tint ?? COMPOSITE_COLOURS[4].hex).toLowerCase()}
+            onPick={(hex, settled) => { updateObject(obj.id, { color: hex }); if (settled) afterPick(); }}
+          />
         )}
 
         {TINT_MATERIAL[obj.type] && (
