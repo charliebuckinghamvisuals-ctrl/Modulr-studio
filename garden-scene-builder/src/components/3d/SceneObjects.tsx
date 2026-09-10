@@ -1096,45 +1096,6 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
       );
     }
 
-    if (obj.type === 'hot_tub') {
-      /*
-       * Placeholder hot tub, until Charlie's model arrives: a 2.1m square
-       * cabinet with a rounded top rim, water level 80mm down, and a step.
-       * Sized like a real 5-6 seater so the outdoor section can be laid out
-       * around the real footprint now.
-       */
-      return (
-        <group>
-          {/* Cabinet */}
-          <mesh position={[0, 0.4, 0]} castShadow receiveShadow>
-            <boxGeometry args={[2.1, 0.8, 2.1]} />
-            <meshStandardMaterial color="#4a4d4f" roughness={0.75} />
-          </mesh>
-          {/* Acrylic shell: a rim around the top with the water inside it. */}
-          {([[0, -0.98], [0, 0.98], [-0.98, 0], [0.98, 0]] as const).map(([rx, rz], i) => (
-            <mesh key={`rim-${i}`} position={[rx, 0.84, rz]} castShadow>
-              <boxGeometry args={[rx === 0 ? 2.14 : 0.18, 0.08, rz === 0 ? 2.14 : 0.18]} />
-              <meshStandardMaterial color="#e9e6df" roughness={0.3} />
-            </mesh>
-          ))}
-          <mesh position={[0, 0.805, 0]}>
-            <boxGeometry args={[1.8, 0.01, 1.8]} />
-            <meshStandardMaterial color="#d9d6cf" roughness={0.35} />
-          </mesh>
-          {/* Water, 20mm below the rim */}
-          <mesh position={[0, 0.86, 0]}>
-            <boxGeometry args={[1.8, 0.01, 1.8]} />
-            <meshPhysicalMaterial color="#5fa9c4" roughness={0.04} metalness={0} transmission={0.5} thickness={0.2} ior={1.33} clearcoat={1} transparent opacity={0.85} />
-          </mesh>
-          {/* Step */}
-          <mesh position={[0, 0.18, 1.25]} castShadow receiveShadow>
-            <boxGeometry args={[1.0, 0.36, 0.4]} />
-            <meshStandardMaterial color="#4a4d4f" roughness={0.75} />
-          </mesh>
-        </group>
-      );
-    }
-
     if (obj.type === 'indoor_plant') {
       return (
         <group>

@@ -123,7 +123,7 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
   dining_table: 1.2, towel_heater: 0.45, external_extraction_fan: 0.35,
   // A 60mm bezel - anything like a normal ring would swallow the ceiling.
   spot_light: 0.16,
-  hot_tub: 1.3,
+  hot_tub: 1.5,
 };
 
 /**

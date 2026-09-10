@@ -67,6 +67,10 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   office_chair: 'models/office_chair.glb',
   aircon_indoor: 'models/aircon_indoor.glb',
   aircon_outdoor: 'models/aircon_outdoor.glb',
+  // Charlie's hot tub (10 Sep): 2.25m square, 790 high, origin at floor
+  // centre. 22MB raw; simplified to 64k triangles with the textures as
+  // 512px JPEGs (2.8MB) - see scratchpad glbtool simp2.cjs + tex2jpg.cjs.
+  hot_tub: 'models/hot_tub.glb',
   towel_heater: 'models/towel_heater.glb',
   external_extraction_fan: 'models/external_extraction_fan.glb',
   spot_light: 'models/spot_light.glb',
@@ -510,6 +514,11 @@ export const TIMBER_MATERIAL: Partial<Record<ObjectType, {
   bed_2: { materials: ['Veneer A02 120cm'], grain: 'x' },
   // The low stool's legs are turned oak ("Eiken" in the export), not metal.
   bar_stool: { materials: ['033132_S_Eiken_Stroken'] },
+  // The hot tub's slatted cabinet: exported with a floor-plank photo mapped
+  // at a different scale on every face - "the cladding material seems
+  // messed up" (10 Sep). Projected in metres instead, boards running up,
+  // so it reads as one cabinet; the Wood row can then re-dress it.
+  hot_tub: { materials: ['[Wood_Floor_Light]'], worktop: 'oak', tint: '#b99a72' },
 };
 export const hasTimber = (type: ObjectType) => TIMBER_MATERIAL[type] !== undefined;
 
@@ -651,6 +660,7 @@ export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
   office_chair: true,
   aircon_indoor: true,
   aircon_outdoor: true,
+  hot_tub: true,
   towel_heater: true,
   external_extraction_fan: true,
   bed: true,
@@ -864,6 +874,7 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   office_chair: 'Office Chair',
   aircon_indoor: 'Air Con (Wall Unit)',
   aircon_outdoor: 'Air Con (Outdoor Unit)',
+  hot_tub: 'Hot Tub',
   bar_stool: 'Bar Stool',
   bar_stool_tall: 'Bar Stool (Tall)',
   toilet: 'Toilet',
