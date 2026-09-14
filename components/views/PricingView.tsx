@@ -203,25 +203,25 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             <Sparkles size={26} />
                         </div>
                         <div className="space-y-2">
-                            <h3 className="text-2xl font-black text-slate-800 tracking-tight">We are still working on this page</h3>
+                            <h3 className="text-2xl font-black text-slate-800 tracking-tight">Subscriptions are locked for now</h3>
                             <p className="text-sm text-slate-600 leading-relaxed">
-                                Modulr Studio is in private beta, and our pricing is not final.
+                                Our main subscriptions are still in progress and are not open yet.
                                 The plans below are a work in progress - treat them as an
                                 indication rather than a quote, because the numbers may still
                                 change before launch.
                             </p>
                             <p className="text-sm text-slate-600 leading-relaxed">
-                                Subscriptions are not open yet. Want early access? Request a beta
-                                code and use the studio free while we finish building.
+                                In the meantime the studio is free to try: create an account,
+                                confirm your email, and you have 40 renders over 7 days.
                             </p>
                         </div>
                         <div className="flex flex-col gap-3 pt-1">
-                            <a
-                                href="mailto:info@napc.uk?subject=Modulr%20Studio%20beta%20access"
+                            <button
+                                onClick={() => onNavigate?.(AppStage.RENDER_ENGINE)}
                                 className="w-full py-3 rounded-xl bg-accent hover:bg-accent-hover text-white font-bold text-sm transition-colors"
                             >
-                                Request Beta Access
-                            </a>
+                                Start free tester access
+                            </button>
                             <button
                                 onClick={() => setShowBillingClosed(false)}
                                 className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-accent font-bold text-sm transition-colors"
