@@ -6,6 +6,7 @@ import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBu
 import { saveToHistory } from '../services/historyService';
 import { trackFeatureUsage } from '../services/analytics';
 import { db, auth } from '../services/firebase';
+import { stageFromPath, pathForStage, applyDocumentHead } from '../routes';
 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -40,7 +41,42 @@ export const compressImageFile = (file: File, maxWidth = 1920): Promise<string> 
 };
 
 export const useAppEngine = () => {
-    const [activeStage, setActiveStage] = useState<AppStage>(AppStage.HOME);
+    /**
+     * The page opens at whatever the address bar says, so a link to
+     * /3d-configurator or /pricing lands on that page rather than Home.
+     * /share/... is handled before the shell in App.tsx and falls through
+     * to Home here, which is harmless.
+     */
+    const [activeStage, setActiveStage] = useState<AppStage>(
+        () => stageFromPath(window.location.pathname) ?? AppStage.HOME
+    );
+
+    /**
+     * Keep the address bar, history and document head in step with the stage.
+     *
+     * Every navigation pushes a history entry, so the back button returns to
+     * the previous page instead of leaving the site; popstate does the
+     * reverse. The head tags (title, description, canonical) are what the tab
+     * shows and what Google indexes per URL.
+     */
+    useEffect(() => {
+        // A client share page is not a stage; leave its URL and head alone.
+        if (window.location.pathname.startsWith('/share/')) return;
+        const path = pathForStage(activeStage);
+        if (window.location.pathname !== path) {
+            window.history.pushState({ stage: activeStage }, '', path);
+        }
+        applyDocumentHead(activeStage);
+    }, [activeStage]);
+
+    useEffect(() => {
+        const onPop = () => {
+            const stage = stageFromPath(window.location.pathname);
+            if (stage) setActiveStage(stage);
+        };
+        window.addEventListener('popstate', onPop);
+        return () => window.removeEventListener('popstate', onPop);
+    }, []);
 
     // Image State
     const [stageImages, setStageImages] = useState<Partial<Record<AppStage, string>>>({});

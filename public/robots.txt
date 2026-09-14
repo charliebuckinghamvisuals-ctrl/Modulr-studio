@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /share/
+Disallow: /projects
+Disallow: /account
+Disallow: /sign-in
+Disallow: /editor
+Disallow: /studio
+Disallow: /3d-config/
+
+Sitemap: https://modulrstudio.co.uk/sitemap.xml
