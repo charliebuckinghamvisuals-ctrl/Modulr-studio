@@ -56,17 +56,17 @@ const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: s
      * near a quarter of revenue at full usage on a 10p render, and still viable
      * at 20p. At 200 the same plan loses money on anyone who uses it properly.
      */
-    { label: 'Renders',            trial: '5 (24 hours)', standard: '100 per month', business: 'Unlimited' },
-    { label: 'Output quality',     trial: '1080p Full HD', standard: '1080p Full HD', business: '4K Ultra HD' },
+    { label: 'Renders',            trial: '40 (7 days)', standard: '100 per month', business: 'Unlimited' },
+    { label: 'Output quality',     trial: '2K + 4K export', standard: '1080p Full HD', business: '4K Ultra HD' },
     { label: 'Planning Checker',   trial: 'Free to all', standard: 'Free to all', business: 'Free to all' },
     { label: 'Render Engine',      trial: true,  standard: true,  business: true },
     { label: 'Line Converter',     trial: true,  standard: true,  business: true },
     { label: 'Weather Lab',        trial: true,  standard: true,  business: true },
     { label: 'Material Studio',    trial: true,  standard: true,  business: true },
     { label: 'Content Studio',     trial: false, standard: false, business: true },
-    { label: '3D Configurator',    trial: false, standard: false, business: true },
+    { label: '3D Configurator',    trial: true,  standard: false, business: true },
     { label: 'Animation Studio',   trial: false, standard: false, business: true },
-    { label: 'Projects & clients', trial: false, standard: true,  business: true },
+    { label: 'Projects & clients', trial: true,  standard: true,  business: true },
     { label: 'Commercial rights',  trial: false, standard: true,  business: true },
     { label: 'Priority queue',     trial: false, standard: false, business: true },
 ];
@@ -300,8 +300,11 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             <h3 className="text-xl font-bold text-accent mb-2 flex items-center gap-2">Try Before You Buy</h3>
                             <p className="text-sm text-secondary min-h-[40px]">Experience the full power of our engine. No card required.</p>
                         </div>
-                        <div className="mb-8 font-bold text-4xl text-primary dark:text-white">
-                            24 Hours
+                        {/* Same fixed height as the paid cards' price blocks so the three
+                            buttons sit on one line. */}
+                        <div className="mb-8 min-h-[96px] flex flex-col justify-start">
+                            <div className="font-bold text-5xl text-primary dark:text-white drop-shadow-md">7 Days</div>
+                            <span className="text-secondary font-medium">40 free renders, no card</span>
                         </div>
 
                         <Button 
@@ -323,17 +326,11 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             <h3 className="text-2xl font-bold text-accent mb-2">Standard</h3>
                             <p className="text-sm text-secondary min-h-[40px]">Everything a smaller studio needs to sell a job.</p>
                         </div>
-                        <div className="mb-8">
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-5xl font-bold text-primary drop-shadow-md">
-                                    £{billingCycle === 'monthly' ? '49.99' : '449'}
-                                </span>
-                                <span className="text-xs font-bold text-secondary uppercase tracking-tighter self-end mb-2">inc VAT</span>
-                            </div>
-                            <span className="text-secondary font-medium"> / {billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
-                            {billingCycle === 'yearly' && (
-                                <div className="text-xs font-bold text-green-500 uppercase mt-2">£37.42 effective monthly</div>
-                            )}
+                        {/* Price TBD (Charlie, 14 Sep 2026): subscriptions are locked until
+                            Stripe is set up, so no figure is shown. */}
+                        <div className="mb-8 min-h-[96px] flex flex-col justify-start">
+                            <div className="text-5xl font-bold text-primary drop-shadow-md">TBD</div>
+                            <span className="text-secondary font-medium">Pricing to be confirmed</span>
                         </div>
 
                         <Button
@@ -362,19 +359,9 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             <h3 className="text-2xl font-bold text-accent dark:text-accent mb-2 flex items-center gap-2">Business</h3>
                             <p className="text-sm text-secondary">The absolute peak of visualization performance.</p>
                         </div>
-                        <div className="mb-8 text-white">
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-5xl font-bold text-primary dark:text-white drop-shadow-md">
-                                    £{billingCycle === 'monthly' ? '140.99' : '1,269'}
-                                </span>
-                                <span className="text-xs font-bold text-secondary uppercase tracking-tighter self-end mb-2">inc VAT</span>
-                            </div>
-                            <span className="text-secondary font-medium"> / {billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
-                            {billingCycle === 'yearly' && (
-                                <div className="text-xs font-bold text-green-400 uppercase mt-2">
-                                    £105.75 effective monthly
-                                </div>
-                            )}
+                        <div className="mb-8 min-h-[96px] flex flex-col justify-start text-white">
+                            <div className="text-5xl font-bold text-primary dark:text-white drop-shadow-md">TBD</div>
+                            <span className="text-secondary font-medium">Pricing to be confirmed</span>
                         </div>
 
                         <Button 
