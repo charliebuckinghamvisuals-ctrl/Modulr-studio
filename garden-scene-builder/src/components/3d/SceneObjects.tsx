@@ -8,7 +8,7 @@ import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
 import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel, metalUsesColour, isCornerUnit, CORNER_UNIT, UNIT_FAMILY, isWallLight } from '../../modelRegistry';
 import { applyModelMaterials, retintModel, resurfaceWorktop, refinishUnits, refinishMetal } from '../../utils/materialFixes';
-import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS, snapEndPanel, settleAgainstWalls, snapToOutsideWall } from '../../utils/placement';
+import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS, snapEndPanel, snapTap, isKitchenTap, settleAgainstWalls, snapToOutsideWall } from '../../utils/placement';
 import { wallpaperProps } from '../../utils/wallpaper';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
 import { RotateCw, Copy, Trash2 } from 'lucide-react';
@@ -415,6 +415,11 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
      * the room out, which is not the client's job.
      */
     if (viewMode === 'walking') return;
+    // While something is being placed, the click belongs to the placement
+    // plane. Objects used to take it first (they are nearer the camera than
+    // the floor plane), so clicking a sink to put a tap on it selected the
+    // sink and left the tap hanging off the cursor.
+    if (useStore.getState().activePlacementType) return;
     e.stopPropagation();
     setSelectedObjectId(obj.id);
 
@@ -515,11 +520,15 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
            * that actually touch. So a snapped unit shows one continuous top,
            * and an unsnapped one shows a break. That break is the tell.
            */
-          if (isEndPanel(obj.type)) {
+          if (isEndPanel(obj.type) || isKitchenTap(obj.type)) {
             // End panels: 3mm off the end of the nearest run of their family,
-            // backs in line, turned to the run - see snapEndPanel.
+            // backs in line, turned to the run - see snapEndPanel. Kitchen
+            // taps: onto the sink's tap deck, turned with the sink, so the
+            // spout reaches over the bowl - see snapTap.
             const all = useStore.getState().scene.objects;
-            const s = snapEndPanel(obj.type, nx, nz, all, obj.id);
+            const s = isEndPanel(obj.type)
+              ? snapEndPanel(obj.type, nx, nz, all, obj.id)
+              : snapTap(obj.type, nx, nz, all, obj.id);
             if (s) {
               nx = s.x; nz = s.z;
               if (Math.abs(s.rot - (obj.rot ?? 0)) > 0.001) useStore.getState().updateObject(obj.id, { rot: s.rot });

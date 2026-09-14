@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { SceneState, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
+import { SceneState, SceneObject, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
 import { v4 as uuidv4 } from 'uuid';
-import { isInteriorType, clampToRoomInterior } from './utils/placement';
+import { isInteriorType, clampToRoomInterior, snapTap } from './utils/placement';
 import { bayRange, wallSpanMm } from './utils/bay';
 import { sunState, DAY_START, DAY_END } from './utils/sun';
 import { UNIT_FAMILY, isVeneerFinish } from './modelRegistry';
@@ -389,7 +389,13 @@ function loadAutosave(): SceneState | null {
     const parsed = JSON.parse(raw);
     // Only accept something that actually looks like a scene.
     if (!parsed?.room || typeof parsed.room.widthMm !== 'number' || !Array.isArray(parsed.objects)) return null;
-    return { ...initialState, ...parsed, room: { ...initialState.room, ...parsed.room } };
+    // Taps saved before they followed the sink can be sitting on the deck
+    // with the spout over the wall. Seat each one on its sink on the way in.
+    const objects = (parsed.objects as SceneObject[]).map(o => {
+      const s = snapTap(o.type, o.x, o.z, parsed.objects, o.id);
+      return s ? { ...o, x: s.x, z: s.z, rot: s.rot } : o;
+    });
+    return { ...initialState, ...parsed, objects, room: { ...initialState.room, ...parsed.room } };
   } catch {
     return null;
   }

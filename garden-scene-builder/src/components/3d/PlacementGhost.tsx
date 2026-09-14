@@ -4,7 +4,7 @@ import { useGLTF } from '@react-three/drei';
 import { isOutdoorType, bayFloorTop } from '../../utils/bay';
 import { useStore } from '../../store';
 import { MODEL_URLS, MODEL_SCALES, mountHeight, CEILING_MOUNTED, isCeilingMounted, isWallLight } from '../../modelRegistry';
-import { isInteriorType, clampToRoomInterior, interiorCeilingHeight, snapEndPanel, settleAgainstWalls, snapToOutsideWall } from '../../utils/placement';
+import { isInteriorType, clampToRoomInterior, interiorCeilingHeight, snapEndPanel, snapTap, isKitchenTap, settleAgainstWalls, snapToOutsideWall } from '../../utils/placement';
 import { isEndPanel } from '../../modelRegistry';
 
 /** Semi-transparent clone of a GLB model, used as the placement preview. */
@@ -85,8 +85,11 @@ export function PlacementGhost() {
     if (!posRef.current) return;
     const st = useStore.getState();
     st.saveState();
-    // An end panel placed near the end of a run lands on it, 3mm off.
-    const snap = isEndPanel(type) ? snapEndPanel(type, posRef.current.x, posRef.current.z, st.scene.objects) : null;
+    // An end panel placed near the end of a run lands on it, 3mm off; a
+    // kitchen tap placed near a sink lands on its tap deck, turned with it.
+    const snap = isEndPanel(type)
+      ? snapEndPanel(type, posRef.current.x, posRef.current.z, st.scene.objects)
+      : snapTap(type, posRef.current.x, posRef.current.z, st.scene.objects);
     if (snap) {
       st.addObject(type, snap.x, snap.z, snap.rot, true);
     } else {
@@ -121,10 +124,14 @@ export function PlacementGhost() {
   return (
     <>
       {/* Invisible catch-all plane: tracks the cursor and takes the placing
-          click before anything else in the scene can react to it. */}
+          click. It lies on the floor, except for a tap: that one is placed by
+          pointing at a worktop, so the plane sits at worktop height and the
+          cursor lands where it is pointing rather than on the floor a metre
+          behind. Existing objects step aside while a placement is active -
+          see handlePointerDown in SceneObjects. */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0.002, 0]}
+        position={[0, isKitchenTap(type) ? y + 0.002 : 0.002, 0]}
         onPointerMove={moveGhost}
         onPointerDown={place}
         renderOrder={999}

@@ -75,6 +75,47 @@ export function snapEndPanel(
   return best;
 }
 
+/** The kitchen taps: they belong on the sink unit, not anywhere on a worktop. */
+export const KITCHEN_TAP_TYPES: ObjectType[] = ['kitchen_tap_straight', 'kitchen_tap_curved'];
+export const isKitchenTap = (type: ObjectType) => KITCHEN_TAP_TYPES.includes(type);
+
+/**
+ * How far behind the sink unit's centre the tap stands, in the unit's own
+ * frame. Measured from kitchen_sink_1200.glb: the worktop's back edge is at
+ * z -320 and the bowl runs z -224..226, so the tap deck is the 96mm strip
+ * between them and the tap's base sits in the middle of it.
+ */
+const SINK_TAP_OFFSET_M = -0.272;
+
+/**
+ * Where a kitchen tap lands on the nearest sink unit.
+ *
+ * A tap dropped or dragged within reach of a sink jumps onto the tap deck
+ * behind the bowl, centred, and takes the SINK'S rotation - which is what
+ * makes the spout reach forward over the bowl. Before this the tap kept
+ * whatever angle the placement ghost happened to have, and on a sink turned
+ * to face the room that put the spout over the wall. Returns null when no
+ * sink is in reach, and the caller keeps the raw position.
+ */
+export function snapTap(
+  type: ObjectType, x: number, z: number, objects: SceneObject[], selfId?: string,
+): { x: number; z: number; rot: number } | null {
+  if (!isKitchenTap(type)) return null;
+  const REACH = 0.7;
+  let best: { x: number; z: number; rot: number; dist: number } | null = null;
+  for (const n of objects) {
+    if (n.id === selfId || n.type !== 'kitchen_sink_1200') continue;
+    const rot = n.rot ?? 0;
+    // Local +z is the unit's front; the tap deck is behind the bowl.
+    const px = Math.sin(rot), pz = Math.cos(rot);
+    const tx = n.x + px * SINK_TAP_OFFSET_M;
+    const tz = n.z + pz * SINK_TAP_OFFSET_M;
+    const dist = Math.hypot(x - tx, z - tz);
+    if (dist < REACH && (!best || dist < best.dist)) best = { x: tx, z: tz, rot, dist };
+  }
+  return best;
+}
+
 /** Object types that live INSIDE the room: they stand on the finished floor
  *  and are clamped to the interior when placed or dragged. */
 export const INTERIOR_TYPES: ObjectType[] = [
