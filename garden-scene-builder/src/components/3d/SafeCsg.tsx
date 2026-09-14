@@ -139,6 +139,67 @@ export const Geometry = React.forwardRef<any, SafeGeometryProps>(({ children, co
   const lastAttempt = React.useRef<string>('')
   const failRetries = React.useRef(0)
   const ev = React.useMemo(() => Object.assign(new Evaluator(), { useGroups, consolidateGroups: false }), [useGroups])
+  // The geometry object currently on the mesh. It starts as the R3F-created
+  // <bufferGeometry> below and is replaced wholesale by every rebuild.
+  const live = React.useRef<THREE.BufferGeometry | null>(null)
+
+  const getMesh = React.useCallback((): THREE.Mesh | null => (geo.current as any)?.__r3f?.parent?.object ?? null, [])
+  const liveGeometry = React.useCallback((): THREE.BufferGeometry => getMesh()?.geometry ?? live.current ?? geo.current, [getMesh])
+
+  /**
+   * Put `next` on the mesh as a whole new geometry object.
+   *
+   * This used to copy the boolean's buffers INTO the one geometry the mesh
+   * was created with. That is the bug behind "the walls disappear when I
+   * drag" (14 Sep 2026, traced at the WebGL call level): three r184 uploads
+   * a geometry's vertex buffers once per frame, keyed on a frame counter
+   * that is bumped after the visibility pass and before the shadow pass, so
+   * with shadows on the upload normally lands in the shadow pass. A rebuild
+   * that arrives in a frame where the shadow pass skips this mesh - every
+   * drag freezes shadow updates, and a wall can also leave the shadow
+   * camera - reaches the main pass with new attribute objects and NO GPU
+   * buffers yet. three then caches an EMPTY vertex array for this geometry
+   * under the wall material's program, keyed on those attribute objects, and
+   * never rebinds it: the data is perfect, the mesh is visible, and the GPU
+   * draws nothing until the next rebuild happens to land in a good frame.
+   * That is exactly the flicker-then-gone Charlie recorded. A geometry the
+   * renderer has never seen has no such cache: it is uploaded before its
+   * first draw in every frame ordering. So: new object every time.
+   */
+  const install = React.useCallback((next: THREE.BufferGeometry, material?: THREE.Material | THREE.Material[]) => {
+    next.boundingBox = null
+    next.boundingSphere = null
+    const mesh = getMesh()
+    if (!mesh) {
+      // No mesh to hand it to (should not happen once mounted): fall back to
+      // the in-place copy so at least something is there.
+      dispose(geo.current)
+      geo.current.index = next.index
+      geo.current.attributes = next.attributes
+      geo.current.groups = next.groups
+      geo.current.drawRange = next.drawRange
+      return
+    }
+    const prev = mesh.geometry
+    mesh.geometry = next
+    live.current = next
+    if (ev.useGroups && material) mesh.material = material as any
+    // The R3F-created geometry is left alone (React still owns it); anything
+    // we installed before is ours to free.
+    if (prev && prev !== next && prev !== geo.current) prev.dispose()
+  }, [ev, getMesh])
+
+  /** Put the uncut base solid on screen. Cloned, because the base geometry
+   *  is often shared with a plain mesh elsewhere and is disposed on the next
+   *  swap. Returns false when there is no base to show. */
+  const showBase = React.useCallback((): boolean => {
+    const baseBrush = operations.current?.children[0] as Brush | undefined
+    const base = baseBrush ? resolve(baseBrush) : null
+    const baseGeom = base?.geometry
+    if (!baseGeom?.attributes?.position || !isFinite(baseGeom)) return false
+    install(baseGeom.clone(), (base as any).material)
+    return true
+  }, [install])
 
   const update = React.useCallback(() => {
     const ops = operations.current.children.slice() as Brush[]
@@ -179,16 +240,10 @@ export const Geometry = React.forwardRef<any, SafeGeometryProps>(({ children, co
       // width left 36 NaN vertices, no warning, no walls. A non-finite bound
       // is treated as a failure so the previous walls stay up.
       if (!isFinite(root.geometry)) throw new Error('boolean produced non-finite geometry')
-      // Success: NOW dispose the old and swap the new in - never before.
-      dispose(geo.current)
-      ;(geo.current as any).boundsTree = (root.geometry as any).boundsTree
-      geo.current.index = root.geometry.index
-      geo.current.attributes = root.geometry.attributes
-      geo.current.groups = root.geometry.groups
-      geo.current.drawRange = root.geometry.drawRange
-      if (ev.useGroups && (geo.current as any)?.__r3f?.parent?.object?.material)
-        (geo.current as any).__r3f.parent.object.material = root.material
-      if (computeVertexNormals) geo.current.computeVertexNormals()
+      // Success: put the result on the mesh as a NEW geometry object - never
+      // by copying its buffers into the geometry already there. See install().
+      if (computeVertexNormals) root.geometry.computeVertexNormals()
+      install(root.geometry, root.material)
       failRetries.current = 0
     } catch (e) {
       // Keep the previous geometry on screen - a stale opening beats no
@@ -210,7 +265,7 @@ export const Geometry = React.forwardRef<any, SafeGeometryProps>(({ children, co
       // opening), so "previous geometry" is an empty buffer and the wall
       // would simply not exist. A wall must never disappear - show the base
       // solid uncut instead.
-      if (!healthy(geo.current)) showBase()
+      if (!healthy(liveGeometry())) showBase()
       const msg = e instanceof Error ? e.message : String(e)
       console.warn('[SafeCsg] boolean evaluate failed; keeping previous geometry', e)
       // Whoever owns the mesh (the room shell) listens for this and records
@@ -218,27 +273,7 @@ export const Geometry = React.forwardRef<any, SafeGeometryProps>(({ children, co
       // the exact inputs instead of a screenshot.
       window.dispatchEvent(new CustomEvent('modulr-csg-failed', { detail: { message: msg } }))
     }
-  }, [computeVertexNormals, ev])
-
-  /** Put the uncut base solid on screen. Cloned, because the base geometry
-   *  is often shared with a plain mesh elsewhere and is disposed on the next
-   *  swap. Returns false when there is no base to show. */
-  const showBase = React.useCallback((): boolean => {
-    const baseBrush = operations.current?.children[0] as Brush | undefined
-    const base = baseBrush ? resolve(baseBrush) : null
-    const baseGeom = base?.geometry
-    if (!baseGeom?.attributes?.position || !isFinite(baseGeom)) return false
-    const c = baseGeom.clone()
-    geo.current.index = c.index
-    geo.current.attributes = c.attributes
-    geo.current.groups = c.groups
-    geo.current.drawRange = { start: 0, count: Infinity }
-    geo.current.boundingBox = null
-    geo.current.boundingSphere = null
-    if (ev.useGroups && (geo.current as any)?.__r3f?.parent?.object)
-      (geo.current as any).__r3f.parent.object.material = (base as any).material
-    return true
-  }, [ev])
+  }, [computeVertexNormals, ev, install, liveGeometry, showBase])
 
   /** Throw the signature away and run the boolean again from scratch. */
   const rebuild = React.useCallback(() => {
@@ -246,16 +281,22 @@ export const Geometry = React.forwardRef<any, SafeGeometryProps>(({ children, co
     update()
   }, [update])
 
+  // The geometry installed last is ours to dispose when the mesh goes.
+  React.useEffect(() => () => {
+    const g = live.current
+    if (g && g !== geo.current) g.dispose()
+  }, [])
+
   const ctx = React.useMemo(() => ({ showOperations }), [showOperations])
   React.useLayoutEffect(() => void update())
   React.useImperativeHandle(fref, () => ({
-    geometry: geo.current,
+    get geometry() { return liveGeometry() },
     operations: operations.current,
     update,
     rebuild,
     showBase,
-    healthy: () => healthy(geo.current),
-  }), [update, rebuild, showBase])
+    healthy: () => healthy(liveGeometry()),
+  }), [update, rebuild, showBase, liveGeometry])
 
   return (
     <>
