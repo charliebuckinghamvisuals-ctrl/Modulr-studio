@@ -69,7 +69,7 @@ const Panel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 const BetaBadge = () => (
     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-bold uppercase tracking-wider">
         <Sparkles size={14} />
-        Private Beta
+        Free Tester Access
     </div>
 );
 
@@ -92,7 +92,7 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
     useEffect(() => { setVerified(user?.emailVerified === true); }, [user]);
 
     const finish = () => {
-        toast.success('Welcome to the beta');
+        toast.success('Welcome to Modulr Studio');
         onGranted?.();
         // The beta flag lives in the ID token, and much of the app reads its
         // entitlements once on mount. A reload is the simplest way to be sure
@@ -309,8 +309,8 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
                     <p className="text-xs text-slate-500 leading-relaxed">
                         We have sent a confirmation link to{' '}
                         <span className="font-semibold text-accent">{user.email}</span>. Open it, then
-                        come back and press the button below. Beta seats are limited, so we confirm
-                        every address is real before opening the studio.
+                        come back and press the button below. We confirm every address is real
+                        before opening the studio.
                     </p>
                     <p className="text-[11px] text-slate-400 leading-relaxed">
                         It comes from <span className="font-mono text-slate-500">noreply@modulr-studio.firebaseapp.com</span>,
@@ -371,7 +371,7 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
                     <p className="text-xs text-slate-500 leading-relaxed">
                         You are signed in as{' '}
                         <span className="font-semibold text-accent">{user.email}</span> and your email is
-                        confirmed. Your beta access covers 40 renders over 7 days, starting from your first render.
+                        confirmed. Your tester access covers 40 renders over 7 days, starting from your first render.
                     </p>
                 </div>
 
@@ -406,11 +406,11 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
             <div className="space-y-2">
                 <BetaBadge />
                 <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-                    {mode === 'signup' ? 'Join the Modulr Studio beta' : 'Welcome back'}
+                    {mode === 'signup' ? 'Create your tester account' : 'Welcome back'}
                 </h2>
                 <p className="text-xs text-slate-500 leading-relaxed">
                     {mode === 'signup'
-                        ? 'The studio tools are in free beta: create an account, confirm your email, and you have 40 renders over 7 days. Everything else on the site is free to browse.'
+                        ? 'Create an account, confirm your email, and you have 40 free renders over 7 days to put the studio through its paces. Everything else on the site is free to browse.'
                         : 'Sign in to your Modulr Studio account.'}
                 </p>
             </div>
@@ -425,7 +425,7 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
                             mode === m ? 'bg-white text-accent shadow-sm' : 'text-slate-500 hover:text-accent'
                         }`}
                     >
-                        {m === 'signup' ? 'Join Beta' : 'Sign In'}
+                        {m === 'signup' ? 'Sign Up' : 'Sign In'}
                     </button>
                 ))}
             </div>
@@ -469,7 +469,7 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
                     {isLoading ? (
                         <><Loader2 size={16} className="animate-spin" /><span>Please wait…</span></>
                     ) : (
-                        <><span>{mode === 'signup' ? 'Join the Beta' : 'Sign In'}</span><ArrowRight size={16} /></>
+                        <><span>{mode === 'signup' ? 'Create Account' : 'Sign In'}</span><ArrowRight size={16} /></>
                     )}
                 </button>
             </form>

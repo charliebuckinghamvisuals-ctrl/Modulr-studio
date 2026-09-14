@@ -3544,8 +3544,8 @@ const resolveEffectivePlan = async (req) => {
         const snap = await db.collection('users').doc(req.user.uid).get();
         const plan = snap.exists ? (snap.data().plan || 'free') : 'free';
         if (PAID_PLANS.has(plan)) return plan;
-        // Open beta: a confirmed email with no paid plan is a beta member.
-        if (req.user?.beta === true || req.user?.email_verified === true) return 'beta';
+        // Open tester access: a confirmed email with no paid plan is a tester.
+        if (req.user?.beta === true || req.user?.email_verified === true) return 'tester';
         return plan;
     } catch (e) {
         console.error('[ANIMATION] Plan lookup failed:', e.message || e);
@@ -3862,7 +3862,7 @@ app.get('/api/user/credits', async (req, res) => {
             if (data.projectsEnabled !== true) await syncProjectAccess(req.user.uid, true);
             return res.json(withEntitlements({
                 credits: Math.max(0, TESTER_RENDERS - used),
-                plan: isTesterUser(req.user) ? 'tester' : 'beta',
+                plan: 'tester',
                 rendersLeft: Math.max(0, TESTER_RENDERS - used),
                 rendersPerDay: TESTER_RENDERS,
                 trialDaysLeft: Math.ceil(msLeft / 86400000),
