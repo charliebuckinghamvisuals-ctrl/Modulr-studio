@@ -5,6 +5,7 @@ import { Settings, Plus, Box, Tent, Map, Settings2, Trash2, DoorOpen, DoorClosed
 import { v4 as uuidv4 } from 'uuid';
 import { Link } from 'react-router-dom';
 import { gableCeilingMaxMm } from '../utils/placement';
+import { fenceLength, fenceArea } from './3d/FenceRuns';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS, INTERIOR_DOOR_STYLES } from '../modelRegistry';
@@ -81,6 +82,7 @@ function DeferredInput({ type, value, onChange, className, ...props }: any) {
 
 export function Sidebar() {
   const store = useStore.getState();
+  const toolMode = useStore(s => s.toolMode);
   const wrap = (fn: any) => (...args: any[]) => { store.saveState(); fn(...args); };
   // Reactive read so the selected wall's card highlights as selection changes.
   const selectedElementId = useStore(s => s.selectedElementId);
@@ -102,7 +104,6 @@ export function Sidebar() {
   const addWindow = wrap(store.addWindow);
   const updateWindow = wrap(store.updateWindow);
   const removeWindow = wrap(store.removeWindow);
-  const toggleTime = wrap(store.toggleTime);
   
   // "New" asks in place rather than through a browser modal - see the button.
   const [confirmNew, setConfirmNew] = useState(false);
@@ -132,13 +133,7 @@ export function Sidebar() {
               {areDoorsOpen ? <DoorOpen size={16}/> : <DoorClosed size={16}/>}
             </button>
           )}
-          <button
-            onClick={toggleTime}
-            className="w-8 h-8 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center shadow-sm border border-black/5 text-gray-500 hover:text-gray-800 transition-colors"
-            title="Toggle Day/Night"
-          >
-            {env.time === 'day' ? <Map size={16}/> : <Settings2 size={16}/>}
-          </button>
+
         </div>
       </div>
 
@@ -664,7 +659,7 @@ export function Sidebar() {
                             once there is one. A door already set there
                             keeps its option if the section is turned off,
                             so it can be moved rather than lost. */}
-                        {(room.bay || door.wall === 'bay') && <option value="bay">{room.bay ? 'Into outdoor section' : 'Outdoor section (off)'}</option>}
+                        {(room.bay || door.wall === 'bay') && <option value="bay">{room.bay ? 'Divider' : 'Divider (section off)'}</option>}
                       </select>
                     </div>
                     {/* The product: single, French, bi-fold or sliding. Each
@@ -771,6 +766,9 @@ export function Sidebar() {
                         <option value="back">Back</option>
                         <option value="left">Left</option>
                         <option value="right">Right</option>
+                        {/* The divider between room and outdoor section - a
+                            wall like the others while the section is on. */}
+                        {(room.bay || win.wall === 'bay') && <option value="bay">{room.bay ? 'Divider' : 'Divider (section off)'}</option>}
                       </select>
                     </div>
                     <div className="flex justify-between items-center text-xs">
@@ -810,9 +808,17 @@ export function Sidebar() {
 
             <CollapsibleSection title="Colours & Materials" defaultOpen={true} step="cladding">
               <div>
+                <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Frame Material</label>
+                <div className="flex gap-2 mb-3">
+                  {([['upvc', 'uPVC'], ['aluminium', 'Aluminium'], ['timber', 'Timber']] as const).map(([id, name]) => (
+                    <button key={id} onClick={() => updateRoom({ frameMaterial: id })} className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg transition-colors ${(room.frameMaterial ?? 'aluminium') === id ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
+                      {name}
+                    </button>
+                  ))}
+                </div>
                 <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Door/Window Frames</label>
                 <div className="flex gap-2">
-                  {['anthracite', 'black', 'white', 'silver'].map(col => (
+                  {['white', 'anthracite', 'black'].map(col => (
                     <button key={col} onClick={() => updateRoom({ frameColor: col as any })} className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg capitalize transition-colors ${room.frameColor === col ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
                       {col}
                     </button>
@@ -828,7 +834,7 @@ export function Sidebar() {
                   <button onClick={() => updateRoom({ frameColorInner: undefined })} className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg transition-colors ${room.frameColorInner === undefined ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
                     Match
                   </button>
-                  {['anthracite', 'black', 'white', 'silver'].map(col => (
+                  {['white', 'anthracite', 'black'].map(col => (
                     <button key={col} onClick={() => updateRoom({ frameColorInner: col as any })} className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg capitalize transition-colors ${room.frameColorInner === col ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
                       {col}
                     </button>
@@ -907,9 +913,9 @@ export function Sidebar() {
               <div>
                 <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Roof Material</label>
                 <div className="flex gap-2 flex-wrap">
-                  {['epdm', 'sedum', 'upvc', 'metal'].map(col => (
-                    <button key={col} onClick={() => updateRoom({ roofMaterial: col as any })} className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg uppercase transition-colors ${room.roofMaterial === col ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
-                      {col.replace('_', ' ')}
+                  {([['epdm', 'EPDM'], ['rubber', 'Rubber'], ['aluminium', 'Aluminium'], ['sedum', 'Sedum']] as const).map(([col, name]) => (
+                    <button key={col} onClick={() => updateRoom({ roofMaterial: col })} className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg transition-colors ${room.roofMaterial === col ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
+                      {name}
                     </button>
                   ))}
                 </div>
@@ -1065,6 +1071,58 @@ export function Sidebar() {
             {/* The covered outdoor section - one end of the building left
                 open under the same roof, for a hot tub or outdoor kitchen.
                 See utils/bay for what it does to the shell. */}
+            {/* The garden boundary: fence runs drawn on the ground to mark out
+                and measure the plot - each run's length, the perimeter, and
+                the enclosed area once the loop is closed. */}
+            <CollapsibleSection title="Garden Boundary" step="extras">
+              {(() => {
+                const fences = scene.fences || [];
+                const drawing = toolMode === 'fence';
+                const perimeter = fences.reduce((s, f) => s + fenceLength(f), 0);
+                const area = fenceArea(fences);
+                const last = fences[fences.length - 1];
+                const canClose = fences.length >= 2 && area === null && !!last;
+                const btn = 'px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-white border border-black/10 ';
+                return (
+                  <div className="space-y-3">
+                    <p className="text-[10px] text-gray-400 leading-snug">Click the ground to set each corner of your garden. Click the first corner again to close it, Esc to stop.</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => store.setToolMode(drawing ? 'select' : 'fence')}
+                        className={'flex-1 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-colors ' + (drawing ? 'bg-emerald-500 text-white' : 'bg-[#3b4d4a] text-white hover:bg-[#2d3a38]')}
+                      >
+                        {drawing ? 'Drawing - Esc to stop' : fences.length ? 'Continue boundary' : 'Draw boundary'}
+                      </button>
+                      {canClose && (
+                        <button onClick={() => { store.saveState(); store.addFence(last.bx, last.bz, fences[0].ax, fences[0].az); store.setToolMode('select'); }} className={btn + 'text-[#3b4d4a] hover:bg-gray-50'}>Close</button>
+                      )}
+                      {fences.length > 0 && (
+                        <button onClick={() => { store.saveState(); store.clearFences(); }} className={btn + 'text-gray-500 hover:text-red-500'}>Clear</button>
+                      )}
+                    </div>
+                    {fences.length > 0 && (
+                      <div className="bg-white border border-black/5 rounded-xl shadow-sm divide-y divide-black/5">
+                        {fences.map((f, i) => (
+                          <div key={f.id} className="flex items-center justify-between px-3 py-1.5 text-xs">
+                            <span className="text-gray-500">Run {i + 1}</span>
+                            <span className="font-semibold text-[#3b4d4a]">{Math.round(fenceLength(f) * 1000)} mm</span>
+                            <button onClick={() => { store.saveState(); store.removeFence(f.id); }} className="text-gray-300 hover:text-red-500" title="Remove this run"><Trash2 size={12} /></button>
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-between px-3 py-2 text-xs font-bold text-[#3b4d4a]">
+                          <span>Perimeter</span><span>{perimeter.toFixed(2)} m</span>
+                        </div>
+                        <div className="flex items-center justify-between px-3 py-2 text-xs font-bold text-[#3b4d4a]">
+                          <span>Garden area</span>
+                          {area === null ? <span className="font-normal text-gray-400">close the boundary</span> : <span>{area.toFixed(1)} m²</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </CollapsibleSection>
+
             <CollapsibleSection title="Outdoor Section" step="extras">
               <div className="flex items-center justify-between p-4 bg-white border border-black/5 rounded-xl shadow-sm">
                 <span className="text-xs font-medium text-gray-700">
@@ -1436,7 +1494,16 @@ export function Sidebar() {
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Tables & Storage</label>
               <div className="grid grid-cols-2 gap-2.5">
-                {(['dining_table', 'dining_table_round', 'coffee_table', 'coffee_table_black', 'tv_unit', 'desk', 'desk_single', 'shelving_unit', 'wardrobe', 'chest_of_drawers', 'bedside_table'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['dining_table', 'dining_table_round', 'coffee_table', 'coffee_table_black', 'tv_unit', 'wall_tv', 'desk', 'desk_single', 'shelving_unit', 'wardrobe', 'chest_of_drawers', 'bedside_table'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Games</label>
+              <div className="grid grid-cols-2 gap-2.5">
+                {(['pool_table', 'arcade_machine', 'dart_board'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
@@ -1489,6 +1556,14 @@ export function Sidebar() {
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Lighting</label>
               <div className="grid grid-cols-2 gap-2.5 mb-2.5">
                 {(['pendant_light'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
+                ))}
+              </div>
+              {/* Exterior wall lights: dropped anywhere near the building,
+                  they fix themselves to the nearest outside wall. */}
+              <label className="text-[10px] font-semibold text-gray-500 mb-2 block">Outside walls</label>
+              <div className="grid grid-cols-3 gap-2.5 mb-2.5">
+                {(['wall_light_sconce', 'wall_light_angled', 'wall_light_box'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>

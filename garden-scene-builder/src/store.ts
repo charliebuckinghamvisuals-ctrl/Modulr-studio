@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import { SceneState, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { isInteriorType, clampToRoomInterior } from './utils/placement';
-import { bayRange } from './utils/bay';
-import { UNIT_FAMILY } from './modelRegistry';
+import { bayRange, wallSpanMm } from './utils/bay';
+import { sunState, DAY_START, DAY_END } from './utils/sun';
+import { UNIT_FAMILY, isVeneerFinish } from './modelRegistry';
 
 // Debug/E2E hook: lets automated tests drive the store directly (drag
 // simulation, perf probes). Harmless in production - nothing reads it.
@@ -31,6 +32,11 @@ interface AppState {
   // Actions
   setViewMode: (mode: ViewMode) => void;
   setToolMode: (mode: ToolMode) => void;
+  /** Garden boundary fence runs (components/3d/FenceRuns): a straight run
+   *  from (ax,az) to (bx,bz) in world metres, drawn corner to corner. */
+  addFence: (ax: number, az: number, bx: number, bz: number) => void;
+  removeFence: (id: string) => void;
+  clearFences: () => void;
   setActivePlacementType: (type: ObjectType | null) => void;
   setSelectedObjectId: (id: string | null) => void;
   setSelectedElementId: (id: string | null) => void;
@@ -52,6 +58,10 @@ interface AppState {
   configMode: 'public' | 'business';
   setConfigMode: (mode: 'public' | 'business') => void;
   walkPointerLocked: boolean;
+  /** Where the next walkthrough starts - chosen with the Walk Inside /
+   *  Walk Outside buttons, read by the walk rig when it mounts. */
+  walkStart: 'inside' | 'outside';
+  setWalkStart: (where: 'inside' | 'outside') => void;
   setWalkPointerLocked: (locked: boolean) => void;
   /** True when the walkthrough floor-finish panel is open. */
   walkFloorOpen: boolean;
@@ -178,6 +188,11 @@ interface AppState {
    *  this a lighting layout cannot actually be judged. */
   nightPreview: boolean;
   setNightPreview: (on: boolean) => void;
+  /** Time of day in hours (utils/sun): the sun slider. nightPreview follows
+   *  it - true once the sun is down - so everything keyed to "night" (the
+   *  fittings switching on, the night HDR) comes with the slider. */
+  timeOfDay: number;
+  setTimeOfDay: (hours: number) => void;
   /** The line a dragged fitting has snapped onto, drawn on the ceiling plan
    *  so "lined up" is something you can see rather than hope for. */
   alignGuide: { x?: number; z?: number } | null;
@@ -216,12 +231,31 @@ function clampOpening<T extends { wall: string; widthMm: number; offsetMm: numbe
   room: SceneState['room'],
   el: T,
 ): T {
+  // The stretch of wall that is actually there: with an outdoor section the
+  // front wall stops at the divider, so an opening can no longer be clamped
+  // to the building's full width and land over the open bay (where it is
+  // hidden and looks lost). A wall the bay has removed entirely keeps the
+  // full span: the opening stays hidden and comes back with the wall.
   const wallLen = (el.wall === 'front' || el.wall === 'back') ? room.widthMm : room.depthMm;
-  const maxWidth = Math.max(300, wallLen - MIN_PIER_MM * 2);
-  const widthMm = Math.min(Math.max(300, el.widthMm), maxWidth);
-  const maxOffset = Math.max(0, wallLen / 2 - widthMm / 2 - MIN_PIER_MM);
-  const offsetMm = Math.min(Math.max(el.offsetMm ?? 0, -maxOffset), maxOffset);
+  const span = wallSpanMm(room, el.wall) ?? { lo: -wallLen / 2, hi: wallLen / 2 };
+  const maxWidth = Math.max(300, span.hi - span.lo - MIN_PIER_MM * 2);
+  // A width or offset that is not a number (an emptied input, a field an old
+  // save never had) must not come out of here as NaN: Math.max(300, NaN) is
+  // NaN, and a NaN opening is a cut the wall boolean silently ignores.
+  const wantW = Number.isFinite(el.widthMm) ? el.widthMm : 900;
+  const wantOff = Number.isFinite(el.offsetMm) ? el.offsetMm : 0;
+  const widthMm = Math.min(Math.max(300, wantW), maxWidth);
+  const lo = span.lo + widthMm / 2 + MIN_PIER_MM;
+  const hi = span.hi - widthMm / 2 - MIN_PIER_MM;
+  const offsetMm = lo > hi ? Math.round((lo + hi) / 2) : Math.min(Math.max(wantOff, lo), hi);
   return { ...el, widthMm, offsetMm };
+}
+
+/** Where a new opening on this wall starts: the middle of the wall that is
+ *  there, snapped to 50mm. */
+function wallMidMm(room: SceneState['room'], wall: string): number {
+  const span = wallSpanMm(room, wall);
+  return span ? Math.round((span.lo + span.hi) / 2 / 50) * 50 : 0;
 }
 
 const initialState: SceneState = {
@@ -381,6 +415,13 @@ export const useStore = create<AppState>((set, get) => ({
 
   setViewMode: (mode) => set({ viewMode: mode, toolMode: 'select', activePlacementType: null }),
   setToolMode: (mode) => set({ toolMode: mode }),
+  addFence: (ax, az, bx, bz) => set((state) => ({
+    scene: { ...state.scene, fences: [...(state.scene.fences || []), { id: uuidv4(), ax, az, bx, bz }] },
+  })),
+  removeFence: (id) => set((state) => ({
+    scene: { ...state.scene, fences: (state.scene.fences || []).filter(f => f.id !== id) },
+  })),
+  clearFences: () => set((state) => ({ scene: { ...state.scene, fences: [] } })),
   setActivePlacementType: (type) => set({ activePlacementType: type, toolMode: type ? 'place' : 'select' }),
   setSelectedObjectId: (id) => set({ selectedObjectId: id, selectedElementId: null }),
   setSelectedElementId: (id) => set({ selectedElementId: id, selectedObjectId: null }),
@@ -406,6 +447,8 @@ export const useStore = create<AppState>((set, get) => ({
     viewMode: mode === 'public' && (state.viewMode === 'walking' || state.viewMode === 'lighting') ? '3d' : state.viewMode,
   })),
   walkPointerLocked: false,
+  walkStart: 'outside',
+  setWalkStart: (where) => set({ walkStart: where }),
   setWalkPointerLocked: (locked) => set({ walkPointerLocked: locked }),
   walkFloorOpen: false,
   setWalkFloorOpen: (open) => set({ walkFloorOpen: open }),
@@ -542,7 +585,24 @@ export const useStore = create<AppState>((set, get) => ({
     return set((state) => {
     let finalUpdates = { ...updates };
     const currentRoom = state.scene.room;
-    
+
+    /*
+     * No dimension may become NaN. Every numeric field of the room feeds a
+     * geometry somewhere, and a NaN in the wall boolean is the one failure
+     * that nothing downstream can see: the result has the right vertex
+     * count, throws nothing, and draws nothing - the walls simply vanish.
+     * Measured on the live build (14 Sep): widthMm NaN = no walls, no
+     * warning. A non-finite number for a field that currently holds a
+     * number is dropped here, keeping the value that was on screen.
+     */
+    for (const k of Object.keys(finalUpdates) as (keyof typeof finalUpdates)[]) {
+      const v = finalUpdates[k] as unknown;
+      if (typeof v === 'number' && !Number.isFinite(v)) {
+        console.warn(`[store] updateRoom ignored non-finite ${String(k)}`, v);
+        delete finalUpdates[k];
+      }
+    }
+
     const isPictureFrameOn = finalUpdates.hasPictureFrame !== undefined ? finalUpdates.hasPictureFrame : currentRoom.hasPictureFrame;
     
     if (isPictureFrameOn) {
@@ -576,6 +636,26 @@ export const useStore = create<AppState>((set, get) => ({
       });
     }
 
+    /*
+     * The walls changed size (building width/depth, wall thickness, the
+     * outdoor section): every door and window is re-clamped to the wall
+     * that is now there. Openings were only ever clamped when THEY changed,
+     * so shrinking the building or the bay could leave a door wider than
+     * its wall - a cut that swallows the whole wall, and a wall that is
+     * simply not there. A wall must never disappear.
+     */
+    const wallsChanged = ['widthMm', 'depthMm', 'wallThicknessMm', 'bay'].some(k => k in finalUpdates);
+    if (wallsChanged) {
+      // Same object back when nothing moved, so an untouched opening does
+      // not re-trigger the wall rebuild.
+      const same = <T extends { widthMm: number; offsetMm: number }>(a: T, b: T) => a.widthMm === b.widthMm && a.offsetMm === b.offsetMm ? a : b;
+      const doors = (room.doors || []).map(dr => same(dr, clampOpening(room, dr)));
+      const windows = (room.windows || []).map(wn => same(wn, clampOpening(room, wn)));
+      if (doors.some((dr, i) => dr !== room.doors![i]) || windows.some((wn, i) => wn !== room.windows[i])) {
+        return { scene: { ...state.scene, room: { ...room, doors, windows }, objects } };
+      }
+    }
+
     return {
       scene: { ...state.scene, room, objects }
     };
@@ -593,14 +673,14 @@ export const useStore = create<AppState>((set, get) => ({
         ...state.scene.room,
         doors: [
           ...(state.scene.room.doors || []),
-          {
+          clampOpening(state.scene.room, {
             id: uuidv4(),
-            wall: 'front',
-            offsetMm: 0,
+            wall: 'front' as const,
+            offsetMm: wallMidMm(state.scene.room, 'front'),
             widthMm: 2000,
             heightMm: 2100,
             leaves: 2,
-          }
+          })
         ]
       }
     }
@@ -608,9 +688,6 @@ export const useStore = create<AppState>((set, get) => ({
 
   addDoorAt: (wall, offsetMm) => set((state) => {
     const room = state.scene.room;
-    const widthMm = 1800;
-    const wallLen = (wall === 'front' || wall === 'back') ? room.widthMm : room.depthMm;
-    const maxOff = Math.max(0, wallLen / 2 - widthMm / 2 - 200);
     const id = uuidv4();
     return {
       selectedElementId: id,
@@ -621,7 +698,7 @@ export const useStore = create<AppState>((set, get) => ({
           ...room,
           doors: [
             ...(room.doors || []),
-            { id, wall, offsetMm: Math.max(-maxOff, Math.min(maxOff, Math.round(offsetMm / 50) * 50)), widthMm, heightMm: 2100, leaves: 2 }
+            clampOpening(room, { id, wall, offsetMm: Math.round(offsetMm / 50) * 50, widthMm: 1800, heightMm: 2100, leaves: 2 })
           ]
         }
       }
@@ -655,13 +732,15 @@ export const useStore = create<AppState>((set, get) => ({
     // or stack on an earlier window.
     const winW = 600;
     const margin = 300;
-    const half = room.widthMm / 2;
+    // The front wall that is there - with an outdoor section it stops at
+    // the divider, and a window over the bay would hang in mid-air.
+    const span = wallSpanMm(room, 'front') ?? { lo: -room.widthMm / 2, hi: room.widthMm / 2 };
     const occupied = [
       ...(room.doors || []).filter(d => d.wall === 'front').map(d => ({ c: d.offsetMm, hw: d.widthMm / 2 })),
       ...room.windows.filter(w => w.wall === 'front').map(w => ({ c: w.offsetMm ?? 0, hw: w.widthMm / 2 })),
     ];
-    const leftmost = -half + margin + winW / 2;
-    const rightmost = half - margin - winW / 2;
+    const leftmost = span.lo + margin + winW / 2;
+    const rightmost = span.hi - margin - winW / 2;
     let offsetMm = leftmost;
     while (
       offsetMm <= rightmost &&
@@ -693,9 +772,6 @@ export const useStore = create<AppState>((set, get) => ({
 
   addWindowAt: (wall, offsetMm) => set((state) => {
     const room = state.scene.room;
-    const widthMm = 1000;
-    const wallLen = (wall === 'front' || wall === 'back') ? room.widthMm : room.depthMm;
-    const maxOff = Math.max(0, wallLen / 2 - widthMm / 2 - 200);
     const id = uuidv4();
     return {
       selectedElementId: id,
@@ -706,7 +782,7 @@ export const useStore = create<AppState>((set, get) => ({
           ...room,
           windows: [
             ...room.windows,
-            { id, wall, offsetMm: Math.max(-maxOff, Math.min(maxOff, Math.round(offsetMm / 50) * 50)), widthMm, heightMm: 1000, sillMm: 900 }
+            clampOpening(room, { id, wall, offsetMm: Math.round(offsetMm / 50) * 50, widthMm: 1000, heightMm: 1000, sillMm: 900 })
           ]
         }
       }
@@ -914,7 +990,10 @@ export const useStore = create<AppState>((set, get) => ({
   walkFov: 60,
   setWalkFov: (fov) => set({ walkFov: Math.min(100, Math.max(20, fov)) }),
   nightPreview: false,
-  setNightPreview: (on) => set({ nightPreview: on }),
+  // The toggle is a shortcut on the slider: night is 10pm, day is 1pm.
+  setNightPreview: (on) => set({ nightPreview: on, timeOfDay: on ? 22 : 13 }),
+  timeOfDay: 13,
+  setTimeOfDay: (hours) => { const h = Math.max(DAY_START, Math.min(DAY_END, hours)); set({ timeOfDay: h, nightPreview: sunState(h).elevation < 0 }); },
   alignGuide: null,
   setAlignGuide: (g) => set(s => {
     // Reference-equal when nothing changed, so a drag does not re-render the
@@ -1071,6 +1150,11 @@ export const useStore = create<AppState>((set, get) => ({
   recolourUnits: (scope, hex) => set((state) => ({
     scene: {
       ...state.scene,
+      // Picking a colour on veneered doors means paint: the kitchen goes
+      // back to the sheen it had before the wood, and takes the colour.
+      room: isVeneerFinish(state.scene.room.unitFinish)
+        ? { ...state.scene.room, unitFinish: state.scene.room.unitPaintFinish ?? 'satin' }
+        : state.scene.room,
       objects: state.scene.objects.map(o => {
         const fam = UNIT_FAMILY[o.type];
         if (!fam) return o;

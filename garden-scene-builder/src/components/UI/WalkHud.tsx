@@ -37,6 +37,9 @@ export function WalkHud() {
   // useShallow: this selector builds a new array, and a store selector that
   // returns a fresh reference on every call re-renders forever (React 185).
   const pendingDoors = useStore(useShallow(s => {
+    // An exterior door set, clicked from the garden or the room: one leaf
+    // to swing, and the way in.
+    if (s.walkPending?.kind === 'opening') return (s.scene.room.doors || []).filter(d => d.id === s.walkPending?.id).map(d => d.id);
     if (s.walkPending?.kind !== 'partition') return [] as string[];
     const part = (s.scene.room.partitions || []).find(p => p.id === s.walkPending?.id);
     return (part?.doors || []).filter(d => d.style).map(d => d.id);
@@ -132,7 +135,7 @@ export function WalkHud() {
 
   if (!locked) {
     return (
-      <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+      <div className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-none">
         {/*
           A real button, not a hint. Walking and picking a finish used to be
           the same click, so one always shadowed the other - either you could
@@ -145,8 +148,22 @@ export function WalkHud() {
           className="pointer-events-auto bg-black/70 hover:bg-black/85 backdrop-blur-sm text-white px-5 py-3 rounded-xl text-center shadow-2xl transition-colors cursor-pointer"
         >
           <div className="text-sm font-semibold">Click here to walk around</div>
-          <div className="text-[11px] text-white/60 mt-1">WASD to walk · Shift to jog · or click anything in the room to change its finish</div>
+          <div className="text-[11px] text-white/60 mt-1">WASD to walk · Shift to jog · click a door to open it and go in · click anything to change its finish</div>
         </button>
+        {/* Straight to where you want to be, no door to open. Each puts
+            you there and starts you walking in one click. */}
+        <div className="flex gap-2 mt-3 pointer-events-auto">
+          {([['inside', 'Go inside'], ['outside', 'Go outside']] as const).map(([where, text]) => (
+            <button
+              key={where}
+              type="button"
+              onClick={() => { window.dispatchEvent(new CustomEvent('walk-teleport', { detail: { where } })); resumeWalking(); }}
+              className="bg-white/90 hover:bg-white text-[#3b4d4a] px-4 py-2 rounded-full text-[11px] font-bold shadow-lg transition-colors cursor-pointer"
+            >
+              {text}
+            </button>
+          ))}
+        </div>
       </div>
     );
   }
@@ -171,10 +188,11 @@ export function WalkHud() {
           </div>
           <div className="flex flex-col gap-1 text-[9px] text-white/70 leading-none">
             <div className="flex items-center gap-1.5"><Key wide>Shift</Key> jog</div>
+            <div className="flex items-center gap-1.5"><Key wide>T</Key> inside / outside</div>
             <div className="flex items-center gap-1.5"><Key wide>Esc</Key> cursor</div>
           </div>
         </div>
-        <div className="text-[9px] text-white/50 mt-1.5 pl-1">Click an item, the floor, a wall or a window to change its finish</div>
+        <div className="text-[9px] text-white/50 mt-1.5 pl-1">Click a door to open it · click an item, the floor, a wall or a window to change its finish</div>
       </div>
     </>
   );

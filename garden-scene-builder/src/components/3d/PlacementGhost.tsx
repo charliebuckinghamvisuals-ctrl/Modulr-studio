@@ -3,8 +3,8 @@ import * as THREE from 'three';
 import { useGLTF } from '@react-three/drei';
 import { isOutdoorType, bayFloorTop } from '../../utils/bay';
 import { useStore } from '../../store';
-import { MODEL_URLS, MODEL_SCALES, mountHeight, CEILING_MOUNTED, isCeilingMounted } from '../../modelRegistry';
-import { isInteriorType, clampToRoomInterior, interiorCeilingHeight, snapEndPanel, settleAgainstWalls } from '../../utils/placement';
+import { MODEL_URLS, MODEL_SCALES, mountHeight, CEILING_MOUNTED, isCeilingMounted, isWallLight } from '../../modelRegistry';
+import { isInteriorType, clampToRoomInterior, interiorCeilingHeight, snapEndPanel, settleAgainstWalls, snapToOutsideWall } from '../../utils/placement';
 import { isEndPanel } from '../../modelRegistry';
 
 /** Semi-transparent clone of a GLB model, used as the placement preview. */
@@ -69,6 +69,9 @@ export function PlacementGhost() {
   const moveGhost = (e: any) => {
     let x = e.point.x, z = e.point.z;
     if (interior) { const c = clampToRoomInterior(room, x, z, 0.05, type); x = c.x; z = c.z; }
+    // An exterior wall light goes onto the nearest outside wall face,
+    // turned to point out from it.
+    if (isWallLight(type)) { const s = snapToOutsideWall(room, x, z); x = s.x; z = s.z; if (s.rot !== rot) setRot(s.rot); }
     posRef.current = { x, z };
     if (groupRef.current) {
       groupRef.current.position.set(x, y, z);

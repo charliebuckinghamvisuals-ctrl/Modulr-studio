@@ -56,7 +56,9 @@ export function ElementEditorPanel() {
   const setFromLeft = (v: number) => update({ offsetMm: Math.round(s * (v + el.widthMm / 2 - L / 2)) });
 
   return (
-    <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-2xl border border-black/5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] rounded-2xl px-5 py-3 z-20 text-[#3b4d4a]">
+    // Right edge, like the object panel: bottom-centre covered the opening
+    // being dragged once you were zoomed in on it.
+    <div className="absolute right-6 top-24 bg-white/90 backdrop-blur-2xl border border-black/5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] rounded-2xl px-5 py-3 z-20 text-[#3b4d4a]">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
           {isDoor ? 'Door' : 'Window'} · {el.wall} wall <span className="normal-case tracking-normal text-gray-300">(corners viewed from outside)</span>

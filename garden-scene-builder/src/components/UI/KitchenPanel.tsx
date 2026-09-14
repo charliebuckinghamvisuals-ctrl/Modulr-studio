@@ -1,7 +1,7 @@
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import {
-  UNIT_COLOURS, UNIT_FINISHES, VENEERS, WORKTOPS, FAMILY_LABEL, UNIT_FAMILY,
+  UNIT_COLOURS, UNIT_FINISHES, VENEERS, WORKTOPS, FAMILY_LABEL, UNIT_FAMILY, isVeneerFinish,
   type UnitFamily,
 } from '../../modelRegistry';
 import { useSavedColours, addSavedColour } from '../../utils/savedColours';
@@ -78,7 +78,7 @@ export function KitchenPanel() {
             <button
               key={v.id}
               title={v.name}
-              onClick={() => updateRoom({ unitFinish: v.id })}
+              onClick={() => updateRoom({ unitFinish: v.id, unitPaintFinish: isVeneerFinish(finish) ? room.unitPaintFinish : finish as any })}
               style={{ backgroundImage: 'url(textures/' + v.prefix + '_color.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
               className={`h-9 rounded-lg border text-[9px] font-bold uppercase tracking-wide text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.7)] transition-all ${
                 finish === v.id ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20' : 'border-black/10 hover:scale-[1.03]'

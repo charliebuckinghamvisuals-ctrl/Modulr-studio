@@ -2098,14 +2098,16 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                         : `- Fascia / roof edge trim: ${f.toUpperCase()}, a crisp flat band along the top of every wall, clearly distinct from the cladding below it.`);
                 }
                 if (spec.roofMaterial) {
-                    const roofNames = { epdm: 'EPDM rubber membrane', sedum: 'sedum green roof', upvc: 'uPVC roof sheet', metal: 'standing-seam metal roof' };
+                    const roofNames = { epdm: 'EPDM rubber membrane', sedum: 'sedum green roof', upvc: 'uPVC roof sheet', metal: 'standing-seam metal roof', rubber: 'textured black rubber roof sheeting', aluminium: 'black powder-coated aluminium roof sheet' };
                     const r = roofNames[spec.roofMaterial] || sanitizeString(String(spec.roofMaterial), 20);
                     const rc = typeof spec.roofColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(spec.roofColor) ? ` in ${spec.roofColor}` : '';
                     lines.push(`- Roof covering: ${r}${rc}.`);
                 }
                 if (typeof spec.frameColor === 'string' && spec.frameColor.trim()) {
                     const fc = sanitizeString(spec.frameColor, 20).toUpperCase();
-                    lines.push(`- Window and door frames: ${fc} aluminium on every opening. A SOLID door leaf is ${fc} like its frame - never the cladding colour.`);
+                    const fmNames = { upvc: 'uPVC', aluminium: 'aluminium', timber: 'painted timber' };
+                    const fm = fmNames[spec.frameMaterial] || 'aluminium';
+                    lines.push(`- Window and door frames: ${fc} ${fm} on every opening. A SOLID door leaf is ${fc} like its frame - never the cladding colour.`);
                 }
 
                 /**
@@ -2192,7 +2194,10 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                     : `- Windows: NONE anywhere on this building. Do not add any window openings on any elevation.${doors.length ? ' The only glazing is in the door sets listed above.' : ''}`);
                 windows.forEach((wn, i) => {
                     const style = wn.style === 'crittall' ? 'Crittall-style glazing bar grid' : 'standard';
-                    lines.push(`  - Window ${i + 1}: ${mm(wn.widthMm) || '?'} x ${mm(wn.heightMm) || '?'}, ${style}, ${sanitizeString(String(wn.wall || ''), 10) || 'front'} elevation.${where(wn)}`);
+                    const placeWords = wn.wall === 'bay'
+                        ? 'in the dividing wall between the enclosed room and the covered outdoor section - it is INSIDE the section, seen only through its open front, never on an outside elevation'
+                        : `${sanitizeString(String(wn.wall || ''), 10) || 'front'} elevation`;
+                    lines.push(`  - Window ${i + 1}: ${mm(wn.widthMm) || '?'} x ${mm(wn.heightMm) || '?'}, ${style}, ${placeWords}.${where(wn)}`);
                 });
                 if (spec.claddingOrientation) lines.push(`- Cladding board direction: ${spec.claddingOrientation === 'vertical' ? 'vertical' : 'horizontal'}.`);
                 const sky = Array.isArray(spec.skylights) ? spec.skylights.length : 0;

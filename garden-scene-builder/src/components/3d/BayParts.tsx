@@ -155,6 +155,7 @@ export function BayParts({ room, bay, w, d, h, wallThickness, frameColorHex, roo
   // Doors set in the divider, and the divider itself - memoised, because a
   // fresh geometry every render would tear the boolean down each frame.
   const bayDoors = (room.doors || []).filter(dr => dr.wall === 'bay');
+  const bayWindows = (room.windows || []).filter(wn => wn.wall === 'bay');
   const dividerGeom = useMemo(
     () => slopedWallGeometry(wt, len, bay.dividerX, cz, wallTop, isVertical),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,7 +182,7 @@ export function BayParts({ room, bay, w, d, h, wallThickness, frameColorHex, roo
           'bay') are cut out here, with the same boolean the shell uses;
           the geometry is memoised so the boolean only re-runs when the
           wall or its doors actually change. */}
-      {bayDoors.length ? (
+      {bayDoors.length || bayWindows.length ? (
         <mesh position={[bay.dividerX, 0, cz]} castShadow receiveShadow userData={{ openingId: 'bay-divider' }}>
           <Geometry useGroups>
             <Base>
@@ -194,6 +195,19 @@ export function BayParts({ room, bay, w, d, h, wallThickness, frameColorHex, roo
                 {paperMat('cut-' + dr.id)}
               </Subtraction>
             ))}
+            {/* Windows in the divider, cut like the shell cuts its own: a
+                window on the floor is cut a little below it so no cut face
+                lies level with the floor and flickers. */}
+            {bayWindows.map(wn => {
+              const sill = (wn.sillMm ?? 0) / 1000, winH = wn.heightMm / 1000;
+              const below = sill < 0.001 ? 0.1 : 0;
+              return (
+                <Subtraction key={wn.id} position={[0, sill + winH / 2 - below / 2, (wn.offsetMm ?? 0) / 1000]}>
+                  <boxGeometry args={[wt * 3, winH + below, wn.widthMm / 1000]} />
+                  {paperMat('cut-' + wn.id)}
+                </Subtraction>
+              );
+            })}
           </Geometry>
         </mesh>
       ) : (
@@ -253,7 +267,7 @@ export function BayParts({ room, bay, w, d, h, wallThickness, frameColorHex, roo
         <group position={[left ? -w / 2 + wt / 2 : w / 2 - wt / 2, 0, cz]}>
           <mesh>
             <primitive object={slopedWallGeometry(0.012, len - 0.1, 0, 0, (z) => ceilAt(z + cz) - 0.05, false)} attach="geometry" />
-            {[0, 1, 2, 3, 4, 5].map(i => <meshPhysicalMaterial key={`gl-${i}`} attach={`material-${i}`} color="#b9cdd8" transmission={0.92} ior={1.5} thickness={0.02} roughness={0.05} clearcoat={1} />)}
+            {[0, 1, 2, 3, 4, 5].map(i => <meshPhysicalMaterial key={`gl-${i}`} attach={`material-${i}`} color="#b9cdd8" transparent opacity={0.28} depthWrite={false} roughness={0.05} metalness={0} clearcoat={1} clearcoatRoughness={0.05} />)}
           </mesh>
           <mesh position={[0, 0.025, 0]} castShadow><boxGeometry args={[0.05, 0.05, len]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>
           <mesh position={[0, ceilAt(cz) - 0.03, 0]} rotation={[pitch, 0, 0]} castShadow><boxGeometry args={[0.05, 0.05, len / Math.cos(pitch)]} /><meshStandardMaterial color={frameColorHex} metalness={0.6} roughness={0.3} /></mesh>

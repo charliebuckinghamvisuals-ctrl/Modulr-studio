@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Moon, Trash2, Footprints, Plus } from 'lucide-react';
+import { Trash2, Footprints, Plus } from 'lucide-react';
 import { LIGHT_COLOURS } from '../../modelRegistry';
 
 /**
@@ -195,18 +195,11 @@ export function LightingPanel() {
           )}
         </div>
         <button
-          onClick={() => { setNightPreview(true); setViewMode('walking'); }}
+          onClick={() => { useStore.getState().setWalkStart('inside'); setViewMode('walking'); }}
           disabled={!spots.length}
           className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-colors ${spots.length ? 'bg-[#1f2a37] text-white hover:bg-[#111a24]' : 'bg-black/5 text-gray-400 cursor-not-allowed'}`}>
-          <Footprints size={14} /> Walk it at night
+          <Footprints size={14} /> Walk it
         </button>
-        <div className="flex items-center justify-between pt-1">
-          <span className="text-[11px] text-gray-600 flex items-center gap-1.5"><Moon size={12} /> Night preview</span>
-          <button onClick={() => setNightPreview(!nightPreview)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all ${nightPreview ? 'bg-emerald-500' : 'bg-gray-300/60'}`}>
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all shadow-md ${nightPreview ? 'translate-x-[24px]' : 'translate-x-[3px]'}`} />
-          </button>
-        </div>
       </div>
     </div>
   );

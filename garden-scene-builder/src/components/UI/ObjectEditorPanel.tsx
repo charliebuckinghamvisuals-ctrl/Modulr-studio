@@ -167,11 +167,28 @@ export function ObjectEditorPanel() {
     resumeWalking();
   };
 
+  /**
+   * Light fittings are specified as a SET: one lamp colour, one bezel
+   * finish across every downlight in the ceiling. Picking on one fitting
+   * applies to every fitting of the same type, so a row of eight spots is
+   * not eight separate errands (Charlie, 11 Sep).
+   */
+  const updateFitting = (updates: Partial<typeof obj>) => {
+    const st = useStore.getState();
+    if (isLightFitting(obj.type)) st.scene.objects.filter(o => o.type === obj.type).forEach(o => st.updateObject(o.id, updates));
+    else updateObject(obj.id, updates);
+  };
+
   return (
-    // Docked bottom-centre so it never covers the object being edited - the
-    // old floating top-right card sat over the scene. Frequent actions
-    // (rotate / duplicate / delete) live in the mini toolbar at the object.
-    <div className={`absolute bottom-24 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-2xl border border-black/5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] rounded-2xl px-5 py-3 z-20 w-80 text-[#3b4d4a] transition-opacity duration-150 ${dragging && !finishesOnly ? 'opacity-0 pointer-events-none' : ''}`}>
+    // Docked to the RIGHT edge of the canvas, out of the middle. Bottom-
+    // centre put it over the very thing being edited the moment you zoomed
+    // in on something small - a wall light filled the view and the panel
+    // sat on top of it, so the click to grab it hit the panel (Charlie, 11
+    // Sep). The middle of the view is where the work is; the panel keeps to
+    // the side, scrolls if it is taller than the canvas, and in the
+    // walkthrough (finishes only) stays bottom-centre where the walker
+    // expects it.
+    <div className={`absolute bg-white/90 backdrop-blur-2xl border border-black/5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] rounded-2xl px-5 py-3 z-20 w-80 text-[#3b4d4a] transition-opacity duration-150 ${finishesOnly ? 'bottom-24 left-1/2 -translate-x-1/2' : 'right-6 top-24 max-h-[calc(100%-13rem)] overflow-y-auto'} ${dragging && !finishesOnly ? 'opacity-0 pointer-events-none' : ''}`}>
       <div className={`flex justify-between items-center ${collapsed ? '' : 'mb-2'}`}>
         <div className="flex items-center gap-2">
           {/* Minimise to the header only. Docked bottom-centre, this panel
@@ -335,7 +352,11 @@ export function ObjectEditorPanel() {
             current={(obj.color ?? UNIT_COLOURS[0].hex).toLowerCase()}
             onPick={(hex, settled) => {
               if (family && !obj.independent) recolourUnits(scope === 'all' ? 'all' : family, hex);
-              else updateObject(obj.id, { color: hex });
+              else {
+                updateObject(obj.id, { color: hex });
+                // A bespoke unit painted while the kitchen is veneered: back to paint.
+                if (isVeneerFinish(scene.room.unitFinish)) updateRoom({ unitFinish: scene.room.unitPaintFinish ?? 'satin' });
+              }
               if (settled) afterPick();
             }}
           />
@@ -352,16 +373,13 @@ export function ObjectEditorPanel() {
             <div className="flex items-start gap-3">
               <span className="text-xs font-semibold text-gray-700 shrink-0 pt-1">Wood</span>
               <div className="flex gap-1.5 flex-wrap items-center">
-                <button
-                  title="Painted doors"
-                  onClick={() => { updateRoom({ unitFinish: 'satin' }); afterPick(); }}
-                  className={'px-2 h-7 rounded-md border text-[10px] font-semibold transition-all ' + (!veneered ? 'bg-[#3b4d4a] text-white border-transparent' : 'bg-white text-gray-600 border-black/15 hover:bg-gray-50')}
-                >Paint</button>
+                {/* No "Paint" chip: a colour above IS paint, and picking one
+                    takes the doors back to it. */}
                 {VENEERS.map(v => (
                   <button
                     key={v.id}
                     title={v.name}
-                    onClick={() => { updateRoom({ unitFinish: v.id }); afterPick(); }}
+                    onClick={() => { updateRoom({ unitFinish: v.id, unitPaintFinish: veneered ? scene.room.unitPaintFinish : (current as any) ?? 'satin' }); afterPick(); }}
                     style={{ backgroundImage: 'url(textures/' + v.prefix + '_color.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
                     className={'w-7 h-7 rounded-md border transition-all ' + (current === v.id ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20 scale-110' : 'border-black/15 hover:scale-110')}
                   />
@@ -378,7 +396,7 @@ export function ObjectEditorPanel() {
             label="Lamp"
             presets={LIGHT_COLOURS}
             current={(obj.color ?? LIGHT_COLOURS[0].hex).toLowerCase()}
-            onPick={(hex, settled) => { updateObject(obj.id, { color: hex }); if (settled) afterPick(); }}
+            onPick={(hex, settled) => { updateFitting({ color: hex }); if (settled) afterPick(); }}
           />
         )}
 
@@ -431,7 +449,7 @@ export function ObjectEditorPanel() {
                   <button
                     key={f.hex}
                     title={f.name}
-                    onClick={() => { updateObject(obj.id, viaColour ? { color: f.hex } : { metal: f.hex }); afterPick(); }}
+                    onClick={() => { updateFitting(viaColour ? { color: f.hex } : { metal: f.hex }); afterPick(); }}
                     style={{ background: `linear-gradient(135deg, ${f.hex} 30%, #ffffff88 48%, ${f.hex} 62%)`, backgroundColor: f.hex }}
                     className={`w-6 h-6 rounded-full border transition-all ${
                       active ? 'ring-2 ring-[#3b4d4a] ring-offset-1 border-black/20 scale-110' : 'border-black/15 hover:scale-110'

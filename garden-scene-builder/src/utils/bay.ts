@@ -147,3 +147,63 @@ export function clampInZone(room: Room, lx: number, lz: number, margin: number, 
   else z = Math.max(-hz, Math.min(hz, outZ));
   return { lx: x, lz: z };
 }
+
+/**
+ * The stretch of a wall an opening may sit in, in that wall's own offset
+ * coordinate in mm: along x for the front and back, along z for the ends,
+ * along the divider from its midpoint for 'bay'.
+ *
+ * The bay takes wall away - the front over the bay and its divider, the
+ * bay's stretch of the end wall and (full depth) of the back wall, the
+ * whole end wall once it is a screen or open. An opening put there would
+ * hang in the air across the open section, so RoomGeometry hides it
+ * (openingInBay). This is the same rule from the other side: where an
+ * opening CAN go. Null: nothing of this wall is left.
+ */
+export function wallSpanMm(room: Room, wall: string): { lo: number; hi: number } | null {
+  const wtMm = room.wallThicknessMm ?? 150;
+  const bay = bayRange(room);
+  if (wall === 'bay') {
+    if (!bay) return null;
+    const half = bay.depth * 500;
+    return { lo: -half, hi: half };
+  }
+  const alongX = wall === 'front' || wall === 'back';
+  const len = alongX ? room.widthMm : room.depthMm;
+  const full = { lo: -len / 2, hi: len / 2 };
+  if (!bay) return full;
+  if (wall === 'front' || (wall === 'back' && bay.full)) {
+    // The bay and its divider, along x.
+    return bay.side === 'left'
+      ? { lo: Math.round(bay.x1 * 1000) + wtMm, hi: full.hi }
+      : { lo: full.lo, hi: Math.round(bay.x0 * 1000) - wtMm };
+  }
+  if (wall === bay.side) {
+    if ((room.bay?.screen ?? 'solid') !== 'solid') return null;
+    // Behind the bay (and the return wall of a corner bay).
+    return { lo: full.lo, hi: Math.round(bay.z0 * 1000) - wtMm };
+  }
+  return full;
+}
+
+/**
+ * An opening that would sit in wall the bay has removed: on the front
+ * wall over the bay (or its divider), or anywhere on the end wall once
+ * that is a screen or open, or the bay's stretch of the end and back
+ * walls. Such a door or window stays in the design - turn the bay off
+ * and it is back - but it is neither drawn, cut nor walked through.
+ * A door IN the divider exists only while the bay does.
+ */
+export function openingRemovedByBay(room: Room, bay: BayRange | null, o: { wall: string; offsetMm?: number; widthMm: number }): boolean {
+  if (o.wall === 'bay') return !bay;
+  if (!bay) return false;
+  const wt = (room.wallThicknessMm ?? 150) / 1000;
+  const half = o.widthMm / 2000, c = (o.offsetMm ?? 0) / 1000;
+  if (o.wall === 'front') return c + half > bay.x0 - wt && c - half < bay.x1 + wt;
+  if (o.wall === bay.side) {
+    if ((room.bay?.screen ?? 'solid') !== 'solid') return true;
+    return c + half > bay.z0 - wt;
+  }
+  if (o.wall === 'back' && bay.full) return c + half > bay.x0 - wt && c - half < bay.x1 + wt;
+  return false;
+}

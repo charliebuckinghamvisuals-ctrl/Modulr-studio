@@ -1,6 +1,17 @@
 import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
-import { CameraControls, Environment, Lightformer, ContactShadows, Plane, Text, Grid as DreiGrid, SoftShadows, PerspectiveCamera, OrthographicCamera, Sky, Cloud, Clouds } from '@react-three/drei';
+import { CameraControls, Environment, Lightformer, ContactShadows, Plane, Text, Grid as DreiGrid, SoftShadows, PerspectiveCamera, OrthographicCamera, Sky, Cloud, Clouds, Stars, useEnvironment, useTexture } from '@react-three/drei';
+
+// Both sky maps fetched up front. The night one used to load on the first
+// flip to night: while it loaded the Environment suspended, the scene lost
+// its environment map, every material recompiled without one and then
+// again with it - two shader rebuilds and a second of black on the first
+// sunset (11 Sep).
+useEnvironment.preload({ files: 'textures/garden_nook.hdr' });
+useEnvironment.preload({ files: 'textures/night.hdr' });
+import { sunState, MOON_DIR } from '../../utils/sun';
+import { isLightFitting } from '../../modelRegistry';
+import { FenceRuns, FenceTool } from './FenceRuns';
 import * as THREE from 'three';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,7 +20,8 @@ import { SceneObjects } from './SceneObjects';
 import { LightingPlan } from './LightingPlan';
 import { PlacementGhost } from './PlacementGhost';
 import { ObjectType } from '../../types';
-import { clampToRoomInterior } from '../../utils/placement';
+import { buildWalkSolids, walkBlocked, walkFloorY, toRoomLocal, toWorld } from '../../utils/walkCollide';
+import { enclosedRange } from '../../utils/bay';
 
 
 /**
@@ -28,8 +40,12 @@ import { clampToRoomInterior } from '../../utils/placement';
  *   - WASD relative to where you are looking, Shift to jog
  *   - acceleration and damping, so starting and stopping ease instead of
  *     snapping between full speed and dead stop
- *   - eye height fixed at 1.6m above the finished floor, and the walker is
- *     clamped inside the room so you cannot drift through the cladding
+ *   - eye height 1.5m above whatever you are standing on - the garden, the
+ *     finished floor, the outdoor section's deck - easing up the step at
+ *     the threshold rather than snapping
+ *   - the walk STARTS OUTSIDE, in front of the building. Every wall is
+ *     solid (utils/walkCollide): you cannot drift through the cladding,
+ *     and an open door is a gap you walk through - click a door to open it
  *   - Esc releases the pointer (the browser does this for us) and the
  *     cursor comes back for the sidebar and the finish swatches
  */
@@ -57,29 +73,73 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
   const velocity = useRef(new THREE.Vector3());
   const position = useRef(new THREE.Vector3());
 
-  // Eye height above the FINISHED floor. 1.6m puts the camera behind the
-  // eyes of a 1.87m person, which is why the first version felt like
-  // looking down on the room; 1.5m is eye level for someone around 1.62m
-  // and matches how the space actually reads standing in it.
-  const eyeY = ((room.baseHeightMm ?? 100) / 1000) + 1.5;
+  // Eye height above whatever the walker stands on. 1.6m puts the camera
+  // behind the eyes of a 1.87m person, which is why the first version felt
+  // like looking down on the room; 1.5m is eye level for someone around
+  // 1.62m and matches how the space actually reads standing in it.
+  const EYE = 1.5;
+  // The walker's radius: keeps the near clip plane off a wall face, so you
+  // never see through the cladding, and stops you clipping a door jamb.
+  const RADIUS = 0.3;
 
-  // Enter the room looking at it, rather than wherever the orbit camera was.
-  // (Putting the orbit camera BACK afterwards is MainScene's job, through the
-  // controls - restoring the camera itself here is undone the moment
-  // CameraControls remounts, because it reads the walk pose into its own
-  // state during render, before any cleanup runs.)
-  useEffect(() => {
+  // The solid walls, rebuilt only when the building or a door's open state
+  // changes - never per frame.
+  const openDoorIds = useStore(s => s.openDoorIds);
+  const areDoorsOpen = useStore(s => s.areDoorsOpen);
+  const solids = useMemo(() => buildWalkSolids(room, openDoorIds, areDoorsOpen), [room, openDoorIds, areDoorsOpen]);
+  const solidsRef = useRef(solids);
+  solidsRef.current = solids;
+
+  // Start in the garden, a few paces in front of the building and facing
+  // it - the front elevation is what a client sees first, and the doors
+  // are how they get in. (Putting the orbit camera BACK afterwards is
+  // MainScene's job, through the controls - restoring the camera itself
+  // here is undone the moment CameraControls remounts, because it reads
+  // the walk pose into its own state during render, before any cleanup.)
+  /**
+   * Put the walker somewhere, facing something. 'outside' is the start:
+   * in the garden in front of the building, facing it. 'inside' is the
+   * middle of the room facing the front doors - the quick way in for a
+   * client who only wants the interior and does not want to open a door
+   * every time (T while walking, or the button on the card).
+   */
+  const teleport = (where: 'inside' | 'outside') => {
     const camera = get().camera;
-    const startZ = Math.max(1.2, room.depthMm / 2000 - 1.0);
-    position.current.set(0, eyeY, startZ);
-    // A camera with rotation.y = 0 looks down -Z, which is the back of the
-    // room; PI would spawn you facing out through the front doors.
-    yaw.current = 0;
+    const rm = useStore.getState().scene.room;
+    let local: { x: number; z: number }, face: number;
+    if (where === 'inside') {
+      const enc = enclosedRange(rm);
+      local = { x: (enc.x0 + enc.x1) / 2, z: 0 };
+      face = Math.PI; // rotation.y = PI looks down +z: out through the front
+    } else {
+      const deck = (rm.hasDecking || rm.hasPictureFrame) ? (rm.deckingSizeMm ?? 1500) / 1000 : 0;
+      local = { x: 0, z: rm.depthMm / 2000 + deck + 5 };
+      face = 0; // rotation.y = 0 looks down -z: at the building
+    }
+    const p = toWorld(rm, local.x, local.z);
+    position.current.set(p.x, walkFloorY(rm, local.x, local.z) + EYE, p.z);
+    velocity.current.set(0, 0, 0);
+    // The room's own turn is added so the facing holds on a rotated plot.
+    yaw.current = face + (rm.rot ?? 0);
     pitch.current = 0;
     camera.position.copy(position.current);
     camera.rotation.set(0, 0, 0);
     camera.rotation.order = 'YXZ';
     camera.rotation.y = yaw.current;
+  };
+  const isInside = () => { const l = toRoomLocal(useStore.getState().scene.room, position.current.x, position.current.z); const rm = useStore.getState().scene.room; return Math.abs(l.x) < rm.widthMm / 2000 && Math.abs(l.z) < rm.depthMm / 2000; };
+
+  // Start in the garden, a few paces in front of the building and facing
+  // it - the front elevation is what a client sees first, and the doors
+  // are how they get in. (Putting the orbit camera BACK afterwards is
+  // MainScene's job, through the controls - restoring the camera itself
+  // here is undone the moment CameraControls remounts, because it reads
+  // the walk pose into its own state during render, before any cleanup.)
+  useEffect(() => {
+    teleport(useStore.getState().walkStart);
+    const onTeleport = (e: any) => teleport(e.detail?.where === 'inside' || (e.detail?.where === 'toggle' && !isInside()) ? 'inside' : 'outside');
+    window.addEventListener('walk-teleport', onTeleport);
+    return () => window.removeEventListener('walk-teleport', onTeleport);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -91,6 +151,8 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       keys.current[e.code] = true;
+      // T: straight inside, or back out to the garden.
+      if (e.code === 'KeyT' && !e.repeat) window.dispatchEvent(new CustomEvent('walk-teleport', { detail: { where: 'toggle' } }));
       // The page must not scroll under the walker.
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     };
@@ -305,17 +367,31 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
     velocity.current.lerp(target, accel);
     if (velocity.current.lengthSq() < 1e-6) velocity.current.set(0, 0, 0);
 
-    position.current.addScaledVector(velocity.current, delta);
+    // Walls are solid; open doors are gaps. Resolved one axis at a time in
+    // room-local space so a wall you walk into at an angle slides you along
+    // it rather than stopping you dead. A walker already inside a wall
+    // (the building was resized under them) is let out rather than pinned.
+    const step = velocity.current.clone().multiplyScalar(delta);
+    const here = toRoomLocal(room, position.current.x, position.current.z);
+    const there = toRoomLocal(room, position.current.x + step.x, position.current.z + step.z);
+    const rects = solidsRef.current;
+    const free = !walkBlocked(rects, here.x, here.z, RADIUS);
+    let lx = here.x, lz = here.z, hit = false;
+    if (!free || !walkBlocked(rects, there.x, lz, RADIUS)) lx = there.x; else hit = true;
+    if (!free || !walkBlocked(rects, lx, there.z, RADIUS)) lz = there.z; else hit = true;
+    // And not off into the next county.
+    const w = room.widthMm / 1000, d = room.depthMm / 1000;
+    lx = Math.max(-w / 2 - 20, Math.min(w / 2 + 20, lx));
+    lz = Math.max(-d / 2 - 20, Math.min(d / 2 + 20, lz));
+    const next = toWorld(room, lx, lz);
+    position.current.x = next.x;
+    position.current.z = next.z;
+    if (hit) velocity.current.multiplyScalar(0.5); // scrub speed on contact
 
-    // Stay inside the building. The margin keeps the near clip plane off the
-    // wall face, so you never see through the cladding.
-    const clamped = clampToRoomInterior(room, position.current.x, position.current.z, 0.35);
-    if (clamped.x !== position.current.x || clamped.z !== position.current.z) {
-      position.current.x = clamped.x;
-      position.current.z = clamped.z;
-      velocity.current.multiplyScalar(0.5); // scrub speed on contact
-    }
-    position.current.y = eyeY;
+    // Eye height follows the ground: up the step onto the plinth at the
+    // threshold, down onto the garden again. Eased, not snapped.
+    const targetY = walkFloorY(room, lx, lz) + EYE;
+    position.current.y += (targetY - position.current.y) * (1 - Math.exp(-10 * delta));
 
     camera.position.copy(position.current);
     camera.rotation.order = 'YXZ';
@@ -549,6 +625,46 @@ export function MainScene() {
   // intensity, grid colours - was already wired to this and simply never
   // switched on. It is what makes a lighting layout visible.
   const isNight = useStore(s => s.nightPreview);
+  // The sun, from the slider: position, colour, strength and the sky's
+  // tuning all come from the one time of day (utils/sun). Night is when
+  // the sun is down; the moon takes over as the key light.
+  const timeOfDay = useStore(s => s.timeOfDay);
+  const sun = useMemo(() => sunState(timeOfDay), [timeOfDay]);
+  const hasFittings = useStore(s => s.scene.objects.some(o => isLightFitting(o.type)));
+  const grassTex: any = useTexture({ map: './textures/grass_color.jpg', normalMap: './textures/grass_normal.jpg', roughnessMap: './textures/grass_roughness.jpg' });
+  const grass = useMemo(() => {
+    const out: any = {};
+    for (const k of ['map', 'normalMap', 'roughnessMap']) {
+      const t = grassTex[k].clone();
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(100 / 1.4, 100 / 1.4);
+      t.anisotropy = 8;
+      t.colorSpace = k === 'map' ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
+      t.needsUpdate = true;
+      out[k] = t;
+    }
+    return out;
+  }, [grassTex.map, grassTex.normalMap, grassTex.roughnessMap]);
+  const keyDir = sun.night ? MOON_DIR : sun.dir;
+  // Exposure follows the daylight, so an evening is dimmer as a whole and
+  // not just lit from a lower angle. Not while exporting - the elevation
+  // drawings need their fixed, even light.
+  const { gl: sceneGl } = useThree();
+  useEffect(() => {
+    if (isExporting) { sceneGl.toneMappingExposure = 1.2; return; }
+    sceneGl.toneMappingExposure = 0.55 + 0.65 * sun.daylight;
+  }, [sceneGl, sun.daylight, isExporting]);
+  const keyPos: [number, number, number] = [keyDir[0] * 45, Math.max(6, keyDir[1] * 45), keyDir[2] * 45];
+  // Cloud colour follows the light: white by day, lit peach and orange as
+  // the sun drops (the clouds are where a sunset actually shows), a dim
+  // grey-blue at night.
+  const cloudMix = (day: string, night: string) => {
+    const p = (h: string) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const lerp3 = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i] - v) * t);
+    const lit = lerp3(p(day), p('#ff9c5a'), Math.pow(sun.warmth, 1.3) * 0.85);
+    const c = lerp3(p(night), lit, sun.daylight);
+    return '#' + c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+  };
 
 
   useFrame((_, delta) => {
@@ -614,9 +730,9 @@ export function MainScene() {
       {!isExporting && (
         <directionalLight
           castShadow
-          position={[20, 40, 20]}
-          intensity={isNight ? 0.6 : 2.0}
-          color={isNight ? "#a0b0d0" : "#fffcf2"}
+          position={keyPos}
+          intensity={sun.night ? 0.6 : Math.max(0.05, sun.intensity)}
+          color={sun.night ? "#a0b0d0" : sun.colour}
           shadow-mapSize={[1024, 1024]}
           shadow-camera-left={-20}
           shadow-camera-right={20}
@@ -646,7 +762,20 @@ export function MainScene() {
         a shaded soffit is correct.
       */}
       {viewMode === 'walking' && !isExporting && (
-        <hemisphereLight color="#e8eef5" groundColor="#ffffff" intensity={isNight ? 0.2 : 2.1} />
+        /*
+          After dark the same light IS the room's bounce: what the fittings
+          throw at the floor and walls comes back up warm and even. That is
+          how a visualiser lights a night interior - keys on the fittings,
+          a soft warm fill for the bounce a renderer would compute - and it
+          is what a point light on the ceiling could never be: it has no
+          position, so it makes no blob. Warm, floor brighter than ceiling,
+          and only when there are fittings to bounce.
+        */
+        <hemisphereLight
+          color={sun.night ? '#ffe9d2' : '#e8eef5'}
+          groundColor={sun.night ? '#ffdcb8' : '#ffffff'}
+          intensity={sun.night ? (hasFittings ? 1.1 : 0.15) : 0.2 + 1.9 * sun.daylight}
+        />
       )}
 
       <group name="environment-background" visible={viewMode !== 'render'}>
@@ -663,22 +792,32 @@ export function MainScene() {
           <>
             <Sky
               distance={450000}
-              sunPosition={[20, 12, 20]}
-              inclination={0.49}
-              azimuth={0.25}
-              turbidity={4}
-              rayleigh={1.2}
-              mieCoefficient={0.005}
+              sunPosition={[sun.dir[0] * 100, sun.dir[1] * 100, sun.dir[2] * 100]}
+              turbidity={sun.turbidity}
+              rayleigh={sun.rayleigh}
+              mieCoefficient={sun.mie}
               mieDirectionalG={0.8}
             />
+            {/* After sunset: stars, and a moon where the night's key light
+                comes from. The atmosphere shader goes dark on its own once
+                the sun is below the horizon. */}
+            {sun.elevation < 0 && (
+              <>
+                <Stars radius={220} depth={60} count={2600} factor={4.5} saturation={0} fade speed={0.4} />
+                <mesh position={[MOON_DIR[0] * 380, MOON_DIR[1] * 380, MOON_DIR[2] * 380]}>
+                  <sphereGeometry args={[7, 24, 24]} />
+                  <meshBasicMaterial color="#eef1f8" toneMapped={false} />
+                </mesh>
+              </>
+            )}
             {/* limit is the instanced buffer drei allocates and walks every
                 frame. The three clouds below use 62 segments between them, so
                 200 was reserving and iterating more than three times what is
                 drawn. 64 covers them with room to spare. */}
             <Clouds material={THREE.MeshLambertMaterial} limit={64}>
-              <Cloud seed={1} segments={26} bounds={[26, 3, 12]} volume={9} color="#ffffff" opacity={0.5} position={[-14, 22, -22]} />
-              <Cloud seed={2} segments={20} bounds={[20, 3, 10]} volume={7} color="#f3f6fa" opacity={0.42} position={[20, 26, -30]} />
-              <Cloud seed={3} segments={16} bounds={[16, 2, 8]} volume={5} color="#ffffff" opacity={0.32} position={[4, 30, -40]} />
+              <Cloud seed={1} segments={26} bounds={[26, 3, 12]} volume={9} color={cloudMix('#ffffff', '#2a3040')} opacity={0.5} position={[-14, 22, -22]} />
+              <Cloud seed={2} segments={20} bounds={[20, 3, 10]} volume={7} color={cloudMix('#f3f6fa', '#262c3a')} opacity={0.42} position={[20, 26, -30]} />
+              <Cloud seed={3} segments={16} bounds={[16, 2, 8]} volume={5} color={cloudMix('#ffffff', '#2a3040')} opacity={0.32} position={[4, 30, -40]} />
             </Clouds>
           </>
         )}
@@ -706,7 +845,7 @@ export function MainScene() {
             files={isNight ? "textures/night.hdr" : "textures/garden_nook.hdr"}
             resolution={256}
             frames={1}
-            environmentIntensity={isNight ? 0.3 : 1.0}
+            environmentIntensity={isNight ? 0.3 : 0.3 + 0.7 * sun.daylight}
           >
             {/* Eight panels, 45 degrees apart, each spanning about 25 degrees
                 of azimuth - so every horizontal direction is within a few
@@ -716,7 +855,7 @@ export function MainScene() {
               <Lightformer
                 key={i}
                 form="rect"
-                intensity={isNight ? 0.35 : 1.4}
+                intensity={isNight ? 0.35 : 0.35 + 1.05 * sun.daylight}
                 color="#fff4e4"
                 position={[Math.sin(i * Math.PI / 4) * 7, 1.6, Math.cos(i * Math.PI / 4) * 7]}
                 rotation-y={i * Math.PI / 4 + Math.PI}
@@ -732,19 +871,21 @@ export function MainScene() {
             // photograph of a real sky with a bright side - so leaving it at full
             // strength would reintroduce exactly the uneven face-to-face lighting
             // the flat ambient above is there to remove.
-            environmentIntensity={isExporting ? 0.08 : (isNight ? 0.3 : 1.0)}
+            environmentIntensity={isExporting ? 0.08 : (isNight ? 0.3 : 0.3 + 0.7 * sun.daylight)}
           />
         )}
 
-        {/* Ground Plane */}
-        <Plane 
-          receiveShadow 
-          args={[100, 100]} 
+        {/* Ground Plane - real grass (ambientCG Grass002, 1.4m tile) rather
+            than a flat green. One 1K set over a 100m plane; the frame cost
+            is a texture fetch per pixel, not geometry. */}
+        <Plane
+          receiveShadow
+          args={[100, 100]}
           rotation={[-Math.PI / 2, 0, 0]}
           position={[0, -0.01, 0]}
           onClick={handlePointerUp}
         >
-          <meshStandardMaterial color="#2e4225" roughness={0.8} metalness={0} />
+          <meshStandardMaterial {...grass} roughness={1} metalness={0} />
         </Plane>
         
         <DreiGrid
@@ -775,6 +916,8 @@ export function MainScene() {
 
         {/* Garden Objects */}
         <SceneObjects />
+        <FenceRuns />
+        <FenceTool />
         <LightingPlan />
       </group>
 

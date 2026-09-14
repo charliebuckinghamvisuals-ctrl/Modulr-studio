@@ -1,6 +1,6 @@
 import type { ObjectType, Room, SceneObject } from '../types';
 import { UNIT_FAMILY, NATIVE_WIDTH_MM, END_PANELS, END_PANEL_T, END_PANEL_GAP, isEndPanel } from '../modelRegistry';
-import { zoneX, clampInZone } from './bay';
+import { zoneX, clampInZone, bayRange, openingRemovedByBay } from './bay';
 
 /**
  * Settle an object against the room's inner wall faces by its FACES.
@@ -99,6 +99,7 @@ export const INTERIOR_TYPES: ObjectType[] = [
   // Stands on the finished floor like the rest, but in the outdoor section -
   // see OUTDOOR_TYPES in utils/bay for where it is allowed to go.
   'hot_tub',
+  'pool_table', 'arcade_machine', 'wall_tv', 'dart_board',
   // aircon_outdoor is the condenser on the OUTSIDE wall, like the extract terminal.
   // external_extraction_fan is deliberately NOT here - it is the outside
   // terminal of the extract run, so it has to be placeable on an outside wall.
@@ -124,6 +125,8 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
   // A 60mm bezel - anything like a normal ring would swallow the ceiling.
   spot_light: 0.16,
   hot_tub: 1.5,
+  wall_light_sconce: 0.3, wall_light_angled: 0.3, wall_light_box: 0.3,
+  pool_table: 1.35, arcade_machine: 0.55, wall_tv: 0.75, dart_board: 0.4,
 };
 
 /**
@@ -254,4 +257,90 @@ export function roomLocal(room: Room, x: number, z: number) {
     hx: room.widthMm / 2000 - wallT,
     hz: room.depthMm / 2000 - wallT,
   };
+}
+
+/**
+ * Put a wall-mounted exterior fitting on the nearest OUTSIDE wall face.
+ *
+ * World in, world out. The candidates are the four outer faces of the
+ * building and, with an outdoor section, the faces that look into it (the
+ * divider, the end and back walls, the return wall of a corner bay); the
+ * stretch of the front wall the bay has taken away is not a wall. The
+ * fitting's back plate sits on the face and it is turned to point out
+ * from it - its local -z is the back plate (modelRegistry WALL_LIGHT_TYPES).
+ */
+export function snapToOutsideWall(room: Room, x: number, z: number): { x: number; z: number; rot: number } {
+  const rx = (room.x ?? 0) / 1000, rz = (room.z ?? 0) / 1000, rot = room.rot ?? 0;
+  const cos = Math.cos(-rot), sin = Math.sin(-rot);
+  const lx = (x - rx) * cos - (z - rz) * sin;
+  const lz = (x - rx) * sin + (z - rz) * cos;
+  const w = room.widthMm / 1000, d = room.depthMm / 1000;
+  const wt = (room.wallThicknessMm ?? 150) / 1000;
+  const bay = bayRange(room);
+  const M = 0.15; // keep the fitting off the corners
+  // A face: fixed coordinate, the span it runs over, which way it looks.
+  // wall: whose doors and windows sit in this face, and where along it
+  // their offsets are measured from (0 for the shell, the divider's
+  // midpoint for the bay wall).
+  type Face = { axis: 'x' | 'z'; at: number; lo: number; hi: number; out: 1 | -1; wall?: string; origin?: number };
+  const faces: Face[] = [];
+  // Front: the room's stretch only.
+  if (bay) {
+    const through = (room.bay?.screen ?? 'solid') !== 'solid';
+    if (bay.side === 'left') faces.push({ axis: 'z', at: d / 2, lo: bay.x1 + wt, hi: w / 2, out: 1, wall: 'front' });
+    else faces.push({ axis: 'z', at: d / 2, lo: -w / 2, hi: bay.x0 - wt, out: 1, wall: 'front' });
+    // The bay's own faces.
+    faces.push({ axis: 'x', at: bay.dividerX + (bay.side === 'left' ? -wt / 2 : wt / 2), lo: bay.z0, hi: d / 2, out: bay.side === 'left' ? -1 : 1, wall: 'bay', origin: (bay.z0 + d / 2) / 2 });
+    if (!through) faces.push({ axis: 'x', at: bay.side === 'left' ? -w / 2 + wt : w / 2 - wt, lo: bay.z0, hi: d / 2, out: bay.side === 'left' ? 1 : -1 });
+    if (bay.full) { if ((room.bay?.backWall ?? 'solid') === 'solid') faces.push({ axis: 'z', at: bay.z0, lo: bay.x0, hi: bay.x1, out: 1 }); }
+    else faces.push({ axis: 'z', at: bay.returnZ + wt / 2, lo: bay.x0, hi: bay.x1, out: 1 });
+  } else {
+    faces.push({ axis: 'z', at: d / 2, lo: -w / 2, hi: w / 2, out: 1, wall: 'front' });
+  }
+  faces.push({ axis: 'z', at: -d / 2, lo: -w / 2, hi: w / 2, out: -1, wall: 'back' });
+  faces.push({ axis: 'x', at: -w / 2, lo: -d / 2, hi: d / 2, out: -1, wall: 'left' });
+  faces.push({ axis: 'x', at: w / 2, lo: -d / 2, hi: d / 2, out: 1, wall: 'right' });
+
+  /**
+   * Magnets along a face: the centre of every door and window in it, and
+   * the middle of each blank stretch - between two openings, or between
+   * an opening and the corner. A light centred over a door, or centred
+   * between two, is what people are actually trying to do, and a 50mm
+   * grid always left it a fraction off (Charlie, 11 Sep).
+   */
+  const magnets = (f: Face): number[] => {
+    if (!f.wall) return [];
+    const origin = f.origin ?? 0;
+    const ops = [...(room.doors || []), ...(room.windows || [])]
+      .filter(o => o.wall === f.wall && !openingRemovedByBay(room, bay, o))
+      .map(o => ({ c: origin + (o.offsetMm ?? 0) / 1000, hw: o.widthMm / 2000 }))
+      .filter(o => o.c > f.lo && o.c < f.hi)
+      .sort((p, q) => p.c - q.c);
+    const out: number[] = [];
+    let edge = f.lo;
+    for (const o of ops) {
+      out.push((edge + (o.c - o.hw)) / 2, o.c);
+      edge = o.c + o.hw;
+    }
+    out.push((edge + f.hi) / 2);
+    return out;
+  };
+  const MAGNET = 0.12;
+
+  let best: { dist: number; x: number; z: number; rot: number } | null = null;
+  for (const f of faces) {
+    if (f.hi - f.lo < M * 2 + 0.05) continue;
+    const along = f.axis === 'z' ? lx : lz;
+    let a = Math.max(f.lo + M, Math.min(f.hi - M, along));
+    for (const m of magnets(f)) if (Math.abs(m - a) < MAGNET) { a = m; break; }
+    const across = f.axis === 'z' ? lz : lx;
+    const dist = Math.hypot(across - f.at, along - a);
+    if (best && dist >= best.dist) continue;
+    // Local -z is the back plate: turned so it faces INTO the wall.
+    const r = f.axis === 'z' ? (f.out > 0 ? 0 : Math.PI) : (f.out > 0 ? Math.PI / 2 : -Math.PI / 2);
+    best = f.axis === 'z' ? { dist, x: a, z: f.at, rot: r } : { dist, x: f.at, z: a, rot: r };
+  }
+  if (!best) return { x, z, rot: 0 };
+  const c2 = Math.cos(rot), s2 = Math.sin(rot);
+  return { x: rx + best.x * c2 - best.z * s2, z: rz + best.x * s2 + best.z * c2, rot: best.rot + rot };
 }

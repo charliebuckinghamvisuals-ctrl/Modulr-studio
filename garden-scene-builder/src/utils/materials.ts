@@ -59,6 +59,13 @@ export const MATERIAL_DEF = {
   timber_decking: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 1.0, color: '#ffffff' },
   composite_decking: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.8, color: '#aaaaaa' },
   epdm: { prefix: 'slate_roof', tileSize: 1.0, roughness: 0.5, color: '#333333' },
+  // ambientCG Rubber004 (75cm tile): a textured rubber roof sheet.
+  rubber: { prefix: 'roof_rubber', tileSize: 0.75, roughness: 1.0, color: '#ffffff', noAo: true, sheet: true },
+  // ambientCG Metal027: black powder-coated steel, standing in for an
+  // aluminium roof. Metal-dark in the map, so the tint stays white.
+  aluminium: { prefix: 'roof_alu', tileSize: 1.0, roughness: 0.55, color: '#ffffff', noAo: true, sheet: true },
+  // ambientCG Grass002 (1.4m tile): the garden the building stands in.
+  grass: { prefix: 'grass', tileSize: 1.4, roughness: 1.0, color: '#ffffff' },
   sedum: { prefix: 'sedum', tileSize: 2.0, roughness: 1.0, color: '#ffffff' },
   metal: { prefix: 'slate_roof', tileSize: 2.0, roughness: 0.4, color: '#777777' },
   slate: { prefix: 'slate_roof', tileSize: 1.0, roughness: 0.9, color: '#ffffff' },
@@ -224,7 +231,8 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
             // changing the cladding resized the floorboards too.
             const isCladding = def.prefix !== 'slate_roof'
                 && def.prefix !== 'sedum'
-                && !(def as any).isFloor;
+                && !(def as any).isFloor
+                && !(def as any).sheet;
             
             let s_x = 1 / (def.tileSize * (isCladding ? claddingWidthMm / 100 : 1));
             let s_y = 1 / (def.tileSize * (isCladding ? claddingWidthMm / 100 : 1));
@@ -235,10 +243,15 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
             // want 1/tileSize, floors want size/tileSize. Applying the wall
             // formula to the floor produced less than one tile across an entire
             // room, which is why the boards looked enormous.
-            if ((def as any).isFloor) {
+            // A roof SHEET is laid like a floor - a plain box face with 0..1
+            // UVs across the whole roof, so it wants size/tile - but at its
+            // real tile, untouched by the floorboard slider. Treated as
+            // cladding it was stretched one tile tall across the whole roof
+            // (Charlie, 11 Sep: "all stretched and distorted").
+            if ((def as any).isFloor || (def as any).sheet) {
                 const floorW = widthMeters > 0 ? widthMeters : 4;
                 const floorD = heightMeters > 0 ? heightMeters : 4;
-                const tile = def.tileSize * floorScale;
+                const tile = def.tileSize * ((def as any).sheet ? 1 : floorScale);
                 m.repeat.set(floorW / tile, floorD / tile);
                 m.center.set(0.5, 0.5);
                 m.rotation = rotation;

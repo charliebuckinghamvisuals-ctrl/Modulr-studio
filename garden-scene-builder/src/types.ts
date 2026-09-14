@@ -15,7 +15,11 @@ export type CladdingType =
   | 'box_metal_grey' | 'box_metal_black' | 'corrugated_metal' | 'fire_board_grey';
 export type BaseMaterialType = 'concrete' | 'timber_decking' | 'composite_decking';
 export type DeckingMaterialType = 'timber' | 'composite_grey' | 'composite_oak' | 'composite_cedar' | 'composite_brown' | 'composite_black';
-export type RoofMaterialType = 'epdm' | 'sedum' | 'upvc' | 'metal';
+/** 'upvc' and 'metal' are kept so older saved designs still load; the
+ *  pickers offer EPDM, rubber, aluminium and sedum. */
+export type RoofMaterialType = 'epdm' | 'sedum' | 'rubber' | 'aluminium' | 'upvc' | 'metal';
+/** What the door and window frames are made of. Colour is separate. */
+export type FrameMaterialType = 'upvc' | 'aluminium' | 'timber';
 export type FrameColorType = 'anthracite' | 'black' | 'white' | 'silver';
 export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 'planter' | 'bench' | 'slab' | 'patio' | 'toilet' | 'sink' | 'shower' | 'shower_corner' | 'shower_small' | 'vanity' | 'interior_wall' | 'interior_door' | 'desk' | 'sofa' | 'sofa_2seater' | 'sofa_l' | 'footstool' | 'armchair' | 'dining_table' | 'rug' | 'tv' | 'bed' | 'bedside_table' | 'bookshelf' | 'dressing_table' | 'wardrobe' | 'exterior_wall_light' | 'drop_light' | 'coffee_table' | 'coffee_table_black' | 'indoor_plant' | 'kitchen_island' | 'kitchen_unit_600' | 'kitchen_unit_1200' | 'kitchen_sink_1200' | 'kitchen_tall_fridge' | 'kitchen_tall_oven_single' | 'kitchen_tall_oven_double' | 'kitchen_tap_straight' | 'kitchen_tap_curved' | 'kitchen_drawer_2' | 'kitchen_drawer_3' | 'kitchen_tall_larder' | 'kitchen_hob_gas' | 'kitchen_hob_induction' | 'kitchen_extractor'
  | 'kitchen_wall_unit_600' | 'kitchen_wall_unit_1200'
@@ -28,6 +32,12 @@ export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 
  | 'aircon_indoor' | 'aircon_outdoor'
  // Outdoor section (utils/bay).
  | 'hot_tub'
+ // Exterior wall lights: on the outside faces of the building (utils/placement snapToOutsideWall).
+ | 'wall_light_sconce' | 'wall_light_angled' | 'wall_light_box'
+ // Games room.
+ | 'pool_table' | 'arcade_machine'
+ // Wall-hung: the TV lifted out of the media unit, and a dart board.
+ | 'wall_tv' | 'dart_board'
  // L-shaped corner base unit (10 Sep).
  | 'kitchen_corner_unit';
 
@@ -68,7 +78,9 @@ export type InteriorFloorType = 'oak_plank' | 'light_oak' | 'rustic_pine' | 'smo
 
 export interface WindowData {
   id: string;
-  wall: 'front' | 'back' | 'left' | 'right';
+  /** 'bay' is the dividing wall between the room and the outdoor section
+   *  (utils/bay) - a wall like any other while the section is on. */
+  wall: 'front' | 'back' | 'left' | 'right' | 'bay';
   offsetMm: number;
   widthMm: number;
   heightMm: number;
@@ -190,6 +202,9 @@ export interface Room {
   baseMaterial: BaseMaterialType;
   roofMaterial: RoofMaterialType;
   frameColor: FrameColorType;
+  /** uPVC, aluminium or painted timber - the finish on every frame member.
+   *  Unset on older designs = aluminium, which is what they were drawn as. */
+  frameMaterial?: FrameMaterialType;
   /** Colour of the INSIDE face of every window and door frame. Dual-colour
    *  systems - black out, white in - are a normal spec. Unset means the same
    *  as outside, so every design saved before this existed is unchanged. */
@@ -203,6 +218,10 @@ export interface Room {
   /** Cabinet door finish - matt, satin or gloss. Kitchen-wide, like the
    *  worktop: mixing finishes across one run is not a thing people spec. */
   unitFinish?: 'matt' | 'satin' | 'gloss' | 'oak_veneer' | 'walnut_veneer' | 'silver_oak_veneer';
+  /** The paint sheen the kitchen had before a veneer was chosen, so picking
+   *  a colour brings the doors straight back to that paint - no separate
+   *  "Paint" step (Charlie, 11 Sep). */
+  unitPaintFinish?: 'matt' | 'satin' | 'gloss';
   /** Board-size multiplier for the interior floor: 1 = the material's real
    *  scale, 2 = planks twice as wide. */
   floorScale?: number;

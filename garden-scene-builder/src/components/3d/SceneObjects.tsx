@@ -6,9 +6,9 @@ import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
-import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel, metalUsesColour, isCornerUnit, CORNER_UNIT, UNIT_FAMILY } from '../../modelRegistry';
+import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel, metalUsesColour, isCornerUnit, CORNER_UNIT, UNIT_FAMILY, isWallLight } from '../../modelRegistry';
 import { applyModelMaterials, retintModel, resurfaceWorktop, refinishUnits, refinishMetal } from '../../utils/materialFixes';
-import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS, snapEndPanel, settleAgainstWalls } from '../../utils/placement';
+import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS, snapEndPanel, settleAgainstWalls, snapToOutsideWall } from '../../utils/placement';
 import { wallpaperProps } from '../../utils/wallpaper';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
 import { RotateCw, Copy, Trash2 } from 'lucide-react';
@@ -168,36 +168,151 @@ export function SceneObjects() {
 
   return (
     <group>
-      {(() => {
-        /*
-         * Only the first LIT_CAP fittings get a REAL light.
-         *
-         * Every live light is work for the GPU on every frame, and a lighting
-         * layout is exactly the design that tempts you to place twenty of
-         * them. Past the cap a fitting still shows and still glows - you can
-         * lay out as many as you like - it just stops adding to the shader
-         * cost. Twelve is enough to light a garden room convincingly.
-         */
-        let lit = 0;
-        return objects.map(obj => {
-          if (isExporting && ['tree', 'conifer', 'hedge', 'shrub', 'flowerbed', 'planter', 'bench', 'slab', 'patio'].includes(obj.type)) {
-            return null;
-          }
-          const castsLight = lightsEmit && isLightFitting(obj.type) && lit < LIT_CAP;
-          if (castsLight) lit++;
-          return <ObjectMesh key={obj.id} obj={obj} castsLight={castsLight} />;
-        });
-      })()}
+      {objects.map(obj => {
+        if (isExporting && ['tree', 'conifer', 'hedge', 'shrub', 'flowerbed', 'planter', 'bench', 'slab', 'patio'].includes(obj.type)) {
+          return null;
+        }
+        return <ObjectMesh key={obj.id} obj={obj} />;
+      })}
+      <FittingLights objects={objects} emit={lightsEmit} />
       {/* One slab per run of cabinets, laid over the hidden per-unit tops. */}
       <WorktopRuns />
     </group>
   );
 }
 
-/** How many light fittings actually emit light - see the note at the map. */
+/** How many light fittings actually emit light - see the note at FittingLights. */
 const LIT_CAP = 12;
+/** The pool grows in steps of this many lights, so laying out a row of
+ *  downlights rebuilds the shaders a couple of times, not once per light. */
+const POOL_STEP = 4;
 
-function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?: boolean }) {
+/**
+ * The real light from the fittings: a POOL of spot lights.
+ *
+ * The number of lights in the scene is compiled into every shader, so
+ * mounting a light when the sun went down made three.js rebuild every
+ * program in the scene - nineteen of them, one frame of six seconds, which
+ * is what "changing to night is very laggy" was (11 Sep). So the pool does
+ * not come and go with the sun: a slot with no fitting, or by day, simply
+ * has no intensity, and a day/night change only moves intensities.
+ *
+ * Nor is it a fixed twelve: twelve idle spots cost as much GPU again as
+ * the whole rest of the frame (measured 11.6ms against 6.4ms), so the pool
+ * is sized to the fittings actually in the design, rounded up to a step
+ * of four, and never shrinks within a session. It grows on the first,
+ * fifth and ninth light - and when it does, the shaders are rebuilt with
+ * the browser's parallel compiler while the last frame stays on screen
+ * (see the effect below), rather than freezing the page.
+ *
+ * A ceiling fitting throws a pool straight down - the pool on the floor IS
+ * the thing being designed. A wall light throws one soft wash down the
+ * cladding. Past
+ * LIT_CAP a fitting still shows and still glows - lay out as many as you
+ * like - it just stops adding light. No shadows: a shadow-casting light
+ * costs a full render pass per frame, and a dozen would make the
+ * walkthrough unusable on a laptop.
+ */
+/** How far each wall light stands off its wall, so its light can start
+ *  clear of the fitting. From the model files (wallmount.cjs). */
+const WALL_LIGHT_DEPTH_M: Partial<Record<SceneObject['type'], number>> = { wall_light_sconce: 0.171, wall_light_angled: 0.155, wall_light_box: 0.051 };
+
+interface Emitter { x: number; y: number; z: number; tx: number; ty: number; tz: number; colour: string; intensity: number; angle: number; penumbra: number; distance: number; decay: number; shadow?: boolean }
+
+function FittingLights({ objects, emit }: { objects: SceneObject[]; emit: boolean }) {
+  const room = useStore(s => s.scene.room);
+  const { gl, scene, camera, setFrameloop } = useThree();
+  const targets = useMemo(() => Array.from({ length: LIT_CAP }, () => new THREE.Object3D()), []);
+
+  const emitters: Emitter[] = [];
+  const baseH = ((room.baseHeightMm ?? 100) / 1000) + 0.01;
+  for (const obj of objects) {
+    if (!isLightFitting(obj.type) || emitters.length >= LIT_CAP) continue;
+    const colour = obj.color ?? LIGHT_COLOURS[0].hex;
+    if (isWallLight(obj.type)) {
+      const rot = obj.rot ?? 0;
+      const ox = Math.sin(rot), oz = Math.cos(rot);
+      const y = mountHeight(obj.type);
+      // Just in front of the fitting's own body - the lantern is 171mm
+      // deep, and a light placed inside it was shadowed by it.
+      const clear = (WALL_LIGHT_DEPTH_M[obj.type] ?? 0.1) + 0.05;
+      const x = obj.x + ox * clear, z = obj.z + oz * clear;
+      // Down and out from the fitting - the wash on the cladding below it.
+      // These two CAST SHADOWS - the only lights in the scene that do. A
+      // wall light washes the face of the wall it is on, and without a
+      // shadow the same beam lit the inside face of that wall a plinth's
+      // thickness behind: a glow on the room's ceiling and floor at the
+      // wall, from a fitting outside. No cone geometry can separate the two
+      // faces; only the wall itself can, so it does. Small maps and a short
+      // reach keep the passes cheap.
+      // One soft wash DOWN the cladding, and nothing up - Charlie wants the
+      // light from the bottom only. Strong enough to read in daylight,
+      // since the walkthrough is lit by day.
+      emitters.push({ x, y: y - 0.05, z, tx: obj.x + ox * 0.6, ty: y - 2.2, tz: obj.z + oz * 0.6, colour, intensity: 70, angle: 0.85, penumbra: 0.9, distance: 4, decay: 2, shadow: true });
+      continue;
+    }
+    const y = isCeilingMounted(obj.type)
+      ? baseH + ceilingHeightAt(room, obj.x, obj.z) - (CEILING_MOUNTED[obj.type] ?? 0) - 0.01
+      : baseH + mountHeight(obj.type);
+    // Real output: three's lights are physical (candela), and a 9cd
+    // downlight lit nothing - the fittings read as dots on the ceiling with
+    // no light coming from them. 60cd is a 500-lumen downlight.
+    // Wide and soft, the way a real downlight reads on a floor: a broad
+    // pool with a soft edge, not a hard disc.
+    emitters.push({ x: obj.x, y, z: obj.z, tx: obj.x, ty: y - 3, tz: obj.z, colour, intensity: 30, angle: 0.75, penumbra: 0.75, distance: 8, decay: 1.8 });
+  }
+
+  // Pool size: enough for the emitters, in steps, never shrinking.
+  const needed = Math.min(LIT_CAP, Math.ceil(emitters.length / POOL_STEP) * POOL_STEP);
+  const poolRef = useRef(0);
+  if (needed > poolRef.current) poolRef.current = needed;
+  const pool = poolRef.current;
+
+  /**
+   * The pool just grew: every material needs a new program for the new
+   * light count. Compiled with KHR_parallel_shader_compile while the frame
+   * loop is paused, so the last frame stays up and the page stays
+   * responsive, instead of one frame that takes seconds. The loop resumes
+   * when the programs are ready (or after a bounded wait, in case).
+   */
+  const compiledFor = useRef(0);
+  useEffect(() => {
+    if (pool === compiledFor.current) return;
+    compiledFor.current = pool;
+    let done = false;
+    const resume = () => { if (!done) { done = true; setFrameloop('always'); } };
+    setFrameloop('never');
+    const timeout = setTimeout(resume, 8000);
+    gl.compileAsync(scene, camera).then(resume, resume);
+    return () => { clearTimeout(timeout); resume(); };
+  }, [pool, gl, scene, camera, setFrameloop]);
+
+  return (
+    <>
+      {targets.slice(0, pool).map((target, i) => {
+        const e = emit ? emitters[i] : undefined;
+        if (!e) {
+          return (
+            <group key={i}>
+              <primitive object={target} position={[0, -1, 0]} />
+              <spotLight position={[0, 5, 0]} target={target} intensity={0} distance={0.01} castShadow={false} />
+            </group>
+          );
+        }
+        return (
+          <group key={i}>
+            <primitive object={target} position={[e.tx, e.ty, e.tz]} />
+            <spotLight position={[e.x, e.y, e.z]} target={target} color={e.colour}
+              intensity={e.intensity} angle={e.angle} penumbra={e.penumbra} distance={e.distance} decay={e.decay}
+              castShadow={!!e.shadow} shadow-mapSize={[256, 256]} shadow-camera-near={0.05} shadow-camera-far={e.distance} shadow-bias={-0.002} shadow-normalBias={0.02} />
+          </group>
+        );
+      })}
+    </>
+  );
+}
+
+function ObjectMesh({ obj }: { obj: SceneObject }) {
   const { selectedObjectId, setSelectedObjectId, updateObject, viewMode, room } = useStore(useShallow(s => ({
     selectedObjectId: s.selectedObjectId,
     setSelectedObjectId: s.setSelectedObjectId,
@@ -212,9 +327,6 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
   const poolRadius = Math.max(0.35,
     (ceilingHeightAt(room, obj.x, obj.z) - 0.75) * Math.tan(0.62));
   const paper = wallpaperProps();
-  // A spot light aims at its target object, so each fitting carries its own,
-  // parented to the fitting and therefore moving with it.
-  const beamTarget = useMemo(() => new THREE.Object3D(), []);
   /** Whether this drag moves only this fitting (Alt held when it was grabbed). */
   const dragSolo = useRef(false);
   const pendingMove = useRef<{ x: number; z: number } | null>(null);
@@ -363,6 +475,15 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
         const snap = 0.05;
         let nx = Math.round(intersect.x / snap) * snap;
         let nz = Math.round(intersect.z / snap) * snap;
+        if (isWallLight(obj.type)) {
+          // Stays on the outside of the building: the nearest outer face,
+          // turned to point out from it. From the raw pointer, not the
+          // 50mm grid - the wall snap has its own magnets (door centres,
+          // the middle between two doors) and the grid fought them.
+          const s = snapToOutsideWall(room, intersect.x, intersect.z);
+          nx = s.x; nz = s.z;
+          if (Math.abs(s.rot - (obj.rot ?? 0)) > 0.001) useStore.getState().updateObject(obj.id, { rot: s.rot });
+        }
         if (isInterior) {
           /**
            * Walls: the object's near FACE snaps to the inner wall face when
@@ -530,7 +651,9 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
               type={obj.type}
               seed={obj.id}
               color={obj.color}
-              worktop={room.worktopMaterial}
+              // A bespoke unit carries its own worktop - the corner unit is
+              // the one that shows it, since it keeps its own L-shaped top.
+              worktop={obj.independent && obj.worktopMaterial ? obj.worktopMaterial : room.worktopMaterial}
               finish={room.unitFinish}
               veneer={obj.veneer}
               metal={obj.metal}
@@ -731,11 +854,11 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
             {/* Glass walls */}
             <mesh position={[0.44, 1.05, 0]}>
               <boxGeometry args={[0.01, 2, 0.9]} />
-              <meshPhysicalMaterial color="#cceeff" transmission={0.9} ior={1.5} roughness={0} />
+              <meshPhysicalMaterial color="#cceeff" transparent opacity={0.25} depthWrite={false} roughness={0.02} metalness={0} clearcoat={1} />
             </mesh>
             <mesh position={[0, 1.05, 0.44]}>
               <boxGeometry args={[0.88, 2, 0.01]} />
-              <meshPhysicalMaterial color="#cceeff" transmission={0.9} ior={1.5} roughness={0} />
+              <meshPhysicalMaterial color="#cceeff" transparent opacity={0.25} depthWrite={false} roughness={0.02} metalness={0} clearcoat={1} />
             </mesh>
             {/* Fixture pole */}
             <mesh position={[0, 1.2, -0.42]} castShadow>
@@ -997,7 +1120,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
                       <mesh position={[0, h - 0.04, 0]} castShadow><boxGeometry args={[w, 0.08, 0.04]} />{leaf}</mesh>
                       <mesh position={[0, lowH + railH + glassH/2, 0]}>
                         <boxGeometry args={[w - 0.16, glassH, 0.01]} />
-                        <meshPhysicalMaterial color="#c9d6dc" transmission={0.85} ior={1.5} thickness={0.01} roughness={0.1} />
+                        <meshPhysicalMaterial color="#c9d6dc" transparent opacity={0.3} depthWrite={false} roughness={0.05} metalness={0} clearcoat={1} />
                       </mesh>
                     </group>
                   );
@@ -1234,29 +1357,7 @@ function ObjectMesh({ obj, castsLight = false }: { obj: SceneObject; castsLight?
         </group>
       )}
       {meshContent}
-      {/*
-        The beam. A spot rather than a point light, because the pool it throws
-        on the floor IS the thing being designed - a bare point light lights
-        the room evenly and tells you nothing about where the fittings are.
-        No shadows: a shadow-casting light costs a full render pass per frame,
-        and a dozen of them would make the walkthrough unusable on a laptop.
-      */}
-      {castsLight && (
-        <>
-          <primitive object={beamTarget} position={[0, -3, 0]} />
-          <spotLight
-            position={[0, -0.01, 0]}
-            target={beamTarget}
-            color={obj.color ?? LIGHT_COLOURS[0].hex}
-            intensity={9}
-            angle={0.62}
-            penumbra={0.55}
-            distance={7}
-            decay={1.6}
-            castShadow={false}
-          />
-        </>
-      )}
+      {/* The real light from a fitting comes from the FittingLights pool. */}
       {isSelected && (
         <mesh position={[0, 0.02, 0]} rotation={[-Math.PI/2, 0, 0]}>
           {/* A tight ring reads as "this object", the old 2m halo read as

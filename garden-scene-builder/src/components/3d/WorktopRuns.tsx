@@ -188,8 +188,12 @@ export function WorktopRuns() {
         let current: typeof line = [];
         const flush = () => {
           if (!current.length) return;
-          const start = current[0].t - current[0].w / 2;
-          const end = current[current.length - 1].t + current[current.length - 1].w / 2;
+          // The OUTERMOST edges of everything in the run - not the first and
+          // last units' edges. A stray end panel lost inside a sink unit was
+          // the last unit by centre, so the slab stopped at it, halfway along
+          // the sink (Charlie, 11 Sep).
+          const start = Math.min(...current.map(p => p.t - p.w / 2));
+          const end = Math.max(...current.map(p => p.t + p.w / 2));
           const length = end - start;
           const midT = (start + end) / 2;
           const s = current[0].s;

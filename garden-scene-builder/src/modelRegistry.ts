@@ -51,6 +51,19 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   tv_unit: 'models/tv_unit.glb',
   dining_table_round: 'models/dining_table_round.glb',
   pendant_light: 'models/pendant_light.glb',
+  // Charlie's three exterior wall lights (11 Sep): back plate at z=0
+  // facing -z, origin at the fitting's vertical centre.
+  wall_light_sconce: 'models/wall_light_sconce.glb',
+  wall_light_angled: 'models/wall_light_angled.glb',
+  wall_light_box: 'models/wall_light_box.glb',
+  // Charlie's games room pieces (11 Sep): the arcade cabinet came in at
+  // 217mm tall and is baked up to 1.8m; the pool table to 7ft (2135mm).
+  pool_table: 'models/pool_table.glb',
+  arcade_machine: 'models/arcade_machine.glb',
+  // The 55" TV from the media unit on its own (extracted from tv_unit.glb,
+  // node 0.0), and Charlie's dart board. Both hang on a wall.
+  wall_tv: 'models/wall_tv.glb',
+  dart_board: 'models/dart_board.glb',
   end_panel_tall: 'models/end_panel_tall.glb',
   end_panel_base: 'models/end_panel_base.glb',
   end_panel_wall: 'models/end_panel_wall.glb',
@@ -107,7 +120,17 @@ export const EMISSIVE_MATERIAL: Partial<Record<ObjectType, string>> = {
   spot_light: 'M01_Silver_Fog',
   // The pendant's bulb envelope.
   pendant_light: 'Glass Thin',
+  // The exterior wall lights' diffusers.
+  wall_light_sconce: '_Sconce Light',
+  wall_light_angled: '[Translucent Glass Blue]',
+  wall_light_box: 'Light1',
 };
+
+/** Fixed to an OUTSIDE wall face of the building (utils/placement
+ *  snapToOutsideWall): the fitting's back plate is at its origin, facing
+ *  local -z, so at rot 0 it sits on the front wall pointing out. */
+export const WALL_LIGHT_TYPES: ObjectType[] = ['wall_light_sconce', 'wall_light_angled', 'wall_light_box'];
+export const isWallLight = (type: ObjectType) => WALL_LIGHT_TYPES.includes(type);
 
 /** Lamp colours, warmest first - the temperatures people actually specify. */
 export const LIGHT_COLOURS: { name: string; hex: string }[] = [
@@ -374,8 +397,18 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   // The extract terminal goes high on the OUTSIDE wall. Not an interior type,
   // so this is measured from the ground rather than the finished floor.
   external_extraction_fan: 2000,
+  // Exterior wall lights: origin at the fitting's centre, a little below
+  // head-of-door height on the outside wall, measured from the ground.
+  wall_light_sconce: 1900,
+  wall_light_angled: 1900,
+  wall_light_box: 1900,
   // A wall-hung pan hangs clear of the floor - it was sitting on it. 100mm
   // under this pan puts its seat at 477mm, comfort height.
+  // A wall-hung 55" TV: its bottom edge at 950 puts the screen centre at
+  // eye level from a sofa. The dart board's bottom at 1420 puts the bull
+  // at the regulation 1730.
+  wall_tv: 950,
+  dart_board: 1420,
   toilet: 100,
 };
 
@@ -481,6 +514,19 @@ export const MATERIAL_TWEAKS: Partial<Record<ObjectType, Record<string, Material
     // Matt black shade. With any metalness the HDR turned it silver. The
     // rod, rose and bulb holder are in METAL_MATERIALS and take a finish.
     'M08_Obsidian_Black': { color: '#141414', roughness: 0.55, metalness: 0.05 },
+  },
+  // The TV on its own: a near-black glossy screen in a matt black bezel.
+  wall_tv: {
+    'M08_Obsidian_Black': { color: '#040405', roughness: 0.04, metalness: 0, envMapIntensity: 1.1, dropMap: true, glass: true },
+    '[0137_Black]': { color: '#151515', roughness: 0.45, metalness: 0 },
+  },
+  // Black woodgrain on every timber part of the pool table (Charlie, 11
+  // Sep): the export's wood texture stays for the grain, tinted to black.
+  pool_table: {
+    'wood  (sub)1': { color: '#141312', roughness: 0.5, metalness: 0 },
+    'wood 2 (sub)1': { color: '#141312', roughness: 0.5, metalness: 0 },
+    'wood leg (sub)1': { color: '#141312', roughness: 0.5, metalness: 0 },
+    'top board (sub)1': { color: '#141312', roughness: 0.5, metalness: 0 },
   },
 };
 
@@ -658,6 +704,13 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
   pendant_light: ['[Metal Corrugated Shiny]', '[Color M07]', 'Bronze Light'],
   // The bezel ring around the lens.
   spot_light: ['Metal_06_1K2'],
+  // The dart board's wire spider.
+  dart_board: ['[Steel Brushed Stainless]'],
+  // Exterior wall lights: the whole housing is the metalwork; only the
+  // diffuser (EMISSIVE_MATERIAL) is not.
+  wall_light_sconce: ['_Sconce Metal', 'Aluminum Anodized DarkGray'],
+  wall_light_angled: ['[0135_DarkGray]'],
+  wall_light_box: ['Ext Wall Light'],
 };
 
 /**
@@ -742,6 +795,13 @@ export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
   // Porcelain and a painted cabinet - neither is half metal.
   toilet: true,
   vanity: true,
+  // The angled light's white inner; the housings are in METAL_MATERIALS.
+  wall_light_angled: true,
+  // Felt, timber and painted cabinet - the exporter's 0.5 metalness is not real.
+  pool_table: true,
+  arcade_machine: true,
+  // Plastic bezel and glass; the screen gloss is a tweak below.
+  wall_tv: true,
 };
 
 /**
@@ -879,6 +939,10 @@ export const DEFAULT_FINISH: Partial<Record<ObjectType, string>> = {
   kitchen_extractor: '#c8c9c7',
   pendant_light: '#c8c9c7',
   spot_light: '#c8c9c7',
+  // Exterior lights are nearly always black.
+  wall_light_sconce: '#26262a',
+  wall_light_angled: '#26262a',
+  wall_light_box: '#26262a',
   dining_table_round: '#26262a',
   bedside_table: '#26262a',
   kitchen_sink_1200: '#26262a',
@@ -964,6 +1028,13 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   tv_unit: 'TV & Media Unit',
   dining_table_round: 'Round Dining Table',
   pendant_light: 'Pendant Light',
+  wall_light_sconce: 'Wall Light (Lantern)',
+  wall_light_angled: 'Wall Light (Angled)',
+  wall_light_box: 'Wall Light (Box)',
+  pool_table: 'Pool Table',
+  arcade_machine: 'Arcade Machine',
+  wall_tv: 'Wall-hung TV',
+  dart_board: 'Dart Board',
   end_panel_base: 'End Panel (Base)',
   end_panel_tall: 'End Panel (Tall)',
   end_panel_wall: 'End Panel (Wall)',

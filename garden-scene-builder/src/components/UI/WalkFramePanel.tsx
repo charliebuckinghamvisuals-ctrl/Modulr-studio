@@ -67,7 +67,7 @@ export function WalkFramePanel() {
   const pick = (patch: Partial<typeof room>) => { updateRoom(patch); setOpen(false); resumeWalking(); };
 
   const swatches = (current: FrameColorType, onPick: (id: FrameColorType) => void) =>
-    FRAME_COLOURS.map(c => (
+    FRAME_COLOURS.filter(c => c.id !== 'silver').map(c => (
       <button
         key={c.id}
         title={c.name}
@@ -133,6 +133,12 @@ export function WalkFramePanel() {
             <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 w-14">Frame</span>
             {PROFILES.map(p => (
               <button key={p.id} onClick={() => updateRoom({ frameStyle: p.id })} className={chip(profile === p.id)}>{p.name}</button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 w-14">Material</span>
+            {([['upvc', 'uPVC'], ['aluminium', 'Aluminium'], ['timber', 'Timber']] as const).map(([id, name]) => (
+              <button key={id} onClick={() => updateRoom({ frameMaterial: id })} className={chip((room.frameMaterial ?? 'aluminium') === id)}>{name}</button>
             ))}
           </div>
         </div>

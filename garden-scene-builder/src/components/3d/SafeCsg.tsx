@@ -43,6 +43,27 @@ function dispose(geometry: THREE.BufferGeometry) {
   geometry.drawRange = { start: 0, count: Infinity }
 }
 
+/** Every coordinate a real number. A NaN'd geometry has the right vertex
+ *  count and draws nothing, so the count checks alone let it through. */
+function isFinite(geometry: THREE.BufferGeometry): boolean {
+  const pos = geometry?.attributes?.position
+  if (!pos) return false
+  const a = pos.array as ArrayLike<number>
+  const n = Math.min(a.length, (pos.count || 0) * pos.itemSize)
+  for (let i = 0; i < n; i++) if (!Number.isFinite(a[i])) return false
+  return true
+}
+
+/** Would this geometry put anything on screen? Vertices, finite, something
+ *  to draw, and (under useGroups) at least one group for the material array
+ *  to bind to. */
+export function healthy(geometry: THREE.BufferGeometry): boolean {
+  const pos = geometry?.attributes?.position
+  if (!pos || pos.count === 0) return false
+  if (geometry.drawRange && geometry.drawRange.count === 0) return false
+  return isFinite(geometry)
+}
+
 function resolve(op: THREE.Object3D): Brush {
   let currentOp: THREE.Object3D = null!
   if (op instanceof BrushImpl) {
@@ -136,6 +157,7 @@ export const Geometry = React.forwardRef<any, SafeGeometryProps>(({ children, co
     // scene, so being able to count them is how we tell a real fix from a
     // hopeful one. Nothing in the app reads this.
     ;(window as any).__csgUpdates = (((window as any).__csgUpdates as number) || 0) + 1
+    const baseBrush = ops[0]
     try {
       operations.current.matrixWorld.identity()
       let root = resolve(ops.shift()!)
@@ -150,6 +172,13 @@ export const Geometry = React.forwardRef<any, SafeGeometryProps>(({ children, co
       // is treated exactly like a throw.
       const pos = root.geometry?.attributes?.position
       if (!pos || pos.count === 0) throw new Error('boolean produced empty geometry')
+      // The other silent failure: a NaN anywhere in the inputs (a dimension
+      // that never became a number) gives a result with the right vertex
+      // COUNT and not one finite coordinate in it. Nothing throws, nothing is
+      // empty, the GPU just draws nothing - measured on the live build: a NaN
+      // width left 36 NaN vertices, no warning, no walls. A non-finite bound
+      // is treated as a failure so the previous walls stay up.
+      if (!isFinite(root.geometry)) throw new Error('boolean produced non-finite geometry')
       // Success: NOW dispose the old and swap the new in - never before.
       dispose(geo.current)
       ;(geo.current as any).boundsTree = (root.geometry as any).boundsTree
@@ -176,13 +205,57 @@ export const Geometry = React.forwardRef<any, SafeGeometryProps>(({ children, co
         failRetries.current++
         requestAnimationFrame(() => update())
       }
+      // Nothing to keep: the very first evaluate for this mesh failed (a
+      // saved design loading, a wall that has just gained its first
+      // opening), so "previous geometry" is an empty buffer and the wall
+      // would simply not exist. A wall must never disappear - show the base
+      // solid uncut instead.
+      if (!healthy(geo.current)) showBase()
+      const msg = e instanceof Error ? e.message : String(e)
       console.warn('[SafeCsg] boolean evaluate failed; keeping previous geometry', e)
+      // Whoever owns the mesh (the room shell) listens for this and records
+      // the design that produced it, so a report of missing walls comes with
+      // the exact inputs instead of a screenshot.
+      window.dispatchEvent(new CustomEvent('modulr-csg-failed', { detail: { message: msg } }))
     }
   }, [computeVertexNormals, ev])
 
+  /** Put the uncut base solid on screen. Cloned, because the base geometry
+   *  is often shared with a plain mesh elsewhere and is disposed on the next
+   *  swap. Returns false when there is no base to show. */
+  const showBase = React.useCallback((): boolean => {
+    const baseBrush = operations.current?.children[0] as Brush | undefined
+    const base = baseBrush ? resolve(baseBrush) : null
+    const baseGeom = base?.geometry
+    if (!baseGeom?.attributes?.position || !isFinite(baseGeom)) return false
+    const c = baseGeom.clone()
+    geo.current.index = c.index
+    geo.current.attributes = c.attributes
+    geo.current.groups = c.groups
+    geo.current.drawRange = { start: 0, count: Infinity }
+    geo.current.boundingBox = null
+    geo.current.boundingSphere = null
+    if (ev.useGroups && (geo.current as any)?.__r3f?.parent?.object)
+      (geo.current as any).__r3f.parent.object.material = (base as any).material
+    return true
+  }, [ev])
+
+  /** Throw the signature away and run the boolean again from scratch. */
+  const rebuild = React.useCallback(() => {
+    lastSig.current = ''
+    update()
+  }, [update])
+
   const ctx = React.useMemo(() => ({ showOperations }), [showOperations])
   React.useLayoutEffect(() => void update())
-  React.useImperativeHandle(fref, () => ({ geometry: geo.current, operations: operations.current, update }), [update])
+  React.useImperativeHandle(fref, () => ({
+    geometry: geo.current,
+    operations: operations.current,
+    update,
+    rebuild,
+    showBase,
+    healthy: () => healthy(geo.current),
+  }), [update, rebuild, showBase])
 
   return (
     <>

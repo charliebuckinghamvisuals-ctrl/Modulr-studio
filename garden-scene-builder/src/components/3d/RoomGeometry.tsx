@@ -1,8 +1,8 @@
 import React from 'react';
 import { useMemo, useState, useRef, useEffect, useDeferredValue } from 'react';
-import { Room, Door } from '../../types';
+import { Room, Door, FrameMaterialType } from '../../types';
 import { doorKind } from '../../utils/doors';
-import { bayRange, enclosedRange } from '../../utils/bay';
+import { bayRange, enclosedRange, wallSpanMm, openingRemovedByBay } from '../../utils/bay';
 import { BayParts } from './BayParts';
 import { useFrame } from '@react-three/fiber';
 // SafeCsg = fork of @react-three/csg whose failed boolean evaluations keep
@@ -10,7 +10,7 @@ import { useFrame } from '@react-three/fiber';
 import { Geometry, Base, Subtraction, Addition } from './SafeCsg';
 import * as THREE from 'three';
 import { frameColourHex } from '../../utils/frameColours';
-import { Text, Line, Html, Edges, Billboard } from '@react-three/drei';
+import { Text, Line, Html, Edges, Billboard, useTexture } from '@react-three/drei';
 import { useRealMaterial, resolveDeckingKey, resolveFloorKey } from '../../utils/materials';
 import { Suspense } from 'react';
 import { createWorldScaleBoxGeometry, createWorldScaleGableGeometry } from '../../utils/geometry';
@@ -227,7 +227,59 @@ function DimText({ value, onValueChange, position, rotation, children, isDraggab
  * takes its own colour. When the colours match it is one box, so a
  * single-colour frame draws exactly as it always did.
  */
-function FrameBar({ position, args, outer, inner, metalness = 0.6, roughness = 0.3, castShadow = false }: {
+/**
+ * What a frame member is made of - the surface under the colour.
+ *
+ * Only the relief and roughness maps are used; the colour is the frame
+ * colour, so white uPVC is white and black aluminium is black. (The
+ * ambientCG colour maps are all dark and would swallow the tint.) Bars
+ * carry world-scale UVs, so the grain and grip are life-size on a 50mm
+ * sash and a 100mm jamb alike.
+ *   upvc      ambientCG Plastic006 - the faint stipple of extruded PVC
+ *   aluminium ambientCG Metal027   - powder coat, a touch of sheen
+ *   timber    ambientCG Wood049   - real oak, colour map and all: white
+ *             leaves it natural oak, anthracite and black read as a dark
+ *             stain with the grain still showing
+ */
+const FRAME_FINISH: Record<FrameMaterialType, { prefix: string; tile: number; metalness: number; roughness: number; normalScale: number; colourMap?: boolean }> = {
+  upvc: { prefix: 'upvc', tile: 0.5, metalness: 0, roughness: 0.55, normalScale: 0.5 },
+  aluminium: { prefix: 'roof_alu', tile: 0.6, metalness: 0.7, roughness: 0.45, normalScale: 0.35 },
+  timber: { prefix: 'frame_oak', tile: 0.8, metalness: 0, roughness: 0.65, normalScale: 0.7, colourMap: true },
+};
+/** One material per finish and colour, shared by every bar that uses it -
+ *  nineteen bars per door, and a design has many doors. */
+const frameMaterialCache = new Map<string, THREE.MeshStandardMaterial>();
+function useFrameMaterial(hex: string, metalnessOverride?: number, roughnessOverride?: number, vertical = false): THREE.MeshStandardMaterial {
+  const finishId = useStore(s => s.scene.room.frameMaterial ?? 'aluminium');
+  const finish = FRAME_FINISH[finishId] ?? FRAME_FINISH.aluminium;
+  const tex: any = useTexture({ normalMap: `./textures/${finish.prefix}_normal.jpg`, roughnessMap: `./textures/${finish.prefix}_roughness.jpg`, ...(finish.colourMap ? { map: `./textures/${finish.prefix}_color.jpg` } : {}) });
+  return useMemo(() => {
+    // Grain runs along the bar: the oak map is cut with the grain across
+    // it, so an upright member (jamb, mullion, stile) gets the maps turned
+    // a quarter. Heads, sills and rails take them as they come.
+    const turn = finish.colourMap && vertical;
+    const key = `${finishId}|${hex}|${metalnessOverride ?? ''}|${roughnessOverride ?? ''}|${turn ? 'v' : 'h'}`;
+    let m = frameMaterialCache.get(key);
+    if (m) return m;
+    const prep = (t: THREE.Texture, colour = false) => { const c = t.clone(); c.wrapS = c.wrapT = THREE.RepeatWrapping; c.repeat.set(1 / finish.tile, 1 / finish.tile); if (turn) c.rotation = Math.PI / 2; c.colorSpace = colour ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace; c.needsUpdate = true; return c; };
+    // Oak: white is natural oak; a dark frame colour stains it. The tint is
+    // lifted so black does not go to nothing - stained, not painted over.
+    const stained = finish.colourMap ? new THREE.Color(hex).lerp(new THREE.Color('#ffffff'), 0.35) : new THREE.Color(hex);
+    m = new THREE.MeshStandardMaterial({
+      color: stained,
+      map: finish.colourMap && tex.map ? prep(tex.map, true) : null,
+      normalMap: prep(tex.normalMap),
+      normalScale: new THREE.Vector2(finish.normalScale, finish.normalScale),
+      roughnessMap: prep(tex.roughnessMap),
+      roughness: roughnessOverride ?? finish.roughness,
+      metalness: metalnessOverride ?? finish.metalness,
+    });
+    frameMaterialCache.set(key, m);
+    return m;
+  }, [finishId, hex, metalnessOverride, roughnessOverride, vertical, tex.normalMap, tex.roughnessMap, tex.map]);
+}
+
+function FrameBar({ position, args, outer, inner, metalness, roughness, castShadow = false }: {
   position: [number, number, number];
   args: [number, number, number];
   outer: string;
@@ -237,25 +289,22 @@ function FrameBar({ position, args, outer, inner, metalness = 0.6, roughness = 0
   castShadow?: boolean;
 }) {
   const [w, h, d] = args;
+  // An upright member is taller than it is wide.
+  const vertical = h > w;
+  const outerMat = useFrameMaterial(outer, metalness, roughness, vertical);
+  const innerMat = useFrameMaterial(inner, metalness, roughness, vertical);
+  // World-scale UVs, so the finish maps in metres rather than stretching
+  // one tile over a 2.1m jamb.
+  const whole = useMemo(() => createWorldScaleBoxGeometry(w, h, d, false, 0, 0, 0), [w, h, d]);
+  const half = useMemo(() => createWorldScaleBoxGeometry(w, h, d / 2, false, 0, 0, 0), [w, h, d]);
   if (outer === inner) {
-    return (
-      <mesh position={position} castShadow={castShadow}>
-        <boxGeometry args={args} />
-        <meshStandardMaterial color={outer} metalness={metalness} roughness={roughness} />
-      </mesh>
-    );
+    return <mesh position={position} castShadow={castShadow} geometry={whole} material={outerMat} />;
   }
   const [x, y, z] = position;
   return (
     <group>
-      <mesh position={[x, y, z + d / 4]} castShadow={castShadow}>
-        <boxGeometry args={[w, h, d / 2]} />
-        <meshStandardMaterial color={outer} metalness={metalness} roughness={roughness} />
-      </mesh>
-      <mesh position={[x, y, z - d / 4]} castShadow={castShadow}>
-        <boxGeometry args={[w, h, d / 2]} />
-        <meshStandardMaterial color={inner} metalness={metalness} roughness={roughness} />
-      </mesh>
+      <mesh position={[x, y, z + d / 4]} castShadow={castShadow} geometry={half} material={outerMat} />
+      <mesh position={[x, y, z - d / 4]} castShadow={castShadow} geometry={half} material={innerMat} />
     </group>
   );
 }
@@ -282,7 +331,17 @@ function CrittallBars({ glassW, glassH, depth, color, innerColor }: { glassW: nu
  * Works in room-local space so it lands correctly on moved/rotated rooms.
  */
 function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number }) {
-  const [hit, setHit] = useState<{ wall: 'front' | 'back' | 'left' | 'right', offsetMm: number, pos: [number, number, number] } | null>(null);
+  const [hit, setHit] = useState<{ wall: Door['wall'], offsetMm: number, pos: [number, number, number] } | null>(null);
+  // With an outdoor section some of the wall is gone (utils/bay): the front
+  // over the bay and its divider, the bay's stretch of the end wall. Clicks
+  // and + buttons there used to put an opening in mid-air, where it is
+  // hidden - "I added a door and it's invisible".
+  const bay = useMemo(() => bayRange(room), [room.bay, room.widthMm, room.depthMm, room.wallThicknessMm]);
+  const spans = useMemo(() => {
+    const out: Partial<Record<Door['wall'], { lo: number; hi: number }>> = {};
+    (['front', 'back', 'left', 'right', 'bay'] as const).forEach(wl => { const s = wallSpanMm(room, wl); if (s) out[wl] = s; });
+    return out;
+  }, [room.bay, room.widthMm, room.depthMm, room.wallThicknessMm]);
 
   useEffect(() => {
     const onWallClick = (e: any) => {
@@ -296,7 +355,7 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
       const w = room.widthMm / 1000, d = room.depthMm / 1000;
       const band = ((room.wallThicknessMm ?? 150) / 1000) + 0.06;
       if (y < baseH + 0.15 || y > baseH + h + 0.1) { setHit(null); return; }
-      let wall: 'front' | 'back' | 'left' | 'right' | null = null;
+      let wall: Door['wall'] | null = null;
       let offsetMm = 0;
       if (Math.abs(Math.abs(lz) - d / 2) < band && Math.abs(lx) < w / 2 - 0.05) {
         wall = lz > 0 ? 'front' : 'back';
@@ -304,15 +363,22 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
       } else if (Math.abs(Math.abs(lx) - w / 2) < band && Math.abs(lz) < d / 2 - 0.05) {
         wall = lx > 0 ? 'right' : 'left';
         offsetMm = Math.round(lz * 1000);
+      } else if (bay && Math.abs(lx - bay.dividerX) < band && lz > bay.z0 + 0.05 && lz < d / 2 - 0.05) {
+        // The divider's face inside the section. offsetMm runs along the
+        // divider from its midpoint.
+        wall = 'bay';
+        offsetMm = Math.round((lz - (bay.z0 + d / 2) / 2) * 1000);
       }
-      if (!wall) { setHit(null); return; }
+      // Wall the bay has taken away - nothing to put an opening in.
+      const span = wall ? spans[wall] : undefined;
+      if (!wall || !span || offsetMm < span.lo + 50 || offsetMm > span.hi - 50) { setHit(null); return; }
       setHit({ wall, offsetMm, pos: [lx, Math.min(Math.max(y, baseH + 0.8), baseH + h - 0.2), lz] });
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setHit(null); };
     window.addEventListener('wall-clicked', onWallClick);
     window.addEventListener('keydown', onKey);
     return () => { window.removeEventListener('wall-clicked', onWallClick); window.removeEventListener('keydown', onKey); };
-  }, [room.x, room.z, room.rot, room.widthMm, room.depthMm, room.wallThicknessMm, h, baseH]);
+  }, [room.x, room.z, room.rot, room.widthMm, room.depthMm, room.wallThicknessMm, h, baseH, bay, spans]);
 
   const viewMode = useStore(s => s.viewMode);
   const isExporting = useStore(s => s.isExporting);
@@ -332,29 +398,38 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
     setHit(null);
   };
 
-  // A permanent + button on the middle of each wall, plus the popup chip at
-  // whatever point was chosen (via a + button or a direct wall click).
+  // A permanent + button on the middle of each wall - the middle of the
+  // wall that is THERE, so with an outdoor section the front one sits on
+  // the room's stretch, not over the bay - the divider included, a wall
+  // like any other - and the popup chip at whatever point was chosen (via
+  // a + button or a direct wall click).
   const w = room.widthMm / 1000, d = room.depthMm / 1000;
+  const wt = (room.wallThicknessMm ?? 150) / 1000;
   const midY = baseH + h * 0.55;
-  const wallButtons: { wall: 'front' | 'back' | 'left' | 'right'; pos: [number, number, number] }[] = [
-    { wall: 'front', pos: [0, midY, d / 2 + 0.12] },
-    { wall: 'back', pos: [0, midY, -d / 2 - 0.12] },
-    { wall: 'left', pos: [-w / 2 - 0.12, midY, 0] },
-    { wall: 'right', pos: [w / 2 + 0.12, midY, 0] },
-  ];
+  const mid = (wl: Door['wall']) => { const s = spans[wl]; return s ? Math.round((s.lo + s.hi) / 2 / 50) * 50 : null; };
+  const wallButtons: { wall: Door['wall']; offsetMm: number; pos: [number, number, number] }[] = [];
+  const fm = mid('front'), bm = mid('back'), lm = mid('left'), rm = mid('right'), dm = mid('bay');
+  if (fm !== null) wallButtons.push({ wall: 'front', offsetMm: fm, pos: [fm / 1000, midY, d / 2 + 0.12] });
+  if (bm !== null) wallButtons.push({ wall: 'back', offsetMm: bm, pos: [bm / 1000, midY, -d / 2 - 0.12] });
+  if (lm !== null) wallButtons.push({ wall: 'left', offsetMm: lm, pos: [-w / 2 - 0.12, midY, lm / 1000] });
+  if (rm !== null) wallButtons.push({ wall: 'right', offsetMm: rm, pos: [w / 2 + 0.12, midY, rm / 1000] });
+  if (dm !== null && bay) {
+    const faceX = bay.dividerX + (bay.side === 'left' ? -(wt / 2 + 0.12) : wt / 2 + 0.12);
+    wallButtons.push({ wall: 'bay', offsetMm: dm, pos: [faceX, midY, (bay.z0 + d / 2) / 2 + dm / 1000] });
+  }
 
   return (
     <>
       {showAdders && wallButtons.map(b => (
         <Html key={`wall-add-${b.wall}`} position={b.pos} center zIndexRange={[125, 0]}>
           <button
-            title={`Add a window or door to the ${b.wall} wall`}
+            title={`Add a window or door to the ${b.wall === 'bay' ? 'divider' : b.wall} wall`}
             style={{ pointerEvents: 'auto' }}
             onPointerDown={(e) => e.stopPropagation()}
             // Moving onto the button leaves the 3D mesh, which would hide the
             // buttons out from under the cursor - keep the hover alive.
             onPointerEnter={() => useStore.getState().setHoveredElementId('room')}
-            onClick={(e) => { e.stopPropagation(); setHit({ wall: b.wall, offsetMm: 0, pos: b.pos }); }}
+            onClick={(e) => { e.stopPropagation(); setHit({ wall: b.wall, offsetMm: b.offsetMm, pos: b.pos }); }}
             className="w-7 h-7 rounded-full bg-white/90 backdrop-blur-md border border-black/10 shadow-md text-[#3b4d4a] text-base font-bold leading-none hover:bg-[#3b4d4a] hover:text-white hover:scale-110 transition-all"
           >
             +
@@ -416,13 +491,19 @@ function DoorLeaf({ leafW, doorH, frameThickness, sashThickness, depth, style, f
         still opened from Open Doors in the toolbar, which does the whole
         set at once anyway.
       */}
-      {/* Panel: glass, or a solid slab for the entrance-door style */}
+      {/* Panel: glass, or a solid slab for the entrance-door style.
+          GLASS IS ALPHA-BLENDED, NOT TRANSMISSIVE - here and everywhere
+          else in the scene. transmission made three.js render the whole
+          opaque scene AGAIN into an offscreen buffer every frame for the
+          refraction (measured 13.2ms -> 4.6ms of GPU per frame without
+          it, 11 Sep), and doubled every shader variant. Through a flat
+          20mm pane the refraction is invisible anyway. */}
       {style === 'solid' ? (
         <FrameBar position={[0, 0, 0]} args={[leafW - sashThickness*2, doorH - frameThickness*2 - sashThickness*2, 0.045]} outer={frameColorHex} inner={frameColorInnerHex} metalness={0.35} roughness={0.55} castShadow />
       ) : (
         <mesh>
           <boxGeometry args={[leafW - sashThickness*2, doorH - frameThickness*2 - sashThickness*2, 0.02]} />
-          <meshPhysicalMaterial color="#aabed1" transmission={0.9} ior={1.5} thickness={0.05} roughness={0.1} clearcoat={1} envMapIntensity={3} />
+          <meshPhysicalMaterial color="#aabed1" transparent opacity={0.3} depthWrite={false} roughness={0.05} metalness={0} clearcoat={1} clearcoatRoughness={0.05} envMapIntensity={3} />
         </mesh>
       )}
       {style === 'crittall' && (
@@ -454,7 +535,9 @@ function DoorLeaf({ leafW, doorH, frameThickness, sashThickness, depth, style, f
  * turned to face its wall), leaves closed at z = 0.
  */
 function AnimatedDoorLeaves({ door, frameColorHex, frameColorInnerHex, frameThickness, sashThickness, depth, room }: { door: Door, frameColorHex: string, frameColorInnerHex: string, frameThickness: number, sashThickness: number, depth: number, room: Room }) {
-  const { areDoorsOpen } = useStore();
+  // Open with the Open Doors toggle, or on its own - clicked in the
+  // walkthrough, which is how you get in from the garden.
+  const areDoorsOpen = useStore(s => s.areDoorsOpen || s.openDoorIds.includes(door.id));
   const pivots = useRef<THREE.Group[]>([]);
   const progress = useRef(0);
 
@@ -1151,10 +1234,15 @@ export function RoomGeometry() {
   })));
   const isPlanView = viewMode === 'plan' || viewMode === 'lighting';
   const isNight = useStore(s => s.nightPreview);
-  const w = Math.max(0.5, room.widthMm / 1000);
-  const d = Math.max(0.5, room.depthMm / 1000);
-  
-  const wallThickness = (room.wallThicknessMm || 150) / 1000;
+  // Every dimension the shell is built from goes through `mm`: a value that
+  // is not a finite number takes the fallback instead of poisoning the
+  // boolean. Math.max(0.5, NaN) is NaN, and one NaN input is enough to make
+  // the walls draw nothing without a single error (see SafeCsg).
+  const mm = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+  const w = Math.max(0.5, mm(room.widthMm, 8000) / 1000);
+  const d = Math.max(0.5, mm(room.depthMm, 4300) / 1000);
+
+  const wallThickness = mm(room.wallThicknessMm || 150, 150) / 1000;
   
   const isUltraSlim = room.frameStyle === 'ultra-slim';
   const isSlim = room.frameStyle === 'slim' || isUltraSlim;
@@ -1194,7 +1282,7 @@ export function RoomGeometry() {
 
   // Heights and pitch
   const isGable = room.shape === 'Gable';
-  const roofHRaw = (room.roofHeightMm ?? 200) / 1000;
+  const roofHRaw = mm(room.roofHeightMm ?? 200, 200) / 1000;
 
   // baseH must be declared before the gable height calculation below uses it.
   // It previously sat ~60 lines further down, which put this reference inside
@@ -1202,17 +1290,18 @@ export function RoomGeometry() {
   // shape never evaluated that branch and looked fine — but selecting Gable
   // threw "Cannot access 'baseH' before initialization" during render, which
   // unmounted the whole 3D scene and left a black screen.
-  const baseH = (room.baseHeightMm ?? 100) / 1000;
+  const baseH = mm(room.baseHeightMm ?? 100, 100) / 1000;
 
   // For Gable, room.heightMm is the TOTAL height (base + wall + roof)
   // Therefore wall height = total height - base - roof
+  const heightM = mm(room.heightMm, 2050) / 1000;
   const frontH = isGable
-    ? (room.heightMm / 1000) - baseH - roofHRaw
-    : room.heightMm / 1000;
+    ? heightM - baseH - roofHRaw
+    : heightM;
 
   const backH = isGable
     ? frontH
-    : (room.backHeightMm ?? room.heightMm) / 1000;
+    : mm(room.backHeightMm ?? room.heightMm, mm(room.heightMm, 2050)) / 1000;
 
   const isPitched = Math.abs(frontH - backH) > 0.001;
   const roofPitch = isPitched ? Math.atan2(backH - frontH, d) : 0;
@@ -1274,25 +1363,7 @@ export function RoomGeometry() {
    * turn the bay off and it is back - but it is neither drawn nor cut, so
    * it cannot hang in mid-air across the open section.
    */
-  const openingInBay = (o: { wall: string; offsetMm?: number; widthMm: number }) => {
-    // A door IN the divider exists only while the bay does.
-    if (o.wall === 'bay') return !bay;
-    if (!bay) return false;
-    const half = o.widthMm / 2000, c = (o.offsetMm ?? 0) / 1000;
-    if (o.wall === 'front') return c + half > bay.x0 - wallThickness && c - half < bay.x1 + wallThickness;
-    // The end wall: gone entirely once it is a screen or open; otherwise an
-    // opening in the bay's stretch of it would open into the bay, which is
-    // outside - so it is hidden there too.
-    if (o.wall === bay.side) {
-      if ((room.bay?.screen ?? 'solid') !== 'solid') return true;
-      return c + half > bay.z0 - wallThickness;
-    }
-    if (o.wall === 'back' && bay.full) {
-      if ((room.bay?.backWall ?? 'solid') !== 'solid') return c + half > bay.x0 - wallThickness && c - half < bay.x1 + wallThickness;
-      return c + half > bay.x0 - wallThickness && c - half < bay.x1 + wallThickness;
-    }
-    return false;
-  };
+  const openingInBay = (o: { wall: string; offsetMm?: number; widthMm: number }) => openingRemovedByBay(room, bay, o);
   const texFloor = useRealMaterial(resolveFloorKey(room.interiorFloorType), encW, d, 0);
   // The bay's wall finish, for the cut faces the bay's own cuts leave
   // INSIDE it (the back corner where the end wall was) - see the brushes.
@@ -1317,7 +1388,7 @@ export function RoomGeometry() {
     const openings = [
       // Divider doors have their own threshold; the slab does not run into them.
       ...(room.doors || []).filter(o => !openingInBay(o) && o.wall !== 'bay').map(o => ({ key: `door-${o.id}`, wall: o.wall, offset: o.offsetMm / 1000, width: o.widthMm / 1000 })),
-      ...(room.windows || []).filter(o => (o.sillMm ?? 0) < 1 && !openingInBay(o)).map(o => ({ key: `win-${o.id}`, wall: o.wall, offset: (o.offsetMm ?? 0) / 1000, width: o.widthMm / 1000 })),
+      ...(room.windows || []).filter(o => (o.sillMm ?? 0) < 1 && !openingInBay(o) && o.wall !== 'bay').map(o => ({ key: `win-${o.id}`, wall: o.wall, offset: (o.offsetMm ?? 0) / 1000, width: o.widthMm / 1000 })),
     ];
     return openings.map(o => {
       // The piece's centre: half a reveal inside the inner wall face.
@@ -1386,13 +1457,16 @@ export function RoomGeometry() {
   const isDeckingMaterial = room.hasDecking || room.hasPictureFrame || room.baseMaterial === 'timber_decking' || room.baseMaterial === 'composite_decking';
 
   const baseMaterialColors: Record<string, string> = { concrete: '#8a8d8f', timber_decking: '#a3794a', composite_decking: '#545a5e' };
-  const roofMaterialColors: Record<string, string> = { epdm: '#222222', sedum: '#2d3032', upvc: '#d3d5d7', metal: '#6a6d70' };
+  const roofMaterialColors: Record<string, string> = { epdm: '#222222', sedum: '#2d3032', upvc: '#d3d5d7', metal: '#6a6d70', rubber: '#1c1c1c', aluminium: '#26282b' };
   
   const baseColorHex = baseMaterialColors[room.baseMaterial as string] || '#8a8d8f';
   // An explicit roofColor overrides the colour implied by the roof material, so
   // the roof and the fascia can be specified independently rather than the roof
   // being locked to whatever its material happens to be.
   const roofColorHex = (room as any).roofColor || roofMaterialColors[room.roofMaterial as string] || '#222222';
+  // Coverings with a real surface map get it on the roof's top face; EPDM
+  // and the old ids stay a flat colour (sedum lays its own mat on top).
+  const texturedRoof = room.roofMaterial === 'rubber' || room.roofMaterial === 'aluminium';
   const frameColorHex = frameColourHex(room.frameColor);
   // Inside face of every frame member. Falls back to the outside colour, so a
   // design saved before the split renders exactly as it did.
@@ -1693,10 +1767,16 @@ export function RoomGeometry() {
     window.addEventListener('pointerdown', dn, true);
     window.addEventListener('pointerup', up, true);
     window.addEventListener('pointercancel', up, true);
+    // The configurator runs in an iframe on the live site. A button released
+    // outside the frame (or with focus gone to another window) never sends
+    // the up, and a held flag that never clears would freeze the openings at
+    // their pre-drag positions for the rest of the session.
+    window.addEventListener('blur', up);
     return () => {
       window.removeEventListener('pointerdown', dn, true);
       window.removeEventListener('pointerup', up, true);
       window.removeEventListener('pointercancel', up, true);
+      window.removeEventListener('blur', up);
     };
   }, []);
   useEffect(() => {
@@ -1709,6 +1789,51 @@ export function RoomGeometry() {
   }, [room.doors, room.windows, controlsEnabled, pointerHeld]);
   const deferredDoors = csgDoors;
   const deferredWindows = csgWindows;
+
+  /*
+   * The shell watchdog.
+   *
+   * Everything above makes the wall boolean fail loudly and fall back. This
+   * is for the failure nobody has predicted: every 30 frames the shell's
+   * geometry is checked for being drawable at all - vertices, finite
+   * coordinates, a draw range. If it is not, the boolean is run again from
+   * scratch; if that still gives nothing, the uncut base solid goes up. And
+   * every failure - here or in SafeCsg - is recorded with the design that
+   * produced it (console, window.__modulrShellDiag, and localStorage under
+   * 'modulr:shell-diag'), so the next report of missing walls can be
+   * reproduced from data rather than a screenshot.
+   */
+  const shellCsgRef = useRef<{ rebuild: () => void; showBase: () => boolean; healthy: () => boolean } | null>(null);
+  const shellFrame = useRef(0);
+  const shellStrikes = useRef(0);
+  useEffect(() => {
+    const record = (why: string) => {
+      const snapshot = { at: new Date().toISOString(), why, room: useStore.getState().scene.room };
+      (window as any).__modulrShellDiag = snapshot;
+      try { localStorage.setItem('modulr:shell-diag', JSON.stringify(snapshot)); } catch { /* private mode */ }
+      console.error('[Modulr] wall shell problem - design recorded in localStorage modulr:shell-diag', why, JSON.stringify(snapshot.room));
+    };
+    const onFail = (e: Event) => record((e as CustomEvent).detail?.message ?? 'csg failed');
+    window.addEventListener('modulr-csg-failed', onFail);
+    (window as any).__modulrShellRecord = record;
+    return () => { window.removeEventListener('modulr-csg-failed', onFail); delete (window as any).__modulrShellRecord; };
+  }, []);
+  useFrame(() => {
+    if (++shellFrame.current % 30 !== 0) return;
+    const csg = shellCsgRef.current;
+    if (!csg) return;
+    if (csg.healthy()) { shellStrikes.current = 0; return; }
+    shellStrikes.current++;
+    // First strike: rebuild from the current inputs. Second: base solid.
+    // Beyond that, stop poking it every half second - it is recorded.
+    if (shellStrikes.current === 1) {
+      csg.rebuild();
+      if (!csg.healthy()) csg.showBase();
+      (window as any).__modulrShellRecord?.('watchdog: shell geometry not drawable');
+    } else if (shellStrikes.current === 2) {
+      csg.showBase();
+    }
+  });
 
   return (
     /**
@@ -1727,7 +1852,7 @@ export function RoomGeometry() {
     <group userData={{ isShell: true }} position={[room.x / 1000, 0, room.z / 1000]} rotation={[0, room.rot, 0]}>
       {/* Interior light to prevent partitions from being too dark.
           Damped in the walkthrough - see the note on the warm light below. */}
-      <pointLight position={[0, h - 0.5, 0]} intensity={viewMode === 'walking' ? 0 : 1.5} distance={15} decay={2} castShadow={false} />
+      <pointLight position={[0, h - 0.5, 0]} intensity={viewMode === 'walking' || isNight ? 0 : 1.5} distance={15} decay={2} castShadow={false} />
 
       {/* Base Plinth / Decking Area */}
       {renderBaseMeshes()}
@@ -1755,7 +1880,7 @@ export function RoomGeometry() {
             window.dispatchEvent(new CustomEvent('wall-clicked', { detail: { x: e.point.x, y: e.point.y, z: e.point.z } }));
           }}
         >
-          <Geometry useGroups>
+          <Geometry useGroups ref={shellCsgRef}>
             {/* Main block */}
             <Base position={[0, (h + 0.05)/2, 0]}>
               <primitive object={claddingBoxGeom} attach="geometry" />
@@ -1895,10 +2020,13 @@ export function RoomGeometry() {
             {/* Doors Cutouts. A door in the bay's divider is cut from the
                 divider itself (BayParts), not from the shell. */}
             {(deferredDoors || []).filter(dr => !openingInBay(dr) && dr.wall !== 'bay').map(door => {
+              // An opening with a dimension that is not a number is left
+              // uncut rather than handed to the boolean as a NaN brush.
+              if (![door.widthMm, door.heightMm, door.offsetMm].every(v => typeof v === 'number' && Number.isFinite(v))) return null;
               const doorW = door.widthMm / 1000;
               const doorH = door.heightMm / 1000;
               const offset = door.offsetMm / 1000;
-              
+
               let pos: [number, number, number] = [0, doorH/2 - 0.05, 0];
               let size: [number, number, number] = [doorW, doorH + 0.1, wallThickness * 3];
 
@@ -1982,6 +2110,7 @@ export function RoomGeometry() {
 
             {/* Window Cutouts */}
             {(deferredWindows || []).filter(wn => !openingInBay(wn)).map(win => {
+              if (![win.widthMm, win.heightMm, win.sillMm ?? 0, win.offsetMm ?? 0].every(v => typeof v === 'number' && Number.isFinite(v))) return null;
               const winW = win.widthMm / 1000;
               const winH = win.heightMm / 1000;
               const sill = (win.sillMm ?? 0) / 1000;
@@ -2190,7 +2319,13 @@ export function RoomGeometry() {
                 return [
                   <meshStandardMaterial key="mat-0" attach="material-0" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Right
                   <meshStandardMaterial key="mat-1" attach="material-1" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Left
-                  <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
+                  // The top face shows the covering itself when it has one - the
+                  // rubber sheet, the aluminium - rather than a flat colour.
+                  texturedRoof
+                    ? (room.roofMaterial === 'aluminium'
+                        ? <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} roughnessMap={texRoof.roughnessMap} roughness={0.32} metalness={0.9} envMapIntensity={1.2} />
+                        : <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} normalScale={new THREE.Vector2(0.9, 0.9)} roughnessMap={texRoof.roughnessMap} roughness={1} metalness={0} />)
+                    : <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
                   <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
                   React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }), // Front fascia
                   React.cloneElement(getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }), // Back fascia
@@ -2225,7 +2360,13 @@ export function RoomGeometry() {
                 return [
                   <meshStandardMaterial key="mat-0" attach="material-0" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Right
                   <meshStandardMaterial key="mat-1" attach="material-1" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Left
-                  <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
+                  // The top face shows the covering itself when it has one - the
+                  // rubber sheet, the aluminium - rather than a flat colour.
+                  texturedRoof
+                    ? (room.roofMaterial === 'aluminium'
+                        ? <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} roughnessMap={texRoof.roughnessMap} roughness={0.32} metalness={0.9} envMapIntensity={1.2} />
+                        : <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} normalScale={new THREE.Vector2(0.9, 0.9)} roughnessMap={texRoof.roughnessMap} roughness={1} metalness={0} />)
+                    : <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
                   <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
                   React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }), // Front fascia
                   React.cloneElement(getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }), // Back fascia
@@ -2319,7 +2460,13 @@ export function RoomGeometry() {
                 const faceMats = [
                   React.cloneElement(getFasciaMat('right'), { key: 'mat-0', attach: 'material-0' }),
                   React.cloneElement(getFasciaMat('left'), { key: 'mat-1', attach: 'material-1' }),
-                  <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
+                  // The top face shows the covering itself when it has one - the
+                  // rubber sheet, the aluminium - rather than a flat colour.
+                  texturedRoof
+                    ? (room.roofMaterial === 'aluminium'
+                        ? <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} roughnessMap={texRoof.roughnessMap} roughness={0.32} metalness={0.9} envMapIntensity={1.2} />
+                        : <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} normalScale={new THREE.Vector2(0.9, 0.9)} roughnessMap={texRoof.roughnessMap} roughness={1} metalness={0} />)
+                    : <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
                   <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
                   React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }),
                   React.cloneElement(getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }),
@@ -2362,9 +2509,21 @@ export function RoomGeometry() {
                 );
               })()}
             </mesh>
-          {/* Metal Flashing Trim */}
+          {/* The roof SURFACE: a 20mm sheet over the whole slab, which is
+              what you actually see from above. It was a fixed glossy dark
+              grey ("metal flashing") whatever covering was chosen, so
+              rubber and aluminium looked identical to it (Charlie, 11 Sep).
+              Now it IS the covering: matte speckled rubber, glossy
+              powder-coated aluminium, or a matt EPDM membrane. Sedum lays
+              its own mat over the top. */}
           <mesh position={[0, roofH/2 + 0.01, 0]}>
-            <meshStandardMaterial color="#444" metalness={0.8} roughness={0.2} />
+            {room.roofMaterial === 'aluminium'
+              ? <meshStandardMaterial color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} roughnessMap={texRoof.roughnessMap} roughness={0.32} metalness={0.9} envMapIntensity={1.2} />
+              : room.roofMaterial === 'rubber'
+                ? <meshStandardMaterial color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} normalScale={new THREE.Vector2(0.9, 0.9)} roughnessMap={texRoof.roughnessMap} roughness={1} metalness={0} />
+                : room.roofMaterial === 'epdm'
+                  ? <meshStandardMaterial color="#262626" roughness={0.85} metalness={0.05} />
+                  : <meshStandardMaterial color="#444" metalness={0.8} roughness={0.2} />}
             <Geometry>
               <Base>
                 <boxGeometry args={[roofW + 0.02, 0.02, roofD + 0.02]} />
@@ -2455,7 +2614,7 @@ export function RoomGeometry() {
         bounce in MainScene lights the room while the spotlights do the rest.
         Kept for the 3D view, where it reads as warmth through the glazing.
       */}
-      <pointLight position={[0, h - 0.5, 0]} intensity={viewMode === 'walking' ? 0 : 3} color="#ffe5b4" distance={10} castShadow={false} />
+      <pointLight position={[0, h - 0.5, 0]} intensity={viewMode === 'walking' || isNight ? 0 : 3} color="#ffe5b4" distance={10} castShadow={false} />
 
       {/* Guttering & downpipe. Pent/flat: one half-round run along the low
           edge with its rim flush with the fascia top. Gable: a run along each
@@ -2575,7 +2734,7 @@ export function RoomGeometry() {
             {/* Glass */}
             <mesh>
               <shapeGeometry args={[glassShape]} />
-              <meshPhysicalMaterial color="#aabed1" transmission={0.9} ior={1.5} thickness={0.05} roughness={0.1} clearcoat={1} envMapIntensity={3} side={THREE.DoubleSide} />
+              <meshPhysicalMaterial color="#aabed1" transparent opacity={0.3} depthWrite={false} roughness={0.05} metalness={0} clearcoat={1} clearcoatRoughness={0.05} envMapIntensity={3} side={THREE.DoubleSide} />
             </mesh>
             {/* Bottom rail - kept in both styles so the glass never floats on the wall top */}
             <mesh position={[0, 0.005, 0]} castShadow>
@@ -2796,6 +2955,13 @@ export function RoomGeometry() {
         if (win.wall === 'front') { pos = [offset, sill + winH/2, frameZ + dragZOffset]; } 
         else if (win.wall === 'back') { pos = [offset, sill + winH/2, -frameZ - dragZOffset]; rot = [0, Math.PI, 0]; } 
         else if (win.wall === 'left') { pos = [-frameX - dragZOffset, sill + winH/2, offset]; rot = [0, -Math.PI/2, 0]; } 
+        else if (win.wall === 'bay' && bay) {
+          // In the divider, outside face toward the section - as for doors.
+          const left = bay.side === 'left';
+          const faceX = bay.dividerX + (left ? -wallThickness/2 + frameDepth/2 : wallThickness/2 - frameDepth/2);
+          pos = [faceX + (left ? -dragZOffset : dragZOffset), sill + winH/2, (bay.z0 + d/2) / 2 + offset];
+          rot = [0, left ? -Math.PI/2 : Math.PI/2, 0];
+        }
         else { pos = [frameX + dragZOffset, sill + winH/2, offset]; rot = [0, Math.PI/2, 0]; }
 
         return (
@@ -2898,7 +3064,7 @@ export function RoomGeometry() {
                    {/* Glass */}
                    <mesh>
                      <boxGeometry args={[paneW - winSashT*2, winH - winFrameT*2 - winSashT*2, 0.02]} />
-                     <meshPhysicalMaterial color="#aabed1" transmission={0.9} ior={1.5} thickness={0.05} roughness={0.1} clearcoat={1} envMapIntensity={3} />
+                     <meshPhysicalMaterial color="#aabed1" transparent opacity={0.3} depthWrite={false} roughness={0.05} metalness={0} clearcoat={1} clearcoatRoughness={0.05} envMapIntensity={3} />
                    </mesh>
                    {win.style === 'crittall' && (
                      <CrittallBars
@@ -2946,7 +3112,7 @@ export function RoomGeometry() {
                 {/* Flat skylight glass */}
                 <mesh position={[0, 0.02, 0]}>
                   <boxGeometry args={[skyW, 0.02, skyL]} />
-                  <meshPhysicalMaterial color="#aabed1" transmission={0.9} opacity={1} ior={1.5} thickness={0.05} roughness={0.0} transparent />
+                  <meshPhysicalMaterial color="#aabed1" transparent opacity={0.3} depthWrite={false} roughness={0.05} metalness={0} clearcoat={1} clearcoatRoughness={0.05} />
                 </mesh>
                 {/* Metal Frame */}
                 {/* Front */}
@@ -3051,6 +3217,7 @@ export function RoomGeometry() {
             if (win.wall === 'front') { pos = [offset, 0, frameZ]; } 
             else if (win.wall === 'back') { pos = [offset, 0, -frameZ]; rot = [0, Math.PI, 0]; } 
             else if (win.wall === 'left') { pos = [-frameX, 0, offset]; rot = [0, -Math.PI/2, 0]; } 
+            else if (win.wall === 'bay') { if (!bay) return null; pos = [bay.dividerX, 0, (bay.z0 + d/2) / 2 + offset]; rot = [0, Math.PI/2, 0]; }
             else { pos = [frameX, 0, offset]; rot = [0, Math.PI/2, 0]; }
 
             return (
@@ -3079,6 +3246,7 @@ export function RoomGeometry() {
             if (door.wall === 'front') { pos = [offset, 0, frameZ]; } 
             else if (door.wall === 'back') { pos = [offset, 0, -frameZ]; rot = [0, Math.PI, 0]; } 
             else if (door.wall === 'left') { pos = [-frameX, 0, offset]; rot = [0, -Math.PI/2, 0]; } 
+            else if (door.wall === 'bay') { if (!bay) return null; pos = [bay.dividerX, 0, (bay.z0 + d/2) / 2 + offset]; rot = [0, Math.PI/2, 0]; }
             else { pos = [frameX, 0, offset]; rot = [0, Math.PI/2, 0]; }
             
             return (
@@ -3780,13 +3948,11 @@ export function RoomGeometry() {
         </group>
       )}
 
-      {/* Interior Lighting / Night Glow */}
-      {isNight && !isPlanView && (
-        <group position={[0, h - 0.5, 0]}>
-          <pointLight color="#ffeecc" intensity={2} distance={Math.max(w, d) * 1.5} decay={2} castShadow={false} />
-          <ambientLight color="#ffebd6" intensity={0.5} />
-        </group>
-      )}
+      {/* No night "glow" any more. There used to be a point light and an
+          ambient here, on after dark, lighting the room from nowhere - a
+          warm blob on the ceiling that belonged to no fitting. After dark
+          the room is lit by its fittings and nothing else (Charlie, 11 Sep:
+          "I want realism"). */}
 
       </group> {/* End Elevated Structure */}
     </group>

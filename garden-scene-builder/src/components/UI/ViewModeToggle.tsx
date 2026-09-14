@@ -20,28 +20,35 @@ export function ViewModeToggle() {
         <Cuboid size={16} />
         3D View
       </button>
-      {!isPublic && <button
-        onClick={() => {
-          setViewMode('walking');
-          /*
-           * Capture the mouse HERE, on the button press.
-           *
-           * Walking used to depend on clicking the scene first, and that one
-           * click also had to mean "pick this". Whichever meaning won, the
-           * other broke - which is why this kept coming back. Pointer lock
-           * needs a real user gesture and pressing Walk is one, so the
-           * walkthrough now starts already walking and the scene click is
-           * free to mean only "pick this". The two can no longer fight.
-           */
-          resumeWalking();
-        }}
-        className={`flex items-center gap-2 px-6 py-2 rounded-full text-xs font-semibold transition-colors ${
-          viewMode === 'walking' ? 'bg-[#3b4d4a] text-white shadow-sm' : 'text-gray-500 hover:text-white hover:bg-[#3b4d4a]'
-        }`}
-      >
-        <Footprints size={16} />
-        Walk
-      </button>}
+      {/* Two walks, one click each: inside puts you mid-room facing the
+          doors, outside puts you in the garden facing the building. Already
+          walking, the other button just moves you - no door to find. */}
+      {!isPublic && ([['inside', 'Walk Inside'], ['outside', 'Walk Outside']] as const).map(([where, label]) => (
+        <button
+          key={where}
+          onClick={() => {
+            useStore.getState().setWalkStart(where);
+            if (viewMode === 'walking') window.dispatchEvent(new CustomEvent('walk-teleport', { detail: { where } }));
+            else setViewMode('walking');
+            /*
+             * Capture the mouse HERE, on the button press.
+             *
+             * Walking used to depend on clicking the scene first, and that
+             * one click also had to mean "pick this". Whichever meaning won,
+             * the other broke. Pointer lock needs a real user gesture and
+             * pressing Walk is one, so the walkthrough starts already
+             * walking and the scene click is free to mean only "pick this".
+             */
+            resumeWalking();
+          }}
+          className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold transition-colors ${
+            viewMode === 'walking' ? 'bg-[#3b4d4a] text-white shadow-sm' : 'text-gray-500 hover:text-white hover:bg-[#3b4d4a]'
+          }`}
+        >
+          <Footprints size={16} />
+          {label}
+        </button>
+      ))}
       <button
         onClick={() => {
           setViewMode('plan');
