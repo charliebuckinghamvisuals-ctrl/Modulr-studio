@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldCheck, Mail, KeyRound, Loader2, ArrowRight, Sparkles, MailCheck, RefreshCw, UserRound } from 'lucide-react';
+import { Mail, KeyRound, Loader2, ArrowRight, Sparkles, MailCheck, RefreshCw, UserRound } from 'lucide-react';
 import { auth } from '../services/firebase';
 import {
     signInWithEmailAndPassword,
@@ -27,32 +27,13 @@ import { useAuth } from '../hooks/useAuth';
  * It has three states, because the person in front of it can be in three
  * different situations:
  *
- *   1. Signed out            -> email, password and a code.
+ *   1. Signed out            -> name, email and password.
  *   2. Signed in, unverified -> nothing to fill in; go and click the link.
- *   3. Signed in, verified   -> the code alone. Asking someone who is already
- *                               authenticated to retype their own address and
- *                               password is pure friction, and it invites them
- *                               to typo their way into a second account.
+ *   3. Signed in, verified   -> nothing to fill in either: the server opens
+ *                               the studio to any confirmed email (open beta,
+ *                               14 Sep 2026 - the access code is gone), so
+ *                               this state just asks it and lets them in.
  */
-
-const redeemBetaCode = async (user: User, code: string): Promise<{ ok: boolean; error?: string }> => {
-    try {
-        const token = await user.getIdToken();
-        const res = await fetch('/api/beta/redeem', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: code.trim() }),
-        });
-        if (res.ok) return { ok: true };
-        // Surface the server's wording - it distinguishes "not valid" from
-        // "already used", and those need different reactions from the user.
-        const body = await res.json().catch(() => ({}));
-        return { ok: false, error: body?.error || 'That access code is not valid.' };
-    } catch (e) {
-        console.error('Beta redemption failed', e);
-        return { ok: false, error: 'Could not reach the server. Please try again.' };
-    }
-};
 
 /** The server is the only thing that knows who is allowed in. */
 const serverGrantsAccess = async (user: User): Promise<boolean> => {
@@ -99,7 +80,6 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [code, setCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
     /**
@@ -184,10 +164,6 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
             toast.error('Please enter your name');
             return;
         }
-        if (mode === 'signup' && !code.trim()) {
-            toast.error('Please enter your beta access code');
-            return;
-        }
         if (mode === 'signup' && password.length < 8) {
             toast.error('Please choose a password of at least 8 characters');
             return;
@@ -220,18 +196,10 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
                     }
                 }
 
-                // Validate the code BEFORE sending any mail, so a bad code
-                // neither leaves an orphan account nor emails a stranger.
-                const result = await redeemBetaCode(cred.user, code);
-                if (!result.ok) {
-                    try { await cred.user.delete(); } catch { await signOut(auth); }
-                    toast.error(result.error!);
-                    return;
-                }
-
-                await cred.user.getIdToken(true); // pick up the new claim
-                // Claim it before sending, so the arrival effect does not fire a
-                // second identical email at someone who just signed up.
+                // Open beta (14 Sep 2026): no access code. Confirming the
+                // email is the only step between signing up and rendering.
+                // Claim the send before the arrival effect fires a second
+                // identical email at someone who just signed up.
                 autoSentTo.current = cred.user.uid;
                 await sendVerification(cred.user, true);
                 setVerified(false);
@@ -259,23 +227,33 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
         }
     };
 
-    // ── State 3: signed in and verified, needs a code ────────────────────────
-    const handleCodeOnlySubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    // ── State 3: signed in and verified ──────────────────────────────────────
+    // Nothing left for the person to do: the server lets any confirmed email
+    // in, so ask it once and open the studio. A refusal here means the token
+    // has not picked up the confirmation yet (or the server is down), and the
+    // button below retries with a fresh token.
+    const [granted, setGranted] = useState<'checking' | 'refused' | null>(null);
+    const grantAttemptedFor = useRef<string | null>(null);
+    useEffect(() => {
+        if (!user || !verified) return;
+        if (grantAttemptedFor.current === user.uid) return;
+        grantAttemptedFor.current = user.uid;
+        setGranted('checking');
+        (async () => {
+            await user.getIdToken(true);
+            if (await serverGrantsAccess(user)) finish();
+            else setGranted('refused');
+        })();
+    }, [user, verified]);
+
+    const handleRetryGrant = async () => {
         if (!user) return;
-        if (!code.trim()) {
-            toast.error('Please enter your beta access code');
-            return;
-        }
         setIsLoading(true);
         try {
-            const result = await redeemBetaCode(user, code);
-            if (!result.ok) {
-                toast.error(result.error!);
-                return;
-            }
+            await user.reload();
             await user.getIdToken(true);
-            finish();
+            if (await serverGrantsAccess(user)) finish();
+            else toast.error('The studio could not be opened for this account. Please try again in a moment.');
         } finally {
             setIsLoading(false);
         }
@@ -298,7 +276,7 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
             if (await serverGrantsAccess(user)) {
                 finish();
             } else {
-                toast.success('Email confirmed - enter your access code to finish.');
+                toast.error('Email confirmed, but the studio could not be opened yet. Please try again in a moment.');
             }
         } catch (e) {
             console.error('Verification check failed', e);
@@ -389,44 +367,33 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
             <Panel>
                 <div className="space-y-2">
                     <BetaBadge />
-                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Enter your access code</h2>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Opening the studio</h2>
                     <p className="text-xs text-slate-500 leading-relaxed">
                         You are signed in as{' '}
-                        <span className="font-semibold text-accent">{user.email}</span>. The studio
-                        tools are in private beta - add your code to unlock them.
+                        <span className="font-semibold text-accent">{user.email}</span> and your email is
+                        confirmed. Your beta access covers 40 renders over 7 days, starting from your first render.
                     </p>
                 </div>
 
-                <form onSubmit={handleCodeOnlySubmit} className="space-y-4">
-                    <div className="space-y-1 text-left">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-secondary pl-1">
-                            Beta Access Code
-                        </label>
-                        <div className="relative">
-                            <ShieldCheck size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary" />
-                            <input type="text" value={code} onChange={e => setCode(e.target.value.toUpperCase())}
-                                placeholder="MODULR-XXXXX-XXXXX-XXXXX" autoComplete="off" spellCheck={false}
-                                autoFocus className={`${field} font-mono tracking-wider`} />
-                        </div>
-                    </div>
-
-                    <button type="submit" disabled={isLoading} className={primaryButton}>
+                {granted === 'refused' ? (
+                    <button onClick={handleRetryGrant} disabled={isLoading} className={primaryButton}>
                         {isLoading ? (
                             <><Loader2 size={16} className="animate-spin" /><span>Please wait…</span></>
                         ) : (
-                            <><span>Unlock the Studio</span><ArrowRight size={16} /></>
+                            <><span>Open the Studio</span><ArrowRight size={16} /></>
                         )}
                     </button>
-                </form>
+                ) : (
+                    <div className="flex items-center justify-center gap-3 text-slate-500 py-2">
+                        <Loader2 className="animate-spin" size={18} />
+                        <span className="text-sm">Just a moment…</span>
+                    </div>
+                )}
 
                 <p className="text-[11px] text-slate-500 text-center leading-relaxed">
-                    No access code? Email{' '}
-                    <a href="mailto:info@napc.uk" className="text-accent font-semibold underline underline-offset-2">
-                        info@napc.uk
-                    </a>{' '}
-                    to request one, or{' '}
+                    Wrong account?{' '}
                     <button onClick={() => signOut(auth)} className="text-accent font-semibold underline underline-offset-2">
-                        sign out
+                        Sign out
                     </button>
                     .
                 </p>
@@ -443,7 +410,7 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
                 </h2>
                 <p className="text-xs text-slate-500 leading-relaxed">
                     {mode === 'signup'
-                        ? 'The studio tools are in private beta. Enter your access code to start rendering. Everything else on the site is free to browse.'
+                        ? 'The studio tools are in free beta: create an account, confirm your email, and you have 40 renders over 7 days. Everything else on the site is free to browse.'
                         : 'Sign in to your Modulr Studio account.'}
                 </p>
             </div>
@@ -498,20 +465,6 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
                     </div>
                 </div>
 
-                {mode === 'signup' && (
-                    <div className="space-y-1 text-left">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-secondary pl-1">
-                            Beta Access Code
-                        </label>
-                        <div className="relative">
-                            <ShieldCheck size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary" />
-                            <input type="text" value={code} onChange={e => setCode(e.target.value.toUpperCase())}
-                                placeholder="MODULR-XXXXX-XXXXX-XXXXX" autoComplete="off" spellCheck={false}
-                                className={`${field} font-mono tracking-wider`} />
-                        </div>
-                    </div>
-                )}
-
                 <button type="submit" disabled={isLoading} className={primaryButton}>
                     {isLoading ? (
                         <><Loader2 size={16} className="animate-spin" /><span>Please wait…</span></>
@@ -522,11 +475,11 @@ export const BetaGate: React.FC<BetaGateProps> = ({ onGranted }) => {
             </form>
 
             <p className="text-[11px] text-slate-500 text-center leading-relaxed">
-                No access code? Email{' '}
+                Questions? Email{' '}
                 <a href="mailto:info@napc.uk" className="text-accent font-semibold underline underline-offset-2">
                     info@napc.uk
-                </a>{' '}
-                to request one.
+                </a>
+                .
             </p>
         </Panel>
     );

@@ -524,6 +524,32 @@ const TESTER_EMAILS = (process.env.TESTER_EMAILS || '')
 const isTesterUser = (user) =>
     !!user && !!user.email && TESTER_EMAILS.includes(user.email.toLowerCase().trim());
 
+/**
+ * Open beta (14 Sep 2026, Charlie's call): every signed-in account with a
+ * confirmed email is a beta member - no access code, no allowlist entry.
+ * Members are metered exactly like the hand-allowlisted testers
+ * (TESTER_RENDERS renders in TESTER_DAYS days, 4K exports and animations on
+ * their own monthly counters). A paid plan on the user's document always
+ * wins, so a Standard or Business customer is never counted as a tester.
+ * Master accounts are handled before this is ever consulted.
+ */
+const PAID_PLANS = new Set(['standard', 'business', 'master']);
+const hasPaidPlan = async (uid) => {
+    if (!db || !uid) return false;
+    try {
+        const snap = await db.collection('users').doc(uid).get();
+        return snap.exists && PAID_PLANS.has(snap.data().plan);
+    } catch (e) {
+        console.error('[BETA] Plan lookup failed for uid:', uid, '|', e.message || e);
+        return false;
+    }
+};
+const isOpenBetaUser = async (user) => {
+    if (!user || isMasterUser(user)) return false;
+    if (user.beta !== true && user.email_verified !== true) return false;
+    return !(await hasPaidPlan(user.uid));
+};
+
 // Tester allowance. 40 renders is roughly £5 of 4K image generation at current
 // Gemini rates, which is the budget agreed per tester.
 const TESTER_RENDERS = 40;
@@ -811,7 +837,7 @@ const enforceRenderAccess = async (req, creditCost) => {
     // Beta members are metered exactly like testers - a fixed render count over
     // a fixed window - so they share checkTesterRender rather than duplicating
     // the transactional counter logic.
-    if (isTesterUser(req.user) || req.user?.beta === true) {
+    if (isTesterUser(req.user) || await isOpenBetaUser(req.user)) {
         if (creditCost === CREDIT_COSTS.ANALYSIS) {
             return { allowed: true };
         }
@@ -1269,7 +1295,10 @@ const enforceMasterLock = (req, res, next) => {
         return next();
     }
 
-    if (req.user?.beta === true) {
+    // Open beta: any account with an email may come in once that email is
+    // confirmed. The beta claim is kept for accounts that redeemed a code
+    // before the beta opened.
+    if (req.user?.beta === true || req.user?.email) {
         /**
          * A beta seat must have a real address behind it.
          *
@@ -3423,7 +3452,7 @@ app.post('/api/export4k', userAiLimiter, async (req, res) => {
             return res.status(400).json({ error: 'No image supplied for export.' });
         }
 
-        const plan = req.user?.beta === true && !isTesterUser(req.user) ? 'beta' : await resolveEffectivePlan(req);
+        const plan = await resolveEffectivePlan(req);
         if (plan === null) {
             return res.status(503).json({ error: '4K export temporarily unavailable. Please try again shortly.' });
         }
@@ -3513,7 +3542,11 @@ const resolveEffectivePlan = async (req) => {
     if (!db) return 'free';
     try {
         const snap = await db.collection('users').doc(req.user.uid).get();
-        return snap.exists ? (snap.data().plan || 'free') : 'free';
+        const plan = snap.exists ? (snap.data().plan || 'free') : 'free';
+        if (PAID_PLANS.has(plan)) return plan;
+        // Open beta: a confirmed email with no paid plan is a beta member.
+        if (req.user?.beta === true || req.user?.email_verified === true) return 'beta';
+        return plan;
     } catch (e) {
         console.error('[ANIMATION] Plan lookup failed:', e.message || e);
         return null; // caller treats null as "refuse", never as "free"
@@ -3819,7 +3852,7 @@ app.get('/api/user/credits', async (req, res) => {
 
         // Tester: report the remaining renders and days so the account page can
         // show a countdown.
-        if (isTesterUser(req.user) || req.user?.beta === true) {
+        if (isTesterUser(req.user) || await isOpenBetaUser(req.user)) {
             const snap = await db.collection('users').doc(req.user.uid).get();
             const data = snap.exists ? snap.data() : {};
             const used = data.testerRendersUsed || 0;
@@ -3829,7 +3862,7 @@ app.get('/api/user/credits', async (req, res) => {
             if (data.projectsEnabled !== true) await syncProjectAccess(req.user.uid, true);
             return res.json(withEntitlements({
                 credits: Math.max(0, TESTER_RENDERS - used),
-                plan: req.user?.beta === true && !isTesterUser(req.user) ? 'beta' : 'tester',
+                plan: isTesterUser(req.user) ? 'tester' : 'beta',
                 rendersLeft: Math.max(0, TESTER_RENDERS - used),
                 rendersPerDay: TESTER_RENDERS,
                 trialDaysLeft: Math.ceil(msLeft / 86400000),
