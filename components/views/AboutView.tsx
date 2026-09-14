@@ -44,18 +44,18 @@ const TOOLS: Tool[] = [
     {
         icon: <Box size={22} />,
         name: '3D Configurator',
-        image: '/gallery-1.jpg',
-        tagline: 'Design the building before you render it',
+        image: '/config-walkthrough.jpg',
+        tagline: 'Design the building, walk through it, then render it',
         body:
-            'Build a garden room or annexe to real dimensions in your browser - footprint, eaves and ridge heights, box or gable roof, glazing, internal walls, decking and cladding. Because the geometry is real rather than generated, what you see is what gets built, and every view stays consistent with every other view.',
+            'Build a garden room or annexe to real dimensions in your browser - footprint, eaves and ridge heights, box or gable roof, door sets, glazing, cladding per elevation, a covered outdoor section, internal walls, kitchen, bathroom and lighting. Then Walk Outside to stand in the garden facing it, or Walk Inside to stand in the room, changing finishes with a click as you go. Because the geometry is real rather than generated, what you see is what gets built, and every view stays consistent with every other view.',
         points: [
             'Box and gable forms with true pitch, real bargeboards, adjustable fascia depth and overhangs',
-            'Internal walls as one system: select, drag and snap them, with doors that belong to the wall they sit in',
-            'Every dimension in millimetres, and every drag handle snapping to clean steps',
-            'Live cost estimate that updates as the specification changes',
-            'Walk-through, plan, elevation and orthographic views',
-            'Save a design to your account and reopen it later, or send any view straight into the Render Engine',
-            'PDF pack with plan, elevations, a permitted development checklist and a planning likelihood score',
+            'Bi-fold, sliding, French and hinged door sets that open the way the real product does, plus skylights',
+            'Internal walls as one system, with doors that belong to the wall they sit in',
+            'Kitchens with real units, corner units, worktops, taps and veneers; bathrooms, beds, desks and sofas',
+            'Walk Inside and Walk Outside, a plan view, and a lighting plan for setting out spots and pendants',
+            'Live cost estimate and a permitted development flag as the specification changes',
+            'Save a design to your account, send any view straight into the Render Engine, or export the PDF pack',
         ],
         status: 'Beta',
     },
@@ -63,9 +63,9 @@ const TOOLS: Tool[] = [
         icon: <Layers size={22} />,
         name: 'Render Engine',
         image: '/gallery-4.jpg',
-        tagline: 'Photoreal exteriors from a drawing or a photo',
+        tagline: 'Pro-level CGI exteriors from a drawing, a photo or the configurator',
         body:
-            'The core of the platform. Feed it a SketchUp screenshot, a CAD elevation, a line drawing or a site photograph and it returns a finished architectural visual - correct materials, believable light, real context. Built specifically around the language of garden rooms and annexes rather than generic architecture.',
+            'The core of the platform. Feed it a view from the 3D Configurator, a SketchUp screenshot, a CAD elevation, a line drawing or a site photograph and it returns a finished architectural visual - correct materials, believable light, real context. Built specifically around the language of garden rooms and annexes rather than generic architecture. From the configurator it is handed the full specification - every door, window and cladding face - so the render matches the design you priced.',
         points: [
             'Works from SketchUp and CAD exports, line drawings or photographs',
             'Automatic detection of cladding, roof, glazing, doors and ground treatment',
@@ -142,7 +142,7 @@ const TOOLS: Tool[] = [
         points: [
             'Slow push in, pan, gentle arc or locked-off camera moves',
             'Optional motion blur, breeze, golden hour or a distant figure',
-            'Ten seconds at 720p, downloaded as an MP4',
+            'Ten seconds at 1080p, downloaded as an MP4',
             'Works from any finished render, or from an exterior photograph',
             'Included with the Business plan, with a monthly allowance',
         ],
@@ -181,12 +181,13 @@ export const AboutView: React.FC = () => {
                         <div className="lg:col-span-8 space-y-7">
                             <div className={TYPE.eyebrow}>Architectural Intelligence</div>
                             <h1 className={TYPE.h1}>
-                                The UK's dedicated render engine for garden rooms and annexes.
+                                The UK's design-to-render platform for garden rooms and annexes.
                             </h1>
                             <p className={`${TYPE.lead} max-w-2xl`}>
-                                Modulr Studio makes high-end architectural visuals instant and affordable
-                                for the people who design and build domestic outbuildings - without the
-                                studio fees, the lead times, or the back-and-forth.
+                                Modulr Studio lets the people who design and build domestic outbuildings
+                                configure a building to real dimensions, walk a client through it and
+                                render it like a pro - without the studio fees, the lead times, or the
+                                back-and-forth.
                             </p>
                         </div>
 
@@ -263,8 +264,8 @@ export const AboutView: React.FC = () => {
                                 <div className={`${CARD} p-7 space-y-3`}>
                                     <h3 className={TYPE.h3}>What makes it different</h3>
                                     <p className={TYPE.small}>
-                                        It's trained on the architectural language of this sector, and it
-                                        works from your real geometry rather than inventing a building
+                                        It is built around the product - garden rooms and annexes, inside and out - and it
+                                        renders from your real geometry rather than inventing a building
                                         from a text prompt.
                                     </p>
                                 </div>

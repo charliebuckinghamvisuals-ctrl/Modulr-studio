@@ -63,8 +63,8 @@ const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: s
     { label: 'Line Converter',     trial: true,  standard: true,  business: true },
     { label: 'Weather Lab',        trial: true,  standard: true,  business: true },
     { label: 'Material Studio',    trial: true,  standard: true,  business: true },
-    { label: 'Content Studio',     trial: false, standard: false, business: true },
     { label: '3D Configurator',    trial: true,  standard: false, business: true },
+    { label: 'Walk Inside & Walk Outside', trial: true, standard: false, business: true },
     { label: 'Animation Studio',   trial: false, standard: false, business: true },
     { label: 'Projects & clients', trial: true,  standard: true,  business: true },
     { label: 'Commercial rights',  trial: false, standard: true,  business: true },
@@ -252,7 +252,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
 
                     <p className="text-lg text-secondary leading-relaxed mb-12">
                         Stop paying thousands for outsourced 3D visualizations.
-                        Generate photorealistic concepts instantly, directly from your sketches.
+                        Pro-level CGI visuals in under a minute, from a sketch, a photo or the 3D Configurator.
                     </p>
 
                     {/* Billing Toggle */}

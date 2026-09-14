@@ -2,10 +2,11 @@ import React from 'react';
 import {
     Share2, Clock, PoundSterling, FileCheck, Users, Repeat,
     ArrowRight, Instagram, Camera, TrendingUp, Box, Sofa, Rotate3d,
-    Layers, Palette, FileText, FolderOpen, Film, ClipboardCheck,
+    Layers, Palette, FileText, FolderOpen, Film, ClipboardCheck, Footprints, Link2,
 } from 'lucide-react';
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
+import { WalkthroughShowcase } from '../WalkthroughShowcase';
 import { AppStage } from '../../types';
 
 /** Same scale as About and Guide so the site reads as one thing. */
@@ -30,6 +31,19 @@ interface UseCase {
 }
 
 const USE_CASES: UseCase[] = [
+    {
+        icon: <Footprints size={22} />,
+        title: 'Walk the client through it before it exists',
+        body:
+            'A plan and an elevation ask the client to imagine. The walkthrough does not. Walk Outside puts them in the garden facing the building they are about to buy; Walk Inside puts them in the room, with the kitchen run, the bed, the sofa and the lighting where you set them out. Open the doors, look out at the garden, click a wall and change the colour while they watch.',
+        points: [
+            'Two walks, one click each: outside facing the building, inside looking out',
+            'Doors open the way the real set does - bi-fold, sliding, French or hinged',
+            'Click any wall, floor, frame, door or kitchen unit and change its finish without stopping',
+            'Send the view you are standing in straight to the Render Engine',
+        ],
+        image: '/config-walkthrough.jpg',
+    },
     {
         icon: <Share2 size={22} />,
         title: 'Social media that actually stops the scroll',
@@ -60,7 +74,7 @@ const USE_CASES: UseCase[] = [
         icon: <PoundSterling size={22} />,
         title: 'Win the quote before a competitor turns up',
         body:
-            'A quote with a photorealistic visual of the proposed building beats a price list every time. Design the scheme, render it, and send a branded proposal the same afternoon while the conversation is still warm.',
+            'A quote with a pro-level CGI visual of the proposed building beats a price list every time. Design the scheme, render it, and send a branded proposal the same afternoon while the conversation is still warm.',
         points: [
             'Turn a sketch or model into a finished visual in minutes',
             'Branded PDF proposal with your logo and colours',
@@ -99,11 +113,11 @@ const USE_CASES: UseCase[] = [
         icon: <Users size={22} />,
         title: 'Design live, on the call',
         body:
-            'Instead of going away and coming back in a week, change the cladding while the client watches. Agreement happens in the room, revisions collapse, and the client feels part of the design rather than presented with it.',
+            'Instead of going away and coming back in a week, change the cladding while the client watches. Drag the ridge down and see what it saves. Walk them into the room and let them pick the worktop. Agreement happens in the meeting, revisions collapse, and the client feels part of the design rather than presented with it.',
         points: [
-            'Swap materials in seconds during a meeting',
+            'Swap materials in seconds, from the sidebar or from inside the walkthrough',
             'Adjust dimensions in the 3D Configurator with live costing',
-            'Settle specification decisions before quoting',
+            'Settle the kitchen, the bathroom and the lighting before quoting',
             'Fewer rounds of "can we see it in a different colour"',
         ],
         image: '/gallery-11.jpg',
@@ -132,12 +146,17 @@ const PIPELINE = [
     {
         icon: <Box size={20} />,
         title: 'Design it',
-        body: 'Build the room to real dimensions in the 3D Configurator, with live costing as you go.',
+        body: 'Build the room to real dimensions in the 3D Configurator - outside and inside, kitchen and lighting included - with live costing as you go.',
+    },
+    {
+        icon: <Footprints size={20} />,
+        title: 'Walk it',
+        body: 'Walk Outside to stand in the garden facing the building. Walk Inside to stand in the room. Change finishes with a click as you go.',
     },
     {
         icon: <Layers size={20} />,
         title: 'Render it',
-        body: 'Send any view straight into the Render Engine and get a photoreal 4K visual back.',
+        body: 'Send the view you are looking at straight into the Render Engine and get a pro-level 4K CGI visual of the configured building back.',
     },
     {
         icon: <Palette size={20} />,
@@ -150,9 +169,14 @@ const PIPELINE = [
         body: 'Export a branded PDF with plan, elevations, material schedule and planning guidance.',
     },
     {
+        icon: <Link2 size={20} />,
+        title: 'Share it',
+        body: 'Send the client one read-only proposal link showing the renders and the estimate, with your contact details staying in your account.',
+    },
+    {
         icon: <FolderOpen size={20} />,
         title: 'Keep it',
-        body: 'Everything filed against the client and job in Projects, on any device you sign in from, and shareable with the client as a single read-only link.',
+        body: 'Everything filed against the client and job in Projects, on any device you sign in from.',
     },
 ];
 
@@ -168,28 +192,28 @@ const ROADMAP: RoadmapItem[] = [
     {
         icon: <Box size={22} />,
         title: '3D Configurator',
-        status: 'In beta now',
+        status: 'In your account now',
         body:
-            'Build a garden room to real dimensions in the browser, then send any view straight into the Render Engine. Because the geometry is real rather than generated, every elevation agrees with every other one. Usable today on the Business plan, and still gaining ground.',
+            'Build a garden room or annexe to real dimensions in the browser, walk around it and through it, then send any view straight into the Render Engine. Because the geometry is real rather than generated, every elevation agrees with every other one. More models, options and finishes are being added week by week.',
         points: [
             'Millimetre-accurate footprint, eaves and ridge heights, box or gable',
-            'Internal walls you select, drag and snap, with doors that travel with them',
-            'Live cost estimate as the specification changes',
-            'Plan, elevation and walk-through views, saved to your account',
+            'Bi-fold, sliding, French and hinged door sets, skylights, a covered outdoor section',
+            'Internal walls, kitchens, bathrooms, bedrooms, offices and games rooms, with a lighting plan',
+            'Walk Inside and Walk Outside, with finishes changed by clicking as you go',
             'PDF pack with drawings, a permitted development checklist and a planning likelihood score',
         ],
     },
     {
         icon: <Sofa size={22} />,
-        title: 'Interior Render Engine',
-        status: 'In design',
+        title: 'Interior renders',
+        status: 'In progress',
         body:
-            'The same engine, built for interiors. It analyses the whole room and identifies every surface and fitting independently, so you can change a floor without redrawing the kitchen.',
+            'The walkthrough already lets you stand inside the finished design. The next step is the Render Engine treating that view the way it treats an exterior: every surface and fitting identified on its own, so you can change a floor without redrawing the kitchen.',
         points: [
             'Per-surface control of floor, walls, ceiling and joinery',
             'Understands daylight direction from the glazing',
             'Separates fixed elements from loose furnishings',
-            'Works from the same SketchUp and photo sources',
+            'Fed by the same configured room, so nothing is guessed',
         ],
     },
     {
@@ -233,17 +257,18 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                             <div className={TYPE.eyebrow}>Why Modulr Studio</div>
                             <h1 className={TYPE.h1}>Better visuals win better work.</h1>
                             <p className={`${TYPE.lead} max-w-2xl`}>
-                                Garden rooms are sold on how they look. Modulr Studio gives you an
-                                unlimited supply of photorealistic 4K visuals of your own designs,
-                                for marketing, for quoting and for planning, without a studio fee
-                                or a two-week wait.
+                                Garden rooms and annexes are sold on how they look, inside and out.
+                                Modulr Studio lets you design the building to real dimensions, walk
+                                a client around it and through it, and render any view like a pro in
+                                4K - for marketing, for quoting and for planning, without a studio
+                                fee or a two-week wait.
                             </p>
                             <div className="flex flex-wrap gap-4 pt-2">
-                                <Button onClick={() => onNavigate?.(AppStage.PRICING)} icon={<ArrowRight size={16} />} className="px-8">
-                                    See Pricing
+                                <Button onClick={() => onNavigate?.(AppStage.DESIGNER)} icon={<ArrowRight size={16} />} className="px-8">
+                                    Open the 3D Configurator
                                 </Button>
-                                <Button variant="secondary" onClick={() => onNavigate?.(AppStage.GALLERY)} className="px-8">
-                                    View the Gallery
+                                <Button variant="secondary" onClick={() => onNavigate?.(AppStage.PRICING)} className="px-8">
+                                    See Pricing
                                 </Button>
                             </div>
                         </div>
@@ -258,6 +283,25 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                         </div>
                     </section>
 
+                    {/* The walkthrough, before the argument. A minute of the
+                        real configurator makes the case faster than the copy
+                        under it, and every claim below is then something the
+                        reader has just watched happen. */}
+                    <section className="space-y-8">
+                        <div className="grid lg:grid-cols-12 gap-10 items-end">
+                            <div className="lg:col-span-7 space-y-5">
+                                <div className={TYPE.eyebrow}>See it working</div>
+                                <h2 className={TYPE.h2}>Design it, walk it, render it. One building all the way through.</h2>
+                            </div>
+                            <p className={`lg:col-span-5 ${TYPE.body}`}>
+                                A games room, configured in the browser and then walked from the garden
+                                to the sofa. Finishes change with a click as you go, and any view can be
+                                sent to the Render Engine.
+                            </p>
+                        </div>
+                        <WalkthroughShowcase />
+                    </section>
+
                     {/* The pipeline. This is the genuine differentiator: rival
                         tools do one stage of this each. Worth stating plainly
                         and early, because it is the argument that justifies the
@@ -266,16 +310,17 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                         <div className="grid lg:grid-cols-12 gap-10 items-end">
                             <div className="lg:col-span-7 space-y-5">
                                 <div className={TYPE.eyebrow}>The complete package</div>
-                                <h2 className={TYPE.h2}>Design, render, specify and quote. In one place.</h2>
+                                <h2 className={TYPE.h2}>Design, walk, render, specify and quote. In one place.</h2>
                             </div>
                             <p className={`lg:col-span-5 ${TYPE.body}`}>
                                 Other tools handle one step of this. Modulr Studio is built to carry a
-                                scheme from a first sketch to a branded client proposal without
-                                leaving the app.
+                                scheme from a first measurement to a branded client proposal without
+                                leaving the app, and without the model, the price and the render ever
+                                disagreeing.
                             </p>
                         </div>
 
-                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             {PIPELINE.map((step, i) => (
                                 <div key={step.title} className={`${CARD} p-6 space-y-3 relative`}>
                                     <div className="flex items-center gap-3">
@@ -303,9 +348,10 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                                     somewhere to work out the actual building.
                                 </p>
                                 <p className={TYPE.small}>
-                                    <strong className="text-primary">Configurators do not render.</strong> They
-                                    produce a 3D preview and a price, then stop. What the client sees is
-                                    a model, not a photograph of their garden.
+                                    <strong className="text-primary">Configurators do not render, and most stop at the front door.</strong> They
+                                    produce an exterior preview and a price, then stop. No interior, no
+                                    walkthrough, and what the client sees is a model rather than a
+                                    photograph of their garden.
                                 </p>
                                 <p className={TYPE.small}>
                                     <strong className="text-primary">Neither produces the paperwork.</strong> The
@@ -316,7 +362,7 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                             <p className={TYPE.body}>
                                 Built specifically for garden rooms and annexes rather than adapted from
                                 generic architecture software, and backed by NAPC's planning expertise.
-                                As far as we are aware, no other platform joins all five steps for this
+                                As far as we are aware, no other platform joins all of these steps for this
                                 sector.
                             </p>
                         </div>
@@ -355,10 +401,10 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                         <div className="grid lg:grid-cols-12 gap-10 items-end">
                             <div className="lg:col-span-7 space-y-5">
                                 <div className={TYPE.eyebrow}>What people use it for</div>
-                                <h2 className={TYPE.h2}>Seven ways it pays for itself.</h2>
+                                <h2 className={TYPE.h2}>Eight ways it pays for itself.</h2>
                             </div>
                             <p className={`lg:col-span-5 ${TYPE.body}`}>
-                                From the first post on Instagram to the final planning submission.
+                                From the first walkthrough on a sales call to the final planning submission.
                             </p>
                         </div>
 
@@ -493,7 +539,7 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                     <section className={`${CARD} p-10 md:p-16 text-center space-y-6`}>
                         <h2 className={TYPE.h2}>Try it on your own design.</h2>
                         <p className={`${TYPE.body} max-w-2xl mx-auto`}>
-                            Upload a photograph, a sketch or a SketchUp screenshot and see what comes
+                            Build a room in the 3D Configurator and walk through it, or upload a photograph, a sketch or a SketchUp screenshot and see what comes
                             back. No card required to start.
                         </p>
                         <div className="flex flex-wrap justify-center gap-4 pt-2">
