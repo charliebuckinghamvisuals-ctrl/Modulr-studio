@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, ClipboardCheck } from 'lucide-react';
+import { Sparkles, ClipboardCheck, Gift, ArrowRight } from 'lucide-react';
 import { AppStage } from '../../types';
 import { CompareSlider } from '../CompareSlider';
 import { Button } from '../Button';
@@ -20,6 +20,28 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
             <DraftingBackground pageName="HOMEPAGE" hideGrid={true} />
 
             <div className="max-w-6xl w-full flex flex-col items-center relative z-10 gap-24 px-8">
+
+                {/* Open tester offer (14 Sep 2026). Sits above the hero so it
+                    is the first thing read. The numbers are the real
+                    allowance the server enforces - 40 renders in 7 days - not
+                    a marketing round-up, so the panel behind "Start free"
+                    says the same thing. */}
+                <button
+                    type="button"
+                    onClick={onOpenEngine}
+                    className="w-full -mb-12 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 rounded-2xl bg-accent text-white px-5 py-3 shadow-lg hover:bg-accent-hover transition-colors text-left"
+                >
+                    <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider bg-white/15 rounded-full px-3 py-1">
+                        <Gift size={14} />
+                        Limited-time offer
+                    </span>
+                    <span className="text-sm sm:text-base font-semibold">
+                        Free 7-day access to Modulr Studio: 40 AI renders, no card needed.
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-sm font-bold underline underline-offset-4">
+                        Start free <ArrowRight size={16} />
+                    </span>
+                </button>
 
                 {/* 1. Hero Section. The eyebrow badge that used to open this
                     block now sits on the hero video below, so it is not said
