@@ -15,7 +15,7 @@ import { AppStage } from './types';
  * Keep the paths stable once shipped: they become inbound links.
  */
 
-export const SITE_ORIGIN = 'https://modulrstudio.co.uk';
+export const SITE_ORIGIN = 'https://www.modulrstudio.co.uk';
 export const SITE_NAME = 'Modulr Studio';
 
 export interface RouteMeta {

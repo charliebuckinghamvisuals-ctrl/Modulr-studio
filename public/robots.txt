@@ -9,4 +9,4 @@ Disallow: /editor
 Disallow: /studio
 Disallow: /3d-config/
 
-Sitemap: https://modulrstudio.co.uk/sitemap.xml
+Sitemap: https://www.modulrstudio.co.uk/sitemap.xml
