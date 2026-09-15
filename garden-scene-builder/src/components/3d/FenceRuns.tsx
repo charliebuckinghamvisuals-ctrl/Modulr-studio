@@ -143,9 +143,11 @@ function Run({ run, showLabel }: { run: FenceRun; showLabel: boolean }) {
       // Click a run to restyle it in the sidebar. The ground plane clears
       // the selection, as it does for objects.
       onPointerDown={(e) => { if (useStore.getState().toolMode !== 'select') return; e.stopPropagation(); useStore.getState().setSelectedFenceId(run.id); window.dispatchEvent(new CustomEvent('boundary-picked')); }}
-      // The ground plane clears the selection on pointer UP, not down - so
-      // without this the pick showed for one frame and vanished.
+      // The ground plane clears the selection on CLICK - a separate event
+      // from pointer down and up, fired after them - so without this the
+      // pick showed for one frame and vanished.
       onPointerUp={(e) => { if (useStore.getState().toolMode !== 'select') return; e.stopPropagation(); }}
+      onClick={(e) => { if (useStore.getState().toolMode !== 'select') return; e.stopPropagation(); }}
     >
       {body}
       {/* A generous invisible hit box: a slatted fence is mostly gaps. */}
@@ -187,25 +189,31 @@ export function FenceTool() {
   const fences = useStore(s => s.scene.fences);
   const [cursor, setCursor] = useState<[number, number] | null>(null);
   const startRef = useRef<[number, number] | null>(null);
-  // Lifted: the pen is off the paper, so the next click starts a NEW run
-  // rather than continuing from the last one - a retaining wall beside
-  // some steps, a screen on its own. State rather than a ref so the start
-  // dot disappears the moment it lifts.
-  const [lifted, setLifted] = useState(false);
+  /*
+   * Lifted: the pen is off the paper. The next click puts it down somewhere
+   * NEW instead of continuing from the last run - a retaining wall beside
+   * some steps, a screen on its own. A ref, not state: the auto-continue
+   * below must not run when the pen is put down, only when a run is drawn.
+   * (As state it re-ran on un-lift and snapped the fresh start back onto
+   * the last run's end, so "New run" joined anyway.) The counter forces a
+   * repaint so the start dot follows.
+   */
+  const liftedRef = useRef(false);
+  const [, repaint] = useState(0);
+  const lift = () => { liftedRef.current = true; startRef.current = null; repaint(n => n + 1); };
 
-  // The pen picks up from the end of the last run, so a boundary is drawn
-  // corner to corner without re-clicking each one - unless it was lifted.
+  // After a run is drawn the pen continues from its end, so a boundary is
+  // drawn corner to corner without re-clicking each one - unless lifted.
   useEffect(() => {
-    if (toolMode !== 'fence') { startRef.current = null; setCursor(null); setLifted(false); return; }
-    if (lifted) { startRef.current = null; return; }
+    if (toolMode !== 'fence') { startRef.current = null; setCursor(null); liftedRef.current = false; return; }
+    if (liftedRef.current) return;
     const last = fences[fences.length - 1];
     startRef.current = last ? [last.bx, last.bz] : null;
-  }, [toolMode, fences, lifted]);
+  }, [toolMode, fences]);
 
   // Right-click on the ground, or the sidebar's New run button, lifts it.
   useEffect(() => {
     if (toolMode !== 'fence') return;
-    const lift = () => setLifted(true);
     window.addEventListener('fence-lift-pen', lift);
     return () => window.removeEventListener('fence-lift-pen', lift);
   }, [toolMode]);
@@ -237,16 +245,20 @@ export function FenceTool() {
         position={[0, 0.003, 0]}
         renderOrder={999}
         onPointerMove={(e) => { e.stopPropagation(); setCursor(snap(e.point.x, e.point.z)); }}
-        onContextMenu={(e) => { e.stopPropagation(); e.nativeEvent?.preventDefault?.(); setLifted(true); }}
+        onContextMenu={(e) => { e.stopPropagation(); e.nativeEvent?.preventDefault?.(); lift(); }}
         onPointerDown={(e) => {
           e.stopPropagation();
           // A right-click is the pen lifting, not a corner.
           if (e.button === 2) return;
           const p = snap(e.point.x, e.point.z);
           const st = useStore.getState();
-          if (!start) { startRef.current = p; setLifted(false); setCursor(p); return; }
+          // Pen down somewhere new. It stays "lifted" until a run is drawn
+          // from here, so the auto-continue cannot pull it back.
+          if (!start) { startRef.current = p; setCursor(p); repaint(n => n + 1); return; }
           if (Math.hypot(p[0] - start[0], p[1] - start[1]) < 0.1) return;
           st.saveState();
+          // A run drawn: the pen is on the paper again and continues from its end.
+          liftedRef.current = false;
           st.addFence(start[0], start[1], p[0], p[1]);
           // Closed the loop: done.
           if (first && p[0] === first[0] && p[1] === first[1]) st.setToolMode('select');
