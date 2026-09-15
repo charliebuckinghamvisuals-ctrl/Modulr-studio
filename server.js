@@ -283,16 +283,19 @@ const ANALYSIS_MODEL = 'gemini-3.8-flash';
 const ANIMATION_SECONDS = 8;
 
 /**
- * Which model animates - a switch for the A/B of 15 Sep 2026.
+ * Which model animates.
  *
- * 'veo' (default) is the Veo 3.1 Fast path above. 'kling' is Kling v3 Pro
- * through fal.ai's queue API: it leads one image-to-video arena at the same
- * price as Veo Fast (about $0.11/s at 1080p without audio) and needs
- * FAL_KEY on the server. Handles are kept opaque to the client: a Veo job
+ * Kling O3 Pro through fal.ai's queue API, decided 15 Sep 2026 after a
+ * like-for-like A/B against Veo 3.1 Fast on the same render: both held the
+ * building, Kling committed to the camera move where Veo barely moved, and
+ * the price is the same (~$0.11/s at 1080p without audio, ~90p a clip).
+ * Needs FAL_KEY on the server; without it the Veo path above still runs,
+ * so a missing key degrades rather than blanks the studio. ANIMATION_ENGINE=veo
+ * forces Veo for a comparison. Handles stay opaque to the client: a Veo job
  * is "models/.../operations/...", a Kling job is "kling:<request id>", and
  * /status and /video read the prefix to know which service to ask.
  */
-const ANIMATION_ENGINE = (process.env.ANIMATION_ENGINE === 'kling' && process.env.FAL_KEY) ? 'kling' : 'veo';
+const ANIMATION_ENGINE = (process.env.FAL_KEY && process.env.ANIMATION_ENGINE !== 'veo') ? 'kling' : 'veo';
 // Kling O3 Pro at 1080p: newer than v3 Pro at the same $0.112/s without
 // audio. The 4K variants cost $0.42/s and are not this. Override with
 // KLING_MODEL_ID to try another endpoint without a code change.
@@ -306,7 +309,8 @@ const klingStart = async ({ base64Image, prompt, negativePrompt, aspectRatio }) 
         method: 'POST',
         headers: falHeaders(),
         body: JSON.stringify({
-            start_image_url: `data:image/jpeg;base64,${base64Image}`,
+            // O3 takes image_url (v3 called it start_image_url).
+            image_url: `data:image/jpeg;base64,${base64Image}`,
             prompt,
             negative_prompt: negativePrompt,
             duration: String(ANIMATION_SECONDS),
@@ -330,11 +334,20 @@ const KLING_HANDLE_RE = /^kling:[a-zA-Z0-9-]{8,80}$/;
 /** Kling status: { done } or, when finished, { done: true, uri }. Throws on failure. */
 const klingResolve = async (handle) => {
     const id = handle.slice('kling:'.length);
-    const st = await fetch(`https://queue.fal.run/${KLING_MODEL_ID}/requests/${id}/status`, { headers: falHeaders() });
+    // Status and result live under the APP (owner/app), not the full model
+    // path - "fal-ai/kling-video", with "/o3/pro/image-to-video" being a
+    // route within it. The full path 405s.
+    const app = KLING_MODEL_ID.split('/').slice(0, 2).join('/');
+    const st = await fetch(`https://queue.fal.run/${app}/requests/${id}/status`, { headers: falHeaders() });
     const status = await st.json().catch(() => ({}));
     if (!st.ok) throw new Error(`Video status failed: ${st.status} ${JSON.stringify(status).slice(0, 200)}`);
     if (status.status !== 'COMPLETED') return { done: false };
-    const rs = await fetch(`https://queue.fal.run/${KLING_MODEL_ID}/requests/${id}/response`, { headers: falHeaders() });
+    // The result lives at the response_url the status hands back (the bare
+    // request URL - a "/response" suffix 405s). Taken from fal, checked to
+    // be fal, never built here.
+    const responseUrl = String(status.response_url || '');
+    if (!responseUrl.startsWith('https://queue.fal.run/')) throw new Error(`Video result URL unexpected: ${responseUrl.slice(0, 80)}`);
+    const rs = await fetch(responseUrl, { headers: falHeaders() });
     const result = await rs.json().catch(() => ({}));
     const uri = result?.video?.url;
     if (!rs.ok || !uri) throw new Error(`Video generation failed: ${JSON.stringify(result?.detail || result).slice(0, 300)}`);
@@ -1150,7 +1163,7 @@ console.log("PORT ENV:", process.env.PORT);
 console.log("PORT SELECT:", port);
 console.log("API KEY STATUS:", (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY) ? "EXISTS (SAFE)" : "MISSING");
 console.log("IMAGE ENGINE:", openAiReady() ? `${OPENAI_IMAGE_MODEL} (OPENAI_API_KEY present)` : "Gemini fallback - OPENAI_API_KEY MISSING, add it on Render");
-console.log("ANIMATION ENGINE:", ANIMATION_ENGINE === 'kling' ? `${KLING_LABEL} via fal.ai` : `${ANIMATION_MODEL} (set ANIMATION_ENGINE=kling + FAL_KEY to switch)`);
+console.log("ANIMATION ENGINE:", ANIMATION_ENGINE === 'kling' ? `${KLING_LABEL} via fal.ai` : `${ANIMATION_MODEL} - Veo fallback, FAL_KEY MISSING, add it on Render`);
 
 const distPath = path.join(__dirname, 'dist');
 if (fs.existsSync(distPath)) {
