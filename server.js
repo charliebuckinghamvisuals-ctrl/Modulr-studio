@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, GenerateVideosOperation } from "@google/genai";
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -3884,7 +3884,13 @@ const OPERATION_NAME_RE = /^models\/[a-zA-Z0-9._-]{1,80}\/operations\/[a-zA-Z0-9
 /** Resolve a finished video operation to its download URI, or null if it is
  *  still running. Throws if the operation itself failed. */
 const resolveVideoUri = async (operationName) => {
-    const op = await ai.operations.getVideosOperation({ operation: { name: operationName } });
+    // The SDK hydrates the result through the operation object it is given
+    // (operation._fromAPIResponse), so a bare { name } is refused with
+    // "_fromAPIResponse is not a function" and every status poll 500s. It
+    // has to be a real GenerateVideosOperation carrying the name.
+    const handle = new GenerateVideosOperation();
+    handle.name = operationName;
+    const op = await ai.operations.getVideosOperation({ operation: handle });
     if (!op?.done) return { done: false };
     if (op.error) {
         const detail = op.error.message || JSON.stringify(op.error);
