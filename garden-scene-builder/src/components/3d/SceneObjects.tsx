@@ -702,6 +702,33 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
         </Suspense>
       );
     }
+    if (obj.type === 'garden_steps') {
+      /*
+       * Three concrete treads, 150 rise x 300 going, climbing towards local
+       * -z so the object's front (the bottom step) faces +z like a unit's
+       * front. Width is the object's widthMm. Cast in one pale concrete
+       * with a slightly darker riser so the treads read in flat light.
+       */
+      const w = (obj.widthMm ?? 1200) / 1000;
+      const rise = 0.15, going = 0.3;
+      return (
+        <>
+          {[0, 1, 2].map(i => (
+            <mesh key={i} position={[0, (rise * (i + 1)) / 2, going - i * going]} castShadow receiveShadow>
+              <boxGeometry args={[w, rise * (i + 1), going]} />
+              <meshStandardMaterial color="#b8b4ad" roughness={0.95} metalness={0} />
+            </mesh>
+          ))}
+          {/* Tread nosings: a thin lighter lip on each front edge. */}
+          {[0, 1, 2].map(i => (
+            <mesh key={`n${i}`} position={[0, rise * (i + 1) - 0.006, going * 1.5 - i * going - 0.005]} receiveShadow>
+              <boxGeometry args={[w, 0.012, 0.03]} />
+              <meshStandardMaterial color="#c9c5bd" roughness={0.9} />
+            </mesh>
+          ))}
+        </>
+      );
+    }
     if (obj.type === 'tree') {
       return (
         <>

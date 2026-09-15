@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, createContext, useContext } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Settings, Plus, Box, Tent, Map, Settings2, Trash2, DoorOpen, DoorClosed, ChevronDown, ChevronRight, Save, FilePlus } from 'lucide-react';
+import { Settings, Plus, Box, Tent, Map, Settings2, Trash2, DoorOpen, DoorClosed, ChevronDown, ChevronRight, Save, FilePlus, Layers } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Link } from 'react-router-dom';
 import { gableCeilingMaxMm } from '../utils/placement';
@@ -1148,15 +1148,8 @@ export function Sidebar() {
                               </button>
                             ))}
                           </div>
-                          {meta.heights.length > 1 && (
-                            <div className="flex gap-1.5">
-                              {meta.heights.map(h => (
-                                <button key={h} onClick={() => apply({ heightMm: h })}
-                                  className={'flex-1 py-1 rounded-lg text-[10px] font-semibold border transition-colors ' + (cur.heightMm === h ? 'bg-[#3b4d4a] text-white border-transparent' : 'bg-white text-gray-600 border-black/10 hover:bg-gray-50')}>
-                                  {(h / 1000).toFixed(1)} m
-                                </button>
-                              ))}
-                            </div>
+                          {meta.kind !== 'open' && (
+                            <DimensionSlider label="Height" min={meta.minHeight} max={meta.maxHeight} step={50} value={cur.heightMm} onChange={(v) => apply({ heightMm: v })} />
                           )}
                           {meta.colours.length > 0 && (
                             <div className="flex flex-wrap gap-1.5">
@@ -1589,6 +1582,16 @@ export function Sidebar() {
               {!room.bay && <p className="text-[10px] text-gray-400 mb-2 leading-snug">Add an Outdoor Section on the Extras step first - these go in it.</p>}
               <div className="grid grid-cols-2 gap-2.5">
                 <ObjectTile type="hot_tub" label="Hot Tub" />
+              </div>
+            </section>
+
+            {/* Garden objects: placed anywhere on the plot, not clamped to
+                the room or the outdoor section. */}
+            <section>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-1 block">Garden</label>
+              <p className="text-[10px] text-gray-400 mb-2 leading-snug">Drop anywhere in the garden, then drag, turn and set the width.</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                <ObjectTile type="garden_steps" label="Concrete steps" icon={<Layers size={20} />} />
               </div>
             </section>
 

@@ -288,6 +288,8 @@ export const familyTypes = (f: UnitFamily) =>
  * slider is deliberately bounded rather than open-ended.
  */
 export const NATIVE_WIDTH_MM: Partial<Record<ObjectType, number>> = {
+  // Procedural garden steps: three concrete treads, sized by width.
+  garden_steps: 1200,
   // The base end panel's width along the run, so the worktop slab counts it.
   end_panel_base: 18,
   kitchen_unit_600: 600,
@@ -303,6 +305,7 @@ export const NATIVE_WIDTH_MM: Partial<Record<ObjectType, number>> = {
 
 /** Allowed width range per type, in mm. */
 export const WIDTH_RANGE_MM: Partial<Record<ObjectType, [number, number]>> = {
+  garden_steps: [600, 4000],
   kitchen_unit_600: [400, 900],
   kitchen_drawer_2: [400, 900],
   kitchen_drawer_3: [400, 900],
@@ -1052,6 +1055,7 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   aircon_indoor: 'Air Con (Wall Unit)',
   aircon_outdoor: 'Air Con (Outdoor Unit)',
   hot_tub: 'Hot Tub',
+  garden_steps: 'Concrete steps',
   bar_stool: 'Bar Stool',
   bar_stool_tall: 'Bar Stool (Tall)',
   toilet: 'Toilet',

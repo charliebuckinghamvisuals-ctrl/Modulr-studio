@@ -20,7 +20,9 @@ export interface BoundaryKindMeta {
   name: string;
   /** One line for the tooltip. */
   hint: string;
-  heights: number[];
+  /** Any height in this range, in 50 mm steps. */
+  minHeight: number;
+  maxHeight: number;
   defaultHeight: number;
   colours: ColourOption[];
   defaultColour: string;
@@ -42,23 +44,22 @@ const HEDGE_GREENS: ColourOption[] = [
   { id: '#7a5f3a', name: 'Beech (copper)', swatch: '#7a5f3a' },
 ];
 
-const FENCE_HEIGHTS = [1200, 1500, 1800, 2000];
 
 export const BOUNDARY_KINDS: BoundaryKindMeta[] = [
-  { kind: 'closeboard', name: 'Close-board', hint: 'Vertical boards on rails - the standard panel fence', heights: FENCE_HEIGHTS, defaultHeight: 1800, colours: TIMBER_STAINS, defaultColour: '#c9b08a' },
-  { kind: 'featheredge', name: 'Feather-edge', hint: 'Overlapping vertical boards, no gaps', heights: FENCE_HEIGHTS, defaultHeight: 1800, colours: TIMBER_STAINS, defaultColour: '#b8894f' },
-  { kind: 'slatted', name: 'Slatted', hint: 'Horizontal slats with a gap - the contemporary screen', heights: FENCE_HEIGHTS, defaultHeight: 1800, colours: TIMBER_STAINS, defaultColour: '#2b2b2b' },
-  { kind: 'hitmiss', name: 'Hit & miss', hint: 'Horizontal boards alternating front and back', heights: FENCE_HEIGHTS, defaultHeight: 1800, colours: TIMBER_STAINS, defaultColour: '#7a5a3a' },
-  { kind: 'brick', name: 'Brick wall', hint: 'Half-brick wall with a coping course', heights: [600, 900, 1200, 1500, 1800], defaultHeight: 1200, colours: [
+  { kind: 'closeboard', name: 'Close-board', hint: 'Vertical boards on rails - the standard panel fence', minHeight: 600, maxHeight: 2500, defaultHeight: 1800, colours: TIMBER_STAINS, defaultColour: '#c9b08a' },
+  { kind: 'featheredge', name: 'Feather-edge', hint: 'Overlapping vertical boards, no gaps', minHeight: 600, maxHeight: 2500, defaultHeight: 1800, colours: TIMBER_STAINS, defaultColour: '#b8894f' },
+  { kind: 'slatted', name: 'Slatted', hint: 'Horizontal slats with a gap - the contemporary screen', minHeight: 600, maxHeight: 2500, defaultHeight: 1800, colours: TIMBER_STAINS, defaultColour: '#2b2b2b' },
+  { kind: 'hitmiss', name: 'Hit & miss', hint: 'Horizontal boards alternating front and back', minHeight: 600, maxHeight: 2500, defaultHeight: 1800, colours: TIMBER_STAINS, defaultColour: '#7a5a3a' },
+  { kind: 'brick', name: 'Brick wall', hint: 'Half-brick wall with a coping course', minHeight: 300, maxHeight: 3000, defaultHeight: 1200, colours: [
     { id: 'red', name: 'Red', swatch: '#8e5a4a' },
     { id: 'buff', name: 'Buff', swatch: '#c9a878' },
   ], defaultColour: 'red' },
-  { kind: 'stone', name: 'Stone wall', hint: 'Coursed or dry stone with a rough cope', heights: [600, 900, 1200, 1500], defaultHeight: 900, colours: [
+  { kind: 'stone', name: 'Stone wall', hint: 'Coursed or dry stone with a rough cope', minHeight: 300, maxHeight: 3000, defaultHeight: 900, colours: [
     { id: 'dry', name: 'Dry stone', swatch: '#6b5a4a' },
     { id: 'cotswold', name: 'Cotswold', swatch: '#c8b892' },
   ], defaultColour: 'cotswold' },
-  { kind: 'hedge', name: 'Hedge', hint: 'A clipped hedge on the line', heights: [1200, 1500, 1800, 2000, 2500], defaultHeight: 1800, colours: HEDGE_GREENS, defaultColour: '#3f6b2f' },
-  { kind: 'open', name: 'Open', hint: 'No boundary here - a line on the plan only', heights: [0], defaultHeight: 0, colours: [], defaultColour: '' },
+  { kind: 'hedge', name: 'Hedge', hint: 'A clipped hedge on the line', minHeight: 400, maxHeight: 4000, defaultHeight: 1800, colours: HEDGE_GREENS, defaultColour: '#3f6b2f' },
+  { kind: 'open', name: 'Open', hint: 'No boundary here - a line on the plan only', minHeight: 0, maxHeight: 0, defaultHeight: 0, colours: [], defaultColour: '' },
 ];
 
 export const boundaryMeta = (kind: BoundaryKind): BoundaryKindMeta =>
@@ -76,7 +77,8 @@ export const runStyle = (run: FenceRun, fallback?: BoundaryStyle): BoundaryStyle
   const heightMm = run.heightMm ?? (run.kind && run.kind !== base.kind ? meta.defaultHeight : base.heightMm);
   const colourOk = (c: string | undefined) => !!c && (meta.colours.length === 0 || meta.colours.some(o => o.id === c) || /^#[0-9a-f]{6}$/i.test(c) && meta.colours.some(o => o.id.startsWith('#')));
   const colour = colourOk(run.colour) ? run.colour! : (run.kind === undefined && colourOk(base.colour) ? base.colour : meta.defaultColour);
-  return { kind, heightMm: meta.heights.includes(heightMm) ? heightMm : meta.defaultHeight, colour };
+  const clampedH = Math.min(meta.maxHeight, Math.max(meta.minHeight, Math.round(heightMm / 50) * 50));
+  return { kind, heightMm: Number.isFinite(heightMm) ? clampedH : meta.defaultHeight, colour };
 };
 
 /** What the render prompt is told about a run. */

@@ -166,6 +166,7 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
   // A 60mm bezel - anything like a normal ring would swallow the ceiling.
   spot_light: 0.16,
   hot_tub: 1.5,
+  garden_steps: 0.8,
   wall_light_sconce: 0.3, wall_light_angled: 0.3, wall_light_box: 0.3,
   pool_table: 1.35, arcade_machine: 0.55, wall_tv: 0.75, dart_board: 0.4,
 };

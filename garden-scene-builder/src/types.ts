@@ -32,6 +32,8 @@ export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 
  | 'aircon_indoor' | 'aircon_outdoor'
  // Outdoor section (utils/bay).
  | 'hot_tub'
+ // Free garden objects: anywhere on the plot, not clamped to the room or the bay.
+ | 'garden_steps'
  // Exterior wall lights: on the outside faces of the building (utils/placement snapToOutsideWall).
  | 'wall_light_sconce' | 'wall_light_angled' | 'wall_light_box'
  // Games room.
