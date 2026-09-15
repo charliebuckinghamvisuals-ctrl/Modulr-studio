@@ -32,8 +32,16 @@ export const BUILDING_STEPS = [
   { id: 'interior', label: 'Interior' },
 ] as const;
 
-function CollapsibleSection({ title, children, defaultOpen = false, step }: { title: string, children: React.ReactNode, defaultOpen?: boolean, step?: string }) {
+function CollapsibleSection({ title, children, defaultOpen = false, step, openOn }: { title: string, children: React.ReactNode, defaultOpen?: boolean, step?: string, openOn?: string }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  // A section can be told to open by a window event - clicking a boundary
+  // run in the scene opens Garden Boundary, so the pick has somewhere to go.
+  useEffect(() => {
+    if (!openOn) return;
+    const open = () => setIsOpen(true);
+    window.addEventListener(openOn, open);
+    return () => window.removeEventListener(openOn, open);
+  }, [openOn]);
   const activeStep = useContext(StepContext);
   // The public configurator has no interior step at all.
   const isPublic = useStore(s => s.configMode === 'public');
@@ -111,6 +119,13 @@ export function Sidebar() {
   const [confirmNew, setConfirmNew] = useState(false);
   const [tab, setTab] = useState('building');
   const [step, setStep] = useState<string>('size');
+  // Picking a run in the scene brings the Extras step (and the Building tab)
+  // forward so the boundary panel is on screen.
+  useEffect(() => {
+    const go = () => { setTab('building'); setStep('extras'); };
+    window.addEventListener('boundary-picked', go);
+    return () => window.removeEventListener('boundary-picked', go);
+  }, []);
 
   return (
     <div className="flex flex-col h-full bg-transparent text-[#1d1d1f]">
@@ -1076,7 +1091,7 @@ export function Sidebar() {
             {/* The garden boundary: fence runs drawn on the ground to mark out
                 and measure the plot - each run's length, the perimeter, and
                 the enclosed area once the loop is closed. */}
-            <CollapsibleSection title="Garden Boundary" step="extras">
+            <CollapsibleSection title="Garden Boundary" step="extras" openOn="boundary-picked">
               {(() => {
                 const fences = scene.fences || [];
                 const drawing = toolMode === 'fence';
@@ -1087,7 +1102,7 @@ export function Sidebar() {
                 const btn = 'px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-white border border-black/10 ';
                 return (
                   <div className="space-y-3">
-                    <p className="text-[10px] text-gray-400 leading-snug">Click the ground to set each corner of your garden. Click the first corner again to close it, Esc to stop.</p>
+                    <p className="text-[10px] text-gray-400 leading-snug">Click the ground to set each corner of your garden. Click the first corner again to close it, Esc to stop. Right-click (or New run) lifts the pen so the next click starts a separate run - a wall beside some steps, say.</p>
                     <div className="flex gap-2">
                       <button
                         onClick={() => store.setToolMode(drawing ? 'select' : 'fence')}
@@ -1097,6 +1112,9 @@ export function Sidebar() {
                       </button>
                       {canClose && (
                         <button onClick={() => { store.saveState(); store.addFence(last.bx, last.bz, fences[0].ax, fences[0].az); store.setToolMode('select'); }} className={btn + 'text-[#3b4d4a] hover:bg-gray-50'}>Close</button>
+                      )}
+                      {drawing && fences.length > 0 && (
+                        <button onClick={() => window.dispatchEvent(new CustomEvent('fence-lift-pen'))} className={btn + 'text-[#3b4d4a] hover:bg-gray-50'} title="Start a separate run that does not join the last one">New run</button>
                       )}
                       {fences.length > 0 && (
                         <button onClick={() => { store.saveState(); store.clearFences(); }} className={btn + 'text-gray-500 hover:text-red-500'}>Clear</button>
@@ -1150,6 +1168,9 @@ export function Sidebar() {
                           </div>
                           {meta.kind !== 'open' && (
                             <DimensionSlider label="Height" min={meta.minHeight} max={meta.maxHeight} step={50} value={cur.heightMm} onChange={(v) => apply({ heightMm: v })} />
+                          )}
+                          {meta.thickness && (
+                            <DimensionSlider label="Thickness" min={meta.thickness.min} max={meta.thickness.max} step={5} value={cur.thicknessMm ?? meta.thickness.default} onChange={(v) => apply({ thicknessMm: v })} />
                           )}
                           {meta.colours.length > 0 && (
                             <div className="flex flex-wrap gap-1.5">

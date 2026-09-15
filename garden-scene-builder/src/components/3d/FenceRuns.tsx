@@ -142,7 +142,10 @@ function Run({ run, showLabel }: { run: FenceRun; showLabel: boolean }) {
     <group
       // Click a run to restyle it in the sidebar. The ground plane clears
       // the selection, as it does for objects.
-      onPointerDown={(e) => { if (useStore.getState().toolMode !== 'select') return; e.stopPropagation(); useStore.getState().setSelectedFenceId(run.id); }}
+      onPointerDown={(e) => { if (useStore.getState().toolMode !== 'select') return; e.stopPropagation(); useStore.getState().setSelectedFenceId(run.id); window.dispatchEvent(new CustomEvent('boundary-picked')); }}
+      // The ground plane clears the selection on pointer UP, not down - so
+      // without this the pick showed for one frame and vanished.
+      onPointerUp={(e) => { if (useStore.getState().toolMode !== 'select') return; e.stopPropagation(); }}
     >
       {body}
       {/* A generous invisible hit box: a slatted fence is mostly gaps. */}
@@ -184,14 +187,28 @@ export function FenceTool() {
   const fences = useStore(s => s.scene.fences);
   const [cursor, setCursor] = useState<[number, number] | null>(null);
   const startRef = useRef<[number, number] | null>(null);
+  // Lifted: the pen is off the paper, so the next click starts a NEW run
+  // rather than continuing from the last one - a retaining wall beside
+  // some steps, a screen on its own. State rather than a ref so the start
+  // dot disappears the moment it lifts.
+  const [lifted, setLifted] = useState(false);
 
   // The pen picks up from the end of the last run, so a boundary is drawn
-  // corner to corner without re-clicking each one.
+  // corner to corner without re-clicking each one - unless it was lifted.
   useEffect(() => {
-    if (toolMode !== 'fence') { startRef.current = null; setCursor(null); return; }
+    if (toolMode !== 'fence') { startRef.current = null; setCursor(null); setLifted(false); return; }
+    if (lifted) { startRef.current = null; return; }
     const last = fences[fences.length - 1];
     startRef.current = last ? [last.bx, last.bz] : null;
-  }, [toolMode, fences]);
+  }, [toolMode, fences, lifted]);
+
+  // Right-click on the ground, or the sidebar's New run button, lifts it.
+  useEffect(() => {
+    if (toolMode !== 'fence') return;
+    const lift = () => setLifted(true);
+    window.addEventListener('fence-lift-pen', lift);
+    return () => window.removeEventListener('fence-lift-pen', lift);
+  }, [toolMode]);
 
   useEffect(() => {
     if (toolMode !== 'fence') return;
@@ -220,11 +237,14 @@ export function FenceTool() {
         position={[0, 0.003, 0]}
         renderOrder={999}
         onPointerMove={(e) => { e.stopPropagation(); setCursor(snap(e.point.x, e.point.z)); }}
+        onContextMenu={(e) => { e.stopPropagation(); e.nativeEvent?.preventDefault?.(); setLifted(true); }}
         onPointerDown={(e) => {
           e.stopPropagation();
+          // A right-click is the pen lifting, not a corner.
+          if (e.button === 2) return;
           const p = snap(e.point.x, e.point.z);
           const st = useStore.getState();
-          if (!start) { startRef.current = p; setCursor(p); return; }
+          if (!start) { startRef.current = p; setLifted(false); setCursor(p); return; }
           if (Math.hypot(p[0] - start[0], p[1] - start[1]) < 0.1) return;
           st.saveState();
           st.addFence(start[0], start[1], p[0], p[1]);

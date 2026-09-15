@@ -184,8 +184,7 @@ export function HitMissRun({ len, style }: RunFrame & { style: BoundaryStyle }) 
 /** Brick or stone: a solid wall with a coping course proud of both faces. */
 export function WallRun({ len, style }: RunFrame & { style: BoundaryStyle }) {
   const h = style.heightMm / 1000;
-  const brick = style.kind === 'brick';
-  const t = brick ? 0.215 : 0.4;
+  const t = (style.thicknessMm ?? (style.kind === 'brick' ? 215 : 400)) / 1000;
   const mat = useWallMaterial(style.colour);
   const geom = useMemo(() => merge([
     box(len, h - 0.05, t, len / 2, (h - 0.05) / 2, 0),
@@ -198,7 +197,8 @@ export function WallRun({ len, style }: RunFrame & { style: BoundaryStyle }) {
 export function HedgeRun({ len, style }: RunFrame & { style: BoundaryStyle }) {
   const h = style.heightMm / 1000;
   const mat = useHedgeMaterial(style.colour);
-  const geom = useMemo(() => merge([box(len, h, 0.6, len / 2, h / 2, 0)]), [len, h]);
+  const t = (style.thicknessMm ?? 600) / 1000;
+  const geom = useMemo(() => merge([box(len, h, t, len / 2, h / 2, 0)]), [len, h, t]);
   return <mesh geometry={geom} material={mat} castShadow receiveShadow />;
 }
 

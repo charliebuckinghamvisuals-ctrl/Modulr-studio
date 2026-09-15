@@ -358,6 +358,8 @@ export interface BoundaryStyle {
   kind: BoundaryKind;
   heightMm: number;
   colour: string;
+  /** Walls and hedges only; timber fences are as thick as their boards. */
+  thicknessMm?: number;
 }
 
 export interface FenceRun extends Partial<BoundaryStyle> {
