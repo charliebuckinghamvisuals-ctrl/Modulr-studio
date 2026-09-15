@@ -175,15 +175,28 @@ ${cameraEffects ? `      - CAMERA EFFECTS ON: shallow-to-moderate depth of field
         Render as an offline archviz engine outputs a frame: everything in focus.
       - Keep the frame clear of clutter; nothing should compete with the building.`}
 
-      LIGHTING:
-      - Soft, bright, overcast daylight. Diffuse and even, no harsh direct sun,
-        no blown highlights, no heavy black shadows.
-      - Gentle ambient occlusion under the eaves, soffits and decking edge.
-      - Subtle, believable contact shadow where the structure meets the ground.
+      LIGHTING - EDITORIAL, NOT OVERCAST:
+      - Late golden hour into early dusk: a low, warm sun from the side, long soft
+        shadows across the lawn, the sky graded from warm near the horizon to a
+        cool clear blue above. This is the light a magazine would shoot in.
+      - INTERIOR LIGHTS ON: a warm glow through every pane of glazing, showing a
+        furnished, lived-in interior - a desk or sofa, a lamp, shelving, a rug.
+        Any soffit downlights, wall lights or external fittings on the building
+        are lit and casting their own soft pools.
+      - No blown highlights, no crushed blacks; warm and cool balanced, the
+        building still reading at its true material colour.
+      - Gentle ambient occlusion under the eaves, soffits and decking edge, and a
+        believable contact shadow where the structure meets the ground.
 
-      COMPOSITION & CONTEXT:
-      - A realistic UK domestic rear garden: mown lawn, timber fence panels with
-        concrete posts, mature planting, neighbouring rooftops in the distance.
+      COMPOSITION & CONTEXT - A DESIGNED GARDEN:
+      - A mature, designed UK rear garden, styled like an editorial photograph
+        rather than a builder's yard: a neatly mown lawn; layered borders of
+        ornamental grasses, hydrangeas, lavender and evergreen shrubs; one or
+        two statement pots with an olive or a clipped bay by the doors; a lantern
+        or two; a pebble or paving margin where lawn meets building; a timber
+        fence or hedge behind; mature trees and neighbouring rooflines softening
+        the edges. Everything looks installed and tended, nothing looks placed
+        for the shot. Styled, not cluttered: nothing competes with the building.
       - The building occupies the majority of the frame with comfortable breathing
         space. Not a wide landscape shot. THIS NEVER JUSTIFIES MOVING THE CAMERA:
         when the source image establishes a viewpoint, its exact framing wins -
@@ -191,11 +204,12 @@ ${cameraEffects ? `      - CAMERA EFFECTS ON: shallow-to-moderate depth of field
       - Horizon level, verticals true, no wide-angle distortion or converging walls.
 
       FINISH:
-      - Neutral, true-to-life colour grade. Materials read at their real colour.
-      - No oversaturation, no HDR halos, no heavy vignette, no lens flare.
+      - Warm, natural, true-to-life colour grade - the materials read at their
+        real colour under real evening light. No oversaturation, no HDR halos, no
+        heavy vignette, no lens flare.
       - Crisp micro-texture: timber grain, board joints, glass reflections, grass blades.
       - Presentation condition: every material newly installed, clean and true. No
-        moss, staining, weathering or garden clutter - this is a marketing visual.
+        moss, staining or weathering - this is a marketing visual.
       - ZERO AI ARTIFACTS: no warped or wavy lines that should be straight, no
         melted or merged elements, no duplicated fence posts or cladding boards,
         no smudged painterly patches, no impossible reflections, no inconsistent
@@ -499,19 +513,37 @@ const releaseFourKExport = async (uid) => {
  * prompts, so "not a full zoom" has to become "ending only slightly nearer than
  * it began" or it simply will not be honoured.
  */
+/**
+ * Camera moves. Written for Kling (15 Sep 2026), which does what it is
+ * told: the old Veo wording - "almost imperceptibly closer", "only slightly
+ * nearer" - came back as a clip in which nothing moved at all. Each move is
+ * now a real, visible move, still smooth and slow, and the framing rule
+ * (same angle, same side of the building) is stated with it.
+ */
 const ANIMATION_PRESETS = {
-    push_in: 'The camera drifts almost imperceptibly closer over the full duration, ending only slightly nearer than it began. The movement is one continuous, slow, steady glide, as if on a motorised slider.',
-    pan: 'The camera glides slowly and evenly sideways across the scene in one continuous motion, as if on a motorised slider. The pace is identical from the first frame to the last.',
-    orbit: 'The camera arcs very slowly around the building in one smooth continuous move, travelling only a short distance so the same face of the building stays in view throughout.',
-    still: 'The camera is locked off on a tripod and does not move. Only the scene itself has life in it.',
+    push_in: 'CAMERA: a slow, steady push-in on a motorised slider, moving smoothly towards the building for the whole clip so it is noticeably closer and larger in frame by the end. The camera angle and the side of the building in view never change; it moves straight forward, never tilts, never cuts.',
+    pan: 'CAMERA: a slow, even sideways tracking move on a motorised slider, gliding across the scene at one constant pace for the whole clip, the building sliding smoothly through the frame. Same height, same angle, no tilt, no cut.',
+    orbit: 'CAMERA: a slow, smooth arc around the building at a constant distance, travelling far enough that the perspective visibly changes while the same face of the building stays in view. No tilt, no cut.',
+    still: 'CAMERA: locked off on a tripod, perfectly still for the whole clip. All the movement is in the scene: wind, sky, light and wildlife.',
 };
 
 const ANIMATION_MODIFIERS = {
     motion_blur: 'Subtle natural motion blur consistent with a real cinema camera at a 180 degree shutter angle.',
-    breeze: 'The existing leaves, grass and planting sway gently in a light breeze, every plant staying rooted in its own place.',
+    breeze: 'A stronger breeze: the trees and shrubs sway visibly, grass ripples in waves across the lawn, leaves flutter and a few drift loose, every plant staying rooted where it grows.',
     golden_hour: 'Warm low golden-hour sunlight with long soft shadows.',
     people: 'A person walks slowly through the scene in the distance, small in frame and out of focus.',
 };
+
+/**
+ * The life every clip has, whether or not a modifier asks for more. Without
+ * this the lock below reads as "hold still", and a still is not an
+ * animation: the garden should look like a real place on a real day.
+ */
+const ANIMATION_AMBIENT_MOTION =
+    'LIVING SCENE: the garden is alive. Leaves and branches move gently in a light wind, grass and long planting sway, ornamental grasses nod. ' +
+    'Clouds drift slowly across the sky. A few small birds fly across the far distance. ' +
+    'Light plays on the glazing - soft reflections of the moving trees and sky in the windows and doors. ' +
+    'Shadows soften and shift almost imperceptibly as the light changes. The movement is natural, continuous and gentle, never a gust, never a cut.';
 
 /** Scene lock, stated twice on purpose.
  *
@@ -522,14 +554,18 @@ const ANIMATION_MODIFIERS = {
  *  repeated AFTER the user's free-text — the model weights the end of a prompt
  *  heavily, so user wording can otherwise drown out an opening-only lock.
  *  Phrased entirely positively: this model does not honour "do not" wording. */
+/**
+ * The lock is on the BUILDING and the layout, not on the scene as a whole.
+ * The earlier wording locked "every plant in exactly the same place, under
+ * the same sky and the same lighting" and asked that any paused frame match
+ * the source - which is a request for a photograph, and Kling obliged.
+ */
 const ANIMATION_SCENE_LOCK_OPENING =
-    'This is documentary footage of an existing, finished scene, captured exactly as it stands. ' +
-    'Every frame of the clip shows the same building with the same geometry, proportions, cladding, doors, windows and colours as the source image, ' +
-    'and the same garden with every plant, tree, path, fence and object in exactly the same place, under the same sky and the same lighting.';
+    'BUILDING LOCK: the garden room is a real, finished building and stays exactly as the source image shows it in every frame - ' +
+    'the same geometry, proportions, roof, cladding, doors, windows and colours, with nothing added, removed, moved or restyled. ' +
+    'Paths, fences, walls, furniture and planting stay where they are; only the camera and natural motion change.';
 const ANIMATION_SCENE_LOCK_CLOSING =
-    'From the first frame to the last, the scene itself stays identical to the source image; ' +
-    'the camera move and the gentle natural motion described above are the only things that change. ' +
-    'Pausing on any single frame shows the source image scene, unchanged, viewed from wherever the camera is at that moment.';
+    'The building never changes; the garden around it breathes. No cuts, no scene changes, one continuous shot.';
 
 /**
  * What must never appear. Veo honours negative prompts; the previous model did
@@ -553,15 +589,17 @@ const ANIMATION_NEGATIVE_PROMPT = [
  *  camera, then atmosphere, then the user's text, then the scene lock again so
  *  it is the last instruction the model reads. */
 const buildAnimationPrompt = (preset, modifiers, extra) => {
+    // Order matters to Kling: what should MOVE comes before what must not.
     const parts = [
-        'Cinematic architectural film of this garden room, filmed on a full-frame cinema camera.',
-        ANIMATION_SCENE_LOCK_OPENING,
+        'Cinematic architectural film of this garden room on a calm summer day, filmed on a full-frame cinema camera.',
         ANIMATION_PRESETS[preset] || ANIMATION_PRESETS.push_in,
+        ANIMATION_AMBIENT_MOTION,
     ];
     for (const m of modifiers) {
         if (ANIMATION_MODIFIERS[m]) parts.push(ANIMATION_MODIFIERS[m]);
     }
-    if (extra) parts.push(extra);
+    if (extra) parts.push('DIRECTOR\x27S NOTES: ' + extra);
+    parts.push(ANIMATION_SCENE_LOCK_OPENING);
     parts.push(ANIMATION_SCENE_LOCK_CLOSING);
     return parts.join(' ');
 };
@@ -2674,6 +2712,13 @@ ${lines.join('\n')}
         materials and finish only - never the viewpoint.
       - IGNORE 3D GRID LINES: the source may show a floor grid on the ground. Never render
         these. Replace with natural, seamless ground or grass.
+      - SET DRESSING: the flat green ground plane, the blank sky and the empty
+        surroundings in this 3D view are PLACEHOLDERS, not the design. Build the
+        designed garden and evening light described in the house style around the
+        building. Anything actually modelled in the view - decking, a canopy, a
+        boundary fence or wall, paths - is part of the design and is kept exactly
+        where it is; the planting, pots, lawn detail, sky and neighbours are yours
+        to dress.
 
       ${configSpecBlock}
 
