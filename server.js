@@ -2338,6 +2338,12 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                         .filter(Boolean);
                     if (runs.length) lines.push(`- GARDEN BOUNDARY, exactly as drawn in the source image and to be kept where it is: ${runs.join('; ')}. Render each run in that material at that height. A run listed as open has no fence or wall - leave it open. Do not add any fence, wall or hedge that is not listed.`);
                 }
+                // PATHS - the paved ribbons drawn on the plan, kept on their line.
+                const paths = Array.isArray(spec.garden?.paths) ? spec.garden.paths.slice(0, 12) : [];
+                if (paths.length) {
+                    const list = paths.map((p, i) => (typeof p?.text === 'string' && p.text.trim()) ? `path ${i + 1}: ${sanitizeString(p.text, 120)}` : null).filter(Boolean);
+                    if (list.length) lines.push(`- GARDEN PATHS, exactly where the source image shows them, in the paving named: ${list.join('; ')}. Keep every path on its drawn line at its drawn width, with crisp, level, evenly jointed paving. Do not add any path, patio or paving that is not listed.`);
+                }
 
                 /**
                  * CLADDING COLOUR, PER ELEVATION - from the client's order.

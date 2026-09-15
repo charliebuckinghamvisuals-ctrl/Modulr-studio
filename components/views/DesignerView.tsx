@@ -103,7 +103,7 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
         setSaveTarget('__new__');
         setPendingSave({
           room,
-          scene: { v: 2, room, objects: scene?.objects || [], fences: scene?.fences || [], garden: scene?.garden },
+          scene: { v: 2, room, objects: scene?.objects || [], fences: scene?.fences || [], paths: scene?.paths || [], garden: scene?.garden },
           price: typeof price === 'number' ? Math.round(price) : null,
         });
         return;

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SceneState, SceneObject, BoundaryStyle, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
+import { SceneState, SceneObject, BoundaryStyle, PathRun, PathSurface, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { isInteriorType, clampToRoomInterior, snapTap } from './utils/placement';
 import { bayRange, wallSpanMm } from './utils/bay';
@@ -43,6 +43,14 @@ interface AppState {
   /** The run picked on the plan or in 3D, for the boundary style panel. */
   selectedFenceId: string | null;
   setSelectedFenceId: (id: string | null) => void;
+  /** Garden paths (components/3d/Paths): a finished polyline becomes a path
+   *  at the current pathStyle; updatePath restyles one, or all with null. */
+  addPath: (points: [number, number][]) => void;
+  updatePath: (id: string | null, patch: Partial<{ widthMm: number; surface: PathSurface }>) => void;
+  removePath: (id: string) => void;
+  clearPaths: () => void;
+  selectedPathId: string | null;
+  setSelectedPathId: (id: string | null) => void;
   setActivePlacementType: (type: ObjectType | null) => void;
   setSelectedObjectId: (id: string | null) => void;
   setSelectedElementId: (id: string | null) => void;
@@ -123,7 +131,7 @@ interface AppState {
   /** Load a saved design. Accepts the full scene the host saves now
    *  ({ room, objects, fences }) or the bare room older saves hold; either
    *  way the room is merged over defaults so fields added since still load. */
-  loadRoom: (design: Partial<SceneState['room']> | { room: Partial<SceneState['room']>; objects?: SceneObject[]; fences?: SceneState['fences'] }) => void;
+  loadRoom: (design: Partial<SceneState['room']> | { room: Partial<SceneState['room']>; objects?: SceneObject[]; fences?: SceneState['fences']; paths?: PathRun[] }) => void;
   /** Apply a starting template: merges its room over the current one and
    *  replaces the placed objects. Undoable like any other edit. */
   applyPreset: (room: Partial<SceneState['room']>, objects: Array<Omit<SceneState['objects'][0], 'id'>>) => void;
@@ -311,6 +319,7 @@ const initialState: SceneState = {
   },
   objects: [],
   fences: [],
+  paths: [],
   pricing: {
     basePricePerSqm: 1200,
     canopyPricePerSqm: 300,
@@ -402,7 +411,7 @@ function loadAutosave(): SceneState | null {
       const s = snapTap(o.type, o.x, o.z, parsed.objects, o.id);
       return s ? { ...o, x: s.x, z: s.z, rot: s.rot } : o;
     });
-    return { ...initialState, ...parsed, objects, room: { ...initialState.room, ...parsed.room } };
+    return { ...initialState, ...parsed, objects, paths: Array.isArray(parsed.paths) ? parsed.paths : [], room: { ...initialState.room, ...parsed.room } };
   } catch {
     return null;
   }
@@ -440,6 +449,20 @@ export const useStore = create<AppState>((set, get) => ({
   })),
   selectedFenceId: null,
   setSelectedFenceId: (id) => set({ selectedFenceId: id }),
+  addPath: (points) => set((state) => ({
+    scene: { ...state.scene, paths: [...(state.scene.paths || []), { id: uuidv4(), points, widthMm: state.scene.pathStyle?.widthMm ?? 900, surface: state.scene.pathStyle?.surface ?? 'stone' }] },
+  })),
+  updatePath: (id, patch) => set((state) => ({
+    scene: {
+      ...state.scene,
+      paths: (state.scene.paths || []).map(p => (id === null || p.id === id) ? { ...p, ...patch } : p),
+      pathStyle: id === null ? { widthMm: 900, surface: 'stone', ...(state.scene.pathStyle || {}), ...patch } : state.scene.pathStyle,
+    },
+  })),
+  removePath: (id) => set((state) => ({ scene: { ...state.scene, paths: (state.scene.paths || []).filter(p => p.id !== id) }, selectedPathId: state.selectedPathId === id ? null : state.selectedPathId })),
+  clearPaths: () => set((state) => ({ scene: { ...state.scene, paths: [] }, selectedPathId: null })),
+  selectedPathId: null,
+  setSelectedPathId: (id) => set({ selectedPathId: id }),
   removeFence: (id) => set((state) => ({
     scene: { ...state.scene, fences: (state.scene.fences || []).filter(f => f.id !== id) },
   })),
@@ -562,7 +585,7 @@ export const useStore = create<AppState>((set, get) => ({
     // A full save carries its room under 'room'; a legacy save IS the room.
     const full = design && typeof design === 'object' && 'room' in design && design.room && typeof design.room === 'object';
     const room = full ? (design as { room: Partial<SceneState['room']> }).room : (design as Partial<SceneState['room']>);
-    const saved = full ? (design as { objects?: SceneObject[]; fences?: SceneState['fences'] }) : {};
+    const saved = full ? (design as { objects?: SceneObject[]; fences?: SceneState['fences']; paths?: PathRun[] }) : {};
     const objects = Array.isArray(saved.objects)
       ? saved.objects.map(o => { const t = snapTap(o.type, o.x, o.z, saved.objects!, o.id); return t ? { ...o, x: t.x, z: t.z, rot: t.rot } : o; })
       : state.scene.objects;
@@ -576,6 +599,7 @@ export const useStore = create<AppState>((set, get) => ({
         room: { ...initialState.room, ...room },
         objects,
         fences: Array.isArray(saved.fences) ? saved.fences : state.scene.fences,
+        paths: Array.isArray(saved.paths) ? saved.paths : state.scene.paths,
       },
       selectedElementId: null,
       selectedObjectId: null,

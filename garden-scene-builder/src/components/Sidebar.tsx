@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { gableCeilingMaxMm } from '../utils/placement';
 import { fenceLength, fenceArea } from './3d/FenceRuns';
 import { BOUNDARY_KINDS, boundaryMeta, runStyle, describeBoundary } from '../utils/boundary';
+import { PATH_SURFACES, pathLength, describePath } from './3d/Paths';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS, INTERIOR_DOOR_STYLES } from '../modelRegistry';
@@ -93,6 +94,7 @@ export function Sidebar() {
   const store = useStore.getState();
   const toolMode = useStore(s => s.toolMode);
   const selectedFenceId = useStore(s => s.selectedFenceId);
+  const selectedPathId = useStore(s => s.selectedPathId);
   const wrap = (fn: any) => (...args: any[]) => { store.saveState(); fn(...args); };
   // Reactive read so the selected wall's card highlights as selection changes.
   const selectedElementId = useStore(s => s.selectedElementId);
@@ -124,7 +126,8 @@ export function Sidebar() {
   useEffect(() => {
     const go = () => { setTab('building'); setStep('extras'); };
     window.addEventListener('boundary-picked', go);
-    return () => window.removeEventListener('boundary-picked', go);
+    window.addEventListener('path-picked', go);
+    return () => { window.removeEventListener('boundary-picked', go); window.removeEventListener('path-picked', go); };
   }, []);
 
   return (
@@ -1190,6 +1193,65 @@ export function Sidebar() {
               })()}
             </CollapsibleSection>
 
+            {/* Paths: click out a line anywhere on the plot, at a width, in
+                stone. Finished with Enter, right-click or the button. */}
+            <CollapsibleSection title="Paths" step="extras" openOn="path-picked">
+              {(() => {
+                const paths = scene.paths || [];
+                const drawing = toolMode === 'path';
+                const target = paths.find(p => p.id === selectedPathId) ?? null;
+                const cur = target ? { widthMm: target.widthMm, surface: target.surface } : { widthMm: scene.pathStyle?.widthMm ?? 900, surface: scene.pathStyle?.surface ?? 'stone' };
+                const apply = (patch: Partial<typeof cur>) => { store.saveState(); store.updatePath(target ? target.id : null, patch); };
+                const btn = 'px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-white border border-black/10 ';
+                return (
+                  <div className="space-y-3">
+                    <p className="text-[10px] text-gray-400 leading-snug">Click the ground for each point of the path, then Finish (or Enter, or right-click). Paths go anywhere - house to garden room, round the side, across the lawn.</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { if (drawing) window.dispatchEvent(new CustomEvent('path-finish')); store.setToolMode(drawing ? 'select' : 'path'); }}
+                        className={'flex-1 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-colors ' + (drawing ? 'bg-emerald-500 text-white' : 'bg-[#3b4d4a] text-white hover:bg-[#2d3a38]')}
+                      >
+                        {drawing ? 'Finish path' : 'Draw a path'}
+                      </button>
+                      {paths.length > 0 && !drawing && (
+                        <button onClick={() => { store.saveState(); store.clearPaths(); }} className={btn + 'text-gray-500 hover:text-red-500'}>Clear</button>
+                      )}
+                    </div>
+                    {paths.length > 0 && (
+                      <div className="bg-white border border-black/5 rounded-xl shadow-sm divide-y divide-black/5">
+                        {paths.map((p, i) => {
+                          const picked = selectedPathId === p.id;
+                          return (
+                            <div key={p.id} className={'flex items-center justify-between gap-2 px-3 py-1.5 text-xs cursor-pointer ' + (picked ? 'bg-emerald-50' : 'hover:bg-gray-50')} onClick={() => store.setSelectedPathId(picked ? null : p.id)}>
+                              <span className="text-gray-500 shrink-0">Path {i + 1}</span>
+                              <span className="text-[10px] text-gray-400 truncate flex-1 text-center">{PATH_SURFACES.find(s => s.id === p.surface)?.name} · {p.widthMm} mm wide</span>
+                              <span className="font-semibold text-[#3b4d4a] shrink-0">{Math.round(pathLength(p) * 1000)} mm</span>
+                              <button onClick={(e) => { e.stopPropagation(); store.saveState(); store.removePath(p.id); }} className="text-gray-300 hover:text-red-500" title="Remove this path"><Trash2 size={12} /></button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div className="space-y-2.5 pt-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-semibold text-gray-500">{target ? `Path ${paths.indexOf(target) + 1}` : paths.length ? 'All paths' : 'New paths'}</label>
+                        {target && <button onClick={() => store.setSelectedPathId(null)} className="text-[10px] text-gray-400 hover:text-[#3b4d4a]">edit all</button>}
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {PATH_SURFACES.map(s => (
+                          <button key={s.id} onClick={() => apply({ surface: s.id })}
+                            className={'py-1.5 px-2 rounded-lg text-[10px] font-semibold border transition-colors ' + (cur.surface === s.id ? 'bg-[#3b4d4a] text-white border-transparent' : 'bg-white text-gray-600 border-black/10 hover:bg-gray-50')}>
+                            {s.name}
+                          </button>
+                        ))}
+                      </div>
+                      <DimensionSlider label="Width" min={400} max={3000} step={50} value={cur.widthMm} onChange={(v) => apply({ widthMm: v })} />
+                    </div>
+                  </div>
+                );
+              })()}
+            </CollapsibleSection>
+
             <CollapsibleSection title="Outdoor Section" step="extras">
               <div className="flex items-center justify-between p-4 bg-white border border-black/5 rounded-xl shadow-sm">
                 <span className="text-xs font-medium text-gray-700">
@@ -1689,14 +1751,15 @@ export function Sidebar() {
               const dataUrl = canvas.toDataURL('image/png');
               // Same payload as the canvas button: screenshot for composition,
               // room spec so the AI obeys the configured building exactly.
-              const { room, fences, boundaryStyle } = useStore.getState().scene;
+              const { room, fences, boundaryStyle, paths } = useStore.getState().scene;
               // The boundary rides with the room: what each run is built of,
               // in words the render prompt can repeat, so a brick wall in the
               // screenshot is rendered as brick and not guessed at.
               const roomSpec = {
                 ...room,
-                garden: fences?.length ? {
-                  boundary: fences.map(f => ({ lengthMm: Math.round(fenceLength(f) * 1000), text: describeBoundary(runStyle(f, boundaryStyle)) })),
+                garden: (fences?.length || paths?.length) ? {
+                  boundary: (fences || []).map(f => ({ lengthMm: Math.round(fenceLength(f) * 1000), text: describeBoundary(runStyle(f, boundaryStyle)) })),
+                  paths: (paths || []).map(p => ({ lengthMm: Math.round(pathLength(p) * 1000), text: describePath(p) })),
                 } : undefined,
               };
               window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl, roomSpec }, window.location.origin);

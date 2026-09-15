@@ -362,6 +362,17 @@ export interface BoundaryStyle {
   thicknessMm?: number;
 }
 
+export type PathSurface = 'stone' | 'grey';
+
+/** A garden path: a polyline on the ground in world metres, drawn as a
+ *  paved ribbon at widthMm. See components/3d/Paths. */
+export interface PathRun {
+  id: string;
+  points: [number, number][];
+  widthMm: number;
+  surface: PathSurface;
+}
+
 export interface FenceRun extends Partial<BoundaryStyle> {
   id: string;
   ax: number;
@@ -390,6 +401,9 @@ export interface SceneState {
   /** The style a newly drawn run takes; runs drawn before this existed
    *  (no kind of their own) also fall back to it. */
   boundaryStyle?: BoundaryStyle;
+  paths: PathRun[];
+  /** The width and surface the next path is drawn with. */
+  pathStyle?: { widthMm: number; surface: PathSurface };
   pricing: PricingConfig;
   env: {
     time: 'day' | 'night';
@@ -405,5 +419,5 @@ export interface SceneState {
  *  uses to set out downlights. Top-down like 'plan', but with the roof and
  *  ceiling stripped away so the fittings are the subject. */
 export type ViewMode = '3d' | 'plan' | 'capture' | 'render' | 'walking' | 'lighting';
-export type ToolMode = 'select' | 'place' | 'fence';
+export type ToolMode = 'select' | 'place' | 'fence' | 'path';
 
