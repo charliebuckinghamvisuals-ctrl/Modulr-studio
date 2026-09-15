@@ -945,6 +945,127 @@ const logRender = (req, endpoint, model, imageSize, extra = {}) => {
     }).catch(e => console.warn('[COSTLOG] write failed:', e.message || e));
 };
 
+/* ------------------------------------------------------------------------
+ * GPT Image 2.5 Sunburst - the one model that draws every image in the app.
+ *
+ * Decided 15 Sep 2026 after the leaderboards (LMArena Image Edit, Artificial
+ * Analysis Editing) put Sunburst first for image EDITING - which is what a
+ * render is here: keep the building, finish its surfaces. It replaces the
+ * two-pass Gemini path (flash-image, then a Pro polish that was quietly
+ * dropped whenever the fidelity check disliked it) for renders, edits,
+ * weather, the material board, the line converter and the 4K export. The
+ * Gemini code stays as the fallback ONLY when OPENAI_API_KEY is absent, so a
+ * missing key degrades rather than blanks the site.
+ *
+ * QUALITY is the user's choice - high, xhigh ("Ultra") or max - and is
+ * checked here, never trusted from the client: max is Business (and master)
+ * only, anyone else asking for it gets xhigh. Cost is per output token, so
+ * the tiers price roughly 1 : 2 : 4 at 2K; the returned usage goes into the
+ * render log so real costs are on record rather than estimated.
+ * ---------------------------------------------------------------------- */
+const OPENAI_IMAGE_MODEL = 'gpt-image-2.5-sunburst';
+const IMAGE_QUALITIES = new Set(['high', 'xhigh', 'max']);
+const MAX_QUALITY_PLANS = new Set(['business', 'master']);
+const OPENAI_MAX_PIXELS = 8_294_400; // 3840 x 2160; the API's ceiling
+
+const openAiReady = () => !!process.env.OPENAI_API_KEY;
+
+/** The tier this request runs at: what was asked for, clamped to the plan. */
+const resolveImageQuality = async (req) => {
+    const asked = IMAGE_QUALITIES.has(req.body?.quality) ? req.body.quality : 'high';
+    if (asked !== 'max') return { quality: asked, clamped: false };
+    const plan = await resolveEffectivePlan(req);
+    if (MAX_QUALITY_PLANS.has(plan)) return { quality: 'max', clamped: false };
+    return { quality: 'xhigh', clamped: true };
+};
+
+/**
+ * Output size for an aspect ratio at a given long edge. Edges must be
+ * multiples of 16 and the total must stay under the API's pixel ceiling, so
+ * a 4K square or 4:3 is scaled down rather than refused.
+ */
+const openAiSizeFor = (ratio, longEdge = 2048) => {
+    const [rw, rh] = (String(ratio || '16:9').match(/^(\d+):(\d+)$/) || [null, 16, 9]).slice(1).map(Number);
+    let w = rw >= rh ? longEdge : Math.round(longEdge * rw / rh);
+    let h = rw >= rh ? Math.round(longEdge * rh / rw) : longEdge;
+    if (w * h > OPENAI_MAX_PIXELS) {
+        const k = Math.sqrt(OPENAI_MAX_PIXELS / (w * h));
+        w = Math.floor(w * k); h = Math.floor(h * k);
+    }
+    const snap = (v) => Math.max(256, Math.floor(v / 16) * 16);
+    return `${snap(w)}x${snap(h)}`;
+};
+
+/** The usage fields worth keeping against a render. */
+const openAiUsageLog = (usage) => usage ? {
+    inputTokens: usage.input_tokens ?? null,
+    outputTokens: usage.output_tokens ?? null,
+    totalTokens: usage.total_tokens ?? null,
+} : {};
+
+/** Turn an OpenAI refusal into words the user can act on, or null. */
+const openAiRefusal = (status, json) => {
+    const msg = String(json?.error?.message || '');
+    if (/verified/i.test(msg)) return 'OpenAI needs the organisation verified before the GPT Image 2.5 models will answer: platform.openai.com, Settings, Organization, Verify Organization. Allow up to 15 minutes after verifying.';
+    if (status === 429 || /quota|billing|balance/i.test(msg)) return 'The image service is out of credit or being rate limited. Please try again in a few minutes.';
+    if (status === 401) return 'The image service rejected the server\'s API key. Check OPENAI_API_KEY on the server.';
+    if (/safety|policy|moderation/i.test(msg)) return 'The image service declined this request on content grounds. Try different wording or a different source image.';
+    return null;
+};
+
+/**
+ * One Sunburst edit: the prompt plus one or more input images, returning
+ * base64 JPEG and the usage. Throws with a clientMessage on a refusal the
+ * user can do something about; returns { b64: null } when the model simply
+ * produced nothing.
+ */
+const openAiImageEdit = async ({ prompt, images, size, quality, label = 'edit' }) => {
+    const form = new FormData();
+    form.append('model', OPENAI_IMAGE_MODEL);
+    form.append('prompt', prompt);
+    for (const [i, img] of images.entries()) {
+        const mime = img.mime || 'image/jpeg';
+        form.append(images.length > 1 ? 'image[]' : 'image', new Blob([Buffer.from(img.b64, 'base64')], { type: mime }), `input-${i}.${mime === 'image/png' ? 'png' : 'jpg'}`);
+    }
+    form.append('size', size);
+    form.append('quality', quality);
+    form.append('output_format', 'jpeg');
+    const t0 = Date.now();
+    const r = await fetch('https://api.openai.com/v1/images/edits', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+        body: form,
+    });
+    const json = await r.json().catch(() => ({}));
+    if (!r.ok) {
+        console.error(`[OPENAI] ${label} failed`, r.status, JSON.stringify(json).slice(0, 500));
+        const clientMessage = openAiRefusal(r.status, json);
+        if (clientMessage) throw Object.assign(new Error('openai refused: ' + r.status), { clientMessage });
+        return { b64: null, usage: null };
+    }
+    console.log(`[OPENAI] ${label} ${quality} ${size} in ${((Date.now() - t0) / 1000).toFixed(1)}s`, json?.usage ? JSON.stringify(json.usage) : '');
+    return { b64: json?.data?.[0]?.b64_json || null, usage: json?.usage || null };
+};
+
+/** Text-to-image on the same model, for the line converter's no-source mode. */
+const openAiImageGenerate = async ({ prompt, size, quality, label = 'generate' }) => {
+    const t0 = Date.now();
+    const r = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: OPENAI_IMAGE_MODEL, prompt, size, quality, output_format: 'jpeg', n: 1 }),
+    });
+    const json = await r.json().catch(() => ({}));
+    if (!r.ok) {
+        console.error(`[OPENAI] ${label} failed`, r.status, JSON.stringify(json).slice(0, 500));
+        const clientMessage = openAiRefusal(r.status, json);
+        if (clientMessage) throw Object.assign(new Error('openai refused: ' + r.status), { clientMessage });
+        return { b64: null, usage: null };
+    }
+    console.log(`[OPENAI] ${label} ${quality} ${size} in ${((Date.now() - t0) / 1000).toFixed(1)}s`, json?.usage ? JSON.stringify(json.usage) : '');
+    return { b64: json?.data?.[0]?.b64_json || null, usage: json?.usage || null };
+};
+
 // API_PORT lets local dev pin the API to 3005 (where vite.config proxies /api)
 // even when a tool injects PORT for the front end. Production is unaffected:
 // hosts set PORT and leave API_PORT unset.
@@ -956,6 +1077,7 @@ console.log("DIRNAME:", __dirname);
 console.log("PORT ENV:", process.env.PORT);
 console.log("PORT SELECT:", port);
 console.log("API KEY STATUS:", (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY) ? "EXISTS (SAFE)" : "MISSING");
+console.log("IMAGE ENGINE:", openAiReady() ? `${OPENAI_IMAGE_MODEL} (OPENAI_API_KEY present)` : "Gemini fallback - OPENAI_API_KEY MISSING, add it on Render");
 
 const distPath = path.join(__dirname, 'dist');
 if (fs.existsSync(distPath)) {
@@ -1898,6 +2020,23 @@ app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
         
         console.log(`[DEBUG] imageConfig: ${JSON.stringify(imageConfig)}`);
 
+        if (openAiReady()) {
+            // Sunburst: an edit when there is a source (environment first,
+            // then the building, matching the prompt's "first / second"), a
+            // plain generation when the drawing is from a description alone.
+            const { quality } = await resolveImageQuality(req);
+            const size = openAiSizeFor(ratio || '16:9', isHighQuality ? 2048 : 1024);
+            const images = [];
+            if (hasEnv) images.push({ b64: environmentImage, mime: 'image/jpeg' });
+            if (hasImage) images.push({ b64: base64Image, mime: 'image/jpeg' });
+            const out = images.length
+                ? await openAiImageEdit({ prompt: textPrompt, images, size, quality, label: 'lineDrawing' })
+                : await openAiImageGenerate({ prompt: textPrompt, size, quality, label: 'lineDrawing' });
+            if (!out.b64) throw new Error("No image generated");
+            logRender(req, 'generateLineDrawing', OPENAI_IMAGE_MODEL, imageConfig.imageSize, { quality, ...openAiUsageLog(out.usage) });
+            return res.json({ result: out.b64, quality });
+        }
+
         const response = await ai.models.generateContent({
             model: modelName,
             contents: { parts },
@@ -1919,6 +2058,7 @@ app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
         throw new Error("No image generated");
     } catch (error) {
         console.error("Line drawing error:", error);
+        if (error && error.clientMessage) return res.status(400).json({ error: error.clientMessage });
         res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }
 });
@@ -2514,28 +2654,21 @@ ${lines.join('\n')}
         /**
          * IMAGE ENGINE - which model draws the render.
          *
-         * 'gemini' (default): the proven two-pass Gemini path below.
-         * 'sunburst' / 'flare': OpenAI GPT Image 2.5, added 9 Sep 2026 for
-         * Charlie to trial locally - Sunburst is the editing-precision model
-         * ("Accuracy"), Flare the fast one ("Speed"). One edit call replaces
-         * both Gemini passes; the QA inspection and corrective retry stay
-         * exactly as they are, judging the output against the source. The
-         * source image goes in as the edit input, so the geometry lock is
-         * the model's job just as it is for Gemini. Needs OPENAI_API_KEY.
+         * Sunburst (GPT Image 2.5) at the user's quality tier - see
+         * OPENAI_IMAGE_MODEL above for why. One edit call replaces both Gemini
+         * passes; the QA inspection and corrective retry stay exactly as they
+         * are, judging the output against the source. The source image goes
+         * in as the edit input, so the geometry lock is the model's job just
+         * as it was for Gemini. Without OPENAI_API_KEY on the server the
+         * two-pass Gemini path below runs instead, so nothing goes dark.
          */
-        const OPENAI_IMAGE_MODELS = { sunburst: 'gpt-image-2.5-sunburst', flare: 'gpt-image-2.5-flare' };
-        const imageEngine = OPENAI_IMAGE_MODELS[req.body.imageEngine] ? req.body.imageEngine : 'gemini';
-        if (imageEngine !== 'gemini' && !process.env.OPENAI_API_KEY) {
-            return res.status(400).json({ error: 'The Sunburst and Flare engines need an OpenAI API key on the server (OPENAI_API_KEY). Switch the engine back to Gemini or add the key.' });
-        }
+        const imageEngine = openAiReady() ? 'sunburst' : 'gemini';
+        if (imageEngine === 'gemini') console.warn('[RENDER] OPENAI_API_KEY missing - drawing with Gemini instead of Sunburst');
+        const { quality: imageQuality, clamped: qualityClamped } = await resolveImageQuality(req);
 
         /** The OpenAI edit size for this render: 2K on the long edge, matching
-         *  the source's aspect. Edges must be multiples of 16. */
-        const openAiSize = () => {
-            const table = { '16:9': '2048x1152', '4:3': '2048x1536', '3:2': '2048x1360', '1:1': '2048x2048', '9:16': '1152x2048', '3:4': '1536x2048', '2:3': '1360x2048' };
-            const r = isSketchUpMode ? (ratio || '16:9') : '16:9';
-            return table[r] || '2048x1152';
-        };
+         *  the source's aspect. */
+        const openAiSize = () => openAiSizeFor(isSketchUpMode ? (ratio || '16:9') : '16:9', 2048);
 
         /**
          * The hard rules, first. The edit endpoint's prompt is a single
@@ -2555,38 +2688,19 @@ ${lines.join('\n')}
             return rules.join('\n') + '\n\n';
         };
 
-        /** One OpenAI edit of the SOURCE image with the render prompt. */
+        /** One Sunburst edit of the SOURCE image with the render prompt, at
+         *  the user's tier. The usage comes back so the log can price it. */
+        let openAiUsage = null;
         const runOpenAIEdit = async (promptText) => {
-            const form = new FormData();
-            form.append('model', OPENAI_IMAGE_MODELS[imageEngine]);
-            form.append('prompt', openAiHardRules() + promptText);
-            form.append('image', new Blob([Buffer.from(base64Image, 'base64')], { type: 'image/jpeg' }), 'source.jpg');
-            form.append('size', openAiSize());
-            // Accuracy runs the higher quality tier; Speed the medium one.
-            form.append('quality', imageEngine === 'sunburst' ? 'high' : 'medium');
-            form.append('output_format', 'jpeg');
-            const t0 = Date.now();
-            const r = await fetch('https://api.openai.com/v1/images/edits', {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-                body: form,
+            const out = await openAiImageEdit({
+                prompt: openAiHardRules() + promptText,
+                images: [{ b64: base64Image, mime: 'image/jpeg' }],
+                size: openAiSize(),
+                quality: imageQuality,
+                label: 'render',
             });
-            const json = await r.json().catch(() => ({}));
-            if (!r.ok) {
-                console.error('[OPENAI] image edit failed', r.status, JSON.stringify(json).slice(0, 500));
-                // The reasons a trial hits are account-side and fixable; say
-                // which, in our own words - never OpenAI's raw text.
-                const msg = String(json?.error?.message || '');
-                let clientMessage = null;
-                if (/verified/i.test(msg)) clientMessage = 'OpenAI needs the organisation verified before the GPT Image 2.5 models will answer: platform.openai.com, Settings, Organization, Verify Organization. Allow up to 15 minutes after verifying, or switch the engine to Gemini.';
-                else if (r.status === 429 || /quota|billing|balance/i.test(msg)) clientMessage = 'The OpenAI account has no credit left, or is being rate limited. Top up at platform.openai.com or switch the engine to Gemini.';
-                else if (r.status === 401) clientMessage = 'OpenAI rejected the API key on the server. Check OPENAI_API_KEY, or switch the engine to Gemini.';
-                if (clientMessage) throw Object.assign(new Error('openai refused: ' + r.status), { clientMessage });
-                return null;
-            }
-            const b64 = json?.data?.[0]?.b64_json || null;
-            console.log(`[OPENAI] ${OPENAI_IMAGE_MODELS[imageEngine]} edit in ${((Date.now() - t0) / 1000).toFixed(1)}s`, json?.usage ? JSON.stringify(json.usage) : '');
-            return b64;
+            if (out.usage) openAiUsage = out.usage;
+            return out.b64;
         };
 
         /** Run one generation pass; returns the image as base64, or null. */
@@ -2881,9 +2995,14 @@ ${failures.map(f => `      - ${f}`).join('\n')}
             }
         }
 
-        logRender(req, 'renderBuilding', imageEngine === 'gemini' ? 'gemini-3.1-flash-image' : OPENAI_IMAGE_MODELS[imageEngine], '2K', {
+        logRender(req, 'renderBuilding', imageEngine === 'gemini' ? 'gemini-3.1-flash-image' : OPENAI_IMAGE_MODEL, '2K', {
             sketchUpMode: isSketchUpMode,
             imageEngine,
+            // The tier that actually ran and what it cost in tokens - the
+            // last call's usage, which is the one the customer received.
+            quality: imageEngine === 'gemini' ? null : imageQuality,
+            qualityClamped,
+            ...openAiUsageLog(openAiUsage),
             verified: verification.checked ? verification.passed : null,
             retried: !!verification.retried,
             // Billable calls this render actually made, so the log prices
@@ -2898,7 +3017,7 @@ ${failures.map(f => `      - ${f}`).join('\n')}
             failures: (verification.failures || []).map(f => String(f).slice(0, 300)),
         });
 
-        return res.json({ result: b64Data, verification: { ...verification, refined, imageEngine } });
+        return res.json({ result: b64Data, quality: imageEngine === 'gemini' ? null : imageQuality, qualityClamped, verification: { ...verification, refined, imageEngine } });
     } catch (error) {
         console.error("Render error in /api/renderBuilding:", error, error.stack);
         // A refusal we can explain in our own words (see runOpenAIEdit).
@@ -2956,6 +3075,21 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
 
         parts.push({ text: prompt });
 
+        if (openAiReady()) {
+            // Sunburst: the render as the edit input, the mask (when drawn)
+            // as a second image the prompt refers to, at the user's tier.
+            const { quality } = await resolveImageQuality(req);
+            const images = [{ b64: base64Image, mime: 'image/jpeg' }];
+            if (maskImage) images.push({ b64: maskImage, mime: 'image/jpeg' });
+            const out = await openAiImageEdit({
+                prompt: (maskImage ? 'Image 1 is the photograph to edit. Image 2 is a mask of the SAME frame: the marked area is the only region you may change.\n\n' : '') + prompt,
+                images, size: openAiSizeFor(ratio, 2048), quality, label: 'editImage',
+            });
+            if (!out.b64) throw new Error("No edit generated");
+            logRender(req, 'editImage', OPENAI_IMAGE_MODEL, '2K', { quality, ...openAiUsageLog(out.usage) });
+            return res.json({ result: out.b64, quality });
+        }
+
         const response = await ai.models.generateContent({
             model: 'gemini-3.1-flash-image',
             contents: {
@@ -2982,6 +3116,7 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
 
     } catch (error) {
         console.error("Edit error:", error);
+        if (error && error.clientMessage) return res.status(400).json({ error: error.clientMessage });
         res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }
 });
@@ -3241,6 +3376,17 @@ app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
         exactly where the source shows it.
     `;
 
+        if (openAiReady()) {
+            const { quality } = await resolveImageQuality(req);
+            const out = await openAiImageEdit({
+                prompt, images: [{ b64: base64Image, mime: 'image/jpeg' }],
+                size: openAiSizeFor(ratio, 2048), quality, label: 'applyWeather',
+            });
+            if (!out.b64) throw new Error("No weather image generated");
+            logRender(req, 'applyWeather', OPENAI_IMAGE_MODEL, '2K', { quality, ...openAiUsageLog(out.usage) });
+            return res.json({ result: out.b64, quality });
+        }
+
         const response = await ai.models.generateContent({
             model: 'gemini-3.1-flash-image',
             contents: {
@@ -3269,6 +3415,7 @@ app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
 
     } catch (error) {
         console.error("Weather error:", error);
+        if (error && error.clientMessage) return res.status(400).json({ error: error.clientMessage });
         res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }
 });
@@ -3395,6 +3542,17 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
         - CRITICAL DIMENSIONS: Strictly lock the output resolution to exactly 2048 x 2048 pixels (2K Square limit). Do not exceed this pixel count to ensure pricing tier.
       `;
 
+        if (openAiReady()) {
+            const { quality } = await resolveImageQuality(req);
+            const out = await openAiImageEdit({
+                prompt, images: [{ b64: base64Image, mime: 'image/jpeg' }],
+                size: '2048x2048', quality, label: 'presentationBoard',
+            });
+            if (!out.b64) throw new Error("No presentation board generated");
+            logRender(req, 'generatePresentationBoard', OPENAI_IMAGE_MODEL, '2K', { quality, ...openAiUsageLog(out.usage) });
+            return res.json({ result: out.b64, quality });
+        }
+
         const response = await ai.models.generateContent({
             model: 'gemini-3.1-flash-image',
             contents: {
@@ -3423,6 +3581,7 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
 
     } catch (error) {
         console.error("Scene Studio error:", error);
+        if (error && error.clientMessage) return res.status(400).json({ error: error.clientMessage });
         res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }
 });
@@ -3484,6 +3643,19 @@ app.post('/api/export4k', userAiLimiter, async (req, res) => {
       CRITICAL: Output resolution 4K UHD (3840 pixels on the long edge).
     `;
 
+        if (openAiReady()) {
+            // Sunburst draws 4K natively (3840 on the long edge, scaled
+            // down for squarer frames to stay under the pixel ceiling).
+            const { quality } = await resolveImageQuality(req);
+            const out = await openAiImageEdit({
+                prompt, images: [{ b64: base64Image, mime: 'image/jpeg' }],
+                size: openAiSizeFor(ratio || '16:9', 3840), quality, label: 'export4k',
+            });
+            if (!out.b64) throw new Error("No 4K export generated");
+            logRender(req, 'export4k', OPENAI_IMAGE_MODEL, '4K', { quality, ...openAiUsageLog(out.usage) });
+            return res.json({ result: out.b64, quality, fourKLeft: claim.remaining });
+        }
+
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-image',
             contents: {
@@ -3516,6 +3688,7 @@ app.post('/api/export4k', userAiLimiter, async (req, res) => {
         // not cost the user one of their hundred.
         if (claimed && uid) await releaseFourKExport(uid);
         console.error("4K export error:", error);
+        if (error && error.clientMessage) return res.status(400).json({ error: error.clientMessage });
         res.status(500).json({ error: 'The 4K export could not be completed. Your allowance was not used - please try again in a moment.' });
     }
 });

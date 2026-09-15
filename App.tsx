@@ -1,7 +1,7 @@
 import React from 'react';
 import { Zap, Grid, Layers, Sparkles, PenTool, Image as ImageIcon, Settings, History, ChevronDown, Loader2, Upload, CloudSun, Aperture } from 'lucide-react';
 import { ToggleSwitch } from './components/ToggleSwitch';
-import { getImageEngine, setImageEngine, type ImageEngine } from './services/geminiService';
+import { getImageQuality, setImageQuality, type ImageQuality } from './services/geminiService';
 import { Toaster, toast } from 'react-hot-toast';
 import { AppShell } from './components/AppShell';
 // StartupLoader (the fake 2.5s percentage bar) is retired: the instant green
@@ -45,10 +45,10 @@ import { useCredits } from './hooks/useCredits';
 const App: React.FC = () => {
     const engine = useAppEngine();
     const { isMaster, user } = useAuth();
-    const { hasApiAccess } = useCredits();
+    const { hasApiAccess, plan } = useCredits();
     const [maskImage, setMaskImage] = React.useState<string | null>(null);
     const [selectedBatchIndex, setSelectedBatchIndex] = React.useState(0);
-    const [imageEngine, setImageEngineState] = React.useState<ImageEngine>(getImageEngine());
+    const [imageQuality, setImageQualityState] = React.useState<ImageQuality>(getImageQuality());
     // "Save to Project" - which finished image is being filed, and as what.
     const [projectSave, setProjectSave] = React.useState<{ image: string; kind: ProjectAssetKind; name: string } | null>(null);
     const [openCategoryDropdown, setOpenCategoryDropdown] = React.useState<string | null>(null);
@@ -153,29 +153,39 @@ const App: React.FC = () => {
     );
 
     /**
-     * Image engine trial, 9 Sep 2026. Accuracy is OpenAI's GPT Image 2.5
-     * Sunburst, Speed is Flare, Gemini is the proven two-pass path and the
-     * one to switch back to if the trial disappoints. Server-side the two
-     * OpenAI engines need OPENAI_API_KEY; without it a render says so.
+     * Quality tier, 15 Sep 2026. Every image is drawn by GPT Image 2.5
+     * Sunburst; the tier is how much it spends on the picture. High is the
+     * default, Ultra roughly twice the cost, Max about four times and
+     * Business-only - the chip is shown locked to everyone else and the
+     * server clamps it regardless of what the client sends. One setting for
+     * every tool: renders, edits, weather, the material board, line work
+     * and the 4K export all read it.
      */
-    const ENGINE_OPTIONS: { id: ImageEngine; label: string; hint: string }[] = [
-        { id: 'sunburst', label: 'Accuracy', hint: 'GPT Image 2.5 Sunburst - editing precision' },
-        { id: 'flare', label: 'Speed', hint: 'GPT Image 2.5 Flare - fastest' },
-        { id: 'gemini', label: 'Gemini', hint: 'Gemini 3.1 Flash + 3 Pro, two passes' },
+    const canUseMax = isMaster || plan === 'business' || plan === 'master';
+    const QUALITY_OPTIONS: { id: ImageQuality; label: string; hint: string; locked?: boolean }[] = [
+        { id: 'high', label: 'High', hint: 'Sunburst, high tier - the everyday setting' },
+        { id: 'xhigh', label: 'Ultra', hint: 'Sunburst, extra-high tier - about twice the render cost' },
+        { id: 'max', label: 'Max', hint: canUseMax ? 'Sunburst at its highest tier - for the final image' : 'Max quality is a Business plan feature', locked: !canUseMax },
     ];
-    const EngineChips = () => (
+    const QualityChips = () => (
         <div className="w-full">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Engine</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Quality</div>
             <div className="flex gap-1.5">
-                {ENGINE_OPTIONS.map(o => (
+                {QUALITY_OPTIONS.map(o => (
                     <button
                         key={o.id}
                         title={o.hint}
-                        onClick={() => { setImageEngine(o.id); setImageEngineState(o.id); }}
-                        className={`flex-1 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide rounded-lg border transition-colors ${
-                            imageEngine === o.id ? 'bg-accent text-white border-transparent' : 'bg-white text-slate-500 border-black/10 hover:bg-slate-50'
-                        }`}
-                    >{o.label}</button>
+                        onClick={() => {
+                            if (o.locked) { engine.setActiveStage(AppStage.PRICING); return; }
+                            setImageQuality(o.id); setImageQualityState(o.id);
+                        }}
+                        className={`flex-1 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide rounded-lg border transition-colors relative ${
+                            imageQuality === o.id && !o.locked ? 'bg-accent text-white border-transparent' : 'bg-white text-slate-500 border-black/10 hover:bg-slate-50'
+                        } ${o.locked ? 'opacity-60' : ''}`}
+                    >
+                        {o.label}
+                        {o.locked && <span className="absolute -top-1.5 -right-1 text-[7px] px-1 py-px rounded-full bg-amber-100 text-amber-700 border border-amber-200 normal-case tracking-normal">Business</span>}
+                    </button>
                 ))}
             </div>
         </div>
@@ -184,7 +194,7 @@ const App: React.FC = () => {
     const renderEngineControls = (
         <>
             <div className="flex flex-col gap-2 w-full">
-                <EngineChips />
+                <QualityChips />
                 <ProModelToggle />
                 <CameraEffectsToggle />
                 <ToggleSwitch 
@@ -401,6 +411,7 @@ const App: React.FC = () => {
     const weatherControls = (
         <div className="flex flex-col h-full space-y-5">
             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-5">
+                <QualityChips />
 
                 <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80 flex items-center gap-2">
@@ -475,6 +486,7 @@ const App: React.FC = () => {
     const lineControls = (
         <div className="flex flex-col h-full space-y-5">
             <div className="flex flex-col gap-2 w-full">
+                <QualityChips />
                 <ProModelToggle />
             </div>
 

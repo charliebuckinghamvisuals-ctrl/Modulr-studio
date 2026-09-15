@@ -57,7 +57,7 @@ const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: s
      * at 20p. At 200 the same plan loses money on anyone who uses it properly.
      */
     { label: 'Renders',            trial: '40 (7 days)', standard: '100 per month', business: 'Unlimited' },
-    { label: 'Output quality',     trial: '2K + 4K export', standard: '1080p Full HD', business: '4K Ultra HD' },
+    { label: 'Render quality',     trial: 'High + Ultra', standard: 'High + Ultra', business: 'High, Ultra + Max' },
     { label: 'Planning Checker',   trial: 'Free to all', standard: 'Free to all', business: 'Free to all' },
     { label: 'Render Engine',      trial: true,  standard: true,  business: true },
     { label: 'Line Converter',     trial: true,  standard: true,  business: true },

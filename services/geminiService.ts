@@ -118,7 +118,7 @@ export const generateLineDrawing = async (base64Image: string | null | undefined
   try {
     const ratio = base64Image ? (await getImageDimensions(base64Image)).ratio : undefined;
 
-    const body: Record<string, unknown> = { additionalPrompt, isHighQuality, ratio, hasColor, isProMode };
+    const body: Record<string, unknown> = { additionalPrompt, isHighQuality, ratio, hasColor, isProMode, quality: currentImageQuality };
     if (base64Image) body.base64Image = base64Image;
     if (environmentImage) body.environmentImage = environmentImage;
 
@@ -269,25 +269,27 @@ export const describeGarden = async (base64Image?: string, notes?: string): Prom
 };
 
 /**
- * Which model draws the render - a trial setting, 9 Sep 2026.
+ * Image quality tier - the user's choice, 15 Sep 2026.
  *
- * 'gemini' is the proven two-pass path. 'sunburst' and 'flare' are OpenAI's
- * GPT Image 2.5 editing models: Accuracy and Speed in the UI. Kept as a
- * module setting like the config spec, so no call site changes, and
- * remembered in localStorage so a choice survives a reload.
+ * Every image is drawn by GPT Image 2.5 Sunburst; what varies is how much
+ * the model spends on it. 'high' is the default, 'xhigh' ("Ultra") costs
+ * about twice, 'max' about four times and is Business-only - the server
+ * clamps a max request from any other plan to xhigh and says so in the
+ * response. Kept as a module setting like the config spec, so every image
+ * call sends it, and remembered in localStorage so it survives a reload.
  */
-export type ImageEngine = 'gemini' | 'sunburst' | 'flare';
-const IMAGE_ENGINE_KEY = 'modulr_image_engine';
-let currentImageEngine: ImageEngine = (() => {
+export type ImageQuality = 'high' | 'xhigh' | 'max';
+const IMAGE_QUALITY_KEY = 'modulr_image_quality';
+let currentImageQuality: ImageQuality = (() => {
   try {
-    const v = localStorage.getItem(IMAGE_ENGINE_KEY);
-    return v === 'sunburst' || v === 'flare' ? v : 'gemini';
-  } catch { return 'gemini'; }
+    const v = localStorage.getItem(IMAGE_QUALITY_KEY);
+    return v === 'xhigh' || v === 'max' ? v : 'high';
+  } catch { return 'high'; }
 })();
-export const getImageEngine = (): ImageEngine => currentImageEngine;
-export const setImageEngine = (engine: ImageEngine) => {
-  currentImageEngine = engine;
-  try { localStorage.setItem(IMAGE_ENGINE_KEY, engine); } catch { /* private mode */ }
+export const getImageQuality = (): ImageQuality => currentImageQuality;
+export const setImageQuality = (quality: ImageQuality) => {
+  currentImageQuality = quality;
+  try { localStorage.setItem(IMAGE_QUALITY_KEY, quality); } catch { /* private mode */ }
 };
 
 export const renderBuilding = async (
@@ -309,7 +311,7 @@ export const renderBuilding = async (
     const response = await apiFetch(`${API_BASE_URL}/renderBuilding`, {
       method: 'POST',
       headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground, isBatchSequence, seed, cameraEffects, imageEngine: currentImageEngine, configSpec: currentConfigSpec || undefined, sceneContext: currentSceneContext || undefined })
+      body: JSON.stringify({ base64Image, materials, additionalPrompt, isHighQuality, ratio, isProMode, orientation, isSketchUpMode, studioBackground, isBatchSequence, seed, cameraEffects, quality: currentImageQuality, configSpec: currentConfigSpec || undefined, sceneContext: currentSceneContext || undefined })
     });
 
     if (!response.ok) {
@@ -341,7 +343,7 @@ export const export4K = async (base64Image: string): Promise<string> => {
     const response = await apiFetch(`${API_BASE_URL}/export4k`, {
       method: 'POST',
       headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ base64Image, ratio })
+      body: JSON.stringify({ base64Image, ratio, quality: currentImageQuality })
     });
 
     if (!response.ok) {
@@ -374,7 +376,7 @@ export const editImage = async (
     const response = await apiFetch(`${API_BASE_URL}/editImage`, {
       method: 'POST',
       headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ base64Image, maskImage, editPrompt, isHighQuality, ratio, isProMode })
+      body: JSON.stringify({ base64Image, maskImage, editPrompt, isHighQuality, ratio, isProMode, quality: currentImageQuality })
     });
 
     if (!response.ok) {
@@ -433,7 +435,7 @@ export const applyWeather = async (
       const response = await apiFetch(`${API_BASE_URL}/applyWeather`, {
         method: 'POST',
         headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ base64Image, weather, isHighQuality, ratio, isProMode })
+        body: JSON.stringify({ base64Image, weather, isHighQuality, ratio, isProMode, quality: currentImageQuality })
       });
 
       if (!response.ok) {
@@ -498,7 +500,7 @@ export const generatePresentationBoard = async (base64Image: string, focusPoints
     const response = await apiFetch(`${API_BASE_URL}/generatePresentationBoard`, {
       method: 'POST',
       headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ base64Image, focusPoints, isHighQuality, isProMode })
+      body: JSON.stringify({ base64Image, focusPoints, isHighQuality, isProMode, quality: currentImageQuality })
     });
 
     if (!response.ok) {
