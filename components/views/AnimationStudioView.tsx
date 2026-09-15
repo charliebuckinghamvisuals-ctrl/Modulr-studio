@@ -410,7 +410,7 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
                                     </div>
                                     <div className="flex flex-wrap items-center justify-between gap-3">
                                         <p className="text-[11px] text-slate-400">
-                                            10 seconds · 720p · carries an invisible SynthID watermark
+                                            8 seconds · 1080p · carries an invisible watermark
                                         </p>
                                         <div className="flex items-center gap-2">
                                             <button

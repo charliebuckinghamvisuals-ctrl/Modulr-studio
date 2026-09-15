@@ -142,7 +142,7 @@ const TOOLS: Tool[] = [
         points: [
             'Slow push in, pan, gentle arc or locked-off camera moves',
             'Optional motion blur, breeze, golden hour or a distant figure',
-            'Ten seconds at 1080p, downloaded as an MP4',
+            'Eight seconds at 1080p, downloaded as an MP4',
             'Works from any finished render, or from an exterior photograph',
             'Included with the Business plan, with a monthly allowance',
         ],

@@ -283,6 +283,62 @@ const ANALYSIS_MODEL = 'gemini-3.8-flash';
 const ANIMATION_SECONDS = 8;
 
 /**
+ * Which model animates - a switch for the A/B of 15 Sep 2026.
+ *
+ * 'veo' (default) is the Veo 3.1 Fast path above. 'kling' is Kling v3 Pro
+ * through fal.ai's queue API: it leads one image-to-video arena at the same
+ * price as Veo Fast (about $0.11/s at 1080p without audio) and needs
+ * FAL_KEY on the server. Handles are kept opaque to the client: a Veo job
+ * is "models/.../operations/...", a Kling job is "kling:<request id>", and
+ * /status and /video read the prefix to know which service to ask.
+ */
+const ANIMATION_ENGINE = (process.env.ANIMATION_ENGINE === 'kling' && process.env.FAL_KEY) ? 'kling' : 'veo';
+const KLING_MODEL_ID = 'fal-ai/kling-video/v3/pro/image-to-video';
+const KLING_LABEL = 'kling-v3-pro';
+const falHeaders = () => ({ Authorization: `Key ${process.env.FAL_KEY}`, 'Content-Type': 'application/json' });
+
+/** Start a Kling clip; returns the opaque handle. */
+const klingStart = async ({ base64Image, prompt, negativePrompt, aspectRatio }) => {
+    const r = await fetch(`https://queue.fal.run/${KLING_MODEL_ID}`, {
+        method: 'POST',
+        headers: falHeaders(),
+        body: JSON.stringify({
+            start_image_url: `data:image/jpeg;base64,${base64Image}`,
+            prompt,
+            negative_prompt: negativePrompt,
+            duration: String(ANIMATION_SECONDS),
+            // A garden room has nothing to say; audio only adds cost and a
+            // soundtrack nobody asked for.
+            generate_audio: false,
+            cfg_scale: 0.5,
+            aspect_ratio: aspectRatio,
+        }),
+    });
+    const json = await r.json().catch(() => ({}));
+    if (!r.ok || !json.request_id) {
+        console.error('[KLING] submit failed', r.status, JSON.stringify(json).slice(0, 400));
+        throw new Error('The model did not start a video job.');
+    }
+    return `kling:${json.request_id}`;
+};
+
+const KLING_HANDLE_RE = /^kling:[a-zA-Z0-9-]{8,80}$/;
+
+/** Kling status: { done } or, when finished, { done: true, uri }. Throws on failure. */
+const klingResolve = async (handle) => {
+    const id = handle.slice('kling:'.length);
+    const st = await fetch(`https://queue.fal.run/${KLING_MODEL_ID}/requests/${id}/status`, { headers: falHeaders() });
+    const status = await st.json().catch(() => ({}));
+    if (!st.ok) throw new Error(`Video status failed: ${st.status} ${JSON.stringify(status).slice(0, 200)}`);
+    if (status.status !== 'COMPLETED') return { done: false };
+    const rs = await fetch(`https://queue.fal.run/${KLING_MODEL_ID}/requests/${id}/response`, { headers: falHeaders() });
+    const result = await rs.json().catch(() => ({}));
+    const uri = result?.video?.url;
+    if (!rs.ok || !uri) throw new Error(`Video generation failed: ${JSON.stringify(result?.detail || result).slice(0, 300)}`);
+    return { done: true, uri };
+};
+
+/**
  * Animations per calendar month, per account.
  *
  * This number is a BUDGET, not a product decision. At the settings above an 8s
@@ -1091,6 +1147,7 @@ console.log("PORT ENV:", process.env.PORT);
 console.log("PORT SELECT:", port);
 console.log("API KEY STATUS:", (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY) ? "EXISTS (SAFE)" : "MISSING");
 console.log("IMAGE ENGINE:", openAiReady() ? `${OPENAI_IMAGE_MODEL} (OPENAI_API_KEY present)` : "Gemini fallback - OPENAI_API_KEY MISSING, add it on Render");
+console.log("ANIMATION ENGINE:", ANIMATION_ENGINE === 'kling' ? `${KLING_LABEL} via fal.ai` : `${ANIMATION_MODEL} (set ANIMATION_ENGINE=kling + FAL_KEY to switch)`);
 
 const distPath = path.join(__dirname, 'dist');
 if (fs.existsSync(distPath)) {
@@ -3836,11 +3893,16 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
         };
 
         let operationName;
-        try {
-            operationName = await startOnce();
-        } catch (firstErr) {
-            console.warn('[ANIM] first attempt failed, retrying once:', firstErr.message || firstErr);
-            operationName = await startOnce();
+        if (ANIMATION_ENGINE === 'kling') {
+            videoAttempts = 1;
+            operationName = await klingStart({ base64Image, prompt, negativePrompt: ANIMATION_NEGATIVE_PROMPT, aspectRatio });
+        } else {
+            try {
+                operationName = await startOnce();
+            } catch (firstErr) {
+                console.warn('[ANIM] first attempt failed, retrying once:', firstErr.message || firstErr);
+                operationName = await startOnce();
+            }
         }
 
         /**
@@ -3849,7 +3911,8 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
          * the log - so "what does a project cost" could not be answered for any
          * project containing an animation.
          */
-        logRender(req, 'animation', ANIMATION_MODEL, ANIMATION_RESOLUTION, {
+        logRender(req, 'animation', ANIMATION_ENGINE === 'kling' ? KLING_LABEL : ANIMATION_MODEL, ANIMATION_RESOLUTION, {
+            engine: ANIMATION_ENGINE,
             videoAttempts,
             aspectRatio,
             durationSeconds: ANIMATION_SECONDS,
@@ -3884,6 +3947,7 @@ const OPERATION_NAME_RE = /^models\/[a-zA-Z0-9._-]{1,80}\/operations\/[a-zA-Z0-9
 /** Resolve a finished video operation to its download URI, or null if it is
  *  still running. Throws if the operation itself failed. */
 const resolveVideoUri = async (operationName) => {
+    if (operationName.startsWith('kling:')) return klingResolve(operationName);
     // The SDK hydrates the result through the operation object it is given
     // (operation._fromAPIResponse), so a bare { name } is refused with
     // "_fromAPIResponse is not a function" and every status poll 500s. It
@@ -3908,7 +3972,7 @@ const resolveVideoUri = async (operationName) => {
 app.get('/api/animation/status', async (req, res) => {
     try {
         const name = sanitizeString(req.query.file, 200);
-        if (!OPERATION_NAME_RE.test(name)) {
+        if (!OPERATION_NAME_RE.test(name) && !KLING_HANDLE_RE.test(name)) {
             return res.status(400).json({ error: 'Invalid job reference.' });
         }
         const result = await resolveVideoUri(name);
@@ -3922,7 +3986,7 @@ app.get('/api/animation/status', async (req, res) => {
 app.get('/api/animation/video', async (req, res) => {
     try {
         const name = sanitizeString(req.query.file, 200);
-        if (!OPERATION_NAME_RE.test(name)) {
+        if (!OPERATION_NAME_RE.test(name) && !KLING_HANDLE_RE.test(name)) {
             return res.status(400).json({ error: 'Invalid job reference.' });
         }
 
@@ -3943,7 +4007,12 @@ app.get('/api/animation/video', async (req, res) => {
         } catch {
             return res.status(502).json({ error: 'Could not fetch the finished video.' });
         }
-        if (target.protocol !== 'https:' || target.hostname !== 'generativelanguage.googleapis.com') {
+        const isKling = name.startsWith('kling:');
+        // fal serves finished files from its own media CDN (v3.fal.media and
+        // friends), publicly, no key. Google's needs ours. Anything else is
+        // refused: the URL came from an API response, not from us.
+        const falHost = /(^|\.)fal\.media$/.test(target.hostname) || /(^|\.)fal\.run$/.test(target.hostname);
+        if (target.protocol !== 'https:' || (isKling ? !falHost : target.hostname !== 'generativelanguage.googleapis.com')) {
             console.error('Animation download refused, unexpected host:', target.hostname);
             return res.status(502).json({ error: 'Could not fetch the finished video.' });
         }
@@ -3954,7 +4023,7 @@ app.get('/api/animation/video', async (req, res) => {
         // Use the shared apiKey (with its VITE_ fallback) — reading the env var
         // directly meant a deployment still on the deprecated name could
         // generate clips (paying for them) but never download them.
-        const upstream = await fetch(target.href, { headers: { 'x-goog-api-key': apiKey } });
+        const upstream = await fetch(target.href, isKling ? {} : { headers: { 'x-goog-api-key': apiKey } });
         if (!upstream.ok) {
             return res.status(upstream.status).json({ error: 'Could not fetch the finished video.' });
         }
