@@ -244,6 +244,11 @@ export interface Room {
   hasPictureFrame?: boolean;
   hasDecking?: boolean;
   deckingSizeMm?: number;
+  /** Extra decking beyond the building's side, per side, in mm. The canopy
+   *  does not follow: a client wanting a wider deck does not want a wider
+   *  roof. Default 0. */
+  deckingLeftMm?: number;
+  deckingRightMm?: number;
   deckingMaterial?: DeckingMaterialType;
   overhangLeftMm?: number;
   overhangRightMm?: number;

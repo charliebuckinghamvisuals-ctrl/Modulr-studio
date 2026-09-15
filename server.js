@@ -2323,6 +2323,13 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                 const wStr = mm(spec.widthMm), dStr = mm(spec.depthMm);
                 if (wStr && dStr) lines.push(`- Building footprint: ${wStr} wide x ${dStr} deep.`);
                 if (spec.shape) lines.push(`- Roof form: ${spec.shape === 'Gable' ? 'gable (dual pitched)' : 'flat roof'}.`);
+                // The deck, as sized - including any side extension past the
+                // building, which is the customer's deck and not a mistake.
+                if (spec.hasDecking || spec.hasPictureFrame) {
+                    const front = Number(spec.deckingSizeMm) || 1500, left = Number(spec.deckingLeftMm) || 0, right = Number(spec.deckingRightMm) || 0;
+                    const sides = [left ? `${left}mm past the LEFT side of the building` : null, right ? `${right}mm past the RIGHT side of the building` : null].filter(Boolean);
+                    lines.push(`- DECKING: a timber/composite deck ${front}mm deep across the full front of the building${sides.length ? `, and extending ${sides.join(' and ')} - the deck is deliberately wider than the building there; the roof and canopy above do NOT extend with it` : ''}. Keep the deck exactly the size and shape the source image shows.`);
+                }
 
                 /**
                  * GARDEN BOUNDARY - from the configurator's drawn runs. The

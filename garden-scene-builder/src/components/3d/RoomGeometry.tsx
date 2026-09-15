@@ -1264,14 +1264,18 @@ export function RoomGeometry() {
   const roofZ = (ohFront - ohBack) / 2;
 
   const isDecking = room.hasDecking || room.hasPictureFrame;
-  let deckFront = 0;
+  let deckFront = 0, deckLeft = 0, deckRight = 0;
   if (isDecking) {
     deckFront = (room.deckingSizeMm ?? 1500) / 1000;
+    // Side extensions widen the deck slab only. The roof (canopy and
+    // overhangs) is sized from w above and never sees these.
+    deckLeft = Math.max(0, room.deckingLeftMm ?? 0) / 1000;
+    deckRight = Math.max(0, room.deckingRightMm ?? 0) / 1000;
   }
 
-  const baseW = w + ohLeft + ohRight;
+  const baseW = w + ohLeft + ohRight + deckLeft + deckRight;
   const baseD = d + ohBack + deckFront;
-  const baseX = (ohRight - ohLeft) / 2;
+  const baseX = (ohRight + deckRight - ohLeft - deckLeft) / 2;
   const baseZ = (deckFront - ohBack) / 2;
 
   // LShape dimensions

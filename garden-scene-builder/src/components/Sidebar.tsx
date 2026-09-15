@@ -1067,6 +1067,16 @@ export function Sidebar() {
                     <span className="text-xs font-medium text-gray-600 w-28">Decking Depth</span>
                     <DeferredInput type="number" value={room.deckingSizeMm ?? 1500} onChange={(e) => updateRoom({ deckingSizeMm: parseInt(e.target.value) || 0 })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
                   </div>
+                  {/* Wider than the building, per side. The canopy stays put. */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-600 w-28">Extend Left</span>
+                    <DeferredInput type="number" value={room.deckingLeftMm ?? 0} onChange={(e) => updateRoom({ deckingLeftMm: Math.max(0, parseInt(e.target.value) || 0) })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-600 w-28">Extend Right</span>
+                    <DeferredInput type="number" value={room.deckingRightMm ?? 0} onChange={(e) => updateRoom({ deckingRightMm: Math.max(0, parseInt(e.target.value) || 0) })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
+                  </div>
+                  <p className="text-[10px] text-gray-400 leading-snug">Beyond the building's side, in mm. The canopy and roof do not change.</p>
                 </div>
               )}
               

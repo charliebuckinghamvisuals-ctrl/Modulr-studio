@@ -1281,7 +1281,13 @@ export const useStore = create<AppState>((set, get) => ({
     }
 
     let deckingArea = 0;
-    if (room.hasDecking) deckingArea += (w * (room.deckingSizeMm || 0) / 1000);
+    if (room.hasDecking) {
+      const front = (room.deckingSizeMm || 0) / 1000;
+      const sides = ((room.deckingLeftMm || 0) + (room.deckingRightMm || 0)) / 1000;
+      // Front strip across the building, plus each side strip down the
+      // building's depth and the front strip.
+      deckingArea += w * front + sides * (d + front);
+    }
 
     // Subtract doors
     let doorArea = 0;
