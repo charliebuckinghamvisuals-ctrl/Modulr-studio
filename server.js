@@ -179,10 +179,15 @@ ${cameraEffects ? `      - CAMERA EFFECTS ON: shallow-to-moderate depth of field
       - Late golden hour into early dusk: a low, warm sun from the side, long soft
         shadows across the lawn, the sky graded from warm near the horizon to a
         cool clear blue above. This is the light a magazine would shoot in.
-      - INTERIOR LIGHTS ON: a warm glow through every pane of glazing, showing a
-        furnished, lived-in interior - a desk or sofa, a lamp, shelving, a rug.
-        Any soffit downlights, wall lights or external fittings on the building
-        are lit and casting their own soft pools.
+      - INTERIOR LIGHTS ON: a warm glow through every pane of glazing. Any soffit
+        downlights, wall lights or external fittings on the building are lit and
+        casting their own soft pools.
+      - NOTHING INVENTED INSIDE OR ON THE BUILDING: the interior shows exactly
+        what the source shows and nothing more. If the source room is empty it
+        stays empty, warmly lit. Do not add furniture, lamps, rugs, art, plants,
+        curtains or people indoors, and do not add benches, chairs, tables,
+        parasols, bikes or any garden furniture outside. Furniture and fittings
+        that ARE in the source are kept exactly as placed.
       - No blown highlights, no crushed blacks; warm and cool balanced, the
         building still reading at its true material colour.
       - Gentle ambient occlusion under the eaves, soffits and decking edge, and a
@@ -192,11 +197,12 @@ ${cameraEffects ? `      - CAMERA EFFECTS ON: shallow-to-moderate depth of field
       - A mature, designed UK rear garden, styled like an editorial photograph
         rather than a builder's yard: a neatly mown lawn; layered borders of
         ornamental grasses, hydrangeas, lavender and evergreen shrubs; one or
-        two statement pots with an olive or a clipped bay by the doors; a lantern
-        or two; a pebble or paving margin where lawn meets building; a timber
-        fence or hedge behind; mature trees and neighbouring rooflines softening
-        the edges. Everything looks installed and tended, nothing looks placed
-        for the shot. Styled, not cluttered: nothing competes with the building.
+        two planted pots by the doors; a pebble or paving margin where lawn meets
+        building; a timber fence or hedge behind; mature trees and neighbouring
+        rooflines softening the edges. PLANTING IS THE ONLY DRESSING: no
+        furniture, lighting or objects that are not in the source. Everything
+        looks installed and tended. Styled, not cluttered: nothing competes with
+        the building.
       - The building occupies the majority of the frame with comfortable breathing
         space. Not a wide landscape shot. THIS NEVER JUSTIFIES MOVING THE CAMERA:
         when the source image establishes a viewpoint, its exact framing wins -
@@ -2717,8 +2723,9 @@ ${lines.join('\n')}
         designed garden and evening light described in the house style around the
         building. Anything actually modelled in the view - decking, a canopy, a
         boundary fence or wall, paths - is part of the design and is kept exactly
-        where it is; the planting, pots, lawn detail, sky and neighbours are yours
-        to dress.
+        where it is; the planting, lawn detail, sky and neighbours are yours to
+        dress. Objects are not: no furniture indoors or out beyond what the view
+        shows.
 
       ${configSpecBlock}
 
