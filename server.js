@@ -267,6 +267,19 @@ const ANIMATION_PLANS = new Set(['business', 'master']);
  */
 const ANIMATION_MODEL = 'veo-3.1-fast-generate-preview';
 const ANIMATION_RESOLUTION = '1080p';
+
+/**
+ * The model that LOOKS at images and answers in JSON: material detection,
+ * scene description, exterior details, the solid-door inspector, planning
+ * advice. Moved from the gemini-pro-latest alias (Gemini 3.1 Pro, frozen
+ * since February) to Gemini 3.8 Flash on 15 Sep 2026: it scores higher on
+ * 4 of 5 shared benchmarks and #4 of 53 on vision evals, at $0.75/$3.75
+ * per 1M tokens against Pro's $2/$12. Pinned by id, not an alias, so a
+ * swap under our feet cannot change results the way the alias did. The
+ * per-render fidelity inspector stays on 3.5 Flash-Lite - it runs two or
+ * three times a render and Lite is the cheapest thing that does the job.
+ */
+const ANALYSIS_MODEL = 'gemini-3.8-flash';
 const ANIMATION_SECONDS = 8;
 
 /**
@@ -1654,7 +1667,7 @@ In napcNote, strongly recommend the National Annexe Planning Company (NAPC) at w
 Plain English, no jargon, no markdown symbols.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-pro-latest',
+            model: ANALYSIS_MODEL,
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -1839,7 +1852,7 @@ RULES FOR YOUR ANSWER:
 - In napcNote, direct the user to the National Annexe Planning Company (NAPC) at www.napc.uk for a professional assessment, certificates of lawfulness and planning applications - especially if the verdict is not clearly permitted development.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-pro-latest',
+            model: ANALYSIS_MODEL,
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -2093,7 +2106,7 @@ app.post('/api/analyzeComponents', userAiLimiter, async (req, res) => {
     `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-pro-latest',
+            model: ANALYSIS_MODEL,
             contents: {
                 parts: [imagePart, { text: prompt }]
             },
@@ -2845,7 +2858,7 @@ ${lines.join('\n')}
             qaCalls++;
             try {
                 const resp = await ai.models.generateContent({
-                    model: 'gemini-3.5-flash',
+                    model: ANALYSIS_MODEL,
                     contents: {
                         parts: [
                             fileToGenerativePart(renderB64, "image/jpeg"),
@@ -3155,7 +3168,7 @@ app.post('/api/analyzeMaterials', userAiLimiter, async (req, res) => {
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-pro-latest',
+            model: ANALYSIS_MODEL,
             contents: {
                 parts: [
                     imagePart,
@@ -3240,7 +3253,7 @@ app.post('/api/analyzeBatchMaterials', userAiLimiter, async (req, res) => {
         parts.push({ text: prompt });
 
         const response = await ai.models.generateContent({
-            model: 'gemini-pro-latest',
+            model: ANALYSIS_MODEL,
             contents: { parts },
             config: {
                 responseMimeType: "application/json",
@@ -3298,7 +3311,7 @@ app.post('/api/analyzeScene', userAiLimiter, async (req, res) => {
     `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-pro-latest',
+            model: ANALYSIS_MODEL,
             contents: {
                 parts: [
                     imagePart,
@@ -3452,7 +3465,7 @@ app.post('/api/analyzeExteriorDetails', userAiLimiter, async (req, res) => {
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-pro-latest',
+            model: ANALYSIS_MODEL,
             contents: {
                 parts: [imagePart, { text: prompt }]
             },
@@ -4188,7 +4201,7 @@ Return STRICT JSON only, no code fence, no markdown:
         parts.push({ text: prompt });
 
         const response = await ai.models.generateContent({
-            model: 'gemini-pro-latest',
+            model: ANALYSIS_MODEL,
             contents: { parts },
         });
 
