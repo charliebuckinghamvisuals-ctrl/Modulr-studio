@@ -18,7 +18,7 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
   // near-black empty box with no feedback, which testers read as "broken".
   const [configLoaded, setConfigLoaded] = useState(false);
   // A scene waiting to be named and saved to Projects (from Save Design).
-  const [pendingSave, setPendingSave] = useState<{ room: any; price: number | null } | null>(null);
+  const [pendingSave, setPendingSave] = useState<{ room: any; scene: any; price: number | null } | null>(null);
   const [saveName, setSaveName] = useState('');
   // '__new__' or an existing project id to attach the design to.
   const [saveTarget, setSaveTarget] = useState('__new__');
@@ -27,7 +27,11 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
 
   const confirmSave = async () => {
     if (!pendingSave) return;
-    const scene3d = JSON.stringify(pendingSave.room);
+    // The WHOLE design: room, placed objects (furniture, kitchen, lights)
+    // and the garden boundary. Saves used to hold the room alone, so a
+    // reopened design came back as an empty shell; the configurator still
+    // reads those older room-only saves.
+    const scene3d = JSON.stringify(pendingSave.scene);
     try {
       if (saveTarget === '__new__') {
         await createProject({
@@ -97,7 +101,11 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
         const room = scene?.room || {};
         setSaveName(`Garden room ${room.widthMm || '?'} x ${room.depthMm || '?'}mm`);
         setSaveTarget('__new__');
-        setPendingSave({ room, price: typeof price === 'number' ? Math.round(price) : null });
+        setPendingSave({
+          room,
+          scene: { v: 2, room, objects: scene?.objects || [], fences: scene?.fences || [], garden: scene?.garden },
+          price: typeof price === 'number' ? Math.round(price) : null,
+        });
         return;
       }
 

@@ -454,6 +454,9 @@ export function MainScene() {
     walkFov: s.walkFov
   })));
   const controlsRef = useRef<any>(null);
+  // Debug handle: the orbit rig, so a test can pose the camera through the
+  // controls rather than fighting them frame by frame. Nothing reads it.
+  useEffect(() => { (window as any).__modulrControls = controlsRef; }, []);
   const { camera, raycaster, pointer, gl } = useThree();
   const [isOrthographic, setIsOrthographic] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -694,6 +697,7 @@ export function MainScene() {
   const handlePointerUp = (e: any) => {
      setSelectedObjectId(null);
      setSelectedElementId(null);
+     useStore.getState().setSelectedFenceId(null);
   };
 
   return (

@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Link } from 'react-router-dom';
 import { gableCeilingMaxMm } from '../utils/placement';
 import { fenceLength, fenceArea } from './3d/FenceRuns';
+import { BOUNDARY_KINDS, boundaryMeta, runStyle, describeBoundary } from '../utils/boundary';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS, INTERIOR_DOOR_STYLES } from '../modelRegistry';
@@ -83,6 +84,7 @@ function DeferredInput({ type, value, onChange, className, ...props }: any) {
 export function Sidebar() {
   const store = useStore.getState();
   const toolMode = useStore(s => s.toolMode);
+  const selectedFenceId = useStore(s => s.selectedFenceId);
   const wrap = (fn: any) => (...args: any[]) => { store.saveState(); fn(...args); };
   // Reactive read so the selected wall's card highlights as selection changes.
   const selectedElementId = useStore(s => s.selectedElementId);
@@ -1102,13 +1104,18 @@ export function Sidebar() {
                     </div>
                     {fences.length > 0 && (
                       <div className="bg-white border border-black/5 rounded-xl shadow-sm divide-y divide-black/5">
-                        {fences.map((f, i) => (
-                          <div key={f.id} className="flex items-center justify-between px-3 py-1.5 text-xs">
-                            <span className="text-gray-500">Run {i + 1}</span>
-                            <span className="font-semibold text-[#3b4d4a]">{Math.round(fenceLength(f) * 1000)} mm</span>
-                            <button onClick={() => { store.saveState(); store.removeFence(f.id); }} className="text-gray-300 hover:text-red-500" title="Remove this run"><Trash2 size={12} /></button>
-                          </div>
-                        ))}
+                        {fences.map((f, i) => {
+                          const st = runStyle(f, scene.boundaryStyle);
+                          const picked = selectedFenceId === f.id;
+                          return (
+                            <div key={f.id} className={'flex items-center justify-between gap-2 px-3 py-1.5 text-xs cursor-pointer ' + (picked ? 'bg-emerald-50' : 'hover:bg-gray-50')} onClick={() => store.setSelectedFenceId(picked ? null : f.id)}>
+                              <span className="text-gray-500 shrink-0">Run {i + 1}</span>
+                              <span className="text-[10px] text-gray-400 truncate flex-1 text-center">{boundaryMeta(st.kind).name}{st.kind !== 'open' ? ` ${st.heightMm / 1000} m` : ''}</span>
+                              <span className="font-semibold text-[#3b4d4a] shrink-0">{Math.round(fenceLength(f) * 1000)} mm</span>
+                              <button onClick={(e) => { e.stopPropagation(); store.saveState(); store.removeFence(f.id); }} className="text-gray-300 hover:text-red-500" title="Remove this run"><Trash2 size={12} /></button>
+                            </div>
+                          );
+                        })}
                         <div className="flex items-center justify-between px-3 py-2 text-xs font-bold text-[#3b4d4a]">
                           <span>Perimeter</span><span>{perimeter.toFixed(2)} m</span>
                         </div>
@@ -1118,6 +1125,52 @@ export function Sidebar() {
                         </div>
                       </div>
                     )}
+                    {/* What the boundary is built of. Edits the picked run, or
+                        every run (and the style new runs take) when none is
+                        picked - click a run in the list or on the plan. */}
+                    {(() => {
+                      const target = fences.find(f => f.id === selectedFenceId) ?? null;
+                      const cur = target ? runStyle(target, scene.boundaryStyle) : (scene.boundaryStyle ?? runStyle(fences[0] ?? { id: '', ax: 0, az: 0, bx: 1, bz: 0 }));
+                      const meta = boundaryMeta(cur.kind);
+                      const apply = (patch: Partial<typeof cur>) => { store.saveState(); store.updateFenceStyle(target ? target.id : null, patch); };
+                      const setKind = (kind: typeof cur.kind) => { const m = boundaryMeta(kind); apply({ kind, heightMm: m.defaultHeight, colour: m.defaultColour }); };
+                      return (
+                        <div className="space-y-2.5 pt-1">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-semibold text-gray-500">{target ? `Run ${fences.indexOf(target) + 1}` : fences.length ? 'All runs' : 'New runs'}</label>
+                            {target && <button onClick={() => store.setSelectedFenceId(null)} className="text-[10px] text-gray-400 hover:text-[#3b4d4a]">edit all</button>}
+                          </div>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {BOUNDARY_KINDS.map(k => (
+                              <button key={k.kind} title={k.hint} onClick={() => setKind(k.kind)}
+                                className={'py-1.5 px-1 rounded-lg text-[10px] font-semibold leading-tight border transition-colors ' + (cur.kind === k.kind ? 'bg-[#3b4d4a] text-white border-transparent' : 'bg-white text-gray-600 border-black/10 hover:bg-gray-50')}>
+                                {k.name}
+                              </button>
+                            ))}
+                          </div>
+                          {meta.heights.length > 1 && (
+                            <div className="flex gap-1.5">
+                              {meta.heights.map(h => (
+                                <button key={h} onClick={() => apply({ heightMm: h })}
+                                  className={'flex-1 py-1 rounded-lg text-[10px] font-semibold border transition-colors ' + (cur.heightMm === h ? 'bg-[#3b4d4a] text-white border-transparent' : 'bg-white text-gray-600 border-black/10 hover:bg-gray-50')}>
+                                  {(h / 1000).toFixed(1)} m
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {meta.colours.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {meta.colours.map(c => (
+                                <button key={c.id} title={c.name} onClick={() => apply({ colour: c.id })}
+                                  className={'w-7 h-7 rounded-full border-2 transition-transform ' + (cur.colour === c.id ? 'border-[#3b4d4a] scale-110' : 'border-white shadow-sm hover:scale-105')}
+                                  style={{ background: c.swatch }} />
+                              ))}
+                              <span className="self-center text-[10px] text-gray-400 ml-1">{meta.colours.find(c => c.id === cur.colour)?.name ?? ''}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })()}
@@ -1612,7 +1665,16 @@ export function Sidebar() {
               const dataUrl = canvas.toDataURL('image/png');
               // Same payload as the canvas button: screenshot for composition,
               // room spec so the AI obeys the configured building exactly.
-              const { room: roomSpec } = useStore.getState().scene;
+              const { room, fences, boundaryStyle } = useStore.getState().scene;
+              // The boundary rides with the room: what each run is built of,
+              // in words the render prompt can repeat, so a brick wall in the
+              // screenshot is rendered as brick and not guessed at.
+              const roomSpec = {
+                ...room,
+                garden: fences?.length ? {
+                  boundary: fences.map(f => ({ lengthMm: Math.round(fenceLength(f) * 1000), text: describeBoundary(runStyle(f, boundaryStyle)) })),
+                } : undefined,
+              };
               window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl, roomSpec }, window.location.origin);
             }
           }}

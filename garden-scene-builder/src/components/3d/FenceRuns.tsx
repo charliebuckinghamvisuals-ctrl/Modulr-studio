@@ -3,7 +3,9 @@ import * as THREE from 'three';
 import { useGLTF, Html, Line } from '@react-three/drei';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { useStore } from '../../store';
-import type { FenceRun } from '../../types';
+import type { BoundaryStyle, FenceRun } from '../../types';
+import { runStyle } from '../../utils/boundary';
+import { FeatherEdgeRun, SlattedRun, HitMissRun, WallRun, HedgeRun, OpenRun } from './BoundaryKinds';
 
 /**
  * The garden boundary: fence runs the customer draws to mark out and
@@ -60,14 +62,13 @@ export function fenceArea(fences: FenceRun[]): number | null {
 const fmt = (m: number) => `${Math.round(m * 1000)} mm`;
 
 /** One straight run of panels. */
-function Run({ run, showLabel }: { run: FenceRun; showLabel: boolean }) {
+/** Charlie's close-board panel model, stained and stretched to height. */
+function CloseBoardRun({ run, style, len, dx, dz, rotY }: { run: FenceRun; style: BoundaryStyle; len: number; dx: number; dz: number; rotY: number }) {
   const { scene } = useGLTF(FENCE_PANEL_URL);
-  const len = fenceLength(run);
   const n = Math.max(1, Math.round(len / PANEL_W));
   const panelLen = len / n;
-  const dx = (run.bx - run.ax) / len, dz = (run.bz - run.az) / len;
-  // Local +x is turned onto the run's direction.
-  const rotY = Math.atan2(-dz, dx);
+  // The model is 1.8 m tall; other heights stretch it.
+  const scaleY = (style.heightMm || 1800) / 1800;
 
   // The panel comes as dozens of separate boards. Merged into ONE mesh per
   // panel - a boundary of thirty panels was 1,700 draw calls otherwise -
@@ -92,26 +93,71 @@ function Run({ run, showLabel }: { run: FenceRun; showLabel: boolean }) {
       if (!mat) {
         const src = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.MeshStandardMaterial;
         mat = src.clone(); mat.metalness = 0; mat.roughness = 0.85;
-        // The export's board texture reads bleached under the sky; a warm
-        // tint brings it back to fresh-sawn softwood.
-        mat.color = new THREE.Color('#c9b08a'); mat.needsUpdate = true;
+        // The export's board texture reads bleached under the sky; the
+        // stain colour brings it back - natural is fresh-sawn softwood.
+        mat.color = new THREE.Color(style.colour || '#c9b08a'); mat.needsUpdate = true;
       }
     });
     const merged = mergeGeometries(parts, false) ?? new THREE.BufferGeometry();
     parts.forEach(p => p.dispose());
     return { geometry: merged, material: mat ?? new THREE.MeshStandardMaterial({ color: '#8a7a62', roughness: 0.85 }) };
-  }, [scene]);
+  }, [scene, style.colour]);
 
   return (
     <group>
       {Array.from({ length: n }, (_, i) => {
         const t = panelLen * (i + 0.5);
         return (
-          <mesh key={i} geometry={geometry} material={material} castShadow receiveShadow position={[run.ax + dx * t, 0, run.az + dz * t]} rotation={[0, rotY, 0]} scale={[panelLen / PANEL_W, 1, 1]} />
+          <mesh key={i} geometry={geometry} material={material} castShadow receiveShadow position={[run.ax + dx * t, 0, run.az + dz * t]} rotation={[0, rotY, 0]} scale={[panelLen / PANEL_W, scaleY, 1]} />
         );
       })}
+    </group>
+  );
+}
+
+/** One run of the boundary, whatever it is built of. */
+function Run({ run, showLabel }: { run: FenceRun; showLabel: boolean }) {
+  const fallback = useStore(s => s.scene.boundaryStyle);
+  const selected = useStore(s => s.selectedFenceId === run.id);
+  const style = runStyle(run, fallback);
+  const len = fenceLength(run);
+  const dx = (run.bx - run.ax) / len, dz = (run.bz - run.az) / len;
+  // Local +x is turned onto the run's direction.
+  const rotY = Math.atan2(-dz, dx);
+  const local = { position: [run.ax, 0, run.az] as [number, number, number], rotation: [0, rotY, 0] as [number, number, number] };
+  const body = (() => {
+    switch (style.kind) {
+      case 'featheredge': return <group {...local}><FeatherEdgeRun len={len} style={style} /></group>;
+      case 'slatted': return <group {...local}><SlattedRun len={len} style={style} /></group>;
+      case 'hitmiss': return <group {...local}><HitMissRun len={len} style={style} /></group>;
+      case 'brick': case 'stone': return <group {...local}><WallRun len={len} style={style} /></group>;
+      case 'hedge': return <group {...local}><HedgeRun len={len} style={style} /></group>;
+      case 'open': return <group {...local}><OpenRun len={len} /></group>;
+      default: return <CloseBoardRun run={run} style={style} len={len} dx={dx} dz={dz} rotY={rotY} />;
+    }
+  })();
+  const h = Math.max(0.05, (style.heightMm || 0) / 1000);
+
+  return (
+    <group
+      // Click a run to restyle it in the sidebar. The ground plane clears
+      // the selection, as it does for objects.
+      onPointerDown={(e) => { if (useStore.getState().toolMode !== 'select') return; e.stopPropagation(); useStore.getState().setSelectedFenceId(run.id); }}
+    >
+      {body}
+      {/* A generous invisible hit box: a slatted fence is mostly gaps. */}
+      <mesh {...local} position={[run.ax + dx * len / 2, h / 2, run.az + dz * len / 2]} visible={false}>
+        <boxGeometry args={[len, h, 0.5]} />
+        <meshBasicMaterial />
+      </mesh>
+      {selected && (
+        <mesh position={[run.ax + dx * len / 2, 0.015, run.az + dz * len / 2]} rotation={[0, rotY, 0]}>
+          <boxGeometry args={[len, 0.01, 0.7]} />
+          <meshBasicMaterial color="#10b981" transparent opacity={0.45} depthTest={false} />
+        </mesh>
+      )}
       {showLabel && (
-        <Html position={[(run.ax + run.bx) / 2, 2.05, (run.az + run.bz) / 2]} center zIndexRange={[90, 0]} style={{ pointerEvents: 'none' }}>
+        <Html position={[(run.ax + run.bx) / 2, h + 0.25, (run.az + run.bz) / 2]} center zIndexRange={[90, 0]} style={{ pointerEvents: 'none' }}>
           <div style={{ background: 'rgba(29,29,31,0.85)', color: '#fff', padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', fontFamily: 'system-ui, sans-serif' }}>{fmt(len)}</div>
         </Html>
       )}

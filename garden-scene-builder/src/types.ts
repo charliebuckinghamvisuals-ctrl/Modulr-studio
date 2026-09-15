@@ -341,7 +341,24 @@ export interface SceneObject {
   groupId?: string;
 }
 
-export interface FenceRun {
+/**
+ * What a boundary run is built of. Timber kinds and hedges are procedural;
+ * brick and stone are textured walls; open is a line on the plan and
+ * nothing in 3D (a boundary onto a field, or one the client is not
+ * fencing). See components/3d/FenceRuns for how each is drawn.
+ */
+export type BoundaryKind = 'closeboard' | 'featheredge' | 'slatted' | 'hitmiss' | 'brick' | 'stone' | 'hedge' | 'open';
+
+/** The look of a run: kind, height and a colour whose meaning depends on
+ *  the kind - a stain hex for timber, a preset id for brick and stone, a
+ *  foliage hex for a hedge. */
+export interface BoundaryStyle {
+  kind: BoundaryKind;
+  heightMm: number;
+  colour: string;
+}
+
+export interface FenceRun extends Partial<BoundaryStyle> {
   id: string;
   ax: number;
   az: number;
@@ -366,6 +383,9 @@ export interface SceneState {
   room: Room;
   objects: SceneObject[];
   fences: FenceRun[];
+  /** The style a newly drawn run takes; runs drawn before this existed
+   *  (no kind of their own) also fall back to it. */
+  boundaryStyle?: BoundaryStyle;
   pricing: PricingConfig;
   env: {
     time: 'day' | 'night';

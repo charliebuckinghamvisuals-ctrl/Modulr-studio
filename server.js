@@ -2208,6 +2208,21 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                 if (spec.shape) lines.push(`- Roof form: ${spec.shape === 'Gable' ? 'gable (dual pitched)' : 'flat roof'}.`);
 
                 /**
+                 * GARDEN BOUNDARY - from the configurator's drawn runs. The
+                 * screenshot shows the fences and walls as real geometry;
+                 * these words say what each is made of, so a stone wall is
+                 * rendered as stone and a hedge as a hedge, at the height
+                 * drawn. Runs are listed in drawing order.
+                 */
+                const boundary = Array.isArray(spec.garden?.boundary) ? spec.garden.boundary.slice(0, 12) : [];
+                if (boundary.length) {
+                    const runs = boundary
+                        .map((b, i) => (typeof b?.text === 'string' && b.text.trim()) ? `run ${i + 1} (${Math.round((Number(b.lengthMm) || 0) / 100) / 10} m): ${sanitizeString(b.text, 120)}` : null)
+                        .filter(Boolean);
+                    if (runs.length) lines.push(`- GARDEN BOUNDARY, exactly as drawn in the source image and to be kept where it is: ${runs.join('; ')}. Render each run in that material at that height. A run listed as open has no fence or wall - leave it open. Do not add any fence, wall or hedge that is not listed.`);
+                }
+
+                /**
                  * CLADDING COLOUR, PER ELEVATION - from the client's order.
                  *
                  * This used to be left out on purpose: a single global

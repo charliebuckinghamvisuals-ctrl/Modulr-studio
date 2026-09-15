@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SceneState, SceneObject, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
+import { SceneState, SceneObject, BoundaryStyle, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { isInteriorType, clampToRoomInterior, snapTap } from './utils/placement';
 import { bayRange, wallSpanMm } from './utils/bay';
@@ -37,6 +37,12 @@ interface AppState {
   addFence: (ax: number, az: number, bx: number, bz: number) => void;
   removeFence: (id: string) => void;
   clearFences: () => void;
+  /** Restyle one run (kind, height, colour), or every run when id is null -
+   *  which also becomes the style new runs are drawn with. */
+  updateFenceStyle: (id: string | null, style: Partial<BoundaryStyle>) => void;
+  /** The run picked on the plan or in 3D, for the boundary style panel. */
+  selectedFenceId: string | null;
+  setSelectedFenceId: (id: string | null) => void;
   setActivePlacementType: (type: ObjectType | null) => void;
   setSelectedObjectId: (id: string | null) => void;
   setSelectedElementId: (id: string | null) => void;
@@ -114,9 +120,10 @@ interface AppState {
   redo: () => void;
   
   // Scene Actions
-  /** Replace the room with a saved design, merged over defaults so scenes
-   *  saved before a field existed still load cleanly. */
-  loadRoom: (room: Partial<SceneState['room']>) => void;
+  /** Load a saved design. Accepts the full scene the host saves now
+   *  ({ room, objects, fences }) or the bare room older saves hold; either
+   *  way the room is merged over defaults so fields added since still load. */
+  loadRoom: (design: Partial<SceneState['room']> | { room: Partial<SceneState['room']>; objects?: SceneObject[]; fences?: SceneState['fences'] }) => void;
   /** Apply a starting template: merges its room over the current one and
    *  replaces the placed objects. Undoable like any other edit. */
   applyPreset: (room: Partial<SceneState['room']>, objects: Array<Omit<SceneState['objects'][0], 'id'>>) => void;
@@ -422,8 +429,17 @@ export const useStore = create<AppState>((set, get) => ({
   setViewMode: (mode) => set({ viewMode: mode, toolMode: 'select', activePlacementType: null }),
   setToolMode: (mode) => set({ toolMode: mode }),
   addFence: (ax, az, bx, bz) => set((state) => ({
-    scene: { ...state.scene, fences: [...(state.scene.fences || []), { id: uuidv4(), ax, az, bx, bz }] },
+    scene: { ...state.scene, fences: [...(state.scene.fences || []), { id: uuidv4(), ax, az, bx, bz, ...(state.scene.boundaryStyle || {}) }] },
   })),
+  updateFenceStyle: (id, style) => set((state) => ({
+    scene: {
+      ...state.scene,
+      fences: (state.scene.fences || []).map(f => (id === null || f.id === id) ? { ...f, ...style } : f),
+      boundaryStyle: id === null ? { kind: 'closeboard', heightMm: 1800, colour: '#c9b08a', ...(state.scene.boundaryStyle || {}), ...style } : state.scene.boundaryStyle,
+    },
+  })),
+  selectedFenceId: null,
+  setSelectedFenceId: (id) => set({ selectedFenceId: id }),
   removeFence: (id) => set((state) => ({
     scene: { ...state.scene, fences: (state.scene.fences || []).filter(f => f.id !== id) },
   })),
@@ -542,17 +558,29 @@ export const useStore = create<AppState>((set, get) => ({
     };
   }),
 
-  loadRoom: (room) => set((state) => ({
-    // The current scene goes onto the undo stack, so loading a design is
-    // reversible like any other edit.
-    pastScenes: [...state.pastScenes, JSON.parse(JSON.stringify(state.scene))],
-    futureScenes: [],
-    scene: {
-      ...state.scene,
-      room: { ...initialState.room, ...room },
-    },
-    selectedElementId: null,
-  })),
+  loadRoom: (design) => set((state) => {
+    // A full save carries its room under 'room'; a legacy save IS the room.
+    const full = design && typeof design === 'object' && 'room' in design && design.room && typeof design.room === 'object';
+    const room = full ? (design as { room: Partial<SceneState['room']> }).room : (design as Partial<SceneState['room']>);
+    const saved = full ? (design as { objects?: SceneObject[]; fences?: SceneState['fences'] }) : {};
+    const objects = Array.isArray(saved.objects)
+      ? saved.objects.map(o => { const t = snapTap(o.type, o.x, o.z, saved.objects!, o.id); return t ? { ...o, x: t.x, z: t.z, rot: t.rot } : o; })
+      : state.scene.objects;
+    return {
+      // The current scene goes onto the undo stack, so loading a design is
+      // reversible like any other edit.
+      pastScenes: [...state.pastScenes, JSON.parse(JSON.stringify(state.scene))],
+      futureScenes: [],
+      scene: {
+        ...state.scene,
+        room: { ...initialState.room, ...room },
+        objects,
+        fences: Array.isArray(saved.fences) ? saved.fences : state.scene.fences,
+      },
+      selectedElementId: null,
+      selectedObjectId: null,
+    };
+  }),
 
   applyPreset: (room, objects) => set((state) => ({
     pastScenes: [...state.pastScenes, JSON.parse(JSON.stringify(state.scene))],
