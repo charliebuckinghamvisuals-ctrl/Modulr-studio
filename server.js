@@ -293,8 +293,11 @@ const ANIMATION_SECONDS = 8;
  * /status and /video read the prefix to know which service to ask.
  */
 const ANIMATION_ENGINE = (process.env.ANIMATION_ENGINE === 'kling' && process.env.FAL_KEY) ? 'kling' : 'veo';
-const KLING_MODEL_ID = 'fal-ai/kling-video/v3/pro/image-to-video';
-const KLING_LABEL = 'kling-v3-pro';
+// Kling O3 Pro at 1080p: newer than v3 Pro at the same $0.112/s without
+// audio. The 4K variants cost $0.42/s and are not this. Override with
+// KLING_MODEL_ID to try another endpoint without a code change.
+const KLING_MODEL_ID = process.env.KLING_MODEL_ID || 'fal-ai/kling-video/o3/pro/image-to-video';
+const KLING_LABEL = KLING_MODEL_ID.replace('fal-ai/kling-video/', 'kling-').split('/').join('-');
 const falHeaders = () => ({ Authorization: `Key ${process.env.FAL_KEY}`, 'Content-Type': 'application/json' });
 
 /** Start a Kling clip; returns the opaque handle. */
