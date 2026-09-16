@@ -33,9 +33,9 @@ export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 
  // Outdoor section (utils/bay).
  | 'hot_tub'
  // Free garden objects: anywhere on the plot, not clamped to the room or the bay.
- | 'garden_steps'
+ | 'garden_steps' | 'garden_ramp'
  // Exterior wall lights: on the outside faces of the building (utils/placement snapToOutsideWall).
- | 'wall_light_sconce' | 'wall_light_angled' | 'wall_light_box'
+ | 'wall_light_sconce' | 'wall_light_angled' | 'wall_light_box' | 'wall_light_slim'
  // Games room.
  | 'pool_table' | 'arcade_machine'
  // Wall-hung: the TV lifted out of the media unit, and a dart board.
@@ -249,6 +249,10 @@ export interface Room {
    *  roof. Default 0. */
   deckingLeftMm?: number;
   deckingRightMm?: number;
+  /** The deck's outline in building-local metres (x across, z front-positive,
+   *  building centred on the origin), when the customer has reshaped it. Unset
+   *  = the rectangle the three sizes above describe. See utils/deck. */
+  deckOutline?: [number, number][];
   deckingMaterial?: DeckingMaterialType;
   overhangLeftMm?: number;
   overhangRightMm?: number;
@@ -309,6 +313,10 @@ export interface SceneObject {
   widthMm?: number;
   depthMm?: number;
   color?: string;
+  /** Procedural garden pieces (steps, ramp): the total rise in mm, and the
+   *  surface - 'concrete' or a decking material key (see DECK_MATERIALS). */
+  riseMm?: number;
+  surface?: string;
   hasDoorGap?: boolean;
   /** Gap centre, measured from the wall's midpoint (legacy). The editor now
    *  shows and edits it as a distance from the wall's start end. */
@@ -378,6 +386,18 @@ export interface PathRun {
   surface: PathSurface;
 }
 
+/** A freeform deck: a polygon on the ground in world metres, raised
+ *  heightMm above the grass in a decking material (a MATERIAL_DEF decking
+ *  key). Several can sit side by side at different heights - a raised
+ *  platform off the doors stepping down to a lower one. See
+ *  components/3d/Decks. */
+export interface DeckArea {
+  id: string;
+  points: [number, number][];
+  heightMm: number;
+  material: string;
+}
+
 export interface FenceRun extends Partial<BoundaryStyle> {
   id: string;
   ax: number;
@@ -409,6 +429,9 @@ export interface SceneState {
   paths: PathRun[];
   /** The width and surface the next path is drawn with. */
   pathStyle?: { widthMm: number; surface: PathSurface };
+  decks: DeckArea[];
+  /** The height and material the next deck is drawn with. */
+  deckStyle?: { heightMm: number; material: string };
   pricing: PricingConfig;
   env: {
     time: 'day' | 'night';
@@ -424,5 +447,5 @@ export interface SceneState {
  *  uses to set out downlights. Top-down like 'plan', but with the roof and
  *  ceiling stripped away so the fittings are the subject. */
 export type ViewMode = '3d' | 'plan' | 'capture' | 'render' | 'walking' | 'lighting';
-export type ToolMode = 'select' | 'place' | 'fence' | 'path';
+export type ToolMode = 'select' | 'place' | 'fence' | 'path' | 'deck';
 

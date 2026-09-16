@@ -4,7 +4,7 @@ import {
   TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH, FORCE_DIELECTRIC,
   EMISSIVE_MATERIAL, LIGHT_COLOURS, UNMIRROR_NORMALS, finishSpec,
   FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById, TIMBER_MATERIAL,
-  veneerById, isVeneerFinish, UNIT_FAMILY, metalUsesColour, HORIZONTAL_VENEER, DOUBLE_SIDED_METAL, FACE_SPLITS, PLINTH_MATERIAL,
+  veneerById, isVeneerFinish, UNIT_FAMILY, metalUsesColour, HORIZONTAL_VENEER, DOUBLE_SIDED_METAL, FACE_SPLITS, PLINTH_MATERIAL, METAL_TEXTURE,
 } from '../modelRegistry';
 import type { WorktopDef } from '../modelRegistry';
 
@@ -315,6 +315,26 @@ function worldScaleOf(mesh: THREE.Mesh) {
  * and every unit in the room shares one set of GPU textures.
  */
 const worktopSets = new Map<string, { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: THREE.Texture }>();
+
+/** Normal + roughness maps for a textured metal finish (METAL_TEXTURE), one
+ *  shared set per prefix, repeating every tileMetres over metre UVs. */
+const grainSets = new Map<string, { normalMap: THREE.Texture; roughnessMap: THREE.Texture }>();
+function grainTextures(prefix: string, tileMetres: number) {
+  const id = `|`;
+  const hit = grainSets.get(id);
+  if (hit) return hit;
+  const loader = new THREE.TextureLoader();
+  const load = (suffix: string) => {
+    const t = loader.load(`./textures/_.jpg`);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.colorSpace = THREE.LinearSRGBColorSpace;
+    t.repeat.set(1 / tileMetres, 1 / tileMetres);
+    return t;
+  };
+  const set = { normalMap: load('normal'), roughnessMap: load('roughness') };
+  grainSets.set(id, set);
+  return set;
+}
 
 function worktopTextures(def: WorktopDef) {
   const hit = worktopSets.get(def.id);
@@ -873,7 +893,10 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
       }
 
       if (metalNames?.includes(m.name)) {
-        const metal = new THREE.MeshStandardMaterial({
+        const grain = METAL_TEXTURE[type];
+        // Physical for a grained coat so its specular can be turned down -
+        // envMapIntensity is a no-op under scene.environment in this three.
+        const metal = new (grain ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial)({
           color: finish.hex,
           roughness: finish.roughness,
           metalness: 1,
@@ -881,6 +904,25 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
           // See DOUBLE_SIDED_METAL: inside-out columns on the 3-hole tap.
           side: DOUBLE_SIDED_METAL[type] ? THREE.DoubleSide : THREE.FrontSide,
         });
+        if (grain) {
+          // A powder-coat grain over the finish: bumps and a roughness
+          // break-up, no colour map, so the picked finish still reads. The
+          // exporter's UVs are arbitrary, so the grain is projected in
+          // metres like a worktop.
+          const set = grainTextures(grain.prefix, grain.tileMetres);
+          boxProjectUVs(mesh.geometry, 1, true, worldScaleOf(mesh));
+          metal.normalMap = set.normalMap;
+          metal.normalScale = new THREE.Vector2(grain.normalScale, grain.normalScale);
+          // A powder coat is paint, not bare metal: at metalness 1 the flat
+          // housing mirrored the garden. Mostly dielectric and properly matt,
+          // with the grain doing the work; the roughness map stays off (the
+          // rubber's is dark and pulled it glossy). userData marks it so a
+          // recolour keeps the matt.
+          metal.metalness = 0.15;
+          metal.roughness = 0.85;
+          (metal as THREE.MeshPhysicalMaterial).specularIntensity = 0.45;
+          metal.userData.powderCoat = true;
+        }
         metal.name = m.name;
         metalMats.push(metal);
         return metal;
@@ -988,7 +1030,8 @@ export function refinishMetal(
   const finish = finishFor(type, hex);
   handles.metalMats.forEach(m => {
     m.color.set(finish.hex);
-    m.roughness = finish.roughness;
+    // A textured powder coat keeps its own matt - see METAL_TEXTURE.
+    if (!m.userData.powderCoat) m.roughness = finish.roughness;
     m.needsUpdate = true;
   });
 }

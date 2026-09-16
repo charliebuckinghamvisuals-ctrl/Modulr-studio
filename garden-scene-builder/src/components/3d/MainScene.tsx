@@ -13,6 +13,7 @@ import { sunState, MOON_DIR } from '../../utils/sun';
 import { isLightFitting } from '../../modelRegistry';
 import { FenceRuns, FenceTool } from './FenceRuns';
 import { Paths, PathTool } from './Paths';
+import { Decks, DeckTool } from './Decks';
 import * as THREE from 'three';
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -700,6 +701,7 @@ export function MainScene() {
      setSelectedElementId(null);
      useStore.getState().setSelectedFenceId(null);
      useStore.getState().setSelectedPathId(null);
+     useStore.getState().setSelectedDeckId(null);
   };
 
   return (
@@ -926,6 +928,8 @@ export function MainScene() {
         <FenceTool />
         <Paths />
         <PathTool />
+        <Decks />
+        <DeckTool />
         <LightingPlan />
       </group>
 

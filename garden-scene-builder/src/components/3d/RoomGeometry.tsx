@@ -21,6 +21,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { DragHandle } from './DragHandles';
 import { GABLE_CEILING_T } from '../../utils/placement';
 import { InteriorDoorModel } from './InteriorDoorModel';
+import { baseFrame, useDeckTexture } from '../../utils/deck';
+import { DeckSlab } from './DeckSlab';
 
 /** Apex liner thickness: enough to sit clear of the gable face without
  *  z-fighting, thin enough to read as paint rather than a second wall. */
@@ -1347,7 +1349,7 @@ export function RoomGeometry() {
   // Falls back to the cladding's DECKING equivalent, not the cladding key
   // itself - see resolveDeckingKey. Reusing the cladding key laid the vertical
   // slat texture across the deck instead of decking boards.
-  const texDecking = useRealMaterial(resolveDeckingKey(room.deckingMaterial, room.cladding), baseW, deckFront, 0);
+  const texDecking = useDeckTexture(resolveDeckingKey(room.deckingMaterial, room.cladding));
   /*
    * The outdoor section (utils/bay): a slice off one end, inside the same
    * shell. `enc` is the enclosed room's inner x-range - the whole interior
@@ -1734,11 +1736,34 @@ export function RoomGeometry() {
       );
     }
 
+    /*
+     * With decking on, the deck is a reshapeable slab (DeckSlab) in the same
+     * material and UV origin as this box, over a plinth that is just the
+     * footprint plus overhangs. The plinth top sits 3mm under the slab so
+     * the two never fight where they overlap; the slab's default outline is
+     * the whole old base rectangle, so nothing looks different until the
+     * customer pulls a corner.
+     */
+    if (isDecking) {
+      const pf = baseFrame(room);
+      const plinthH = Math.max(0.01, baseH - 0.003);
+      const matKey = `${room.deckingMaterial || room.cladding || 'default'}-${room.baseMaterial}-${isDeckingMaterial}`;
+      return (
+        <group>
+          <mesh position={[pf.plinthX, plinthH / 2, pf.plinthZ]} receiveShadow {...pointerEvents}>
+            <primitive object={createWorldScaleBoxGeometry(pf.plinthW, plinthH, pf.plinthD, false, pf.plinthX - baseX, 0, pf.plinthZ - baseZ)} attach="geometry" />
+            <meshStandardMaterial key={matKey} attach="material" {...materialProps} />
+          </mesh>
+          <DeckSlab room={room} materialProps={materialProps as Record<string, unknown>} materialKey={matKey} />
+        </group>
+      );
+    }
+
     // Corner cut is complex to do without CSG, so we just use a single box for now
     // which might slightly overlap the cut, but preserves the texture.
     return (
-      <mesh 
-        position={[baseX, baseH/2, baseZ]} 
+      <mesh
+        position={[baseX, baseH/2, baseZ]}
         receiveShadow
         {...pointerEvents}
       >
@@ -2433,9 +2458,15 @@ export function RoomGeometry() {
             gable's ends, fascia and ridge are built explicitly below. */}
         {!isPlanView && !isGable && (
           <group
-            position={[roofX, (frontH + backH)/2 + roofH/2, roofZ]}
+            position={[roofX, (frontH + backH)/2 + roofH/2, 0]}
             rotation={[isPitched && !isGable ? roofPitch : 0, 0, 0]}
           >
+          {/* Tilted about the SAME axis as the ceiling (z = 0), with the canopy
+              offset applied inside the tilt. Tilting about the slab's own
+              centre, half a canopy forward, dropped its underside roofZ x
+              tan(pitch) below the ceiling at the back - a steep fall with a
+              canopy put the black EPDM underside where the ceiling should be. */}
+          <group position={[0, 0, roofZ]}>
             <mesh castShadow receiveShadow position={[0, 0, 0]}>
               {/* The six face materials go on the BASE brush, not the mesh:
                   with useGroups the boolean hands the mesh a material array
@@ -2584,6 +2615,7 @@ export function RoomGeometry() {
               </Geometry>
             </mesh>
           )}
+          </group>
         </group>
         )}
 

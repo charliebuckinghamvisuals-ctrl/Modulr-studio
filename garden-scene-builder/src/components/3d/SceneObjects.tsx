@@ -15,6 +15,7 @@ import { RotateCw, Copy, Trash2 } from 'lucide-react';
 import { WorktopRuns } from './WorktopRuns';
 import { isOutdoorType, bayFloorTop } from '../../utils/bay';
 import { PartitionOpenings } from './PartitionOpenings';
+import { GardenSteps, GardenRamp } from './GardenPieces';
 
 /**
  * Generic GLB object - any type registered in modelRegistry renders through
@@ -215,13 +216,13 @@ const POOL_STEP = 4;
  */
 /** How far each wall light stands off its wall, so its light can start
  *  clear of the fitting. From the model files (wallmount.cjs). */
-const WALL_LIGHT_DEPTH_M: Partial<Record<SceneObject['type'], number>> = { wall_light_sconce: 0.171, wall_light_angled: 0.155, wall_light_box: 0.051 };
+const WALL_LIGHT_DEPTH_M: Partial<Record<SceneObject['type'], number>> = { wall_light_sconce: 0.171, wall_light_angled: 0.155, wall_light_box: 0.051, wall_light_slim: 0.04 };
 
 interface Emitter { x: number; y: number; z: number; tx: number; ty: number; tz: number; colour: string; intensity: number; angle: number; penumbra: number; distance: number; decay: number; shadow?: boolean }
 
 function FittingLights({ objects, emit }: { objects: SceneObject[]; emit: boolean }) {
   const room = useStore(s => s.scene.room);
-  const { gl, scene, camera, setFrameloop } = useThree();
+  const { gl, scene, camera, setFrameloop, invalidate } = useThree();
   const targets = useMemo(() => Array.from({ length: LIT_CAP }, () => new THREE.Object3D()), []);
 
   const emitters: Emitter[] = [];
@@ -248,7 +249,12 @@ function FittingLights({ objects, emit }: { objects: SceneObject[]; emit: boolea
       // One soft wash DOWN the cladding, and nothing up - Charlie wants the
       // light from the bottom only. Strong enough to read in daylight,
       // since the walkthrough is lit by day.
-      emitters.push({ x, y: y - 0.05, z, tx: obj.x + ox * 0.6, ty: y - 2.2, tz: obj.z + oz * 0.6, colour, intensity: 70, angle: 0.85, penumbra: 0.9, distance: 4, decay: 2, shadow: true });
+      // The slim up/down fitting: two small LEDs, a gentle graze up and down
+      // the boards - at the lantern's 70cd both cones blew out to white
+      // discs (Charlie: "way too strong").
+      const slim = obj.type === 'wall_light_slim';
+      emitters.push({ x, y: y - 0.05, z, tx: obj.x + ox * 0.6, ty: y - 2.2, tz: obj.z + oz * 0.6, colour, intensity: slim ? 14 : 70, angle: slim ? 0.7 : 0.85, penumbra: slim ? 1 : 0.9, distance: slim ? 3 : 4, decay: 2, shadow: true });
+      if (slim) emitters.push({ x, y: y + 0.05, z, tx: obj.x + ox * 0.4, ty: y + 1.8, tz: obj.z + oz * 0.4, colour, intensity: 9, angle: 0.65, penumbra: 1, distance: 2.5, decay: 2 });
       continue;
     }
     const y = isCeilingMounted(obj.type)
@@ -280,12 +286,17 @@ function FittingLights({ objects, emit }: { objects: SceneObject[]; emit: boolea
     if (pool === compiledFor.current) return;
     compiledFor.current = pool;
     let done = false;
-    const resume = () => { if (!done) { done = true; setFrameloop('always'); } };
+    // setFrameloop('always') alone does NOT restart a loop that has run
+    // down - only invalidate() does. Without it the canvas stayed frozen
+    // after the compile, and the next resize wiped it: the scene "went
+    // invisible apart from the dimensions" whenever a light was added,
+    // until a view switch happened to invalidate.
+    const resume = () => { if (!done) { done = true; setFrameloop('always'); invalidate(); } };
     setFrameloop('never');
     const timeout = setTimeout(resume, 8000);
     gl.compileAsync(scene, camera).then(resume, resume);
     return () => { clearTimeout(timeout); resume(); };
-  }, [pool, gl, scene, camera, setFrameloop]);
+  }, [pool, gl, scene, camera, setFrameloop, invalidate]);
 
   return (
     <>
@@ -702,33 +713,8 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
         </Suspense>
       );
     }
-    if (obj.type === 'garden_steps') {
-      /*
-       * Three concrete treads, 150 rise x 300 going, climbing towards local
-       * -z so the object's front (the bottom step) faces +z like a unit's
-       * front. Width is the object's widthMm. Cast in one pale concrete
-       * with a slightly darker riser so the treads read in flat light.
-       */
-      const w = (obj.widthMm ?? 1200) / 1000;
-      const rise = 0.15, going = 0.3;
-      return (
-        <>
-          {[0, 1, 2].map(i => (
-            <mesh key={i} position={[0, (rise * (i + 1)) / 2, going - i * going]} castShadow receiveShadow>
-              <boxGeometry args={[w, rise * (i + 1), going]} />
-              <meshStandardMaterial color="#b8b4ad" roughness={0.95} metalness={0} />
-            </mesh>
-          ))}
-          {/* Tread nosings: a thin lighter lip on each front edge. */}
-          {[0, 1, 2].map(i => (
-            <mesh key={`n${i}`} position={[0, rise * (i + 1) - 0.006, going * 1.5 - i * going - 0.005]} receiveShadow>
-              <boxGeometry args={[w, 0.012, 0.03]} />
-              <meshStandardMaterial color="#c9c5bd" roughness={0.9} />
-            </mesh>
-          ))}
-        </>
-      );
-    }
+    if (obj.type === 'garden_steps') return <GardenSteps obj={obj} />;
+    if (obj.type === 'garden_ramp') return <GardenRamp obj={obj} />;
     if (obj.type === 'tree') {
       return (
         <>
@@ -1040,14 +1026,6 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
           {/* Screen */}
           <mesh position={[0, 1.1, 0.031]}><planeGeometry args={[1.45, 0.8]} /><meshBasicMaterial color="#000" /></mesh>
         </group>
-      );
-    }
-
-    if (obj.type === 'bed') {
-      return (
-        <Suspense fallback={<BedFallback />}>
-          <BedModel />
-        </Suspense>
       );
     }
 

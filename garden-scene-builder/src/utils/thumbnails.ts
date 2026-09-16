@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { ObjectType } from '../types';
 import { applyModelMaterials } from './materialFixes';
 
@@ -21,13 +22,25 @@ const SIZE = 256;
 // Bump when the render/framing changes so cached images are regenerated.
 // v4: models re-exported under the same file name (corner unit, hot tub)
 // kept showing their old picture from the cache.
-const STORAGE_PREFIX = 'modulr_thumb_v4:';
+const STORAGE_PREFIX = 'modulr_thumb_v6:';
 
 const memory = new Map<string, string>();
 const pending = new Map<string, Promise<string | null>>();
 
 let renderer: THREE.WebGLRenderer | null = null;
 let loader: GLTFLoader | null = null;
+let envMap: THREE.Texture | null = null;
+
+/** A studio environment for the metals. Lights alone gave a black powder-
+ *  coated fitting nothing to reflect, so every dark metal thumbnail was a
+ *  silhouette. Built once from three's RoomEnvironment. */
+function getEnvironment(gl: THREE.WebGLRenderer): THREE.Texture {
+  if (envMap) return envMap;
+  const pmrem = new THREE.PMREMGenerator(gl);
+  envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
+  return envMap;
+}
 
 function getRenderer(): THREE.WebGLRenderer | null {
   if (renderer) return renderer;
@@ -94,6 +107,35 @@ function frame(object: THREE.Object3D, camera: THREE.PerspectiveCamera) {
   if (extent > 0.001) place(dist * (extent / 0.88));
 }
 
+/** Resolves once every texture on the model has an image, or after 4 s. */
+function texturesReady(root: THREE.Object3D): Promise<void> {
+  const maps: THREE.Texture[] = [];
+  root.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    mats.forEach((m: any) => {
+      if (!m) return;
+      ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'clearcoatNormalMap'].forEach((k) => { if (m[k]?.isTexture) maps.push(m[k]); });
+    });
+  });
+  const loaded = (t: THREE.Texture) => {
+    const img: any = t.image;
+    if (!img) return false;
+    // An <img> mid-download has complete=false; a decoded one has a width.
+    if (typeof img.complete === 'boolean') return img.complete && (img.naturalWidth ?? img.width) > 0;
+    return (img.width ?? 0) > 0 || !!img.data;
+  };
+  return new Promise((resolve) => {
+    const started = performance.now();
+    const tick = () => {
+      if (maps.every(loaded) || performance.now() - started > 4000) resolve();
+      else setTimeout(tick, 40);
+    };
+    tick();
+  });
+}
+
 async function render(url: string, scale?: [number, number, number], type?: ObjectType): Promise<string | null> {
   const gl = getRenderer();
   if (!gl) return null;
@@ -105,8 +147,16 @@ async function render(url: string, scale?: [number, number, number], type?: Obje
   // chrome rather than the exporter's white plastic.
   if (type) applyModelMaterials(type, model, undefined, undefined, false);
   if (scale) model.scale.set(scale[0], scale[1], scale[2]);
+  // The dressings above fetch their textures with TextureLoader.load and
+  // hand back the texture before the image arrives. Rendering in the same
+  // tick sampled those maps as BLACK - every sofa, chair and table
+  // thumbnail came out as a silhouette, and the cache then kept it. Wait
+  // for the images (bounded, so a missing file cannot hang the picker).
+  await texturesReady(model);
 
   const scene = new THREE.Scene();
+  scene.environment = getEnvironment(gl);
+  scene.environmentIntensity = 0.9;
   scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa4ad, 2.2));
   const key = new THREE.DirectionalLight(0xffffff, 2.4);
   key.position.set(3, 5, 4);

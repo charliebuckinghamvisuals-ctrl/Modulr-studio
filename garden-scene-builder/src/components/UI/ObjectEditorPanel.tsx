@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Trash2, RotateCw, Copy, ChevronDown, ChevronUp } from 'lucide-react';
 import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS, hasTimber, VENEERS, isVeneerFinish, metalUsesColour, isTintableTimber, COMPOSITE_COLOURS, TIMBER_MATERIAL } from '../../modelRegistry';
 import { DimensionSlider } from '../DimensionSlider';
+import { DECK_MATERIALS } from '../3d/Decks';
 import { useSavedColours, addSavedColour, removeSavedColour } from '../../utils/savedColours';
 import { resumeWalking } from '../../utils/walk';
 import { WALL_COLOURS } from './WalkWallPanel';
@@ -535,6 +536,37 @@ export function ObjectEditorPanel() {
                 <span className="text-[10px] text-gray-400">mm</span>
               </div>
             </div>
+          );
+        })()}
+
+        {/* Garden steps and ramp: how far they climb, how long a ramp runs,
+            and what they are finished in - cast concrete or any decking, so
+            a ramp can meet a deck in the same boards. */}
+        {!finishesOnly && (obj.type === 'garden_steps' || obj.type === 'garden_ramp') && (() => {
+          const isRamp = obj.type === 'garden_ramp';
+          const rise = obj.riseMm ?? (isRamp ? 300 : 450);
+          const surfaces = [{ id: 'concrete', name: 'Concrete', swatch: '#b8b4ad' }, ...DECK_MATERIALS];
+          const cur = obj.surface ?? 'concrete';
+          return (
+            <>
+              {isRamp && (
+                <DimensionSlider label="Length" min={600} max={6000} step={50} value={obj.depthMm ?? 1800} onChange={(v) => updateObject(obj.id, { depthMm: v })} />
+              )}
+              <DimensionSlider label={isRamp ? 'Rise' : 'Total rise'} min={isRamp ? 50 : 150} max={isRamp ? 1200 : 1800} step={isRamp ? 10 : 150} value={rise} onChange={(v) => updateObject(obj.id, { riseMm: v })} />
+              {!isRamp && <p className="text-[10px] text-gray-400 -mt-1">{Math.max(1, Math.round(rise / 150))} step{Math.round(rise / 150) === 1 ? '' : 's'} of 150 mm</p>}
+              {isRamp && <p className="text-[10px] text-gray-400 -mt-1">Gradient 1 in {Math.max(1, Math.round((obj.depthMm ?? 1800) / Math.max(1, rise)))}{(obj.depthMm ?? 1800) / Math.max(1, rise) < 12 ? ' - steeper than the 1:12 usually wanted for wheelchair access' : ''}</p>}
+              <div>
+                <span className="text-xs font-semibold text-gray-700 block mb-1.5">Surface</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {surfaces.map(s => (
+                    <button key={s.id} title={s.name} onClick={() => updateObject(obj.id, { surface: s.id })}
+                      className={'w-7 h-7 rounded-full border-2 transition-transform ' + (cur === s.id ? 'border-[#3b4d4a] scale-110' : 'border-white shadow-sm hover:scale-105')}
+                      style={{ background: s.swatch }} />
+                  ))}
+                  <span className="self-center text-[10px] text-gray-400 ml-1">{surfaces.find(s => s.id === cur)?.name ?? ''}</span>
+                </div>
+              </div>
+            </>
           );
         })()}
 

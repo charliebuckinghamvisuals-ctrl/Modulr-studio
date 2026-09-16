@@ -2325,7 +2325,17 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                 if (spec.shape) lines.push(`- Roof form: ${spec.shape === 'Gable' ? 'gable (dual pitched)' : 'flat roof'}.`);
                 // The deck, as sized - including any side extension past the
                 // building, which is the customer's deck and not a mistake.
-                if (spec.hasDecking || spec.hasPictureFrame) {
+                const outline = Array.isArray(spec.deckOutline) && spec.deckOutline.length >= 3
+                    ? spec.deckOutline.filter(p => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])).slice(0, 40)
+                    : null;
+                if ((spec.hasDecking || spec.hasPictureFrame) && outline && outline.length >= 3) {
+                    // A reshaped deck: the outline the customer pulled into place,
+                    // so the words describe the shape rather than three sizes.
+                    let a = 0;
+                    for (let i = 0; i < outline.length; i++) { const [x1, z1] = outline[i], [x2, z2] = outline[(i + 1) % outline.length]; a += x1 * z2 - x2 * z1; }
+                    const area = Math.round(Math.abs(a) / 2 * 10) / 10;
+                    lines.push(`- DECKING: a timber/composite deck of about ${area} m² in a custom ${outline.length}-sided outline, exactly the shape and extent the source image shows - it runs under and out from the building and may wrap a corner or step in and out. Keep every edge where the image has it; the roof and canopy above do NOT follow the deck.`);
+                } else if (spec.hasDecking || spec.hasPictureFrame) {
                     const front = Number(spec.deckingSizeMm) || 1500, left = Number(spec.deckingLeftMm) || 0, right = Number(spec.deckingRightMm) || 0;
                     const sides = [left ? `${left}mm past the LEFT side of the building` : null, right ? `${right}mm past the RIGHT side of the building` : null].filter(Boolean);
                     lines.push(`- DECKING: a timber/composite deck ${front}mm deep across the full front of the building${sides.length ? `, and extending ${sides.join(' and ')} - the deck is deliberately wider than the building there; the roof and canopy above do NOT extend with it` : ''}. Keep the deck exactly the size and shape the source image shows.`);
@@ -2350,6 +2360,13 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                 if (paths.length) {
                     const list = paths.map((p, i) => (typeof p?.text === 'string' && p.text.trim()) ? `path ${i + 1}: ${sanitizeString(p.text, 120)}` : null).filter(Boolean);
                     if (list.length) lines.push(`- GARDEN PATHS, exactly where the source image shows them, in the paving named: ${list.join('; ')}. Keep every path on its drawn line at its drawn width, with crisp, level, evenly jointed paving. Do not add any path, patio or paving that is not listed.`);
+                }
+                // FREEFORM DECKS - drawn outlines at their own heights, each
+                // a separate platform; a raised one steps down to a lower one.
+                const decks = Array.isArray(spec.garden?.decks) ? spec.garden.decks.slice(0, 8) : [];
+                if (decks.length) {
+                    const list = decks.map((d, i) => (typeof d?.text === 'string' && d.text.trim()) ? `deck ${i + 1}: ${sanitizeString(d.text, 160)}` : null).filter(Boolean);
+                    if (list.length) lines.push(`- GARDEN DECKING AREAS, exactly the outline, size and position the source image shows for each: ${list.join('; ')}. Each deck is its own level platform at the height stated with boards running straight and a clean fascia edge; where a higher deck meets a lower one the height difference is a real step. Do not add any deck, platform or step that is not listed.`);
                 }
 
                 /**

@@ -56,6 +56,7 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   wall_light_sconce: 'models/wall_light_sconce.glb',
   wall_light_angled: 'models/wall_light_angled.glb',
   wall_light_box: 'models/wall_light_box.glb',
+  wall_light_slim: 'models/wall_light_slim.glb',
   // Charlie's games room pieces (11 Sep): the arcade cabinet came in at
   // 217mm tall and is baked up to 1.8m; the pool table to 7ft (2135mm).
   pool_table: 'models/pool_table.glb',
@@ -124,12 +125,14 @@ export const EMISSIVE_MATERIAL: Partial<Record<ObjectType, string>> = {
   wall_light_sconce: '_Sconce Light',
   wall_light_angled: '[Translucent Glass Blue]',
   wall_light_box: 'Light1',
+  // Charlie's slim up/down light (16 Sep): the two LED slots, top and bottom.
+  wall_light_slim: 'E04_Green_Bloom',
 };
 
 /** Fixed to an OUTSIDE wall face of the building (utils/placement
  *  snapToOutsideWall): the fitting's back plate is at its origin, facing
  *  local -z, so at rot 0 it sits on the front wall pointing out. */
-export const WALL_LIGHT_TYPES: ObjectType[] = ['wall_light_sconce', 'wall_light_angled', 'wall_light_box'];
+export const WALL_LIGHT_TYPES: ObjectType[] = ['wall_light_sconce', 'wall_light_angled', 'wall_light_box', 'wall_light_slim'];
 export const isWallLight = (type: ObjectType) => WALL_LIGHT_TYPES.includes(type);
 
 /** Lamp colours, warmest first - the temperatures people actually specify. */
@@ -290,6 +293,7 @@ export const familyTypes = (f: UnitFamily) =>
 export const NATIVE_WIDTH_MM: Partial<Record<ObjectType, number>> = {
   // Procedural garden steps: three concrete treads, sized by width.
   garden_steps: 1200,
+  garden_ramp: 1200,
   // The base end panel's width along the run, so the worktop slab counts it.
   end_panel_base: 18,
   kitchen_unit_600: 600,
@@ -306,6 +310,7 @@ export const NATIVE_WIDTH_MM: Partial<Record<ObjectType, number>> = {
 /** Allowed width range per type, in mm. */
 export const WIDTH_RANGE_MM: Partial<Record<ObjectType, [number, number]>> = {
   garden_steps: [600, 4000],
+  garden_ramp: [600, 3000],
   kitchen_unit_600: [400, 900],
   kitchen_drawer_2: [400, 900],
   kitchen_drawer_3: [400, 900],
@@ -405,6 +410,7 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   wall_light_sconce: 1900,
   wall_light_angled: 1900,
   wall_light_box: 1900,
+  wall_light_slim: 1900,
   // A wall-hung pan hangs clear of the floor - it was sitting on it. 100mm
   // under this pan puts its seat at 477mm, comfort height.
   // A wall-hung 55" TV: its bottom edge at 950 puts the screen centre at
@@ -714,6 +720,17 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
   wall_light_sconce: ['_Sconce Metal', 'Aluminum Anodized DarkGray'],
   wall_light_angled: ['[0135_DarkGray]'],
   wall_light_box: ['Ext Wall Light'],
+  wall_light_slim: ['M07_Charcoal_Gleam'],
+};
+
+/**
+ * Metalwork with a surface texture: a fine powder-coat grain rather than a
+ * smooth finish. Normal + roughness maps only (the finish colour stays),
+ * box-projected in metres at tileMetres so the grain is life-size.
+ */
+export const METAL_TEXTURE: Partial<Record<ObjectType, { prefix: string; tileMetres: number; normalScale: number }>> = {
+  // Textured black powder coat, from the rubber roof sheet's grain.
+  wall_light_slim: { prefix: 'roof_rubber', tileMetres: 0.3, normalScale: 0.5 },
 };
 
 /**
@@ -946,6 +963,7 @@ export const DEFAULT_FINISH: Partial<Record<ObjectType, string>> = {
   wall_light_sconce: '#26262a',
   wall_light_angled: '#26262a',
   wall_light_box: '#26262a',
+  wall_light_slim: '#26262a',
   dining_table_round: '#26262a',
   bedside_table: '#26262a',
   kitchen_sink_1200: '#26262a',
@@ -1034,6 +1052,7 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   wall_light_sconce: 'Wall Light (Lantern)',
   wall_light_angled: 'Wall Light (Angled)',
   wall_light_box: 'Wall Light (Box)',
+  wall_light_slim: 'Wall Light (Slim Up/Down)',
   pool_table: 'Pool Table',
   arcade_machine: 'Arcade Machine',
   wall_tv: 'Wall-hung TV',
@@ -1055,7 +1074,8 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   aircon_indoor: 'Air Con (Wall Unit)',
   aircon_outdoor: 'Air Con (Outdoor Unit)',
   hot_tub: 'Hot Tub',
-  garden_steps: 'Concrete steps',
+  garden_steps: 'Garden steps',
+  garden_ramp: 'Ramp',
   bar_stool: 'Bar Stool',
   bar_stool_tall: 'Bar Stool (Tall)',
   toilet: 'Toilet',

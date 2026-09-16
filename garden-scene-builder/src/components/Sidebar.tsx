@@ -1,13 +1,14 @@
 ﻿import { useState, useEffect, createContext, useContext } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Settings, Plus, Box, Tent, Map, Settings2, Trash2, DoorOpen, DoorClosed, ChevronDown, ChevronRight, Save, FilePlus, Layers } from 'lucide-react';
+import { Settings, Plus, Box, Tent, Map, Settings2, Trash2, DoorOpen, DoorClosed, ChevronDown, ChevronRight, Save, FilePlus, Layers, TrendingUp } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Link } from 'react-router-dom';
 import { gableCeilingMaxMm } from '../utils/placement';
 import { fenceLength, fenceArea } from './3d/FenceRuns';
 import { BOUNDARY_KINDS, boundaryMeta, runStyle, describeBoundary } from '../utils/boundary';
 import { PATH_SURFACES, pathLength, describePath } from './3d/Paths';
+import { DECK_MATERIALS, deckArea, describeDeck } from './3d/Decks';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS, INTERIOR_DOOR_STYLES } from '../modelRegistry';
@@ -95,6 +96,7 @@ export function Sidebar() {
   const toolMode = useStore(s => s.toolMode);
   const selectedFenceId = useStore(s => s.selectedFenceId);
   const selectedPathId = useStore(s => s.selectedPathId);
+  const selectedDeckId = useStore(s => s.selectedDeckId);
   const wrap = (fn: any) => (...args: any[]) => { store.saveState(); fn(...args); };
   // Reactive read so the selected wall's card highlights as selection changes.
   const selectedElementId = useStore(s => s.selectedElementId);
@@ -127,7 +129,9 @@ export function Sidebar() {
     const go = () => { setTab('building'); setStep('extras'); };
     window.addEventListener('boundary-picked', go);
     window.addEventListener('path-picked', go);
-    return () => { window.removeEventListener('boundary-picked', go); window.removeEventListener('path-picked', go); };
+    window.addEventListener('deck-picked', go);
+    window.addEventListener('deck-outline-picked', go);
+    return () => { window.removeEventListener('boundary-picked', go); window.removeEventListener('path-picked', go); window.removeEventListener('deck-picked', go); window.removeEventListener('deck-outline-picked', go); };
   }, []);
 
   return (
@@ -1029,7 +1033,7 @@ export function Sidebar() {
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection title="Overhangs & Canopy" step="extras">
+            <CollapsibleSection title="Overhangs & Canopy" step="extras" openOn="deck-outline-picked">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <span className="text-[10px] font-medium text-gray-500 mb-1 block">Front (Canopy)</span>
@@ -1063,6 +1067,17 @@ export function Sidebar() {
 
               {room.hasDecking && (
                 <div className="space-y-4 mt-4">
+                  {/* The deck is a shape now, not three numbers: once a corner has
+                      been pulled the numbers below no longer describe it. */}
+                  {room.deckOutline ? (
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 space-y-2">
+                      <p className="text-[11px] font-semibold text-[#3b4d4a]">Custom deck shape · {deckArea(room.deckOutline).toFixed(1)} m²</p>
+                      <p className="text-[10px] text-gray-500 leading-snug">Click the deck, then drag a green corner to move it, drag a small mid-edge knob to add a corner, Alt-click a corner to remove it.</p>
+                      <button onClick={() => { store.saveState(); updateRoom({ deckOutline: undefined }); }} className="text-[10px] font-bold uppercase tracking-wide text-gray-500 hover:text-red-500">Reset to rectangle</button>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-gray-400 leading-snug">Any shape you like: click the deck in the scene and drag its green corners. The sizes below set the starting rectangle.</p>
+                  )}
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-gray-600 w-28">Decking Depth</span>
                     <DeferredInput type="number" value={room.deckingSizeMm ?? 1500} onChange={(e) => updateRoom({ deckingSizeMm: parseInt(e.target.value) || 0 })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
@@ -1169,8 +1184,23 @@ export function Sidebar() {
                         <div className="space-y-2.5 pt-1">
                           <div className="flex items-center justify-between">
                             <label className="text-[10px] font-semibold text-gray-500">{target ? `Run ${fences.indexOf(target) + 1}` : fences.length ? 'All runs' : 'New runs'}</label>
-                            {target && <button onClick={() => store.setSelectedFenceId(null)} className="text-[10px] text-gray-400 hover:text-[#3b4d4a]">edit all</button>}
+                            {target && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    // A quarter turn about the run's middle; joined ends follow, as they do when it is dragged.
+                                    const mx = (target.ax + target.bx) / 2, mz = (target.az + target.bz) / 2, half = fenceLength(target) / 2;
+                                    const ang = Math.atan2(target.bz - target.az, target.bx - target.ax) + Math.PI / 2;
+                                    const r = (v: number) => Math.round(v * 1000) / 1000;
+                                    store.saveState();
+                                    store.moveFenceRun(target.id, r(mx - Math.cos(ang) * half), r(mz - Math.sin(ang) * half), r(mx + Math.cos(ang) * half), r(mz + Math.sin(ang) * half));
+                                  }}
+                                  className="text-[10px] font-semibold text-[#3b4d4a] hover:text-emerald-600" title="Turn this run a quarter turn about its middle">Turn 90°</button>
+                                <button onClick={() => store.setSelectedFenceId(null)} className="text-[10px] text-gray-400 hover:text-[#3b4d4a]">edit all</button>
+                              </div>
+                            )}
                           </div>
+                          {target && <p className="text-[10px] text-gray-400 leading-snug">Drag the run on the plan to move it, or drag the green knob beside it to turn it. Arrow keys nudge, R turns 45°, Delete removes. Ends joined to other runs come with it - hold Alt to move this run on its own.</p>}
                           <div className="grid grid-cols-4 gap-1.5">
                             {BOUNDARY_KINDS.map(k => (
                               <button key={k.kind} title={k.hint} onClick={() => setKind(k.kind)}
@@ -1256,6 +1286,71 @@ export function Sidebar() {
                         ))}
                       </div>
                       <DimensionSlider label="Width" min={400} max={3000} step={50} value={cur.widthMm} onChange={(v) => apply({ widthMm: v })} />
+                    </div>
+                  </div>
+                );
+              })()}
+            </CollapsibleSection>
+
+            {/* Freeform decking: click out any outline, at any height, in a
+                decking material. As many decks as the garden needs - a raised
+                platform off the doors stepping down to a lower one. */}
+            <CollapsibleSection title="Decking Areas" step="extras" openOn="deck-picked">
+              {(() => {
+                const decks = scene.decks || [];
+                const drawing = toolMode === 'deck';
+                const target = decks.find(d => d.id === selectedDeckId) ?? null;
+                const cur = target ? { heightMm: target.heightMm, material: target.material } : { heightMm: scene.deckStyle?.heightMm ?? 150, material: scene.deckStyle?.material ?? 'match' };
+                const apply = (patch: Partial<typeof cur>) => { store.saveState(); store.updateDeck(target ? target.id : null, patch); };
+                const btn = 'px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-white border border-black/10 ';
+                const total = decks.reduce((s, d) => s + deckArea(d.points), 0);
+                return (
+                  <div className="space-y-3">
+                    <p className="text-[10px] text-gray-400 leading-snug">Any shape, any size. Click the ground at each corner of the deck and click the first corner again to close it (or Enter / right-click). Draw a second deck at a different height for a raised platform that steps down.</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { if (drawing) window.dispatchEvent(new CustomEvent('deck-finish')); else store.setToolMode('deck'); }}
+                        className={'flex-1 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-colors ' + (drawing ? 'bg-emerald-500 text-white' : 'bg-[#3b4d4a] text-white hover:bg-[#2d3a38]')}
+                      >
+                        {drawing ? 'Finish deck' : decks.length ? 'Draw another deck' : 'Draw a deck'}
+                      </button>
+                      {decks.length > 0 && !drawing && (
+                        <button onClick={() => { store.saveState(); store.clearDecks(); }} className={btn + 'text-gray-500 hover:text-red-500'}>Clear</button>
+                      )}
+                    </div>
+                    {decks.length > 0 && (
+                      <div className="bg-white border border-black/5 rounded-xl shadow-sm divide-y divide-black/5">
+                        {decks.map((d, i) => {
+                          const picked = selectedDeckId === d.id;
+                          return (
+                            <div key={d.id} className={'flex items-center justify-between gap-2 px-3 py-1.5 text-xs cursor-pointer ' + (picked ? 'bg-emerald-50' : 'hover:bg-gray-50')} onClick={() => store.setSelectedDeckId(picked ? null : d.id)}>
+                              <span className="text-gray-500 shrink-0">Deck {i + 1}</span>
+                              <span className="text-[10px] text-gray-400 truncate flex-1 text-center">{DECK_MATERIALS.find(m => m.id === d.material)?.name ?? 'Composite'} · {d.heightMm} mm high</span>
+                              <span className="font-semibold text-[#3b4d4a] shrink-0">{deckArea(d.points).toFixed(1)} m²</span>
+                              <button onClick={(e) => { e.stopPropagation(); store.saveState(); store.removeDeck(d.id); }} className="text-gray-300 hover:text-red-500" title="Remove this deck"><Trash2 size={12} /></button>
+                            </div>
+                          );
+                        })}
+                        {decks.length > 1 && (
+                          <div className="flex items-center justify-between px-3 py-2 text-xs font-bold text-[#3b4d4a]"><span>Total decking</span><span>{total.toFixed(1)} m²</span></div>
+                        )}
+                      </div>
+                    )}
+                    <div className="space-y-2.5 pt-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-semibold text-gray-500">{target ? `Deck ${decks.indexOf(target) + 1}` : decks.length ? 'All decks' : 'New decks'}</label>
+                        {target && <button onClick={() => store.setSelectedDeckId(null)} className="text-[10px] text-gray-400 hover:text-[#3b4d4a]">edit all</button>}
+                      </div>
+                      {target && <p className="text-[10px] text-gray-400 leading-snug">Drag the deck to move it, or drag a green corner to reshape it. Arrow keys nudge, Delete removes.</p>}
+                      <DimensionSlider label="Height above lawn" min={50} max={1200} step={10} value={cur.heightMm} onChange={(v) => apply({ heightMm: v })} />
+                      <div className="flex flex-wrap gap-1.5">
+                        {DECK_MATERIALS.map(m => (
+                          <button key={m.id} title={m.name} onClick={() => apply({ material: m.id })}
+                            className={'w-7 h-7 rounded-full border-2 transition-transform ' + (cur.material === m.id ? 'border-[#3b4d4a] scale-110' : 'border-white shadow-sm hover:scale-105')}
+                            style={{ background: m.swatch }} />
+                        ))}
+                        <span className="self-center text-[10px] text-gray-400 ml-1">{DECK_MATERIALS.find(m => m.id === cur.material)?.name ?? ''}</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1684,7 +1779,8 @@ export function Sidebar() {
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-1 block">Garden</label>
               <p className="text-[10px] text-gray-400 mb-2 leading-snug">Drop anywhere in the garden, then drag, turn and set the width.</p>
               <div className="grid grid-cols-2 gap-2.5">
-                <ObjectTile type="garden_steps" label="Concrete steps" icon={<Layers size={20} />} />
+                <ObjectTile type="garden_steps" label="Steps" icon={<Layers size={20} />} />
+                <ObjectTile type="garden_ramp" label="Ramp" icon={<TrendingUp size={20} />} />
               </div>
             </section>
 
@@ -1712,7 +1808,7 @@ export function Sidebar() {
                   they fix themselves to the nearest outside wall. */}
               <label className="text-[10px] font-semibold text-gray-500 mb-2 block">Outside walls</label>
               <div className="grid grid-cols-3 gap-2.5 mb-2.5">
-                {(['wall_light_sconce', 'wall_light_angled', 'wall_light_box'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['wall_light_sconce', 'wall_light_angled', 'wall_light_box', 'wall_light_slim'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
@@ -1761,15 +1857,16 @@ export function Sidebar() {
               const dataUrl = canvas.toDataURL('image/png');
               // Same payload as the canvas button: screenshot for composition,
               // room spec so the AI obeys the configured building exactly.
-              const { room, fences, boundaryStyle, paths } = useStore.getState().scene;
+              const { room, fences, boundaryStyle, paths, decks } = useStore.getState().scene;
               // The boundary rides with the room: what each run is built of,
               // in words the render prompt can repeat, so a brick wall in the
               // screenshot is rendered as brick and not guessed at.
               const roomSpec = {
                 ...room,
-                garden: (fences?.length || paths?.length) ? {
+                garden: (fences?.length || paths?.length || decks?.length) ? {
                   boundary: (fences || []).map(f => ({ lengthMm: Math.round(fenceLength(f) * 1000), text: describeBoundary(runStyle(f, boundaryStyle)) })),
                   paths: (paths || []).map(p => ({ lengthMm: Math.round(pathLength(p) * 1000), text: describePath(p) })),
+                  decks: (decks || []).map(d => ({ areaM2: Math.round(deckArea(d.points) * 10) / 10, heightMm: d.heightMm, text: describeDeck(d) })),
                 } : undefined,
               };
               window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl, roomSpec }, window.location.origin);

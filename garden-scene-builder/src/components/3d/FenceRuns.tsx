@@ -24,6 +24,8 @@ export const FENCE_PANEL_URL = 'models/fence_panel.glb';
 const PANEL_W = 1.8;   // the model's width, metres
 const SNAP = 0.05;     // grid the corners land on
 const CLOSE_SNAP = 0.35; // clicking this near the first corner closes the loop
+/** The ground, for dragging and turning runs from any camera angle. */
+const GROUND = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
 /** Length of a run in metres. */
 export const fenceLength = (f: FenceRun) => Math.hypot(f.bx - f.ax, f.bz - f.az);
@@ -137,29 +139,146 @@ function Run({ run, showLabel }: { run: FenceRun; showLabel: boolean }) {
     }
   })();
   const h = Math.max(0.05, (style.heightMm || 0) / 1000);
+  const mx = (run.ax + run.bx) / 2, mz = (run.az + run.bz) / 2;
+
+  /*
+   * A drawn run moves like an object: grab it anywhere and drag, and a knob
+   * beside its middle turns it about its centre. The ends it shares with
+   * neighbouring runs come along (moveFenceRun), so a closed boundary stays
+   * closed - Alt drags this run on its own.
+   */
+  const [dragging, setDragging] = useState(false);
+  const [rotating, setRotating] = useState(false);
+  // Where the pointer took hold, and the ends at that moment; the run is
+  // re-placed from these each move so a 50mm snap cannot creep.
+  const grab = useRef<{ kind: 'drag' | 'rot'; x: number; z: number; ax: number; az: number; bx: number; bz: number; solo: boolean } | null>(null);
+  /*
+   * The surface the pointer slides along: horizontal, at the HEIGHT of the
+   * spot that was grabbed. Against the ground plane a wall grabbed by its
+   * face in 3D rode half a metre ahead of the cursor - the ray through the
+   * grab point meets the ground well behind the wall - and on release the
+   * click landed on grass and deselected it. Level with the grab, the spot
+   * under the cursor stays under it.
+   */
+  const plane = useRef(GROUND);
+  const editable = () => { const st = useStore.getState(); return st.toolMode === 'select' && st.viewMode !== 'walking' && !st.activePlacementType; };
+  const onPlane = (e: any) => { const p = new THREE.Vector3(); return e.ray.intersectPlane(plane.current, p) ? p : null; };
+
+  const dragDown = (e: any) => {
+    if (!editable()) return;
+    e.stopPropagation();
+    const st = useStore.getState();
+    st.setSelectedFenceId(run.id);
+    window.dispatchEvent(new CustomEvent('boundary-picked'));
+    plane.current = new THREE.Plane(new THREE.Vector3(0, 1, 0), -Math.max(0, e.point?.y ?? 0));
+    const p = onPlane(e);
+    if (!p) return;
+    st.saveState();
+    grab.current = { kind: 'drag', x: p.x, z: p.z, ax: run.ax, az: run.az, bx: run.bx, bz: run.bz, solo: !!e.altKey };
+    setDragging(true);
+    st.setControlsEnabled(false);
+    e.target.setPointerCapture(e.pointerId);
+  };
+  const dragMove = (e: any) => {
+    const g = grab.current;
+    if (!g || g.kind !== 'drag') return;
+    const p = onPlane(e);
+    if (!p) return;
+    // The whole run shifts by the pointer's travel, on the drawing grid.
+    const ox = Math.round((p.x - g.x) / SNAP) * SNAP, oz = Math.round((p.z - g.z) / SNAP) * SNAP;
+    const cur = useStore.getState().scene.fences.find(f => f.id === run.id);
+    if (cur && Math.abs(cur.ax - (g.ax + ox)) < 1e-6 && Math.abs(cur.az - (g.az + oz)) < 1e-6) return;
+    useStore.getState().moveFenceRun(run.id, g.ax + ox, g.az + oz, g.bx + ox, g.bz + oz, g.solo);
+  };
+  const dragUp = (e: any) => {
+    if (!editable()) return;
+    e.stopPropagation();
+    if (!grab.current) return;
+    grab.current = null;
+    setDragging(false);
+    useStore.getState().setControlsEnabled(true);
+    e.target.releasePointerCapture(e.pointerId);
+  };
+
+  // Which way the knob sits: off the run's side, a fixed reach out from its
+  // middle, so it is the same size on a 1 m screen and a 12 m boundary.
+  const KNOB = 0.6;
+  const px = -dz, pz = dx;
+  const rotDown = (e: any) => {
+    if (!editable()) return;
+    e.stopPropagation();
+    const st = useStore.getState();
+    st.setSelectedFenceId(run.id);
+    st.saveState();
+    grab.current = { kind: 'rot', x: 0, z: 0, ax: run.ax, az: run.az, bx: run.bx, bz: run.bz, solo: !!e.altKey };
+    plane.current = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.08);
+    setRotating(true);
+    st.setControlsEnabled(false);
+    e.target.setPointerCapture(e.pointerId);
+  };
+  const rotMove = (e: any) => {
+    if (!grab.current || grab.current.kind !== 'rot') return;
+    const p = onPlane(e);
+    if (!p) return;
+    // The knob follows the pointer round the run's centre; the run turns
+    // with it, its length kept. 15 degree snap unless Shift.
+    let ang = Math.atan2(p.z - mz, p.x - mx) - Math.PI / 2;
+    if (!e.shiftKey) ang = Math.round(ang / (Math.PI / 12)) * (Math.PI / 12);
+    const hx = Math.cos(ang) * len / 2, hz = Math.sin(ang) * len / 2;
+    const r = (v: number) => Math.round(v * 1000) / 1000;
+    useStore.getState().moveFenceRun(run.id, r(mx - hx), r(mz - hz), r(mx + hx), r(mz + hz), grab.current.solo);
+  };
+  const rotUp = (e: any) => {
+    e.stopPropagation();
+    grab.current = null;
+    setRotating(false);
+    useStore.getState().setControlsEnabled(true);
+    e.target.releasePointerCapture(e.pointerId);
+  };
 
   return (
     <group
-      // Click a run to restyle it in the sidebar. The ground plane clears
-      // the selection, as it does for objects.
-      onPointerDown={(e) => { if (useStore.getState().toolMode !== 'select') return; e.stopPropagation(); useStore.getState().setSelectedFenceId(run.id); window.dispatchEvent(new CustomEvent('boundary-picked')); }}
+      // Click a run to restyle it in the sidebar, hold to drag it. The
+      // ground plane clears the selection, as it does for objects.
+      onPointerDown={dragDown}
+      onPointerMove={dragMove}
       // The ground plane clears the selection on CLICK - a separate event
       // from pointer down and up, fired after them - so without this the
       // pick showed for one frame and vanished.
-      onPointerUp={(e) => { if (useStore.getState().toolMode !== 'select') return; e.stopPropagation(); }}
+      onPointerUp={dragUp}
       onClick={(e) => { if (useStore.getState().toolMode !== 'select') return; e.stopPropagation(); }}
+      onPointerOver={() => { if (editable()) document.body.style.cursor = 'move'; }}
+      onPointerOut={() => { if (!dragging) document.body.style.cursor = 'auto'; }}
     >
       {body}
       {/* A generous invisible hit box: a slatted fence is mostly gaps. */}
-      <mesh {...local} position={[run.ax + dx * len / 2, h / 2, run.az + dz * len / 2]} visible={false}>
+      <mesh {...local} position={[mx, h / 2, mz]} visible={false}>
         <boxGeometry args={[len, h, 0.5]} />
         <meshBasicMaterial />
       </mesh>
       {selected && (
-        <mesh position={[run.ax + dx * len / 2, 0.015, run.az + dz * len / 2]} rotation={[0, rotY, 0]}>
+        <mesh position={[mx, 0.015, mz]} rotation={[0, rotY, 0]}>
           <boxGeometry args={[len, 0.01, 0.7]} />
           <meshBasicMaterial color="#10b981" transparent opacity={0.45} depthTest={false} />
         </mesh>
+      )}
+      {/* Rotation handle: a knob on a short stalk off the run's middle.
+          Drag it round to turn the run, 15 degree snap (Shift = free). */}
+      {selected && !dragging && (
+        <>
+          <Line points={[[mx, 0.06, mz], [mx + px * KNOB, 0.06, mz + pz * KNOB]]} color="#10b981" lineWidth={1.5} transparent opacity={rotating ? 0.9 : 0.5} depthTest={false} />
+          <mesh
+            position={[mx + px * KNOB, 0.08, mz + pz * KNOB]}
+            onPointerDown={rotDown}
+            onPointerMove={rotMove}
+            onPointerUp={rotUp}
+            onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'grab'; }}
+            onPointerOut={() => { if (!rotating) document.body.style.cursor = 'auto'; }}
+          >
+            <sphereGeometry args={[0.11, 16, 16]} />
+            <meshBasicMaterial color="#10b981" depthTest={false} />
+          </mesh>
+        </>
       )}
       {showLabel && (
         <Html position={[(run.ax + run.bx) / 2, h + 0.25, (run.az + run.bz) / 2]} center zIndexRange={[90, 0]} style={{ pointerEvents: 'none' }}>
@@ -175,6 +294,45 @@ export function FenceRuns() {
   const viewMode = useStore(s => s.viewMode);
   const isExporting = useStore(s => s.isExporting);
   const showLabel = (viewMode === '3d' || viewMode === 'plan') && !isExporting;
+
+  /**
+   * Keyboard for the picked run, the same keys an object answers to:
+   *   arrows  nudge 5cm (shift 25cm)   R  turn 45deg about its middle
+   *   Delete  remove                   Escape  deselect
+   * Alt nudges this run alone; otherwise joined ends come with it.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const st = useStore.getState();
+      const id = st.selectedFenceId;
+      if (!id || st.selectedObjectId || st.toolMode !== 'select') return;
+      const f = st.scene.fences.find(r => r.id === id);
+      if (!f) return;
+      const step = e.shiftKey ? 0.25 : 0.05;
+      const shift = (ox: number, oz: number) => { st.saveState(); st.moveFenceRun(id, f.ax + ox, f.az + oz, f.bx + ox, f.bz + oz, e.altKey); };
+      let handled = true;
+      if (e.key === 'ArrowLeft')       shift(-step, 0);
+      else if (e.key === 'ArrowRight') shift(step, 0);
+      else if (e.key === 'ArrowUp')    shift(0, -step);
+      else if (e.key === 'ArrowDown')  shift(0, step);
+      else if (e.key === 'r' || e.key === 'R') {
+        const mx = (f.ax + f.bx) / 2, mz = (f.az + f.bz) / 2, half = fenceLength(f) / 2;
+        const ang = Math.atan2(f.bz - f.az, f.bx - f.ax) + Math.PI / 4;
+        const hx = Math.cos(ang) * half, hz = Math.sin(ang) * half;
+        const r = (v: number) => Math.round(v * 1000) / 1000;
+        st.saveState(); st.moveFenceRun(id, r(mx - hx), r(mz - hz), r(mx + hx), r(mz + hz), e.altKey);
+      }
+      else if (e.key === 'Delete' || e.key === 'Backspace') { st.saveState(); st.removeFence(id); st.setSelectedFenceId(null); }
+      else if (e.key === 'Escape') st.setSelectedFenceId(null);
+      else handled = false;
+      if (handled) e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   if (!fences?.length) return null;
   return (
     <Suspense fallback={null}>

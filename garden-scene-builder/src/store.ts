@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SceneState, SceneObject, BoundaryStyle, PathRun, PathSurface, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
+import { SceneState, SceneObject, BoundaryStyle, PathRun, PathSurface, DeckArea, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { isInteriorType, clampToRoomInterior, snapTap } from './utils/placement';
 import { bayRange, wallSpanMm } from './utils/bay';
@@ -40,6 +40,11 @@ interface AppState {
   /** Restyle one run (kind, height, colour), or every run when id is null -
    *  which also becomes the style new runs are drawn with. */
   updateFenceStyle: (id: string | null, style: Partial<BoundaryStyle>) => void;
+  /** Put a run's two ends somewhere new (a drag, a rotate, a nudge). Any
+   *  other run whose end sits on one of this run's ends comes with it, so
+   *  dragging one side of a closed boundary stretches its neighbours instead
+   *  of tearing the loop open; `solo` moves just this run. */
+  moveFenceRun: (id: string, ax: number, az: number, bx: number, bz: number, solo?: boolean) => void;
   /** The run picked on the plan or in 3D, for the boundary style panel. */
   selectedFenceId: string | null;
   setSelectedFenceId: (id: string | null) => void;
@@ -49,6 +54,17 @@ interface AppState {
   updatePath: (id: string | null, patch: Partial<{ widthMm: number; surface: PathSurface }>) => void;
   removePath: (id: string) => void;
   clearPaths: () => void;
+  /** Freeform decking (components/3d/Decks): a closed polygon becomes a deck
+   *  at the current deckStyle. updateDeck restyles one, or all with null;
+   *  moveDeckPoint drags one corner; moveDeck slides the whole deck. */
+  addDeck: (points: [number, number][]) => void;
+  updateDeck: (id: string | null, patch: Partial<{ heightMm: number; material: string }>) => void;
+  moveDeckPoint: (id: string, index: number, x: number, z: number) => void;
+  moveDeck: (id: string, dx: number, dz: number, from?: [number, number][]) => void;
+  removeDeck: (id: string) => void;
+  clearDecks: () => void;
+  selectedDeckId: string | null;
+  setSelectedDeckId: (id: string | null) => void;
   selectedPathId: string | null;
   setSelectedPathId: (id: string | null) => void;
   setActivePlacementType: (type: ObjectType | null) => void;
@@ -131,7 +147,7 @@ interface AppState {
   /** Load a saved design. Accepts the full scene the host saves now
    *  ({ room, objects, fences }) or the bare room older saves hold; either
    *  way the room is merged over defaults so fields added since still load. */
-  loadRoom: (design: Partial<SceneState['room']> | { room: Partial<SceneState['room']>; objects?: SceneObject[]; fences?: SceneState['fences']; paths?: PathRun[] }) => void;
+  loadRoom: (design: Partial<SceneState['room']> | { room: Partial<SceneState['room']>; objects?: SceneObject[]; fences?: SceneState['fences']; paths?: PathRun[]; decks?: DeckArea[] }) => void;
   /** Apply a starting template: merges its room over the current one and
    *  replaces the placed objects. Undoable like any other edit. */
   applyPreset: (room: Partial<SceneState['room']>, objects: Array<Omit<SceneState['objects'][0], 'id'>>) => void;
@@ -320,6 +336,7 @@ const initialState: SceneState = {
   objects: [],
   fences: [],
   paths: [],
+  decks: [],
   pricing: {
     basePricePerSqm: 1200,
     canopyPricePerSqm: 300,
@@ -411,7 +428,7 @@ function loadAutosave(): SceneState | null {
       const s = snapTap(o.type, o.x, o.z, parsed.objects, o.id);
       return s ? { ...o, x: s.x, z: s.z, rot: s.rot } : o;
     });
-    return { ...initialState, ...parsed, objects, paths: Array.isArray(parsed.paths) ? parsed.paths : [], room: { ...initialState.room, ...parsed.room } };
+    return { ...initialState, ...parsed, objects, paths: Array.isArray(parsed.paths) ? parsed.paths : [], decks: Array.isArray(parsed.decks) ? parsed.decks : [], room: { ...initialState.room, ...parsed.room } };
   } catch {
     return null;
   }
@@ -447,8 +464,31 @@ export const useStore = create<AppState>((set, get) => ({
       boundaryStyle: id === null ? { kind: 'closeboard', heightMm: 1800, colour: '#c9b08a', ...(state.scene.boundaryStyle || {}), ...style } : state.scene.boundaryStyle,
     },
   })),
+  moveFenceRun: (id, ax, az, bx, bz, solo = false) => set((state) => {
+    const fences = state.scene.fences || [];
+    const me = fences.find(f => f.id === id);
+    if (!me) return {};
+    // Ends are "joined" when the drawing tool put them on the same point.
+    const joined = (x1: number, z1: number, x2: number, z2: number) => Math.hypot(x1 - x2, z1 - z2) < 0.02;
+    return {
+      scene: {
+        ...state.scene,
+        fences: fences.map(f => {
+          if (f.id === id) return { ...f, ax, az, bx, bz };
+          if (solo) return f;
+          const n = { ...f };
+          if (joined(f.ax, f.az, me.ax, me.az)) { n.ax = ax; n.az = az; }
+          else if (joined(f.ax, f.az, me.bx, me.bz)) { n.ax = bx; n.az = bz; }
+          if (joined(f.bx, f.bz, me.ax, me.az)) { n.bx = ax; n.bz = az; }
+          else if (joined(f.bx, f.bz, me.bx, me.bz)) { n.bx = bx; n.bz = bz; }
+          return n;
+        }),
+      },
+    };
+  }),
   selectedFenceId: null,
-  setSelectedFenceId: (id) => set({ selectedFenceId: id }),
+  // Picking a run takes the keyboard (arrows, R, Delete) from any object.
+  setSelectedFenceId: (id) => set(id ? { selectedFenceId: id, selectedObjectId: null, selectedElementId: null } : { selectedFenceId: id }),
   addPath: (points) => set((state) => ({
     scene: { ...state.scene, paths: [...(state.scene.paths || []), { id: uuidv4(), points, widthMm: state.scene.pathStyle?.widthMm ?? 900, surface: state.scene.pathStyle?.surface ?? 'stone' }] },
   })),
@@ -461,6 +501,28 @@ export const useStore = create<AppState>((set, get) => ({
   })),
   removePath: (id) => set((state) => ({ scene: { ...state.scene, paths: (state.scene.paths || []).filter(p => p.id !== id) }, selectedPathId: state.selectedPathId === id ? null : state.selectedPathId })),
   clearPaths: () => set((state) => ({ scene: { ...state.scene, paths: [] }, selectedPathId: null })),
+  addDeck: (points) => set((state) => ({
+    scene: { ...state.scene, decks: [...(state.scene.decks || []), { id: uuidv4(), points, heightMm: state.scene.deckStyle?.heightMm ?? 150, material: state.scene.deckStyle?.material ?? 'match' }] },
+  })),
+  updateDeck: (id, patch) => set((state) => ({
+    scene: {
+      ...state.scene,
+      decks: (state.scene.decks || []).map(d => (id === null || d.id === id) ? { ...d, ...patch } : d),
+      deckStyle: id === null ? { heightMm: 150, material: 'match', ...(state.scene.deckStyle || {}), ...patch } : state.scene.deckStyle,
+    },
+  })),
+  moveDeckPoint: (id, index, x, z) => set((state) => ({
+    scene: { ...state.scene, decks: (state.scene.decks || []).map(d => d.id === id ? { ...d, points: d.points.map((p, i) => i === index ? [x, z] as [number, number] : p) } : d) },
+  })),
+  // `from` is the outline at grab time, so a drag re-places it from there
+  // each move and the grid snap cannot creep.
+  moveDeck: (id, dx, dz, from) => set((state) => ({
+    scene: { ...state.scene, decks: (state.scene.decks || []).map(d => d.id === id ? { ...d, points: (from ?? d.points).map(([x, z]) => [Math.round((x + dx) * 1000) / 1000, Math.round((z + dz) * 1000) / 1000] as [number, number]) } : d) },
+  })),
+  removeDeck: (id) => set((state) => ({ scene: { ...state.scene, decks: (state.scene.decks || []).filter(d => d.id !== id) }, selectedDeckId: state.selectedDeckId === id ? null : state.selectedDeckId })),
+  clearDecks: () => set((state) => ({ scene: { ...state.scene, decks: [] }, selectedDeckId: null })),
+  selectedDeckId: null,
+  setSelectedDeckId: (id) => set(id ? { selectedDeckId: id, selectedObjectId: null, selectedElementId: null, selectedFenceId: null, selectedPathId: null } : { selectedDeckId: id }),
   selectedPathId: null,
   setSelectedPathId: (id) => set({ selectedPathId: id }),
   removeFence: (id) => set((state) => ({
@@ -468,7 +530,7 @@ export const useStore = create<AppState>((set, get) => ({
   })),
   clearFences: () => set((state) => ({ scene: { ...state.scene, fences: [] } })),
   setActivePlacementType: (type) => set({ activePlacementType: type, toolMode: type ? 'place' : 'select' }),
-  setSelectedObjectId: (id) => set({ selectedObjectId: id, selectedElementId: null }),
+  setSelectedObjectId: (id) => set(id ? { selectedObjectId: id, selectedElementId: null, selectedFenceId: null, selectedDeckId: null } : { selectedObjectId: id, selectedElementId: null }),
   setSelectedElementId: (id) => set({ selectedElementId: id, selectedObjectId: null }),
   setHoveredElementId: (id) => {
     const store = get() as AppState;
@@ -585,7 +647,7 @@ export const useStore = create<AppState>((set, get) => ({
     // A full save carries its room under 'room'; a legacy save IS the room.
     const full = design && typeof design === 'object' && 'room' in design && design.room && typeof design.room === 'object';
     const room = full ? (design as { room: Partial<SceneState['room']> }).room : (design as Partial<SceneState['room']>);
-    const saved = full ? (design as { objects?: SceneObject[]; fences?: SceneState['fences']; paths?: PathRun[] }) : {};
+    const saved = full ? (design as { objects?: SceneObject[]; fences?: SceneState['fences']; paths?: PathRun[]; decks?: DeckArea[] }) : {};
     const objects = Array.isArray(saved.objects)
       ? saved.objects.map(o => { const t = snapTap(o.type, o.x, o.z, saved.objects!, o.id); return t ? { ...o, x: t.x, z: t.z, rot: t.rot } : o; })
       : state.scene.objects;
@@ -600,6 +662,7 @@ export const useStore = create<AppState>((set, get) => ({
         objects,
         fences: Array.isArray(saved.fences) ? saved.fences : state.scene.fences,
         paths: Array.isArray(saved.paths) ? saved.paths : state.scene.paths,
+        decks: Array.isArray(saved.decks) ? saved.decks : state.scene.decks,
       },
       selectedElementId: null,
       selectedObjectId: null,
