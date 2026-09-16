@@ -1,6 +1,7 @@
 import React from 'react';
 import { Zap, Grid, Layers, Sparkles, PenTool, Image as ImageIcon, Settings, History, ChevronDown, Loader2, Upload, CloudSun, Aperture } from 'lucide-react';
 import { ToggleSwitch } from './components/ToggleSwitch';
+import { MaintenanceView, maintenanceActive } from './components/views/MaintenanceView';
 import { getImageQuality, setImageQuality, type ImageQuality } from './services/geminiService';
 import { Toaster, toast } from 'react-hot-toast';
 import { AppShell } from './components/AppShell';
@@ -1044,6 +1045,10 @@ const App: React.FC = () => {
     ]);
 
     const showBetaGate = !hasAccess && GATED_STAGES.has(engine.activeStage);
+
+    // The whole site is parked while the render engine is rebuilt - see
+    // MaintenanceView. ?preview=1 once on any URL lets Charlie through.
+    if (maintenanceActive()) return <MaintenanceView />;
 
     return (
         <>
