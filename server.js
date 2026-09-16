@@ -1148,7 +1148,7 @@ const openAiRefusal = (status, json) => {
  * user can do something about; returns { b64: null } when the model simply
  * produced nothing.
  */
-const openAiImageEdit = async ({ prompt, images, size, quality, label = 'edit' }) => {
+const openAiImageEdit = async ({ prompt, images, size, quality, label = 'edit', mask = null }) => {
     const form = new FormData();
     form.append('model', OPENAI_IMAGE_MODEL);
     form.append('prompt', prompt);
@@ -1156,6 +1156,11 @@ const openAiImageEdit = async ({ prompt, images, size, quality, label = 'edit' }
         const mime = img.mime || 'image/jpeg';
         form.append(images.length > 1 ? 'image[]' : 'image', new Blob([Buffer.from(img.b64, 'base64')], { type: mime }), `input-${i}.${mime === 'image/png' ? 'png' : 'jpg'}`);
     }
+    // A real inpainting mask: a PNG the size of the (single) input whose
+    // TRANSPARENT pixels are the only ones the model may paint. Distinct from
+    // passing a mask as a second reference image, which the model merely
+    // looks at.
+    if (mask) form.append('mask', new Blob([Buffer.from(mask, 'base64')], { type: 'image/png' }), 'mask.png');
     form.append('size', size);
     form.append('quality', quality);
     form.append('output_format', 'jpeg');
@@ -2361,6 +2366,21 @@ app.post('/api/renderBuilding', userAiLimiter, async (req, res) => {
                     const list = paths.map((p, i) => (typeof p?.text === 'string' && p.text.trim()) ? `path ${i + 1}: ${sanitizeString(p.text, 120)}` : null).filter(Boolean);
                     if (list.length) lines.push(`- GARDEN PATHS, exactly where the source image shows them, in the paving named: ${list.join('; ')}. Keep every path on its drawn line at its drawn width, with crisp, level, evenly jointed paving. Do not add any path, patio or paving that is not listed.`);
                 }
+                /**
+                 * EXTERIOR LIGHT FITTINGS - from the configurator's placed
+                 * objects. Without this the model treated the small grey boxes
+                 * in the screenshot as a suggestion and drew whatever lantern it
+                 * fancied, moved it, or dropped one. Charlie: "I said do not
+                 * change style, just colour". So: count, shape, size, finish,
+                 * wall, height - and an order not to restyle.
+                 */
+                const lights = Array.isArray(spec.exteriorLights) ? spec.exteriorLights.slice(0, 12) : [];
+                if (lights.length) {
+                    const list = lights.map((l, i) => (typeof l?.text === 'string' && l.text.trim()) ? `fitting ${i + 1}: ${sanitizeString(l.text, 240)}` : null).filter(Boolean);
+                    const n = lights.reduce((s, l) => s + (Number(l?.count) || 1), 0);
+                    if (list.length) lines.push(`- EXTERIOR LIGHT FITTINGS: exactly ${n}, exactly where the source image shows them, and NOTHING ELSE about them may change: ${list.join('; ')}. Each fitting keeps the precise shape, proportions, size and position seen in the source image - a slim flat box stays a slim flat box, it does not become a lantern, a cylinder or a different product. The ONLY property the words above set is the finish colour. Do not add any light fitting that is not listed, do not remove or move one, do not change its size. Fittings are OFF in daylight - no visible glow or light cone unless the scene is dusk or night.`);
+                }
+
                 // FREEFORM DECKS - drawn outlines at their own heights, each
                 // a separate platform; a raised one steps down to a lower one.
                 const decks = Array.isArray(spec.garden?.decks) ? spec.garden.decks.slice(0, 8) : [];
@@ -3299,6 +3319,101 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
 
     } catch (error) {
         console.error("Edit error:", error);
+        if (error && error.clientMessage) return res.status(400).json({ error: error.clientMessage });
+        res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
+    }
+});
+
+/**
+ * Segmentation masks for the surfaces the Material Studio can repaint.
+ *
+ * The client asks for a handful of labels (cladding, roof, windows, doors,
+ * decking - or the subject of a free-text instruction) and gets back, per
+ * region found, Gemini's 2D box (0-1000 normalised, [ymin, xmin, ymax,
+ * xmax]) and a PNG probability mask that fills that box. The client scales
+ * each mask into its box at the image's full resolution, thresholds it and
+ * unions regions with the same label - that union is the ONLY area a
+ * material change is allowed to touch (see /api/inpaintMasked and
+ * utils/maskedEdit on the client).
+ */
+app.post('/api/segmentMaterials', userAiLimiter, async (req, res) => {
+    try {
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
+        const rawLabels = Array.isArray(req.body.labels) ? req.body.labels : [];
+        const labels = rawLabels.map(l => sanitizeString(l, 80)).filter(Boolean).slice(0, 8);
+        if (!base64Image || !labels.length) return res.status(400).json({ error: 'An image and at least one label are needed' });
+
+        const access = await enforceRenderAccess(req, CREDIT_COSTS.ANALYSIS);
+        if (!access.allowed) return res.status(access.status).json(access.body);
+
+        const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
+        const prompt = `Give the segmentation masks for these surfaces of the building in the photograph: ${labels.map(l => `"${l}"`).join(', ')}.
+Output a JSON list of segmentation masks where each entry contains the 2D bounding box in the key "box_2d", the segmentation mask in key "mask", and the text label in the key "label". Use EXACTLY one of the requested labels as the label (repeat a label for every separate region of that surface). Be precise at the edges: the cladding mask must stop at window and door frames, the roof mask must not include the sky, the decking mask must not include the lawn. If a surface is not present, leave it out.`;
+
+        const response = await ai.models.generateContent({
+            model: ANALYSIS_MODEL,
+            contents: { parts: [imagePart, { text: prompt }] },
+            config: { responseMimeType: 'application/json', temperature: 0.1 },
+        });
+        const text = response.text;
+        if (!text) throw new Error('No segmentation returned');
+        let parsed;
+        try { parsed = JSON.parse(text.replace(/```json/gi, '').replace(/```/g, '').trim()); } catch { throw new Error('Segmentation was not valid JSON'); }
+        const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.masks) ? parsed.masks : []);
+        const result = list
+            .filter(m => m && Array.isArray(m.box_2d) && m.box_2d.length === 4 && typeof m.mask === 'string' && typeof m.label === 'string')
+            .slice(0, 24)
+            .map(m => ({
+                label: sanitizeString(m.label, 80),
+                box_2d: m.box_2d.map(v => Math.max(0, Math.min(1000, Number(v) || 0))),
+                mask: m.mask.replace(/^data:image\/\w+;base64,/, ''),
+            }));
+        res.json({ result });
+    } catch (error) {
+        console.error('Segmentation error:', error);
+        res.status(500).json({ error: 'Could not work out the surfaces in this image. Please try again.' });
+    }
+});
+
+/**
+ * A TRUE masked edit: paint only inside the mask.
+ *
+ * The client sends a crop of the photograph around the surface being changed
+ * and a PNG mask the same size whose transparent pixels are the region to
+ * repaint. The model (Sunburst) fills that region; the client then composites
+ * the result back over the ORIGINAL pixels through the mask, so every pixel
+ * outside it is byte-identical to the source and the image is never
+ * re-synthesised. Sizes must be multiples of 16 - the client sees to that.
+ */
+app.post('/api/inpaintMasked', userAiLimiter, async (req, res) => {
+    try {
+        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
+        const maskPng     = sanitizeString(req.body.maskPng, 10_000_000);
+        const editPrompt  = sanitizeString(req.body.editPrompt, 800);
+        const width       = Math.max(256, Math.min(3840, Math.floor((Number(req.body.width) || 0) / 16) * 16));
+        const height      = Math.max(256, Math.min(3840, Math.floor((Number(req.body.height) || 0) / 16) * 16));
+        if (!base64Image || !maskPng || !editPrompt) return res.status(400).json({ error: 'Image, mask and an instruction are needed' });
+        if (!openAiReady()) return res.status(503).json({ error: 'Masked editing needs the image engine (OPENAI_API_KEY) on the server.' });
+
+        const access = await enforceRenderAccess(req, CREDIT_COSTS.STANDARD_RES);
+        if (!access.allowed) return res.status(access.status).json(access.body);
+
+        const { quality } = await resolveImageQuality(req);
+        const prompt = `You are an inpainting engine. Paint ONLY the transparent (masked) region of the image. Instruction for that region: ${editPrompt}
+Rules: the new surface must follow the exact geometry, perspective, scale and lighting of the photograph - the same planes, the same shadows falling across it, the same reflections and weathering. Keep every boundary where the mask meets the untouched photograph seamless. Do not add, remove or move any object. Do not change anything outside the masked region; it will be discarded anyway. Photographic, sharp, no painterly texture.`;
+        const out = await openAiImageEdit({
+            prompt,
+            images: [{ b64: base64Image, mime: 'image/jpeg' }],
+            mask: maskPng,
+            size: `${width}x${height}`,
+            quality,
+            label: 'inpaintMasked',
+        });
+        if (!out.b64) throw new Error('No edit generated');
+        logRender(req, 'inpaintMasked', OPENAI_IMAGE_MODEL, `${width}x${height}`, { quality, ...openAiUsageLog(out.usage) });
+        res.json({ result: out.b64, quality });
+    } catch (error) {
+        console.error('Masked inpaint error:', error);
         if (error && error.clientMessage) return res.status(400).json({ error: error.clientMessage });
         res.status(500).json({ error: 'Something went wrong on our side. Please try again in a moment.' });
     }

@@ -417,3 +417,52 @@ export function clampToCanopy(room: Room, x: number, z: number): { x: number; z:
   if (ohFront < 2 * m + 0.05) return { x: cx, z: d / 2 + m };
   return { x: cx, z: Math.max(d / 2 + m, Math.min(d / 2 + ohFront - m, z)) };
 }
+
+/**
+ * The exterior light fittings, in words the render prompt can hold the
+ * model to. The render kept restyling the wall lights - a slim box became
+ * a lantern, one of two vanished, a black one came back grey - because the
+ * prompt never mentioned them. Each fitting is described by its real shape
+ * and size, its finish colour, which wall it is on and how high, so the
+ * instruction can be: keep the fitting exactly as shown, change nothing but
+ * the colour named.
+ */
+const WALL_LIGHT_WORDS: Record<string, string> = {
+  wall_light_sconce: 'a cylindrical up/down wall lantern, about 90 mm diameter and 220 mm tall',
+  wall_light_angled: 'an angled wedge wall light with a downward-facing lens, about 150 mm tall',
+  wall_light_box: 'a small square box wall light, about 100 mm, with a diffuser on its face',
+  wall_light_slim: 'a slim flat rectangular up/down wall light, 260 mm wide x 90 mm tall x 40 mm deep, with a plain flat face and thin LED slots on its top and bottom edges',
+};
+const FINISH_WORDS: [string, string][] = [
+  ['#26262a', 'matte black'], ['#1f2123', 'black'], ['#cfd1d4', 'chrome'], ['#c8c9c7', 'brushed steel'],
+  ['#c8a35f', 'brushed brass'], ['#d9b44a', 'polished brass'], ['#f2f2f2', 'powder-coated white'], ['#4a5057', 'anthracite grey'],
+];
+const finishWords = (hex?: string) => {
+  if (!hex) return 'matte black';
+  const h = hex.toLowerCase();
+  const hit = FINISH_WORDS.find(([k]) => k === h);
+  return hit ? hit[1] : `the colour ${h}`;
+};
+const wallName = (rot: number) => {
+  const a = ((rot % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  if (a < Math.PI / 4 || a > 7 * Math.PI / 4) return 'front';
+  if (a < 3 * Math.PI / 4) return 'right-hand side';
+  if (a < 5 * Math.PI / 4) return 'back';
+  return 'left-hand side';
+};
+
+export function describeExteriorLights(room: Room, objects: { type: string; x: number; z: number; rot: number; color?: string; mountHeightMm?: number }[]): { count: number; text: string }[] {
+  const out: { count: number; text: string }[] = [];
+  const wall = objects.filter(o => WALL_LIGHT_WORDS[o.type]);
+  const w = (room.widthMm || 8000) / 1000;
+  for (const o of wall) {
+    const h = o.mountHeightMm ?? 2200;
+    const along = wallName(o.rot) === 'front' || wallName(o.rot) === 'back'
+      ? `${Math.round((o.x + w / 2) * 1000)} mm from the building's left corner`
+      : `${Math.round(((room.depthMm || 4300) / 2 - o.z) * 1000)} mm from the front corner`;
+    out.push({ count: 1, text: `${WALL_LIGHT_WORDS[o.type]}, finished in ${finishWords(o.color)}, on the ${wallName(o.rot)} wall, its centre ${h} mm above the ground, ${along}` });
+  }
+  const spots = objects.filter(o => o.type === 'canopy_spot');
+  if (spots.length) out.push({ count: spots.length, text: `${spots.length} small round recessed LED downlight${spots.length === 1 ? '' : 's'} flush in the canopy soffit, warm white, exactly where shown` });
+  return out;
+}

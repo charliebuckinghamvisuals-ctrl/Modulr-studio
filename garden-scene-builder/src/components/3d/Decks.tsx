@@ -194,7 +194,9 @@ export function Decks() {
   const decks = useStore(s => s.scene.decks);
   const viewMode = useStore(s => s.viewMode);
   const isExporting = useStore(s => s.isExporting);
-  const showLabel = viewMode === 'plan' && !isExporting;
+  const showDims = useStore(s => s.scene.room.showDimensions);
+  const selectedId = useStore(s => s.selectedDeckId);
+  const showLabel = !!showDims && viewMode === 'plan' && !isExporting;
 
   // Keys for the picked deck: arrows nudge (shift 25cm), Delete, Escape.
   useEffect(() => {
@@ -220,7 +222,7 @@ export function Decks() {
   }, []);
 
   if (!decks?.length) return null;
-  return <>{decks.map(d => <Deck key={d.id} deck={d} showLabel={showLabel} />)}</>;
+  return <>{decks.map(d => <Deck key={d.id} deck={d} showLabel={showLabel || (selectedId === d.id && !isExporting)} />)}</>;
 }
 
 /**

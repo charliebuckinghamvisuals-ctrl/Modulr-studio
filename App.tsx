@@ -886,6 +886,9 @@ const App: React.FC = () => {
                     materialLibrary={engine.materialLibrary}
                     onApplyMaterials={engine.handleMaterialStudioApply}
                     isAnalyzingMaterials={engine.isAnalyzingMaterials}
+                    materialPrompt={engine.materialPrompt}
+                    setMaterialPrompt={engine.setMaterialPrompt}
+                    materialMaskPreview={engine.materialMaskPreview}
                 />
             )}
 

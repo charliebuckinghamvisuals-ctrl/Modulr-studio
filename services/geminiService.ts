@@ -555,3 +555,45 @@ export const analyzeSceneForVideo = async (base64Images: string[], mode: 'zoom' 
     }
   }
 };
+/** One surface region from /api/segmentMaterials: a 0-1000 normalised box
+ *  [ymin, xmin, ymax, xmax] and a PNG probability mask that fills it. */
+export interface SegmentRegion { label: string; box_2d: [number, number, number, number]; mask: string }
+
+/**
+ * Segmentation masks for named surfaces (cladding, roof...) or the subject of
+ * a free-text instruction. Feeds the Material Studio's masked edit, where the
+ * union of a label's regions is the only area the change may touch.
+ */
+export const segmentMaterials = async (base64Image: string, labels: string[]): Promise<SegmentRegion[]> => {
+  const response = await apiFetch(`${API_BASE_URL}/segmentMaterials`, {
+    method: 'POST',
+    headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ base64Image, labels })
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(formatErrorMessage(errorData.error, response.status));
+  }
+  const data = await response.json();
+  return (data.result || []) as SegmentRegion[];
+};
+
+/**
+ * Paint only the transparent pixels of maskPng on the crop. The crop and the
+ * mask must be the same size, multiples of 16. Returns the painted crop; the
+ * caller composites it back through the mask (utils/maskedEdit), so the
+ * photograph outside the mask never changes.
+ */
+export const inpaintMasked = async (cropBase64: string, maskPng: string, editPrompt: string, width: number, height: number): Promise<string> => {
+  const response = await apiFetch(`${API_BASE_URL}/inpaintMasked`, {
+    method: 'POST',
+    headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ base64Image: cropBase64, maskPng, editPrompt, width, height, quality: currentImageQuality })
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(formatErrorMessage(errorData.error, response.status));
+  }
+  const data = await response.json();
+  return data.result as string;
+};

@@ -108,9 +108,11 @@ export function Paths() {
   const paths = useStore(s => s.scene.paths);
   const viewMode = useStore(s => s.viewMode);
   const isExporting = useStore(s => s.isExporting);
-  const showLabel = viewMode === 'plan' && !isExporting;
+  const showDims = useStore(s => s.scene.room.showDimensions);
+  const selectedId = useStore(s => s.selectedPathId);
+  const showLabel = !!showDims && viewMode === 'plan' && !isExporting;
   if (!paths?.length) return null;
-  return <>{paths.map(p => <Path key={p.id} path={p} showLabel={showLabel} />)}</>;
+  return <>{paths.map(p => <Path key={p.id} path={p} showLabel={showLabel || (selectedId === p.id && !isExporting)} />)}</>;
 }
 
 /**

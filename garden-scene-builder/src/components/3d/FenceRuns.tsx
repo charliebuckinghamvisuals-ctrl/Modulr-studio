@@ -292,8 +292,11 @@ function Run({ run, showLabel }: { run: FenceRun; showLabel: boolean }) {
 export function FenceRuns() {
   const fences = useStore(s => s.scene.fences);
   const viewMode = useStore(s => s.viewMode);
+  const selectedId = useStore(s => s.selectedFenceId);
   const isExporting = useStore(s => s.isExporting);
-  const showLabel = (viewMode === '3d' || viewMode === 'plan') && !isExporting;
+  const showDims = useStore(s => s.scene.room.showDimensions);
+  // A run's length shows when dimensions are on, or while it is picked.
+  const showLabel = !!showDims && (viewMode === '3d' || viewMode === 'plan') && !isExporting;
 
   /**
    * Keyboard for the picked run, the same keys an object answers to:
@@ -336,7 +339,7 @@ export function FenceRuns() {
   if (!fences?.length) return null;
   return (
     <Suspense fallback={null}>
-      {fences.map(f => <Run key={f.id} run={f} showLabel={showLabel} />)}
+      {fences.map(f => <Run key={f.id} run={f} showLabel={showLabel || (selectedId === f.id && !isExporting)} />)}
     </Suspense>
   );
 }

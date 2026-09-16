@@ -40,6 +40,11 @@ interface MaterialStudioViewProps {
     materialLibrary?: MaterialLibrary;
     onApplyMaterials: () => void;
     isAnalyzingMaterials?: boolean;
+    /** Masked edit: the free instruction, and a tint of the pixels the next
+     *  Apply is allowed to change (null when nothing is changed yet). */
+    materialPrompt?: string;
+    setMaterialPrompt?: (v: string) => void;
+    materialMaskPreview?: string | null;
 }
 
 const MATERIAL_CATEGORIES: Array<{ key: keyof MaterialLibrary; label: string }> = [
@@ -77,6 +82,9 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
     materialLibrary,
     onApplyMaterials,
     isAnalyzingMaterials,
+    materialPrompt = '',
+    setMaterialPrompt,
+    materialMaskPreview,
 }) => {
     /** Presets plus anything the user saved to their own library. */
     const optionsFor = (key: keyof MaterialLibrary): string[] => {
@@ -103,7 +111,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                     <h2 className="text-[7vw] md:text-2xl lg:text-3xl font-bold text-accent w-fit inline-block leading-tight">Material Studio</h2>
                     <p className="text-slate-600 text-sm leading-relaxed">
                         {mode === 'change'
-                            ? 'Swap the cladding, roof, glazing, doors and ground treatment on your building - the structure stays exactly as uploaded.'
+                            ? 'Change the cladding, roof, glazing, doors or ground - as a true masked edit. Only the pixels of the surface you change are repainted; every other pixel of your image is left exactly as it is.'
                             : 'Architectural material detail sheet generator. The engine compiles a high-resolution 2x2 presentation grid based on your specific material focal points.'}
                     </p>
                     {mode && originalImage && (
@@ -141,6 +149,25 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                                             }
                                         />
                                     ))}
+                                </div>
+                                {/* A typed instruction for anything the five pickers do not
+                                    cover. It gets its own mask - whatever it names is
+                                    found in the image and only that is repainted. */}
+                                <div className="flex flex-col gap-2 pt-2">
+                                    <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-400">Or tell it what to change</div>
+                                    <textarea
+                                        value={materialPrompt}
+                                        onChange={e => setMaterialPrompt?.(e.target.value)}
+                                        rows={3}
+                                        placeholder="e.g. make the fascia board anthracite grey · change the door frames to bronze"
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-accent/30 resize-none"
+                                    />
+                                    <p className="text-[10px] text-slate-400 leading-snug">
+                                        Name the surface plainly. It is found in the image and repainted inside its own outline; nothing else is touched.
+                                    </p>
+                                </div>
+                                <div className="rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-[11px] text-emerald-900 leading-snug">
+                                    <span className="font-bold">Pixel-level masked edit.</span> {materialMaskPreview ? 'The green tint on the image is every pixel this change may touch. Everything else stays byte-for-byte identical.' : 'Change a material above and the image will show, in green, exactly which pixels will be repainted.'}
                                 </div>
                             </>
                         )}
@@ -301,7 +328,17 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center text-secondary w-full">
-                        {originalImage ? (
+                        {originalImage && mode === 'change' ? (
+                            /* The source, sharp, with the mask tint over it when a
+                               change is pending - the honest picture of what the
+                               next Apply will and will not touch. */
+                            <div className={`${RENDER_CANVAS} group`}>
+                                <img src={getImageUrl(materialMaskPreview || originalImage)} className="w-full h-full object-contain absolute inset-0 transition-opacity duration-300" alt="Source" />
+                                {materialMaskPreview && (
+                                    <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-full bg-emerald-600/90 text-white text-[10px] font-bold uppercase tracking-widest shadow-lg">Green = the only pixels that will change</div>
+                                )}
+                            </div>
+                        ) : originalImage ? (
                             <div className={`${RENDER_CANVAS} group`}>
                                 <img src={getImageUrl(originalImage)} className="w-full h-full object-contain opacity-30 grayscale transition-all duration-700 group-hover:opacity-50 absolute inset-0" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent"></div>

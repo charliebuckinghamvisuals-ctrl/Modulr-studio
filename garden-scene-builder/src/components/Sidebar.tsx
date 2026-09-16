@@ -12,6 +12,7 @@ import { DECK_MATERIALS, deckArea, describeDeck } from './3d/Decks';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS, INTERIOR_DOOR_STYLES } from '../modelRegistry';
+import { describeExteriorLights } from '../utils/placement';
 import { DOOR_KINDS, LEAF_RANGE, doorKind, clampLeaves, changesForKind } from '../utils/doors';
 import type { DoorKind } from '../types';
 import { MATERIAL_DEF } from '../utils/materials';
@@ -1858,7 +1859,7 @@ export function Sidebar() {
               const dataUrl = canvas.toDataURL('image/png');
               // Same payload as the canvas button: screenshot for composition,
               // room spec so the AI obeys the configured building exactly.
-              const { room, fences, boundaryStyle, paths, decks } = useStore.getState().scene;
+              const { room, fences, boundaryStyle, paths, decks, objects } = useStore.getState().scene;
               // The boundary rides with the room: what each run is built of,
               // in words the render prompt can repeat, so a brick wall in the
               // screenshot is rendered as brick and not guessed at.
@@ -1869,6 +1870,9 @@ export function Sidebar() {
                   paths: (paths || []).map(p => ({ lengthMm: Math.round(pathLength(p) * 1000), text: describePath(p) })),
                   decks: (decks || []).map(d => ({ areaM2: Math.round(deckArea(d.points) * 10) / 10, heightMm: d.heightMm, text: describeDeck(d) })),
                 } : undefined,
+                // The exterior fittings, so the render keeps each one's shape,
+                // place and finish rather than inventing a lantern.
+                exteriorLights: describeExteriorLights(room, objects || []),
               };
               window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl, roomSpec }, window.location.origin);
             }

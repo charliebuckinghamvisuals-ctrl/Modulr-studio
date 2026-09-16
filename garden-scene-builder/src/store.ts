@@ -323,7 +323,9 @@ const initialState: SceneState = {
     x: 0,
     z: 0,
     rot: 0,
-    showDimensions: true,
+    // Off until asked for: the chips on every wall, fence, deck and path
+    // cluttered every view (Charlie, 16 Sep). Extras > Show Dimensions.
+    showDimensions: false,
     doors: [],
     hasDoorHandles: true,
     windows: [],

@@ -3,6 +3,8 @@ import { toast } from 'react-hot-toast';
 import { AppStage, MaterialConfig, WeatherConfig, ProcessingState, LibraryMaterialItem, MaterialLibrary } from '../types';
 import { PRESET_MATERIALS, WEATHER_CONDITIONS, SEASONS } from '../constants';
 import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor, setConfigSpec, describeGarden, getSceneContext, setSceneContext, getLastVerification, RenderVerification, export4K } from '../services/geminiService';
+import { segmentMaterials, SegmentRegion } from '../services/geminiService';
+import { buildMask, unionMasks, maskCoverage, maskPreview, applyMaskedEdit, MaskCanvas } from '../services/maskedEdit';
 import { saveToHistory } from '../services/historyService';
 import { trackFeatureUsage } from '../services/analytics';
 import { db, auth } from '../services/firebase';
@@ -39,6 +41,23 @@ export const compressImageFile = (file: File, maxWidth = 1920): Promise<string> 
         reader.readAsDataURL(file);
     });
 };
+
+/** The surface label each Material Studio category is segmented under. */
+const MATERIAL_SEGMENT_LABELS = {
+    walls: 'cladding',
+    roof: 'roof',
+    windows: 'windows',
+    doors: 'doors',
+    decking: 'decking',
+} as const;
+
+/** Pixel size of a base64 or data-URL image. */
+const imageSize = (src: string) => new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => reject(new Error('Could not read image'));
+    img.src = src.startsWith('data:') || src.startsWith('http') || src.startsWith('blob:') ? src : `data:image/jpeg;base64,`;
+});
 
 export const useAppEngine = () => {
     /**
@@ -138,6 +157,13 @@ export const useAppEngine = () => {
     const [isBatchMode, setIsBatchMode] = useState(false);
     const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
     const [isAnalyzingMaterials, setIsAnalyzingMaterials] = useState(false);
+    /** Material Studio masked edit: what the analysis found (a change is
+     *  detected against it), one mask per surface, the free instruction, and
+     *  a tinted preview of exactly which pixels the next Apply may touch. */
+    const [detectedMaterials, setDetectedMaterials] = useState<MaterialConfig | null>(null);
+    const [materialMasks, setMaterialMasks] = useState<Partial<Record<keyof MaterialConfig, MaskCanvas | null>>>({});
+    const [materialPrompt, setMaterialPrompt] = useState('');
+    const [materialMaskPreview, setMaterialMaskPreview] = useState<string | null>(null);
 
     const [userPlan, setUserPlan] = useState<string>('free');
     const [studioBackground, setStudioBackground] = useState<string>('Pure White Studio');
@@ -951,14 +977,30 @@ export const useAppEngine = () => {
             await handleAnalyzeForMaterialStudio(source);
             return;
         }
-
         setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
+        setDetectedMaterials(null); setMaterialMasks({}); setMaterialPrompt(''); setMaterialMaskPreview(null);
         setProcessing({ isLoading: true, message: 'Analysing the building’s materials...' });
         setIsAnalyzingMaterials(true);
         try {
-            const detected = await analyzeComponents(source);
+            /*
+             * Two things at once: WHAT each surface is (words the user can
+             * change) and WHERE it is (a mask per surface). The masks are what
+             * make the edit a true masked edit - see services/maskedEdit.
+             */
+            const [detected, regions] = await Promise.all([
+                analyzeComponents(source),
+                segmentMaterials(source, Object.values(MATERIAL_SEGMENT_LABELS)).catch(err => { console.warn('segmentation failed', err); return [] as SegmentRegion[]; }),
+            ]);
             setMaterials(detected);
-            toast.success('Materials detected - change any of them below.');
+            setDetectedMaterials(detected);
+            const dims = await imageSize(source);
+            const masks: Partial<Record<keyof MaterialConfig, MaskCanvas | null>> = {};
+            for (const key of Object.keys(MATERIAL_SEGMENT_LABELS) as (keyof typeof MATERIAL_SEGMENT_LABELS)[]) {
+                masks[key] = await buildMask(regions, MATERIAL_SEGMENT_LABELS[key], dims.width, dims.height);
+            }
+            setMaterialMasks(masks);
+            const found = Object.values(masks).filter(Boolean).length;
+            toast.success(found ? `Materials detected - ${found} surface${found === 1 ? '' : 's'} mapped for masked editing.` : 'Materials detected. Surfaces could not be mapped, so changes will use your typed instruction.');
         } catch (error) {
             console.error(error);
             toast.error('Could not analyse the materials in this image.');
@@ -968,34 +1010,86 @@ export const useAppEngine = () => {
         }
     };
 
-    /** Re-render the uploaded image with the user's chosen materials. */
+    /** Which surfaces the user has changed from what was detected. */
+    const changedMaterialKeys = (): (keyof MaterialConfig)[] =>
+        (Object.keys(MATERIAL_SEGMENT_LABELS) as (keyof MaterialConfig)[]).filter(k => {
+            const v = (materials as any)[k]; const d = detectedMaterials ? (detectedMaterials as any)[k] : undefined;
+            return v && v !== 'none' && v !== d;
+        });
+
+    /*
+     * The tinted preview of the pixels the next Apply may touch: the union of
+     * the changed surfaces' masks. Recomputed whenever a choice changes, so
+     * the user sees the mask before spending a credit on it.
+     */
+    useEffect(() => {
+        const source = stageImages[AppStage.MATERIAL_STUDIO];
+        if (!source || materialStudioMode !== 'change' || !detectedMaterials) { setMaterialMaskPreview(null); return; }
+        const keys = changedMaterialKeys();
+        const masks = keys.map(k => materialMasks[k]).filter(Boolean) as MaskCanvas[];
+        if (!masks.length) { setMaterialMaskPreview(null); return; }
+        let alive = true;
+        (async () => {
+            const dims = await imageSize(source);
+            const u = unionMasks(masks, dims.width, dims.height);
+            if (!u) return;
+            const url = await maskPreview(source, u);
+            if (alive) setMaterialMaskPreview(url);
+        })();
+        return () => { alive = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [materials, detectedMaterials, materialMasks, materialStudioMode]);
+
+    /**
+     * Apply the material changes as TRUE masked edits.
+     *
+     * One inpaint per changed surface, each inside that surface's mask, run
+     * in sequence on the growing result; then the typed instruction, inside a
+     * mask of whatever it names. Nothing outside a mask is ever touched - the
+     * photograph is never re-rendered. See services/maskedEdit for how.
+     */
     const handleMaterialStudioApply = async () => {
         const source = stageImages[AppStage.MATERIAL_STUDIO];
         if (!source) return;
+        const keys = changedMaterialKeys();
+        const instruction = materialPrompt.trim();
+        if (!keys.length && !instruction) { toast.error('Change a material or type an instruction first.'); return; }
 
-        setProcessing({ isLoading: true, message: 'Applying new materials...' });
+        setProcessing({ isLoading: true, message: 'Preparing the masked edit...' });
         try {
-            const result = await renderBuilding(
-                source,
-                materials,
-                additionalPrompt,
-                isHighQuality,
-                isProMode,
-                undefined,
-                isSketchUpMode,
-                undefined,
-                false,
-                undefined,
-                cameraEffects
-            );
-            trackFeatureUsage('material_studio_change');
-            setMaterialStudioImage(result);
+            const dims = await imageSize(source);
+            let current = source;
+            let steps = 0;
+            for (const key of keys) {
+                const mask = materialMasks[key];
+                const label = MATERIAL_SEGMENT_LABELS[key as keyof typeof MATERIAL_SEGMENT_LABELS];
+                if (!mask || maskCoverage(mask) < 0.0005) {
+                    toast.error(`The ${label} could not be mapped in this image, so it was left as it is.`);
+                    continue;
+                }
+                setProcessing({ isLoading: true, message: `Changing the ${label} (${++steps})...` });
+                const was = detectedMaterials ? (detectedMaterials as any)[key] : 'the existing material';
+                current = await applyMaskedEdit(current, mask,
+                    `Replace the ${label} - currently ${was} - with ${(materials as any)[key]}. Same surface, same boards or panels layout following the same geometry; only the material changes.`,
+                    (s) => setProcessing({ isLoading: true, message: s }));
+            }
+            if (instruction) {
+                setProcessing({ isLoading: true, message: 'Finding what your instruction refers to...' });
+                // The instruction's own mask: ask for the subject as a label.
+                const regions = await segmentMaterials(current, [instruction.slice(0, 80)]).catch(() => [] as SegmentRegion[]);
+                const mask = await buildMask(regions, instruction.slice(0, 80), dims.width, dims.height);
+                if (!mask || maskCoverage(mask) < 0.0005) throw new Error('Could not find what your instruction refers to in the image. Try naming the surface more plainly, e.g. "fascia board".');
+                current = await applyMaskedEdit(current, mask, instruction, (s) => setProcessing({ isLoading: true, message: s }));
+            }
+            if (current === source) throw new Error('Nothing could be changed - no surface was mapped.');
 
+            trackFeatureUsage('material_studio_change');
+            setMaterialStudioImage(current);
             await saveToHistory({
                 stage: AppStage.MATERIAL_STUDIO,
-                image: result,
+                image: current,
                 originalImage: source,
-                prompt: additionalPrompt || 'Material change',
+                prompt: [...keys.map(k => `${MATERIAL_SEGMENT_LABELS[k as keyof typeof MATERIAL_SEGMENT_LABELS]} -> ${(materials as any)[k]}`), instruction].filter(Boolean).join('; ') || 'Material change',
                 settings: materials
             });
             window.dispatchEvent(new Event('aiarchviz-history-updated'));
@@ -1077,6 +1171,7 @@ export const useAppEngine = () => {
         activeProfileId, setActiveProfileId,
         handleGenerateLineDrawing, handleAnalyzeMaterials, handleRender, handleBatchRender, handleRefineRender, handleEditImage, handleWeather, handleMaterialStudio, handleAnalyzeForEditor, handleAnalyzeForMaterialStudio, handleAnalyzeForRenderEngine,
         materialStudioMode, setMaterialStudioMode, startMaterialStudioMode, handleMaterialStudioApply,
+        detectedMaterials, materialMasks, materialPrompt, setMaterialPrompt, materialMaskPreview,
         handleSlotImageUpload,
         getRenderUrl
     };
