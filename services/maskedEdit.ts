@@ -48,7 +48,8 @@ export async function buildMask(regions: SegmentRegion[], label: string, width: 
   canvas.width = width; canvas.height = height;
   const ctx = canvas.getContext('2d')!;
   for (const r of mine) {
-    const [y0, x0, y1, x1] = r.box_2d;
+    // A full-frame SAM mask covers the whole image; a boxed one fills its box.
+    const [y0, x0, y1, x1] = r.full ? [0, 0, 1000, 1000] : r.box_2d;
     const bx = Math.round(x0 / 1000 * width), by = Math.round(y0 / 1000 * height);
     const bw = Math.max(1, Math.round((x1 - x0) / 1000 * width)), bh = Math.max(1, Math.round((y1 - y0) / 1000 * height));
     let img: HTMLImageElement;
@@ -69,7 +70,33 @@ export async function buildMask(regions: SegmentRegion[], label: string, width: 
     sctx.putImageData(d, 0, 0);
     ctx.drawImage(scratch, bx, by);
   }
-  return canvas;
+  return cleanMask(canvas);
+}
+
+/**
+ * Tidy a raw segmenter mask: the SAM output comes back at low resolution
+ * with stair-stepped edges and small holes (a knot in a board, a shadow),
+ * and each hole left a pale patch of the old cladding inside the new. A
+ * morphological CLOSE (dilate then erode, both by r) fills holes up to ~2r
+ * across without moving the outer edge, then a light blur-and-threshold
+ * rounds the stair-steps. Done with canvas blur + threshold, which is fast
+ * at 2.5K.
+ */
+function cleanMask(mask: MaskCanvas): MaskCanvas {
+  const W = mask.width, H = mask.height;
+  const r = Math.max(4, Math.round(W / 250));
+  const pass = (src: HTMLCanvasElement, radius: number, cutoff: number) => {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const ctx = c.getContext('2d')!;
+    ctx.filter = `blur(${radius}px)`; ctx.drawImage(src, 0, 0); ctx.filter = 'none';
+    const d = ctx.getImageData(0, 0, W, H);
+    for (let i = 3; i < d.data.length; i += 4) d.data[i] = d.data[i] > cutoff ? 255 : 0;
+    ctx.putImageData(d, 0, 0);
+    return c;
+  };
+  const dilated = pass(mask, r, 20);       // grow by ~r: holes up to 2r close
+  const closed = pass(dilated, r, 235);    // shrink back by ~r: edge returns
+  return pass(closed, 1.5, 127);           // round the stair-steps
 }
 
 /** Union of several masks, for a change that spans surfaces. */

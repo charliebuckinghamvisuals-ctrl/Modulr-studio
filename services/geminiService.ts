@@ -557,7 +557,7 @@ export const analyzeSceneForVideo = async (base64Images: string[], mode: 'zoom' 
 };
 /** One surface region from /api/segmentMaterials: a 0-1000 normalised box
  *  [ymin, xmin, ymax, xmax] and a PNG probability mask that fills it. */
-export interface SegmentRegion { label: string; box_2d: [number, number, number, number]; mask: string }
+export interface SegmentRegion { label: string; box_2d: [number, number, number, number]; mask: string; /** A full-frame mask (SAM): white where the surface is, to scale to the image. */ full?: boolean }
 
 /**
  * Segmentation masks for named surfaces (cladding, roof...) or the subject of

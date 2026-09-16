@@ -3324,6 +3324,15 @@ app.post('/api/editImage', userAiLimiter, async (req, res) => {
     }
 });
 
+/** What each Material Studio surface is called to the segmenter. */
+const SEGMENT_PROMPTS = {
+    cladding: 'the exterior wall cladding boards of the building, excluding windows, doors and frames',
+    roof: 'the roof covering of the building, excluding the sky',
+    windows: 'the window glass and window frames of the building',
+    doors: 'the entrance doors of the building including their frames',
+    decking: 'the decking or patio surface on the ground in front of the building, excluding the lawn',
+};
+
 /**
  * Segmentation masks for the surfaces the Material Studio can repaint.
  *
@@ -3342,32 +3351,47 @@ app.post('/api/segmentMaterials', userAiLimiter, async (req, res) => {
         const rawLabels = Array.isArray(req.body.labels) ? req.body.labels : [];
         const labels = rawLabels.map(l => sanitizeString(l, 80)).filter(Boolean).slice(0, 8);
         if (!base64Image || !labels.length) return res.status(400).json({ error: 'An image and at least one label are needed' });
+        if (!process.env.FAL_KEY) return res.status(503).json({ error: 'Surface mapping needs FAL_KEY on the server.' });
 
         const access = await enforceRenderAccess(req, CREDIT_COSTS.ANALYSIS);
         if (!access.allowed) return res.status(access.status).json(access.body);
 
-        const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
-        const prompt = `Give the segmentation masks for these surfaces of the building in the photograph: ${labels.map(l => `"${l}"`).join(', ')}.
-Output a JSON list of segmentation masks where each entry contains the 2D bounding box in the key "box_2d", the segmentation mask in key "mask", and the text label in the key "label". Use EXACTLY one of the requested labels as the label (repeat a label for every separate region of that surface). Be precise at the edges: the cladding mask must stop at window and door frames, the roof mask must not include the sky, the decking mask must not include the lawn. If a surface is not present, leave it out.`;
-
-        const response = await ai.models.generateContent({
-            model: ANALYSIS_MODEL,
-            contents: { parts: [imagePart, { text: prompt }] },
-            config: { responseMimeType: 'application/json', temperature: 0.1 },
-        });
-        const text = response.text;
-        if (!text) throw new Error('No segmentation returned');
-        let parsed;
-        try { parsed = JSON.parse(text.replace(/```json/gi, '').replace(/```/g, '').trim()); } catch { throw new Error('Segmentation was not valid JSON'); }
-        const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.masks) ? parsed.masks : []);
-        const result = list
-            .filter(m => m && Array.isArray(m.box_2d) && m.box_2d.length === 4 && typeof m.mask === 'string' && typeof m.label === 'string')
-            .slice(0, 24)
-            .map(m => ({
-                label: sanitizeString(m.label, 80),
-                box_2d: m.box_2d.map(v => Math.max(0, Math.min(1000, Number(v) || 0))),
-                mask: m.mask.replace(/^data:image\/\w+;base64,/, ''),
-            }));
+        /*
+         * One SAM call per label, in parallel. The label is turned into the
+         * referring expression the segmenter is best at ("the exterior wall
+         * cladding boards of the building"); a free instruction goes through
+         * as its own words. Each answer is a full-frame mask PNG, white where
+         * the surface is - the client uses it directly.
+         */
+        const imageUrl = `data:image/jpeg;base64,${base64Image}`;
+        const one = async (label) => {
+            const prompt = SEGMENT_PROMPTS[label.toLowerCase()] || label;
+            // Through fal's queue, not one long request: a cold start of the
+            // segmenter has taken over four minutes, which no single HTTP
+            // call should be asked to sit through. Submit, poll, fetch.
+            const sub = await fetch('https://queue.fal.run/fal-ai/evf-sam', {
+                method: 'POST', headers: falHeaders(),
+                body: JSON.stringify({ image_url: imageUrl, prompt, mask_only: true, fill_holes: true }),
+            });
+            const subJson = await sub.json().catch(() => ({}));
+            const statusUrl = subJson?.status_url, responseUrl = subJson?.response_url;
+            if (!sub.ok || !statusUrl || !responseUrl) { console.warn('[SAM] submit', label, sub.status, JSON.stringify(subJson).slice(0, 200)); return null; }
+            const deadline = Date.now() + 6 * 60 * 1000;
+            while (Date.now() < deadline) {
+                await new Promise(r => setTimeout(r, 2500));
+                const st = await fetch(statusUrl, { headers: falHeaders() }).then(r => r.json()).catch(() => ({}));
+                if (st.status === 'COMPLETED') break;
+                if (st.status === 'FAILED' || st.status === 'CANCELLED') { console.warn('[SAM] failed', label, JSON.stringify(st).slice(0, 200)); return null; }
+            }
+            const j = await fetch(responseUrl, { headers: falHeaders() }).then(r => r.json()).catch(() => ({}));
+            const url = j?.image?.url;
+            if (!url) { console.warn('[SAM] no mask', label, JSON.stringify(j).slice(0, 200)); return null; }
+            const png = Buffer.from(await (await fetch(url)).arrayBuffer()).toString('base64');
+            return { label, full: true, box_2d: [0, 0, 1000, 1000], mask: png };
+        };
+        const t0 = Date.now();
+        const result = (await Promise.all(labels.map(one))).filter(Boolean);
+        console.log(`[SAM] ${result.length}/${labels.length} surfaces in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
         res.json({ result });
     } catch (error) {
         console.error('Segmentation error:', error);
