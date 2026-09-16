@@ -1,7 +1,7 @@
 import { useStore } from '../../store';
 import { useEffect, useState } from 'react';
 import { Trash2, RotateCw, Copy, ChevronDown, ChevronUp } from 'lucide-react';
-import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS, hasTimber, VENEERS, isVeneerFinish, metalUsesColour, isTintableTimber, COMPOSITE_COLOURS, TIMBER_MATERIAL } from '../../modelRegistry';
+import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS, hasTimber, VENEERS, isVeneerFinish, metalUsesColour, isTintableTimber, COMPOSITE_COLOURS, TIMBER_MATERIAL, isWallLight, MOUNT_HEIGHT_MM } from '../../modelRegistry';
 import { DimensionSlider } from '../DimensionSlider';
 import { DECK_MATERIALS } from '../3d/Decks';
 import { useSavedColours, addSavedColour, removeSavedColour } from '../../utils/savedColours';
@@ -538,6 +538,12 @@ export function ObjectEditorPanel() {
             </div>
           );
         })()}
+
+        {/* Exterior wall lights: how high on the wall. From the ground, at the
+            fitting's centre. */}
+        {!finishesOnly && isWallLight(obj.type) && (
+          <DimensionSlider label="Height" min={600} max={3600} step={50} value={obj.mountHeightMm ?? MOUNT_HEIGHT_MM[obj.type] ?? 2200} onChange={(v) => updateObject(obj.id, { mountHeightMm: v })} />
+        )}
 
         {/* Garden steps and ramp: how far they climb, how long a ramp runs,
             and what they are finished in - cast concrete or any decking, so

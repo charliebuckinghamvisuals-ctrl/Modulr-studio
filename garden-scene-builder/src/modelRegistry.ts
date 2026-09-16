@@ -92,6 +92,7 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   towel_heater: 'models/towel_heater.glb',
   external_extraction_fan: 'models/external_extraction_fan.glb',
   spot_light: 'models/spot_light.glb',
+  canopy_spot: 'models/spot_light.glb',
 };
 
 /**
@@ -105,6 +106,8 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
  */
 export const CEILING_MOUNTED: Partial<Record<ObjectType, number>> = {
   spot_light: 0.008,
+  // The same downlight, recessed in the canopy soffit outside.
+  canopy_spot: 0.008,
   // Charlie's Baltimore pendant (8 Sep): rose to the bottom of the shade,
   // origin at the shade's underside, so this is the full drop.
   pendant_light: 0.778,
@@ -119,6 +122,7 @@ export const isCeilingMounted = (type: ObjectType) => CEILING_MOUNTED[type] !== 
  */
 export const EMISSIVE_MATERIAL: Partial<Record<ObjectType, string>> = {
   spot_light: 'M01_Silver_Fog',
+  canopy_spot: 'M01_Silver_Fog',
   // The pendant's bulb envelope.
   pendant_light: 'Glass Thin',
   // The exterior wall lights' diffusers.
@@ -405,12 +409,13 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   // The extract terminal goes high on the OUTSIDE wall. Not an interior type,
   // so this is measured from the ground rather than the finished floor.
   external_extraction_fan: 2000,
-  // Exterior wall lights: origin at the fitting's centre, a little below
-  // head-of-door height on the outside wall, measured from the ground.
-  wall_light_sconce: 1900,
-  wall_light_angled: 1900,
-  wall_light_box: 1900,
-  wall_light_slim: 1900,
+  // Exterior wall lights: origin at the fitting's centre, about head-of-door
+  // height on the outside wall. The default only - each placed light has
+  // its own Height slider (SceneObject.mountHeightMm, objectMountHeight).
+  wall_light_sconce: 2200,
+  wall_light_angled: 2200,
+  wall_light_box: 2200,
+  wall_light_slim: 2200,
   // A wall-hung pan hangs clear of the floor - it was sitting on it. 100mm
   // under this pan puts its seat at 477mm, comfort height.
   // A wall-hung 55" TV: its bottom edge at 950 puts the screen centre at
@@ -441,6 +446,8 @@ export const EXTRACTOR_FLUE_H = 0.955;    // native flue height, m
 /** Height (m) an object sits at above the finished floor - 0 for anything
  *  that stands on it. */
 export const mountHeight = (type: ObjectType) => (MOUNT_HEIGHT_MM[type] ?? 0) / 1000;
+/** The height a PLACED object is fixed at: its own setting, or the type's default. */
+export const objectMountHeight = (obj: { type: ObjectType; mountHeightMm?: number }) => ((obj.mountHeightMm ?? MOUNT_HEIGHT_MM[obj.type]) ?? 0) / 1000;
 
 /**
  * Per-model material corrections, applied when the GLB is instanced.
@@ -713,6 +720,7 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
   pendant_light: ['[Metal Corrugated Shiny]', '[Color M07]', 'Bronze Light'],
   // The bezel ring around the lens.
   spot_light: ['Metal_06_1K2'],
+  canopy_spot: ['Metal_06_1K2'],
   // The dart board's wire spider.
   dart_board: ['[Steel Brushed Stainless]'],
   // Exterior wall lights: the whole housing is the metalwork; only the
@@ -959,6 +967,7 @@ export const DEFAULT_FINISH: Partial<Record<ObjectType, string>> = {
   kitchen_extractor: '#c8c9c7',
   pendant_light: '#c8c9c7',
   spot_light: '#c8c9c7',
+  canopy_spot: '#c8c9c7',
   // Exterior lights are nearly always black.
   wall_light_sconce: '#26262a',
   wall_light_angled: '#26262a',
@@ -1003,6 +1012,7 @@ export const MODEL_SCALES: Partial<Record<ObjectType, [number, number, number]>>
   // layout and too small to grab. 100mm reads properly and is still a size
   // downlights are actually made in.
   spot_light: [1.7, 1.7, 1.7],
+  canopy_spot: [1.7, 1.7, 1.7],
   // NOT the corner unit. It was stretched 3% in plan to bring its 600-deep
   // legs out to the 620 of the straight carcasses - but that dragged its
   // (correct, 640) worktop 21mm proud of the run slab, which shows far more
@@ -1085,6 +1095,7 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   shower_small: 'Shower (Small)',
   towel_heater: 'Towel Radiator',
   spot_light: 'Spotlight',
+  canopy_spot: 'Canopy Spotlight',
 };
 
 export const GLB_OBJECT_TYPES = Object.keys(GLB_OBJECT_LABELS).filter(t => (MODEL_URLS as Record<string, string>)[t]) as ObjectType[];

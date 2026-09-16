@@ -1800,10 +1800,11 @@ export function Sidebar() {
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Lighting</label>
               <div className="grid grid-cols-2 gap-2.5 mb-2.5">
-                {(['pendant_light'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['pendant_light', 'canopy_spot'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
+              {!room.hasCanopy && !room.hasPictureFrame && <p className="text-[10px] text-gray-400 mb-2.5 leading-snug">Canopy spotlights need a canopy - add one on the Extras step and they recess into its underside.</p>}
               {/* Exterior wall lights: dropped anywhere near the building,
                   they fix themselves to the nearest outside wall. */}
               <label className="text-[10px] font-semibold text-gray-500 mb-2 block">Outside walls</label>

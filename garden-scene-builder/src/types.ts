@@ -24,7 +24,7 @@ export type FrameColorType = 'anthracite' | 'black' | 'white' | 'silver';
 export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 'planter' | 'bench' | 'slab' | 'patio' | 'toilet' | 'sink' | 'shower' | 'shower_corner' | 'shower_small' | 'vanity' | 'interior_wall' | 'interior_door' | 'desk' | 'sofa' | 'sofa_2seater' | 'sofa_l' | 'footstool' | 'armchair' | 'dining_table' | 'rug' | 'tv' | 'bed' | 'bedside_table' | 'bookshelf' | 'dressing_table' | 'wardrobe' | 'exterior_wall_light' | 'drop_light' | 'coffee_table' | 'coffee_table_black' | 'indoor_plant' | 'kitchen_island' | 'kitchen_unit_600' | 'kitchen_unit_1200' | 'kitchen_sink_1200' | 'kitchen_tall_fridge' | 'kitchen_tall_oven_single' | 'kitchen_tall_oven_double' | 'kitchen_tap_straight' | 'kitchen_tap_curved' | 'kitchen_drawer_2' | 'kitchen_drawer_3' | 'kitchen_tall_larder' | 'kitchen_hob_gas' | 'kitchen_hob_induction' | 'kitchen_extractor'
  | 'kitchen_wall_unit_600' | 'kitchen_wall_unit_1200'
  | 'bar_stool' | 'bar_stool_tall' | 'towel_heater' | 'external_extraction_fan'
- | 'spot_light' | 'tv_unit' | 'dining_table_round' | 'pendant_light'
+ | 'spot_light' | 'canopy_spot' | 'tv_unit' | 'dining_table_round' | 'pendant_light'
  | 'end_panel_tall' | 'end_panel_base' | 'end_panel_wall'
  | 'basin_tap_mixer' | 'basin_tap_widespread' | 'basin_tap_wall'
  | 'heater_small' | 'heater_large' | 'boiler'
@@ -317,6 +317,9 @@ export interface SceneObject {
    *  surface - 'concrete' or a decking material key (see DECK_MATERIALS). */
   riseMm?: number;
   surface?: string;
+  /** Fixing height in mm for a wall-mounted object (exterior lights), when
+   *  set by the customer. Unset = the type's MOUNT_HEIGHT_MM default. */
+  mountHeightMm?: number;
   hasDoorGap?: boolean;
   /** Gap centre, measured from the wall's midpoint (legacy). The editor now
    *  shows and edits it as a distance from the wall's start end. */

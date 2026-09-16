@@ -1,14 +1,14 @@
 import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
-import { SceneObject } from '../../types';
+import { SceneObject, Room } from '../../types';
 import * as THREE from 'three';
 import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
-import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel, metalUsesColour, isCornerUnit, CORNER_UNIT, UNIT_FAMILY, isWallLight } from '../../modelRegistry';
+import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, objectMountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel, metalUsesColour, isCornerUnit, CORNER_UNIT, UNIT_FAMILY, isWallLight } from '../../modelRegistry';
 import { applyModelMaterials, retintModel, resurfaceWorktop, refinishUnits, refinishMetal } from '../../utils/materialFixes';
-import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, FOOTPRINT_RADIUS, snapEndPanel, snapTap, isKitchenTap, settleAgainstWalls, snapToOutsideWall } from '../../utils/placement';
+import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, canopySoffitAt, clampToCanopy, FOOTPRINT_RADIUS, snapEndPanel, snapTap, isKitchenTap, settleAgainstWalls, snapToOutsideWall } from '../../utils/placement';
 import { wallpaperProps } from '../../utils/wallpaper';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
 import { RotateCw, Copy, Trash2 } from 'lucide-react';
@@ -125,8 +125,15 @@ export function SceneObjects() {
      * downlight around the design view froze before it would move. Laying
      * out is done in daylight, where a spot pool would be invisible anyway;
      * the fittings still glow, so you can see exactly where they are.
+     *
+     * 16 Sep: the 3D view emits too (Charlie: "why can I only see the
+     * emission in walk mode"). Safe now because the pool below keeps the
+     * light COUNT fixed - moving or adding a fitting within the pool changes
+     * uniforms, not programs - and a pool step compiles asynchronously and
+     * restarts the loop. Plan and lighting views stay unlit: orthographic
+     * symbols, nothing for a spot to land on.
      */
-    lightsEmit: s.nightPreview || s.viewMode === 'walking',
+    lightsEmit: s.nightPreview || s.viewMode === 'walking' || s.viewMode === '3d',
   })));
 
   /**
@@ -218,6 +225,10 @@ const POOL_STEP = 4;
  *  clear of the fitting. From the model files (wallmount.cjs). */
 const WALL_LIGHT_DEPTH_M: Partial<Record<SceneObject['type'], number>> = { wall_light_sconce: 0.171, wall_light_angled: 0.155, wall_light_box: 0.051, wall_light_slim: 0.04 };
 
+/** The soffit a ceiling fitting hangs from, relative to the base top: the
+ *  room ceiling, or the canopy underside for a canopy spot. */
+const soffitAt = (room: Room, obj: SceneObject) => obj.type === 'canopy_spot' ? canopySoffitAt(room, obj.z) : ceilingHeightAt(room, obj.x, obj.z);
+
 interface Emitter { x: number; y: number; z: number; tx: number; ty: number; tz: number; colour: string; intensity: number; angle: number; penumbra: number; distance: number; decay: number; shadow?: boolean }
 
 function FittingLights({ objects, emit }: { objects: SceneObject[]; emit: boolean }) {
@@ -233,7 +244,7 @@ function FittingLights({ objects, emit }: { objects: SceneObject[]; emit: boolea
     if (isWallLight(obj.type)) {
       const rot = obj.rot ?? 0;
       const ox = Math.sin(rot), oz = Math.cos(rot);
-      const y = mountHeight(obj.type);
+      const y = objectMountHeight(obj);
       // Just in front of the fitting's own body - the lantern is 171mm
       // deep, and a light placed inside it was shadowed by it.
       const clear = (WALL_LIGHT_DEPTH_M[obj.type] ?? 0.1) + 0.05;
@@ -258,7 +269,7 @@ function FittingLights({ objects, emit }: { objects: SceneObject[]; emit: boolea
       continue;
     }
     const y = isCeilingMounted(obj.type)
-      ? baseH + ceilingHeightAt(room, obj.x, obj.z) - (CEILING_MOUNTED[obj.type] ?? 0) - 0.01
+      ? baseH + soffitAt(room, obj) - (CEILING_MOUNTED[obj.type] ?? 0) - 0.01
       : baseH + mountHeight(obj.type);
     // Real output: three's lights are physical (candela), and a 9cd
     // downlight lit nothing - the fittings read as dots on the ceiling with
@@ -336,7 +347,7 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   /** Pool cast on the 750mm working plane, from the real drop and beam angle
    *  (0.62rad half-angle, matching the spotLight below). */
   const poolRadius = Math.max(0.35,
-    (ceilingHeightAt(room, obj.x, obj.z) - 0.75) * Math.tan(0.62));
+    (soffitAt(room, obj) - 0.75) * Math.tan(0.62));
   const paper = wallpaperProps();
   /** Whether this drag moves only this fitting (Alt held when it was grabbed). */
   const dragSolo = useRef(false);
@@ -390,7 +401,7 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
    * you actually grabbed it. A plane constant is the negated height.
    */
   const dragPlaneY = isCeilingMounted(obj.type)
-    ? ((room.baseHeightMm ?? 100) / 1000) + 0.01 + ceilingHeightAt(room, obj.x, obj.z)
+    ? ((room.baseHeightMm ?? 100) / 1000) + 0.01 + soffitAt(room, obj)
     : 0;
   const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -dragPlaneY);
 
@@ -404,14 +415,15 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   // sunk on anything with a flat base sitting straight on the floor.
   // Outdoor things stand on the bay's deck, which sits proud of the floor
   // finish - a tub on the floor level was sunk 20mm into the boards.
-  const baseH = isInterior ? ((room.baseHeightMm ?? 100) / 1000) + (isOutdoorType(obj.type) && room.bay ? bayFloorTop(room) : 0.01) : 0;
+  // A canopy spot is outside, but hangs from the roof, which sits on the base.
+  const baseH = isInterior ? ((room.baseHeightMm ?? 100) / 1000) + (isOutdoorType(obj.type) && room.bay ? bayFloorTop(room) : 0.01) : obj.type === 'canopy_spot' ? (room.baseHeightMm ?? 100) / 1000 : 0;
   // Worktop-mounted objects (taps) sit on the 900mm sink unit rather than on
   // the floor, so they are lifted by their mount height as well.
   // A ceiling fitting hangs from the ceiling, which moves with the wall
   // height - so it is placed DOWN from there rather than up from the floor.
   const pos: [number, number, number] = isCeilingMounted(obj.type)
-    ? [obj.x, baseH + ceilingHeightAt(room, obj.x, obj.z) - (CEILING_MOUNTED[obj.type] ?? 0), obj.z]
-    : [obj.x, baseH + mountHeight(obj.type), obj.z];
+    ? [obj.x, baseH + soffitAt(room, obj) - (CEILING_MOUNTED[obj.type] ?? 0), obj.z]
+    : [obj.x, baseH + objectMountHeight(obj), obj.z];
 
   const handlePointerDown = (e: any) => {
     /**
@@ -500,6 +512,8 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
           nx = s.x; nz = s.z;
           if (Math.abs(s.rot - (obj.rot ?? 0)) > 0.001) useStore.getState().updateObject(obj.id, { rot: s.rot });
         }
+        // A canopy spot stays under the canopy soffit.
+        if (obj.type === 'canopy_spot') { const c = clampToCanopy(room, nx, nz); nx = c.x; nz = c.z; }
         if (isInterior) {
           /**
            * Walls: the object's near FACE snaps to the inner wall face when

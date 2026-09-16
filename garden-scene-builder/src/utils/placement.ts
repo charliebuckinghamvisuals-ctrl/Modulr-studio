@@ -165,6 +165,7 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
   dining_table: 1.2, towel_heater: 0.45, external_extraction_fan: 0.35,
   // A 60mm bezel - anything like a normal ring would swallow the ceiling.
   spot_light: 0.16,
+  canopy_spot: 0.16,
   hot_tub: 1.5,
   garden_steps: 0.8,
   garden_ramp: 1.2,
@@ -386,4 +387,33 @@ export function snapToOutsideWall(room: Room, x: number, z: number): { x: number
   if (!best) return { x, z, rot: 0 };
   const c2 = Math.cos(rot), s2 = Math.sin(rot);
   return { x: rx + best.x * c2 - best.z * s2, z: rz + best.x * s2 + best.z * c2, rot: best.rot + rot };
+}
+
+/**
+ * The canopy soffit - the roof's underside where it overhangs the front -
+ * at a room-local z, relative to the top of the base. The same plane as the
+ * ceiling, carried on past the front wall rather than clamped at it, so a
+ * fitting recessed in the canopy sits flush however steep the fall.
+ */
+export function canopySoffitAt(room: Room, z: number): number {
+  const d = Math.max(0.5, (room.depthMm || 4300) / 1000);
+  if (room.shape === 'Gable') return ceilingHeightAt(room, 0, Math.min(z, d / 2));
+  const front = (room.heightMm ?? 2050) / 1000;
+  const back = (room.backHeightMm ?? room.heightMm ?? 2050) / 1000;
+  const t = z / (d / 2);
+  return (front + back) / 2 + t * (front - back) / 2 - 0.02;
+}
+
+/** Keeps a canopy fitting under the canopy: within the roof's side reach and
+ *  between the front wall and the canopy's front edge, 120mm in from each. */
+export function clampToCanopy(room: Room, x: number, z: number): { x: number; z: number } {
+  const w = (room.widthMm || 8000) / 1000, d = (room.depthMm || 4300) / 1000;
+  const ohFront = (room.hasCanopy || room.hasPictureFrame) ? (room.canopySizeMm ?? 0) / 1000 : 0;
+  const ohL = (room.overhangLeftMm ?? 0) / 1000, ohR = (room.overhangRightMm ?? 0) / 1000;
+  const m = 0.12;
+  const cx = Math.max(-w / 2 - ohL + m, Math.min(w / 2 + ohR - m, x));
+  // No canopy to speak of: hang at the front edge so the fitting is at
+  // least visible, rather than vanishing into the wall.
+  if (ohFront < 2 * m + 0.05) return { x: cx, z: d / 2 + m };
+  return { x: cx, z: Math.max(d / 2 + m, Math.min(d / 2 + ohFront - m, z)) };
 }
