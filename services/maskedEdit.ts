@@ -26,7 +26,8 @@ import { inpaintMasked, SegmentRegion } from './geminiService';
 const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
   const img = new Image();
   img.onload = () => resolve(img);
-  img.onerror = () => reject(new Error('Could not decode image'));
+  img.onerror = () => reject(new Error('The image could not be loaded for editing. Try uploading it again.'));
+  if (src.startsWith('http')) img.crossOrigin = 'anonymous';
   img.src = src.startsWith('data:') || src.startsWith('http') || src.startsWith('blob:') ? src : `data:image/jpeg;base64,${src}`;
 });
 

@@ -55,8 +55,9 @@ const MATERIAL_SEGMENT_LABELS = {
 const imageSize = (src: string) => new Promise<{ width: number; height: number }>((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-    img.onerror = () => reject(new Error('Could not read image'));
-    img.src = src.startsWith('data:') || src.startsWith('http') || src.startsWith('blob:') ? src : `data:image/jpeg;base64,`;
+    img.onerror = () => reject(new Error('The image could not be loaded for editing. Try uploading it again.'));
+    if (src.startsWith('http')) img.crossOrigin = 'anonymous';
+    img.src = src.startsWith('data:') || src.startsWith('http') || src.startsWith('blob:') ? src : `data:image/jpeg;base64,${src}`;
 });
 
 export const useAppEngine = () => {
