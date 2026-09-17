@@ -24,6 +24,7 @@ import { PlacementGhost } from './PlacementGhost';
 import { ObjectType } from '../../types';
 import { buildWalkSolids, walkBlocked, walkFloorY, toRoomLocal, toWorld } from '../../utils/walkCollide';
 import { enclosedRange } from '../../utils/bay';
+import { captureRenderInputs } from '../../utils/renderInputs';
 
 
 /**
@@ -418,7 +419,11 @@ function ScreenshotHelper() {
     (window as any).__modulrScene = scene;
     (window as any).__modulrCamera = camera;
     (window as any).__modulrAdvance = advance;
-  }, [scene, camera, advance]);
+    // The render engine's inputs: the shaded view at 2K and the exact edge
+    // drawing of the same frame. The Sidebar's "Send to Render Engine"
+    // calls this; see utils/renderInputs.ts for why both are needed.
+    (window as any).__modulrCaptureRenderInputs = () => captureRenderInputs(gl, scene, camera);
+  }, [gl, scene, camera, advance]);
 
   useEffect(() => {
     const handleCapture = () => {
@@ -897,6 +902,7 @@ export function MainScene() {
         </Plane>
         
         <DreiGrid
+          name="floor-grid"
           position={[0, 0.01, 0]}
           args={[100, 100]}
           cellSize={1}

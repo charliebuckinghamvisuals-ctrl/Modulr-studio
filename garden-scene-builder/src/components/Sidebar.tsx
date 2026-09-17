@@ -1856,7 +1856,14 @@ export function Sidebar() {
           onClick={() => {
             const canvas = document.querySelector('canvas');
             if (canvas) {
-              const dataUrl = canvas.toDataURL('image/png');
+              // The render engine's two inputs off the live scene: the shaded
+              // view at 2K and an exact edge drawing of the same frame (the
+              // geometry lock). Falls back to the on-screen canvas if the
+              // capture helper is not mounted.
+              let captured: { shaded: string; line: string } | null = null;
+              try { captured = (window as any).__modulrCaptureRenderInputs?.() || null; } catch (e) { console.warn('render capture failed, using the canvas', e); }
+              const dataUrl = captured?.shaded || canvas.toDataURL('image/png');
+              const lineImage = captured?.line || null;
               // Same payload as the canvas button: screenshot for composition,
               // room spec so the AI obeys the configured building exactly.
               const { room, fences, boundaryStyle, paths, decks, objects } = useStore.getState().scene;
@@ -1874,7 +1881,7 @@ export function Sidebar() {
                 // place and finish rather than inventing a lantern.
                 exteriorLights: describeExteriorLights(room, objects || []),
               };
-              window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl, roomSpec }, window.location.origin);
+              window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl, lineImage, roomSpec }, window.location.origin);
             }
           }}
           className="w-full bg-[#3b4d4a] hover:bg-[#2d3a38] text-white py-3.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
