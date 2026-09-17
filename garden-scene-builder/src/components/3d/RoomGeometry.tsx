@@ -21,6 +21,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { DragHandle } from './DragHandles';
 import { GABLE_CEILING_T } from '../../utils/placement';
 import { InteriorDoorModel } from './InteriorDoorModel';
+import { DoorHandle } from './DoorHandleModel';
 import { baseFrame, useDeckTexture } from '../../utils/deck';
 import { DeckSlab } from './DeckSlab';
 
@@ -473,14 +474,18 @@ function DoorLeaf({ leafW, doorH, frameThickness, sashThickness, depth, style, f
       <FrameBar position={[-leafW/2 + sashThickness/2, 0, 0]} args={[sashThickness, doorH - frameThickness*2, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
       <FrameBar position={[leafW/2 - sashThickness/2, 0, 0]} args={[sashThickness, doorH - frameThickness*2, depth*0.5]} outer={frameColorHex} inner={frameColorInnerHex} />
 
-      {/* Door Handle, on the edge that opens */}
+      {/* Door handle, on the edge that opens, both faces - Charlie's modelled
+          handle in black metal (components/3d/DoorHandleModel.tsx). +Z is
+          the outside of the leaf. */}
       {handle && (
-        <group position={[handle === 'right' ? leafW/2 - sashThickness/2 - 0.03 : -leafW/2 + sashThickness/2 + 0.03, 0, depth*0.25 + 0.005]}>
-          {/* Backplate */}
-          <mesh position={[0, 0, 0]}><boxGeometry args={[0.04, 0.22, 0.01]} /><meshStandardMaterial color="#333" metalness={0.8} roughness={0.2} /></mesh>
-          {/* Handle lever */}
-          <mesh position={[handle === 'right' ? -0.04 : 0.04, 0, 0.03]}><boxGeometry args={[0.12, 0.02, 0.02]} /><meshStandardMaterial color="#333" metalness={0.8} roughness={0.2} /></mesh>
-        </group>
+        <>
+          <group position={[handle === 'right' ? leafW/2 - sashThickness/2 - 0.04 : -leafW/2 + sashThickness/2 + 0.04, 0, depth*0.25]}>
+            <DoorHandle side={handle} face="outside" />
+          </group>
+          <group position={[handle === 'right' ? leafW/2 - sashThickness/2 - 0.04 : -leafW/2 + sashThickness/2 + 0.04, 0, -depth*0.25]}>
+            <DoorHandle side={handle} face="inside" />
+          </group>
+        </>
       )}
 
       {/*

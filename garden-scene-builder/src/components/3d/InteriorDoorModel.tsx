@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { useStore } from '../../store';
 import { INTERIOR_DOOR_URL, INTERIOR_DOOR_STYLES, METAL_FINISHES } from '../../modelRegistry';
 import type { InteriorDoorStyle } from '../../types';
+import { BLACK_METAL, buildHandle, useHandleScene } from './DoorHandleModel';
 
 /**
  * A modelled internal door - lining, leaf, hinges and handle - sitting in a
@@ -42,9 +43,10 @@ const HANDLE_SCALE = 0.72;
 const OAK_MATERIALS = ['Oak,French', '941,942, 2941, Corn Oak (horizontaal)'];
 const IRONMONGERY = ['[Steel Brushed Stainless]', '*9', '*5', '<LightGray>'];
 
+/** No finish chosen = black metal, the handle's default (Charlie, 17 Sep). */
 const finishFor = (hex?: string) => {
   const h = (hex ?? '').toLowerCase();
-  return METAL_FINISHES.find(f => f.hex.toLowerCase() === h) ?? METAL_FINISHES[0];
+  return METAL_FINISHES.find(f => f.hex.toLowerCase() === h) ?? BLACK_METAL;
 };
 
 export function InteriorDoorModel({ doorId, style, ironmongery, swing = 1, widthMm, heightMm, thicknessM }: {
@@ -57,6 +59,8 @@ export function InteriorDoorModel({ doorId, style, ironmongery, swing = 1, width
   thicknessM: number;
 }) {
   const { scene } = useGLTF(INTERIOR_DOOR_URL);
+  // null until the handle file arrives; the door's own handles show till then.
+  const handleScene = useHandleScene();
   // Only its own button opens it (the walkthrough's door panel). Open Doors
   // in the 3D view is for the exterior sets - it used to swing every
   // internal door in the house too (Charlie, 10 Sep).
@@ -95,8 +99,34 @@ export function InteriorDoorModel({ doorId, style, ironmongery, swing = 1, width
       }
     });
 
-    // Smaller handle, both sides.
-    root.traverse(o => { if (o.name === HANDLE_NODE) o.scale.multiplyScalar(HANDLE_SCALE); });
+    /*
+     * The door's own handles are replaced by Charlie's modelled handle
+     * (DoorHandleModel.tsx): each original is hidden and the new one is
+     * put at its centre, on the leaf face it was on, lever pointing into
+     * the leaf. Added to the leaf itself so it swings with the door; the
+     * metal joins the ironmongery list so the finish picker recolours it.
+     */
+    let leafForHandles: THREE.Object3D | null = null;
+    root.traverse(o => { if (!leafForHandles && o.name === LEAF_NODE) leafForHandles = o; });
+    const originals: THREE.Object3D[] = [];
+    root.traverse(o => { if (o.name === HANDLE_NODE) originals.push(o); });
+    root.updateMatrixWorld(true);
+    if (handleScene) originals.forEach(n => {
+      const c = new THREE.Box3().setFromObject(n).getCenter(new THREE.Vector3());
+      n.visible = false;
+      const { group, material } = buildHandle(handleScene);
+      metals.push(material);
+      const onFront = c.z > HINGE_Z;
+      const towardsCentre = c.x < 0 ? 1 : -1;
+      const mirror = (onFront ? towardsCentre : -towardsCentre) < 0 ? -1 : 1;
+      group.position.set(c.x, c.y, onFront ? HINGE_Z + 0.025 : HINGE_Z - 0.025);
+      group.rotation.y = onFront ? 0 : Math.PI;
+      group.scale.set(mirror, 1, 1);
+      root.add(group);
+      root.updateMatrixWorld(true);
+      if (leafForHandles) (leafForHandles as THREE.Object3D).attach(group);
+    });
+    void HANDLE_SCALE;
 
     /*
      * Re-hang the leaf on a pivot at its hinge line so it can swing.
@@ -124,7 +154,7 @@ export function InteriorDoorModel({ doorId, style, ironmongery, swing = 1, width
     // group the hinge is placed in.
     root.remove(hinge);
     return { root, hinge, metals };
-  }, [scene, style]);
+  }, [scene, handleScene, style]);
 
   useEffect(() => { pivot.current = model.hinge; }, [model]);
 
