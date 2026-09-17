@@ -79,11 +79,29 @@ interface HomeViewProps {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterialStudio, onNavigate }) => {
+    // No page scrollbar gutter beside the full-bleed hero (see index.css).
+    React.useEffect(() => {
+        document.documentElement.classList.add('home-fullbleed');
+        return () => document.documentElement.classList.remove('home-fullbleed');
+    }, []);
     return (
-        <div className="min-h-full flex flex-col items-center bg-background relative overflow-x-hidden pt-20 pb-20 w-full">
+        <div className="min-h-full flex flex-col items-center bg-background relative overflow-x-hidden pt-16 pb-20 w-full">
 
             {/* Pro Drafting Grid (Disabled for Homepage for clean look) */}
             <DraftingBackground pageName="HOMEPAGE" hideGrid={true} />
+
+            {/*
+              Hero, FULL BLEED at the top of the page (Charlie, 17 Sep 2026):
+              the work is the first thing seen, edge to edge, the headline and
+              the buttons follow. The height is set from the viewport width and
+              capped so the headline is still reachable without scrolling far.
+              The six clips are up to 1920 wide, so on a retina laptop the
+              frame is drawn a little above its source; that is the trade for
+              the impact of the full width, taken knowingly.
+            */}
+            <div className="w-full relative z-10 -mt-16 mb-16">
+                <HeroVideoCarousel fullBleed />
+            </div>
 
             <div className="max-w-6xl w-full flex flex-col items-center relative z-10 gap-24 px-8">
 
@@ -152,20 +170,6 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
                         </Button>
                     </div>
                 </div>
-
-                {/*
-                  Hero, sitting under the logo and headline rather than above
-                  them - the name and the promise land first, and the work is
-                  then the proof of it.
-
-                  Contained rather than full-bleed, and that is a sharpness
-                  decision rather than a stylistic one. Full-bleed drew the frame
-                  at the whole viewport width - 2880 device px on a retina laptop
-                  - which is more than a 1080p source has to give, so it read as
-                  soft. Capped by this container it draws at roughly 850 CSS px,
-                  comfortably inside what the files can cover even at 2x.
-                */}
-                <HeroVideoCarousel />
 
                 {/* 2. The workflow, with the walkthrough recording as proof.
                     This is the thing the product is sold on - design, walk,

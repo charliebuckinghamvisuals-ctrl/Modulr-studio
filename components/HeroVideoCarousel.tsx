@@ -26,7 +26,12 @@ const CLIPS: HeroClip[] = [
     { src: '/hero-clip-3.mp4', poster: '/hero-clip-3.jpg', caption: 'Grey garden studio in the snow' },
 ];
 
-export const HeroVideoCarousel: React.FC = () => {
+/**
+ * `fullBleed`: edge to edge with no frame, the height set from the viewport
+ * width and capped, the caption aligned to the page's content column. The
+ * default is the contained card used elsewhere.
+ */
+export const HeroVideoCarousel: React.FC<{ fullBleed?: boolean }> = ({ fullBleed = false }) => {
     const [active, setActive] = useState(0);
     const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
@@ -63,8 +68,8 @@ export const HeroVideoCarousel: React.FC = () => {
 
     return (
         <div className="w-full">
-            <div className="relative rounded-3xl md:rounded-[2.5rem] overflow-hidden border border-border bg-slate-100 shadow-2xl">
-                <div className="relative w-full aspect-video">
+            <div className={`relative overflow-hidden bg-slate-100 ${fullBleed ? '' : 'rounded-3xl md:rounded-[2.5rem] border border-border shadow-2xl'}`}>
+                <div className={`relative w-full ${fullBleed ? 'h-[52vw] min-h-[360px] max-h-[82vh]' : 'aspect-video'}`}>
                     {CLIPS.map((clip, i) => (
                         <video
                             key={clip.src}
@@ -89,14 +94,14 @@ export const HeroVideoCarousel: React.FC = () => {
 
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none" />
 
-                    <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 md:p-8">
+                    <div className={`absolute inset-x-0 bottom-0 p-4 sm:p-6 md:p-8 ${fullBleed ? 'md:px-12 lg:px-20 md:pb-12' : ''}`}>
                         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/40 border border-white/25 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-[0.2em]">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                             Architectural Intelligence
                         </div>
 
                         <p
-                            className="hidden sm:block mt-3 text-white text-base md:text-xl font-light leading-snug max-w-lg"
+                            className={`hidden sm:block mt-3 text-white font-light leading-snug ${fullBleed ? 'text-lg md:text-2xl lg:text-3xl max-w-2xl' : 'text-base md:text-xl max-w-lg'}`}
                             style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 2px 14px rgba(0,0,0,0.75)' }}
                         >
                             {CLIPS[active].caption} — rendered in Modulr Studio, then brought to

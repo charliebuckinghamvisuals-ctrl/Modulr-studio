@@ -204,6 +204,13 @@ body {
   height: 6px;
 }
 
+/* The home page's full-bleed hero: the page scrollbar's 6px gutter read as
+   a gap down the right of the video, so the document scrollbar is hidden
+   while the home page is mounted (HomeView toggles the class). Scrolling
+   by wheel, keys and touch is unaffected. */
+html.home-fullbleed { scrollbar-width: none; }
+html.home-fullbleed::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
