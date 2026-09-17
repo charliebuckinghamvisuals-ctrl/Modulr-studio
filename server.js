@@ -2112,6 +2112,17 @@ app.get('/api/share/:token', shareLimiter, async (req, res) => {
 });
 
 // Protect all API routes and enforce master lock
+/**
+ * The prices on sale, for the pricing page: key, Stripe price ID, label,
+ * pence. Public - the page is read before anyone signs in - so it sits
+ * above the token check like the planning checker. Unset IDs are not
+ * offered; nothing here can start a payment.
+ */
+app.get('/api/public/billing-prices', (_req, res) => {
+    const prices = Object.fromEntries(Object.entries(BILLING_PRICES).map(([key, p]) => [key, { priceId: process.env[p.env] || null, label: p.label, pence: p.pence, plan: p.plan, mode: p.mode }]));
+    res.json({ billingEnabled: process.env.BILLING_ENABLED === 'true', prices, founding: !!FOUNDING_COUPON, videoModels: Object.fromEntries(Object.entries(VIDEO_MODELS).map(([k, v]) => [k, { label: v.label, pricePence: v.pricePence, available: v.available() }])) });
+});
+
 app.use('/api', verifyFirebaseToken, enforceMasterLock);
 
 // Prefer the non-VITE name. The VITE_ prefix is kept only as a fallback for
@@ -4480,11 +4491,6 @@ const withEntitlements = (payload, data) => {
     };
 };
 
-/** The prices on sale, for the pricing page: key, Stripe price ID, label, pence. Unset IDs are not offered. */
-app.get('/api/billing/prices', (_req, res) => {
-    const prices = Object.fromEntries(Object.entries(BILLING_PRICES).map(([key, p]) => [key, { priceId: process.env[p.env] || null, label: p.label, pence: p.pence, plan: p.plan, mode: p.mode }]));
-    res.json({ billingEnabled: process.env.BILLING_ENABLED === 'true', prices, founding: !!FOUNDING_COUPON, videoModels: Object.fromEntries(Object.entries(VIDEO_MODELS).map(([k, v]) => [k, { label: v.label, pricePence: v.pricePence, available: v.available() }])) });
-});
 
 app.get('/api/user/credits', async (req, res) => {
     try {

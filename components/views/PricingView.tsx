@@ -126,7 +126,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
     const [showBillingClosed, setShowBillingClosed] = React.useState(true);
     const [billing, setBilling] = React.useState<BillingInfo | null>(null);
     React.useEffect(() => {
-        fetch('/api/billing/prices').then(r => r.json()).then((b: BillingInfo) => {
+        fetch('/api/public/billing-prices').then(r => r.json()).then((b: BillingInfo) => {
             setBilling(b);
             // Once billing is open the notice has nothing to say.
             if (b?.billingEnabled) setShowBillingClosed(false);
