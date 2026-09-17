@@ -480,17 +480,19 @@ function DoorLeaf({ leafW, doorH, frameThickness, sashThickness, depth, style, f
       {handle && (() => {
         // On the STILE, centred on the bar that opens - never on the glass.
         const hx = handle === 'right' ? leafW/2 - sashThickness/2 : -leafW/2 + sashThickness/2;
-        // Crittall: a handle block on the stile, as the real sets have - a
-        // flat plate the lever mounts on. The handle stands off by its depth.
+        // Crittall: the lock-rail block on the stile that the real sets have,
+        // the lever mounted on it. Drawn with FrameBar so it is the SAME
+        // material and colour as the frame it sits on, sized like the
+        // product: 90 wide, 480 tall, 18 proud of the stile, each face.
         const crittall = style === 'crittall';
-        const blockD = 0.018;
+        const blockW = 0.09, blockH = 0.48, blockD = 0.018;
         const faceZ = depth*0.25 + (crittall ? blockD : 0);
         return (
           <>
             {crittall && (
               <>
-                <mesh position={[hx, 0, depth*0.25 + blockD/2]} castShadow><boxGeometry args={[0.07, 0.34, blockD]} /><meshStandardMaterial color={frameColorHex} metalness={0.35} roughness={0.5} /></mesh>
-                <mesh position={[hx, 0, -depth*0.25 - blockD/2]} castShadow><boxGeometry args={[0.07, 0.34, blockD]} /><meshStandardMaterial color={frameColorInnerHex} metalness={0.35} roughness={0.5} /></mesh>
+                <FrameBar position={[hx, 0, depth*0.25 + blockD/2]} args={[blockW, blockH, blockD]} outer={frameColorHex} inner={frameColorHex} castShadow />
+                <FrameBar position={[hx, 0, -depth*0.25 - blockD/2]} args={[blockW, blockH, blockD]} outer={frameColorInnerHex} inner={frameColorInnerHex} castShadow />
               </>
             )}
             <group position={[hx, 0, faceZ]}>

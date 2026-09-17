@@ -38,6 +38,23 @@ for (const f of fs.readdirSync(destAssets)) {
     if (!fresh.has(f) && /^index(\.es)?-[A-Za-z0-9_-]+\.(js|css)$/.test(f)) { fs.unlinkSync(path.join(destAssets, f)); pruned.push(f); }
 }
 
+// 4. Models: anything the build carries in models/ that the app's copy does
+//    not have yet, or has an older copy of. Charlie also drops models
+//    straight into public/3d-config/models, so nothing there is pruned.
+//    (17 Sep 2026: the door handle shipped in the source tree but never
+//    reached here, so the app loaded a 404 and drew no handles.)
+const distModels = path.join(DIST, 'models');
+const destModels = path.join(DEST, 'models');
+let modelsCopied = 0;
+if (fs.existsSync(distModels)) {
+    fs.mkdirSync(destModels, { recursive: true });
+    for (const f of fs.readdirSync(distModels)) {
+        const src = path.join(distModels, f), dst = path.join(destModels, f);
+        if (!fs.existsSync(dst) || fs.statSync(src).mtimeMs > fs.statSync(dst).mtimeMs) { fs.copyFileSync(src, dst); modelsCopied++; }
+    }
+}
+console.log(`models: ${modelsCopied} copied`);
+
 const html = fs.readFileSync(path.join(DEST, 'index.html'), 'utf8');
 const refs = html.match(/assets\/[A-Za-z0-9._-]+\.(?:js|css)/g) || [];
 const missing = refs.filter(r => !fs.existsSync(path.join(DEST, r)));
