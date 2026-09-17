@@ -25,7 +25,7 @@ interface WorkspaceViewProps {
     onExport4K?: (image: string) => void;
     isExporting4K?: boolean;
     /** The server's automatic quality check on the last render. */
-    verification?: { checked: boolean; passed?: boolean; retried?: boolean } | null;
+    verification?: { checked: boolean; passed?: boolean; retried?: boolean; failures?: { id: string; label: string; problem: string }[] } | null;
     /** Re-render: sameLook=true reuses the last seed, false rolls a new one. */
     onRerender?: (sameLook: boolean) => void;
     onInputClick: () => void;
@@ -250,7 +250,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                                 the design; amber = checked, differences may remain. */}
                             {verification?.checked && (
                                 verification.passed ? (
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold" title={verification.retried ? 'An automatic correction was applied before this render was accepted.' : 'Doors, windows and roof verified against your design.'}>
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold" title={verification.retried ? 'An automatic correction was applied before this render was accepted.' : 'Every item in the design inventory verified against your drawing.'}>
                                         <ShieldCheck size={13} /> Checked against your design
                                     </span>
                                 ) : (

@@ -216,7 +216,78 @@ export interface RenderVerification {
     checked: boolean;
     passed?: boolean;
     retried?: boolean;
+    /** The rebuilt engine: one entry per inventory item that failed. */
+    failures?: { id: string; label: string; problem: string }[];
+    attempts?: { pass: string; checked: boolean; passed: boolean; failures: { id: string; label: string; problem: string }[] }[];
 }
+
+/** One line of the render inventory: what the engine is told to keep. */
+export interface InventoryItem {
+    id: string;
+    group: string;
+    label: string;
+    text: string;
+}
+
+export interface SceneSetting {
+    preset: string;
+    time: string;
+    text: string;
+}
+
+/**
+ * THE RENDER ENGINE (rebuilt 17 Sep 2026): line drawing + shaded view +
+ * inventory -> /api/render. `line` is the configurator's exact edge drawing
+ * (null for an upload: the server draws one). `items` is the inventory the
+ * user saw in the bar; `spec` is the raw design for the server to build
+ * the inventory itself when no items are given.
+ */
+export const renderScene = async (o: {
+    shaded: string; line?: string | null; spec?: Record<string, unknown> | null; items?: InventoryItem[];
+    setting: SceneSetting; seed?: number;
+}): Promise<{ image: string; items: InventoryItem[]; line?: string; verification: RenderVerification; engine: Record<string, string>; seconds: number }> => {
+    const { ratio } = await getImageDimensions(o.shaded);
+    const response = await apiFetch(`${API_BASE_URL}/render`, {
+        method: 'POST',
+        headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+            shaded: o.shaded, line: o.line || null, spec: o.spec || null, items: o.items?.length ? o.items : undefined, ratio,
+            scenePreset: o.setting.preset, timePreset: o.setting.time, sceneText: o.setting.text, seed: o.seed,
+        }),
+    });
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(formatErrorMessage(errorData.error, response.status));
+    }
+    const data = await response.json();
+    lastVerification = data.verification || null;
+    return data;
+};
+
+/** An uploaded view surveyed into inventory items (Gemini 3.8 Flash). */
+export const surveyImage = async (image: string): Promise<InventoryItem[]> => {
+    const response = await apiFetch(`${API_BASE_URL}/render/survey`, {
+        method: 'POST',
+        headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ image }),
+    });
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(formatErrorMessage(errorData.error, response.status));
+    }
+    return (await response.json()).items || [];
+};
+
+/** A configurator design turned into inventory items, no AI, no credits. */
+export const inventoryForSpec = async (spec: Record<string, unknown>): Promise<InventoryItem[]> => {
+    const response = await fetch(`${API_BASE_URL}/render/inventory`, {
+        method: 'POST',
+        headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ spec }),
+    });
+    if (!response.ok) return [];
+    return (await response.json()).items || [];
+};
 let lastVerification: RenderVerification | null = null;
 export const getLastVerification = (): RenderVerification | null => lastVerification;
 

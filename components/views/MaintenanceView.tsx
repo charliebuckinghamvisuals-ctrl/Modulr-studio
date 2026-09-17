@@ -16,6 +16,9 @@ const BYPASS_KEY = 'modulr_preview_bypass';
 export const maintenanceActive = (): boolean => {
     if (!UNDER_CONSTRUCTION) return false;
     try {
+        // Local development is never parked: the sign is for the live site.
+        const host = window.location.hostname;
+        if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.')) return false;
         const q = new URLSearchParams(window.location.search);
         if (q.get('preview') === '1') { localStorage.setItem(BYPASS_KEY, '1'); return false; }
         if (q.get('preview') === '0') { localStorage.removeItem(BYPASS_KEY); return true; }

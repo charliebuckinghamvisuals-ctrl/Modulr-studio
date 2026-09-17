@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { AppStage, MaterialConfig, WeatherConfig, ProcessingState, LibraryMaterialItem, MaterialLibrary } from '../types';
 import { PRESET_MATERIALS, WEATHER_CONDITIONS, SEASONS } from '../constants';
-import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor, setConfigSpec, describeGarden, getSceneContext, setSceneContext, getLastVerification, RenderVerification, export4K } from '../services/geminiService';
+import { generateLineDrawing, analyzeComponents, analyzeBatchMaterials, renderBuilding, applyWeather, editImage, generatePresentationBoard, analyzeExteriorDetails, analyzeSceneForEditor, setConfigSpec, describeGarden, getSceneContext, setSceneContext, getLastVerification, RenderVerification, export4K, renderScene, surveyImage, inventoryForSpec, InventoryItem, SceneSetting } from '../services/geminiService';
 import { segmentMaterials, SegmentRegion } from '../services/geminiService';
 import { buildMask, unionMasks, maskCoverage, maskPreview, applyMaskedEdit, MaskCanvas } from '../services/maskedEdit';
 import { saveToHistory } from '../services/historyService';
@@ -155,6 +155,17 @@ export const useAppEngine = () => {
     const [lastSeed, setLastSeed] = useState<number | null>(null);
     // The server's automatic quality-check result for the last render.
     const [renderVerification, setRenderVerification] = useState<RenderVerification | null>(null);
+    /**
+     * THE RENDER ENGINE (rebuilt 17 Sep 2026). The configurator posts an
+     * exact edge drawing with the shaded view; an upload gets one drawn by
+     * the server. The inventory is what the engine is told to keep, shown
+     * in the panel and editable; the setting is the only thing it may dress.
+     */
+    const [renderLineImage, setRenderLineImage] = useState<string | null>(null);
+    const [renderSpec, setRenderSpec] = useState<Record<string, unknown> | null>(null);
+    const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+    const [isSurveying, setIsSurveying] = useState(false);
+    const [sceneSetting, setSceneSetting] = useState<SceneSetting>({ preset: 'uk-residential', time: 'afternoon', text: '' });
     const [isBatchMode, setIsBatchMode] = useState(false);
     const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
     const [isAnalyzingMaterials, setIsAnalyzingMaterials] = useState(false);
@@ -360,13 +371,23 @@ export const useAppEngine = () => {
         }
     };
 
+    /**
+     * An UPLOAD (SketchUp view, screenshot, any shaded model view) has no
+     * design data, so the survey describes it as inventory items for the
+     * panel. The old five-box material detector is gone: a deck was one
+     * word, a light fitting was nothing at all.
+     */
     const handleAnalyzeForRenderEngine = async (image: string) => {
         setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' }); // Explicit reset
-        setProcessing({ isLoading: true, message: 'Detecting existing materials...' });
+        setRenderLineImage(null);
+        setRenderSpec(null);
+        setInventoryItems([]);
+        setProcessing({ isLoading: true, message: 'Surveying the view: building, openings, decking, lights...' });
         setIsAnalyzingMaterials(true);
+        setIsSurveying(true);
         try {
-            const detectedMaterials = await analyzeComponents(image);
-            setMaterials(detectedMaterials);
+            const items = await surveyImage(image);
+            setInventoryItems(items);
         } catch (error) {
             console.error(error);
             const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -378,8 +399,26 @@ export const useAppEngine = () => {
         } finally {
             setProcessing({ isLoading: false, message: '' });
             setIsAnalyzingMaterials(false);
+            setIsSurveying(false);
         }
     };
+
+    /**
+     * A CONFIGURATOR design: the drawing and the design come with the
+     * image, and the inventory is built from the design (no AI) so the
+     * panel shows exactly what the engine will be told.
+     */
+    const loadConfiguratorScene = async (lineImage: string | null, spec: Record<string, unknown> | null) => {
+        setRenderLineImage(lineImage);
+        setRenderSpec(spec);
+        setInventoryItems([]);
+        if (spec) {
+            try { setInventoryItems(await inventoryForSpec(spec)); } catch (e) { console.warn('inventory failed', e); }
+        }
+    };
+
+    const updateInventoryItem = (id: string, text: string) => setInventoryItems(prev => prev.map(it => (it.id === id ? { ...it, text } : it)));
+    const removeInventoryItem = (id: string) => setInventoryItems(prev => prev.filter(it => it.id !== id));
 
     const handleAnalyzeForEditor = async (image: string) => {
         setEditorAnalysis(null);
@@ -764,11 +803,9 @@ export const useAppEngine = () => {
         const source = originalImage;
         if (!source) return;
 
-        const loadingMsg = isSketchUpMode
-            ? 'Enhancing SketchUp model to photorealistic quality...'
-            : 'Rendering photorealistic textures and lighting...';
-        const weatherPrompt = weather.condition !== 'auto' ? `Weather condition: ${weather.condition}. ` : '';
-        const finalPrompt = weatherPrompt + additionalPrompt;
+        const loadingMsg = renderLineImage
+            ? 'Rendering from the drawing: geometry locked, every item checked...'
+            : 'Drawing the outline, then rendering: geometry locked, every item checked...';
 
         const seed = (opts && opts.reuseSeed === true && lastSeed !== null)
             ? lastSeed
@@ -778,7 +815,17 @@ export const useAppEngine = () => {
 
         setProcessing({ isLoading: true, message: loadingMsg });
         try {
-            const result = await renderBuilding(source, materials, finalPrompt, isHighQuality, isProMode, activeStage === AppStage.STUDIO ? selectedAngle : undefined, isSketchUpMode, activeStage === AppStage.STUDIO ? studioBackground : undefined, false, seed, cameraEffects);
+            // Studio (isolated building on a backdrop) still runs on the
+            // previous route; everything else is the rebuilt engine.
+            let result: string;
+            if (activeStage === AppStage.STUDIO) {
+                result = await renderBuilding(source, materials, additionalPrompt, isHighQuality, isProMode, selectedAngle, isSketchUpMode, studioBackground, false, seed, cameraEffects);
+            } else {
+                const out = await renderScene({ shaded: source, line: renderLineImage, spec: renderSpec, items: inventoryItems, setting: { ...sceneSetting, text: [sceneSetting.text, additionalPrompt].filter(Boolean).join(' ') }, seed });
+                result = out.image;
+                if (out.items?.length && !inventoryItems.length) setInventoryItems(out.items);
+                if (out.line && !renderLineImage) setRenderLineImage(out.line);
+            }
             setRenderVerification(getLastVerification());
             trackFeatureUsage('render_engine');
             setRenderedImage(result);
@@ -1142,6 +1189,7 @@ export const useAppEngine = () => {
     };
 
     return {
+        renderLineImage, setRenderLineImage, renderSpec, inventoryItems, setInventoryItems, updateInventoryItem, removeInventoryItem, isSurveying, sceneSetting, setSceneSetting, loadConfiguratorScene,
         activeStage, setActiveStage,
         originalImage, setOriginalImage, setOriginalImageForStage, lineImage, setLineImage, lineSourceImage, setLineSourceImage, renderedImage, setRenderedImage, editorImage, setEditorImage, lineEnvironmentImage, setLineEnvironmentImage, finalImage, setFinalImage, materialStudioImage, setMaterialStudioImage,
         batchImages, setBatchImages, batchRenders, setBatchRenders, batchMaterials, setBatchMaterials,

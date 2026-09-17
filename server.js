@@ -9,6 +9,7 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import admin from 'firebase-admin';
 import Stripe from 'stripe';
 import helmet from 'helmet';
+import { mountRender } from './render/index.js';
 
 dotenv.config();
 
@@ -2070,6 +2071,17 @@ const fileToGenerativePart = (base64Data, mimeType) => {
         },
     };
 };
+
+/**
+ * THE RENDER ENGINE - render/ (rebuilt 17 Sep 2026).
+ *
+ * One route, /api/render: line drawing + shaded view + itemised inventory
+ * -> gemini-3-pro-image, verified item by item on the analysis model, one
+ * retry through flash-image. Mounted here so it borrows auth, credits and
+ * the cost log from this file without touching Firestore or a key itself.
+ * /api/renderBuilding below is the previous engine and is being retired.
+ */
+mountRender(app, { ai, Type, ANALYSIS_MODEL, enforceRenderAccess, CREDIT_COSTS, userAiLimiter, logRender, sanitizeString });
 
 app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
     try {

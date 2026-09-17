@@ -124,6 +124,10 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
         // into "exactly N doors, style X, cladding Y" so the render matches
         // the configured building instead of guessing from the screenshot.
         setConfigSpec(event.data.roomSpec || null);
+        // The rebuilt engine: the exact edge drawing and the design itself,
+        // from which the inventory shown in the render panel is built.
+        const lineDataUrl: string | null = typeof event.data.lineImage === 'string' ? event.data.lineImage : null;
+        engine.loadConfiguratorScene(lineDataUrl ? lineDataUrl.replace(/^data:[^;]+;base64,/, '') : null, event.data.roomSpec || null);
 
         // Convert dataUrl to a File object so the engine can process it properly
         fetch(dataUrl)
@@ -133,7 +137,7 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
 
             try {
                 // Compress the image to strip the prefix and reduce size before sending to API
-                const base64Data = await compressImageFile(file, 1920);
+                const base64Data = await compressImageFile(file, 2048);
 
                 // Set it as if they uploaded a SketchUp image
                 engine.setIsSketchUpMode(true);

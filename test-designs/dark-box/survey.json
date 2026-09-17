@@ -1,0 +1,64 @@
+{
+  "items": [
+    {
+      "id": "building-1",
+      "group": "building",
+      "label": "Single-storey flat roof garden room",
+      "text": "Single-storey rectangular garden building with a flat roof featuring a prominent, deep projecting overhang and thick dark fascia along the front and side."
+    },
+    {
+      "id": "materials-2",
+      "group": "materials",
+      "label": "Exterior materials and finishes",
+      "text": "Vertical dark brown/charred timber cladding boards across the front and right visible elevations; flat matte dark charcoal/black roof fascia; thin black aluminium window and door frames."
+    },
+    {
+      "id": "openings-3",
+      "group": "openings",
+      "label": "Front horizontal ribbon window",
+      "text": "A wide, horizontally oriented rectangular fixed/awning window set into the upper-left section of the front facade, featuring clear glass, a slim projecting sill, and a black frame."
+    },
+    {
+      "id": "openings-4",
+      "group": "openings",
+      "label": "Front three-leaf glazed sliding doors",
+      "text": "Full-height three-panel glazed sliding glass door set occupying the right half of the front facade, with minimalist black frames running floor-to-ceiling."
+    },
+    {
+      "id": "garden-5",
+      "group": "garden",
+      "label": "Charcoal timber decking",
+      "text": "Extensive dark grey/charcoal timber decking with wide horizontal boards running in front of and alongside the building, featuring a recessed rectangular cut-out on the right exposing a green lawn or tiled patch."
+    },
+    {
+      "id": "garden-6",
+      "group": "garden",
+      "label": "Left-side external steps",
+      "text": "Tiered dark grey steps rising adjacent to the left corner of the building leading towards the rear."
+    },
+    {
+      "id": "garden-7",
+      "group": "garden",
+      "label": "Rear boundary brick wall",
+      "text": "Light buff/sand-coloured brick masonry boundary wall visible standing behind the building on both the left and right sides."
+    },
+    {
+      "id": "lights-8",
+      "group": "lights",
+      "label": "Exterior up/down wall sconces",
+      "text": "Three slim rectangular black up-and-down exterior wall lights mounted to the front facade: one left of the window, one between the window and doors, and one to the right of the glazed doors, casting warm light cones."
+    },
+    {
+      "id": "lights-9",
+      "group": "lights",
+      "label": "Roof overhang soffit spotlights",
+      "text": "A continuous line of circular recessed warm downlights integrated into the underside of the projecting front roof soffit."
+    },
+    {
+      "id": "interior-10",
+      "group": "interior",
+      "label": "Furnished studio interior",
+      "text": "Interior visible through the glazing features light natural wood flooring, smooth white walls, two contemporary white armchairs, an internal light timber door, and a dark grey kitchenette unit with a sink, tall faucet, and overhead wall cabinet."
+    }
+  ]
+}

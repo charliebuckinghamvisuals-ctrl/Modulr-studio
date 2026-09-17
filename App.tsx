@@ -195,11 +195,8 @@ const App: React.FC = () => {
     const renderEngineControls = (
         <>
             <div className="flex flex-col gap-2 w-full">
-                <QualityChips />
-                <ProModelToggle />
-                <CameraEffectsToggle />
-                <ToggleSwitch 
-                    isOn={engine.isBatchMode} 
+                <ToggleSwitch
+                    isOn={engine.isBatchMode}
                     onToggle={() => {
                         engine.setIsBatchMode(!engine.isBatchMode);
                         setSelectedBatchIndex(0);
@@ -222,17 +219,59 @@ const App: React.FC = () => {
                     />
                 )}
                 
+                {/* THE INVENTORY - what the engine is told to keep, item by
+                    item, built from the configurator design or from the
+                    survey of an upload. Editable: the words here are the
+                    words the model gets, and the QA checks every line. */}
                 <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-2">
                     <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
                         <Layers size={14} className="text-secondary" />
-                        Material Library
+                        Design Inventory
                     </label>
-                    {/* "Manage" navigated to the Account page, which no longer
-                        has any material-library UI — a button to nowhere.
-                        Removed until a library manager exists. */}
+                    {engine.inventoryItems.length > 0 && (
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-secondary">{engine.inventoryItems.length} items{engine.renderLineImage ? ' · drawing locked' : ''}</span>
+                    )}
                 </div>
+                {engine.isSurveying ? (
+                    <div className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center gap-3 min-h-[80px] text-accent/50 shadow-inner">
+                        <Loader2 size={16} className="animate-spin text-green-500" />
+                        <span className="text-sm font-medium animate-pulse">Surveying the view...</span>
+                    </div>
+                ) : engine.inventoryItems.length === 0 ? (
+                    <p className="text-[11px] text-slate-500 leading-snug">
+                        Send a design from the 3D Configurator, or upload a view of a model: it is surveyed automatically and every building, opening, deck, boundary and light fitting is listed here for the engine to keep.
+                    </p>
+                ) : (
+                    ['building', 'materials', 'openings', 'garden', 'lights', 'interior', 'other'].map(group => {
+                        const items = engine.inventoryItems.filter(it => (['building', 'materials', 'openings', 'garden', 'lights', 'interior'].includes(it.group) ? it.group : 'other') === group);
+                        if (!items.length) return null;
+                        return (
+                            <div key={group} className="space-y-2">
+                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-accent"></div>
+                                    {group}
+                                </label>
+                                {items.map(it => (
+                                    <div key={it.id} className="group relative">
+                                        <div className="text-[10px] font-bold text-accent/80 mb-1 pr-6">{it.label}</div>
+                                        <textarea
+                                            className="w-full p-3 rounded-2xl bg-white border border-accent/20 text-accent focus:outline-none focus:ring-2 focus:ring-accent/50 text-[11px] leading-snug placeholder-accent/30 min-h-[56px] resize-none shadow-inner"
+                                            value={it.text}
+                                            onChange={(e) => engine.updateInventoryItem(it.id, e.target.value)}
+                                        />
+                                        <button
+                                            onClick={() => engine.removeInventoryItem(it.id)}
+                                            className="absolute top-0 right-0 p-1 text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Remove this item from the inventory"
+                                        >×</button>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })
+                )}
 
-                {Object.keys(engine.materials).filter(k => k !== 'orientation').map((key) => (
+                {false && Object.keys(engine.materials).filter(k => k !== 'orientation').map((key) => (
                     <div key={key} className="group space-y-2">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -341,34 +380,54 @@ const App: React.FC = () => {
                 ))}
             </div>
 
+            {/* THE SETTING - the one thing the engine may dress, and only
+                outside the inventory: sky, light, lawn, planting, what lies
+                beyond the boundary. Presets plus the client's own words. */}
             <div className="space-y-3 pt-6 border-t border-slate-200">
                 <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
-                    Additional Instructions
+                    Describe the setting
                 </label>
-                
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Weather Condition</label>
-                    <select 
-                        value={engine.weather.condition} 
-                        onChange={(e) => engine.setWeather(prev => ({ ...prev, condition: e.target.value }))}
-                        className="w-full bg-white border border-slate-300 text-sm font-bold text-accent rounded-xl px-3 py-2 outline-none shadow-sm focus:ring-2 focus:ring-accent/50"
-                    >
-                        <option value="auto">Auto (Natural Lighting)</option>
-                        {WEATHER_CONDITIONS.map(w => (
-                            <option key={w} value={w}>{w}</option>
-                        ))}
-                    </select>
+
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                    <div>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Garden</label>
+                        <select
+                            value={engine.sceneSetting.preset}
+                            onChange={(e) => engine.setSceneSetting(prev => ({ ...prev, preset: e.target.value }))}
+                            className="w-full bg-white border border-slate-300 text-sm font-bold text-accent rounded-xl px-3 py-2 outline-none shadow-sm focus:ring-2 focus:ring-accent/50"
+                        >
+                            <option value="uk-residential">UK residential garden</option>
+                            <option value="uk-country">UK country garden</option>
+                            <option value="urban-courtyard">Urban courtyard</option>
+                            <option value="coastal">Coastal garden</option>
+                            <option value="woodland">Woodland edge</option>
+                            <option value="none">Plain lawn only</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Time and weather</label>
+                        <select
+                            value={engine.sceneSetting.time}
+                            onChange={(e) => engine.setSceneSetting(prev => ({ ...prev, time: e.target.value }))}
+                            className="w-full bg-white border border-slate-300 text-sm font-bold text-accent rounded-xl px-3 py-2 outline-none shadow-sm focus:ring-2 focus:ring-accent/50"
+                        >
+                            <option value="afternoon">Late afternoon sun</option>
+                            <option value="morning">Early morning</option>
+                            <option value="midday">Midday, clear</option>
+                            <option value="overcast">Overcast, soft light</option>
+                            <option value="dusk">Dusk, lights on</option>
+                            <option value="night">Night, lights on</option>
+                        </select>
+                    </div>
                 </div>
 
                 <textarea
                     className="w-full p-4 rounded-2xl bg-white border border-accent/20 text-accent focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm placeholder-accent/30 min-h-[100px] resize-none shadow-inner transition-all duration-300"
-                    placeholder="e.g. Add a sunset background, dramatic lighting, rain..."
-                    value={engine.additionalPrompt}
-                    onChange={(e) => engine.setAdditionalPrompt(e.target.value)}
+                    placeholder="The client's own garden, in your words: e.g. a long narrow garden with a mature apple tree on the left and a 6ft close-board fence, neighbours' roofs beyond..."
+                    value={engine.sceneSetting.text}
+                    onChange={(e) => engine.setSceneSetting(prev => ({ ...prev, text: e.target.value }))}
                 />
-
-                <GardenContextPanel />
             </div>
             <div className="mt-auto pt-6">
                 {engine.isBatchMode ? (
