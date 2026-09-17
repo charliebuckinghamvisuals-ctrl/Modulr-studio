@@ -12,7 +12,7 @@ import { DECK_MATERIALS, deckArea, describeDeck } from './3d/Decks';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS, INTERIOR_DOOR_STYLES } from '../modelRegistry';
-import { describeExteriorLights } from '../utils/placement';
+import { describeExteriorLights, describeInterior } from '../utils/placement';
 import { DOOR_KINDS, LEAF_RANGE, doorKind, clampLeaves, changesForKind } from '../utils/doors';
 import type { DoorKind } from '../types';
 import { MATERIAL_DEF } from '../utils/materials';
@@ -1880,6 +1880,9 @@ export function Sidebar() {
                 // The exterior fittings, so the render keeps each one's shape,
                 // place and finish rather than inventing a lantern.
                 exteriorLights: describeExteriorLights(room, objects || []),
+                // What is inside, seen through the glazing: wall colour,
+                // floor, every piece of furniture with its colour.
+                interior: describeInterior(room, objects || []),
               };
               window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl, lineImage, roomSpec }, window.location.origin);
             }

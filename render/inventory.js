@@ -26,9 +26,9 @@ const mm = (v) => (typeof v === 'number' && isFinite(v) ? `${Math.round(v)}mm` :
 const hex = (v) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : null);
 
 const CLADDING_LOOKS = {
-    cedar_composite: 'warm cedar-toned composite boards (natural reddish-brown timber tone)',
-    oak_composite: 'oak-toned composite boards (mid golden-brown)',
-    light_oak_composite: 'light oak-toned composite boards (pale honey)',
+    cedar_composite: 'warm CEDAR-toned composite boards (reddish-brown, #b0764b)',
+    oak_composite: 'OAK-toned composite boards (mid golden-brown, #c9a173)',
+    light_oak_composite: 'light oak-toned composite boards (pale honey, #dcc09a)',
     black_composite: 'BLACK composite boards (deep charcoal-black, #1f2123)',
     dark_grey_composite: 'DARK GREY composite boards (#4a5057)',
     light_grey_composite: 'light grey composite boards (#a9aeb2)',
@@ -53,6 +53,34 @@ const CLADDING_LOOKS = {
     corrugated_iron: 'galvanised CORRUGATED STEEL sheet, vertical profile (dull grey metal)',
     painted_planks: 'PAINTED vertical timber boards',
 };
+
+/** The building's deck, as the configurator resolves it (utils/materials.ts
+ *  resolveDeckingKey): the chosen decking, else the cladding's match, else timber. */
+const DECK_LOOKS = {
+    timber_decking: 'natural softwood timber decking boards (warm mid-brown, #a3794a)',
+    timber: 'natural softwood timber decking boards (warm mid-brown, #a3794a)',
+    composite_cedar: 'CEDAR-toned composite decking boards (reddish-brown, #b0764b)',
+    composite_oak: 'OAK-toned composite decking boards (golden-brown, #c9a173)',
+    composite_light_oak: 'light oak composite decking boards (pale honey, #dcc09a)',
+    composite_brown: 'BROWN composite decking boards (#8b6b55)',
+    composite_grey: 'LIGHT GREY composite decking boards (#a9aeb2)',
+    composite_dark_grey: 'DARK GREY composite decking boards (#4a5057)',
+    composite_black: 'BLACK composite decking boards (deep charcoal-black, #1f2123)',
+    composite_white: 'off-white composite decking boards (#e8e6e1)',
+    composite_slate_blue: 'slate-blue composite decking boards (#7c93a6)',
+    composite_sage: 'sage-green composite decking boards (#7e8c74)',
+    composite_clay: 'clay-toned composite decking boards (#9a6b58)',
+};
+const CLADDING_TO_DECKING = {
+    cedar_composite: 'composite_cedar', oak_composite: 'composite_oak', light_oak_composite: 'composite_light_oak', white_composite: 'composite_white',
+    black_composite: 'composite_black', dark_grey_composite: 'composite_dark_grey', light_grey_composite: 'composite_grey', grey_composite: 'composite_grey',
+    slate_blue_composite: 'composite_slate_blue', sage_composite: 'composite_sage', clay_composite: 'composite_clay', corrugated_iron: 'composite_grey', painted_planks: 'composite_white',
+};
+const deckLook = (spec) => {
+    const key = (typeof spec.deckingMaterial === 'string' && spec.deckingMaterial) || CLADDING_TO_DECKING[spec.cladding] || 'timber_decking';
+    return DECK_LOOKS[key] || clean(String(key).replace(/_/g, ' '), 40) + ' decking boards';
+};
+const FASCIA_LOOKS = { black: 'BLACK (#141414)', anthracite: 'ANTHRACITE dark grey (#2f3236)', white: 'WHITE', grey: 'mid GREY' };
 
 const ROOF_NAMES = { epdm: 'EPDM rubber membrane', sedum: 'sedum green roof', upvc: 'uPVC roof sheet', metal: 'standing-seam metal roof', rubber: 'textured black rubber roof sheeting', aluminium: 'black powder-coated aluminium roof sheet' };
 const FRAME_NAMES = { upvc: 'uPVC', aluminium: 'aluminium', timber: 'painted timber' };
@@ -97,11 +125,11 @@ export function inventoryFromSpec(spec) {
             const gable = look(spec.claddingGable);
             if (gable && spec.shape === 'Gable') items.push(item('cladding-gable', 'materials', `Gable apex: ${gable}`, `Gable apex triangles: ${gable}.`));
         }
-        if (spec.fasciaMaterial) {
-            const f = clean(String(spec.fasciaMaterial), 20);
+        {
+            const f = clean(String(spec.fasciaMaterial || 'black'), 20);
             items.push(item('fascia', 'materials', `Fascia: ${f === 'match_cladding' ? 'matches cladding' : f}`, f === 'match_cladding'
                 ? 'Fascia / roof edge trim: the SAME material and colour as the cladding, boards running continuously up to the roof edge.'
-                : `Fascia / roof edge trim: ${f.toUpperCase()}, a crisp flat band along the top of every wall, clearly distinct from the cladding below it, at the depth the line drawing shows.`));
+                : `Fascia / roof edge trim: ${FASCIA_LOOKS[f] || f.toUpperCase()}, a crisp flat smooth band along the top of every wall, clearly distinct from the cladding below it - never timber, never the cladding colour - at the depth the line drawing shows.`));
         }
         if (spec.roofMaterial) {
             const r = ROOF_NAMES[spec.roofMaterial] || clean(String(spec.roofMaterial), 20);
@@ -187,13 +215,21 @@ export function inventoryFromSpec(spec) {
             let a = 0;
             for (let i = 0; i < outline.length; i++) { const [x1, z1] = outline[i], [x2, z2] = outline[(i + 1) % outline.length]; a += x1 * z2 - x2 * z1; }
             const area = Math.round(Math.abs(a) / 2 * 10) / 10;
-            items.push(item('deck', 'garden', `Deck: custom ${outline.length}-sided outline, about ${area} m²`,
-                `DECKING: one level timber/composite deck of about ${area} m² in a custom ${outline.length}-sided outline, exactly the shape and extent the line drawing shows - it runs under and out from the building and may wrap a corner or step in and out. Keep EVERY edge of it where the drawing has it, right to the edge of the frame where the drawing does; do not shrink it, cut it back or replace any part of it with lawn, gravel, planting or paving. Boards running straight with visible joints and a clean fascia edge. The roof and canopy above do NOT follow the deck.`));
+            items.push(item('deck', 'garden', `Deck: custom ${outline.length}-sided outline, about ${area} m², ${deckLook(spec).split(' (')[0]}`,
+                `DECKING: one level deck of ${deckLook(spec)}, about ${area} m² in a custom ${outline.length}-sided outline, exactly the shape and extent the line drawing shows - it runs under and out from the building and may wrap a corner or step in and out. Keep EVERY edge of it where the drawing has it, right to the edge of the frame where the drawing does; do not shrink it, cut it back or replace any part of it with lawn, gravel, planting or paving. Boards in exactly that colour family, running straight with visible joints and a clean fascia edge. The roof and canopy above do NOT follow the deck.`));
         } else if (spec.hasDecking || spec.hasPictureFrame) {
             const front = Number(spec.deckingSizeMm) || 1500, left = Number(spec.deckingLeftMm) || 0, right = Number(spec.deckingRightMm) || 0;
             const sides = [left ? `${left}mm past the LEFT side of the building` : null, right ? `${right}mm past the RIGHT side of the building` : null].filter(Boolean);
-            items.push(item('deck', 'garden', `Deck: ${front}mm deep across the front${sides.length ? ', extended past the side' : ''}`,
-                `DECKING: one level timber/composite deck ${front}mm deep across the full front of the building${sides.length ? `, and extending ${sides.join(' and ')} - deliberately wider than the building there; the roof and canopy above do NOT extend with it` : ''}. Keep the deck exactly the size, shape and extent the line drawing shows; do not shrink it, cut it back or replace any part of it with lawn, gravel, planting or paving. Boards running straight with visible joints and a clean fascia edge.`));
+            items.push(item('deck', 'garden', `Deck: ${front}mm deep across the front, ${deckLook(spec).split(' (')[0]}`,
+                `DECKING: one level deck of ${deckLook(spec)}, ${front}mm deep across the full front of the building${sides.length ? `, and extending ${sides.join(' and ')} - deliberately wider than the building there; the roof and canopy above do NOT extend with it` : ''}. Keep the deck exactly the size, shape and extent the line drawing shows; do not shrink it, cut it back or replace any part of it with lawn, gravel, planting or paving. Boards in exactly that colour family, running straight with visible joints and a clean fascia edge.`));
+        }
+
+        // ---- interior, seen through the glazing --------------------------
+        if (spec.interior && typeof spec.interior === 'object') {
+            const it = spec.interior;
+            const pieces = Array.isArray(it.items) ? it.items.slice(0, 30).map(p => `${Number(p.count) > 1 ? `${Number(p.count)} x ` : ''}${clean(String(p.label || ''), 40)}${hex(p.color) ? ` in ${hex(p.color)}` : ''}`).filter(s => s.trim()) : [];
+            items.push(item('interior', 'interior', `Interior: ${pieces.length ? pieces.slice(0, 4).join(', ') + (pieces.length > 4 ? '...' : '') : 'empty room'}`,
+                `INTERIOR, seen through the glazing and any open door: ${clean(String(it.walls || 'white walls'), 60)}, ${clean(String(it.floor || 'timber plank flooring'), 60)}, ceiling white with the downlights the drawing shows. Furniture and fittings EXACTLY as placed and drawn, each in its stated colour, none removed, none added: ${pieces.length ? pieces.join('; ') : 'no furniture - the room is empty'}. The glass is clear: the interior reads through it, lit softly, with only light reflections of the garden on the pane.`));
         }
         const decks = Array.isArray(spec.garden?.decks) ? spec.garden.decks.slice(0, 8) : [];
         decks.forEach((d, i) => {

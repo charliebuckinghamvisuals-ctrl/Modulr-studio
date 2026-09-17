@@ -54,6 +54,9 @@ export function mountRender(app, deps) {
             let inventorySource = 'items';
             if (!items.length) { items = inventoryFromSpec(req.body.spec); inventorySource = items.length ? 'spec' : 'none'; }
             const inventoryText = inventoryToText(items);
+            // The whole brief, in the log, so a wrong render can be read back
+            // against exactly what the engine was told.
+            console.log(`[RENDER] inventory (${inventorySource}, ${items.length} items):\n` + inventoryText);
 
             // ---- an upload has no drawing: draw one --------------------------
             let lineSource = line ? 'configurator' : 'none';

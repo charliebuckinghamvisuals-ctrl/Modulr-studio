@@ -1,5 +1,5 @@
 import type { ObjectType, Room, SceneObject } from '../types';
-import { UNIT_FAMILY, NATIVE_WIDTH_MM, END_PANELS, END_PANEL_T, END_PANEL_GAP, isEndPanel } from '../modelRegistry';
+import { UNIT_FAMILY, NATIVE_WIDTH_MM, END_PANELS, END_PANEL_T, END_PANEL_GAP, isEndPanel, GLB_OBJECT_LABELS } from '../modelRegistry';
 import { zoneX, clampInZone, bayRange, openingRemovedByBay } from './bay';
 
 /**
@@ -450,6 +450,37 @@ const wallName = (rot: number) => {
   if (a < 5 * Math.PI / 4) return 'back';
   return 'left-hand side';
 };
+
+/** Placed objects that live OUTSIDE the room: not part of the interior. */
+const EXTERIOR_TYPES = new Set<string>(['wall_light_sconce', 'wall_light_angled', 'wall_light_box', 'wall_light_slim', 'hot_tub', 'garden_steps', 'garden_ramp', 'aircon_outdoor', 'external_extraction_fan', 'canopy_spot']);
+
+const INTERIOR_FLOOR_WORDS: Record<string, string> = {
+  oak: 'oak plank flooring', walnut: 'walnut plank flooring', light_oak: 'pale oak plank flooring', grey_oak: 'grey-washed oak plank flooring',
+  herringbone: 'herringbone parquet flooring', tiles: 'large-format tiled flooring', carpet: 'carpet', concrete: 'polished concrete floor', laminate: 'laminate plank flooring',
+};
+
+/**
+ * What is INSIDE the building, for the render engine's inventory: the wall
+ * colour, the floor, and every piece of furniture and fitting with its
+ * colour, so what shows through the glazing is rendered as placed rather
+ * than left out or invented (Charlie, 17 Sep: "it didn't include furniture").
+ */
+export function describeInterior(room: Room, objects: { type: string; color?: string }[]): { walls: string; floor: string; items: { label: string; count: number; color?: string }[] } {
+  const counts = new Map<string, { label: string; count: number; color?: string }>();
+  for (const o of objects) {
+    if (EXTERIOR_TYPES.has(o.type)) continue;
+    const label = (GLB_OBJECT_LABELS as Record<string, string>)[o.type] || o.type.replace(/_/g, ' ');
+    const key = label + '|' + (o.color || '');
+    const cur = counts.get(key);
+    if (cur) cur.count++; else counts.set(key, { label, count: 1, color: o.color });
+  }
+  const floorKey = String((room as any).interiorFloorType || '');
+  return {
+    walls: `walls painted ${room.interiorColor || '#ffffff'}`,
+    floor: INTERIOR_FLOOR_WORDS[floorKey] || (floorKey ? floorKey.replace(/_/g, ' ') + ' flooring' : 'timber plank flooring'),
+    items: [...counts.values()].slice(0, 30),
+  };
+}
 
 export function describeExteriorLights(room: Room, objects: { type: string; x: number; z: number; rot: number; color?: string; mountHeightMm?: number }[]): { count: number; text: string }[] {
   const out: { count: number; text: string }[] = [];
