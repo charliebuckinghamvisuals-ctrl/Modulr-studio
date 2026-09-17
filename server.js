@@ -84,6 +84,44 @@ const PRICE_CATALOG = {
 };
 
 /**
+ * PRICING DECIDED 17 Sep 2026 (Charlie): Standard £59.99 / £599.90 a year,
+ * Business £199.99 / £1,999.90 a year, video credit packs £25 / £50 / £100,
+ * founding price £140.99 for the first five companies and for trial users
+ * who convert in their first month (Stripe coupons, so they expire on their
+ * own). The Stripe objects are created by scripts/stripe-setup.mjs, which
+ * prints the IDs below as environment variables; nothing is typed by hand.
+ * A price with no ID set is simply not on sale yet.
+ */
+const BILLING_PRICES = {
+    standard_monthly: { env: 'STRIPE_PRICE_STANDARD_MONTHLY', plan: 'standard', mode: 'subscription', label: 'Standard, monthly',   pence: 5999 },
+    standard_yearly:  { env: 'STRIPE_PRICE_STANDARD_YEARLY',  plan: 'standard', mode: 'subscription', label: 'Standard, yearly',    pence: 59990 },
+    business_monthly: { env: 'STRIPE_PRICE_BUSINESS_MONTHLY', plan: 'business', mode: 'subscription', label: 'Business, monthly',   pence: 19999 },
+    business_yearly:  { env: 'STRIPE_PRICE_BUSINESS_YEARLY',  plan: 'business', mode: 'subscription', label: 'Business, yearly',    pence: 199990 },
+    video_25:         { env: 'STRIPE_PRICE_VIDEO_25',         plan: null, mode: 'payment', label: '£25 video credits',  pence: 2500,  videoCreditsPence: 2500 },
+    video_50:         { env: 'STRIPE_PRICE_VIDEO_50',         plan: null, mode: 'payment', label: '£50 video credits',  pence: 5000,  videoCreditsPence: 5000 },
+    video_100:        { env: 'STRIPE_PRICE_VIDEO_100',        plan: null, mode: 'payment', label: '£100 video credits', pence: 10000, videoCreditsPence: 10000 },
+};
+for (const [key, p] of Object.entries(BILLING_PRICES)) {
+    const id = process.env[p.env];
+    if (id) PRICE_CATALOG[id] = { key, plan: p.plan, credits: 0, mode: p.mode, videoCreditsPence: p.videoCreditsPence || 0 };
+}
+/** The founding coupons: first five companies (max_redemptions 5) and month-one trial converts (dated). */
+const FOUNDING_COUPON = process.env.STRIPE_COUPON_FOUNDING || null;
+const MONTH_ONE_COUPON = process.env.STRIPE_COUPON_MONTH_ONE || null;
+
+/**
+ * Animation, pay as you go. Business includes ANIMATION_MONTHLY_LIMIT Kling
+ * clips a month; beyond that a clip is paid from the video credit balance
+ * at these prices (Higgsfield list cost 17 Sep: Kling 2.6 Pro 44p, Seedance
+ * 2.5 720p £1.30 per 8s clip). Seedance is priced here but only switched on
+ * once HIGGSFIELD_API_KEY is present - see /api/animation/start.
+ */
+const VIDEO_MODELS = {
+    kling:    { label: 'Kling 2.6 Pro',    pricePence: 150, seconds: 8, resolution: '1080p', available: () => true },
+    seedance: { label: 'Seedance 2.5',     pricePence: 300, seconds: 8, resolution: '720p',  available: () => !!process.env.HIGGSFIELD_API_KEY },
+};
+
+/**
  * Modulr house style.
  *
  * The look every render should land on, shared by both the photo/line-drawing
@@ -387,7 +425,7 @@ const klingResolve = async (handle) => {
  * the worst-case bill for every subscriber simultaneously. Multiply before
  * changing it.
  */
-const ANIMATION_MONTHLY_LIMIT = 10;
+const ANIMATION_MONTHLY_LIMIT = 3; // 17 Sep 2026: three included Kling clips a month on Business, then video credits
 
 /** Calendar-month key, e.g. "2026-08". Comparing this to the stored key is what
  *  resets the allowance - cheaper and more reliable than a scheduled job. */
@@ -683,10 +721,16 @@ const isOpenBetaUser = async (user) => {
 // Tester allowance. 40 renders is roughly £5 of 4K image generation at current
 // Gemini rates, which is the budget agreed per tester.
 const TESTER_RENDERS = 40;
+/** ...and no more than this many of them in one UTC day, so a trial cannot
+ *  be emptied in an hour (Charlie, 17 Sep 2026). */
+const TESTER_RENDERS_PER_DAY = 10;
 
 /** Standard plan: renders per calendar month. Matches the pricing page. */
 const STANDARD_RENDERS_PER_MONTH = 100;
 const TESTER_DAYS = 7;
+/** Business: renders per calendar month (17 Sep 2026: 250, alongside the
+ *  daily ceiling below). Every generated image counts as one. */
+const BUSINESS_RENDERS_PER_MONTH = 250;
 
 /**
  * Business fair-use ceiling: renders per UTC day.
@@ -709,7 +753,7 @@ const BUSINESS_RENDERS_PER_DAY = 25;
  * allowance this is a cost ceiling, not an entitlement, so it applies to
  * master accounts too.
  */
-const FOUR_K_EXPORTS_PER_MONTH = 100;
+const FOUR_K_EXPORTS_PER_MONTH = 50; // 17 Sep 2026: 50, keeps Business above a 50% worst-case margin
 
 /** Plans that may export 4K. Business feature; tester/beta included because
  *  evaluating output quality is the point of tester access, and the monthly
@@ -869,6 +913,8 @@ const checkTesterRender = async (user) => {
             const startedAt = data?.testerStartedAt || now;
             const expiresAt = startedAt + TESTER_DAYS * 86400000;
             const used = data?.testerRendersUsed || 0;
+            const dayKey = new Date().toISOString().slice(0, 10);
+            const usedToday = (data?.testerDay === dayKey ? data?.testerDayUsed : 0) || 0;
 
             if (now >= expiresAt) {
                 return { allowed: false, status: 402, error: `Your ${TESTER_DAYS}-day tester access has ended.` };
@@ -876,12 +922,17 @@ const checkTesterRender = async (user) => {
             if (used >= TESTER_RENDERS) {
                 return { allowed: false, status: 402, error: `Tester limit reached (${TESTER_RENDERS} renders).` };
             }
+            if (usedToday >= TESTER_RENDERS_PER_DAY) {
+                return { allowed: false, status: 402, error: `That's ${TESTER_RENDERS_PER_DAY} renders today, the trial's daily limit. It resets at midnight, with ${TESTER_RENDERS - used} of your ${TESTER_RENDERS} still to use.` };
+            }
 
             transaction.set(userRef, {
                 plan: 'tester',
                 testerStartedAt: startedAt,
                 testerExpiresAt: expiresAt,
                 testerRendersUsed: used + 1,
+                testerDay: dayKey,
+                testerDayUsed: usedToday + 1,
             }, { merge: true });
 
             return { allowed: true, rendersLeft: TESTER_RENDERS - (used + 1) };
@@ -938,14 +989,21 @@ const checkBusinessRender = async (user) => {
             const snap = await transaction.get(userRef);
             const data = snap.exists ? snap.data() : null;
             const used = (data?.businessDay === dayKey ? data?.businessRendersUsed : 0) || 0;
+            const monthKey = dayKey.slice(0, 7);
+            const usedMonth = (data?.businessMonth === monthKey ? data?.businessMonthRendersUsed : 0) || 0;
+            if (usedMonth >= BUSINESS_RENDERS_PER_MONTH) {
+                return { allowed: false, status: 402, error: `You've used all ${BUSINESS_RENDERS_PER_MONTH} renders in your Business plan this month. Your allowance resets on the 1st.` };
+            }
             if (used >= BUSINESS_RENDERS_PER_DAY) {
-                return { allowed: false, status: 402, error: `You've reached today's fair-use ceiling of ${BUSINESS_RENDERS_PER_DAY} renders. It resets at midnight - your plan stays unlimited for day-to-day work.` };
+                return { allowed: false, status: 402, error: `You've reached today's ceiling of ${BUSINESS_RENDERS_PER_DAY} renders. It resets at midnight, with ${BUSINESS_RENDERS_PER_MONTH - usedMonth} of this month's ${BUSINESS_RENDERS_PER_MONTH} still to use.` };
             }
             transaction.set(userRef, {
                 businessDay: dayKey,
                 businessRendersUsed: used + 1,
+                businessMonth: monthKey,
+                businessMonthRendersUsed: usedMonth + 1,
             }, { merge: true });
-            return { allowed: true, rendersLeft: BUSINESS_RENDERS_PER_DAY - (used + 1) };
+            return { allowed: true, rendersLeft: BUSINESS_RENDERS_PER_MONTH - (usedMonth + 1), rendersLeftToday: BUSINESS_RENDERS_PER_DAY - (used + 1) };
         });
     } catch (e) {
         console.error('[BUSINESS] Fair-use check failed:', e.message || e);
@@ -1351,6 +1409,9 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
         // For invoice.paid, we might need to look up uid by customerId if metadata isn't on the invoice
         let uid = object.metadata?.firebase_uid;
         let creditsToAward = parseInt(object.metadata?.credits || "0");
+        // Video credit packs: a one-off payment that tops up the video balance
+        // (pence) and grants no plan.
+        let videoCreditsPence = parseInt(object.metadata?.videoCreditsPence || "0") || 0;
         // NOTE: no 'free' default. Defaulting to 'free' meant that if metadata
         // ever went missing on a renewal we would DOWNGRADE a paying customer
         // at the exact moment their payment succeeded. Unknown plan => leave the
@@ -1408,6 +1469,10 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
                     };
                     if (creditsToAward > 0) {
                         update.credits = admin.firestore.FieldValue.increment(creditsToAward);
+                    }
+                    if (videoCreditsPence > 0) {
+                        update.videoCreditsPence = admin.firestore.FieldValue.increment(videoCreditsPence);
+                        update.videoCreditsBoughtAt = admin.firestore.FieldValue.serverTimestamp();
                     }
                     if (plan) {
                         update.plan = plan;
@@ -4060,8 +4125,38 @@ const resolveEffectivePlan = async (req) => {
     }
 };
 
+/**
+ * Video credit balance, in pence, on the user document. Debit is a
+ * transaction that refuses to go below zero; refund puts it back when a
+ * generation fails (Higgsfield refunds us too, so nobody is out of pocket).
+ */
+const debitVideoCredits = async (uid, pence, modelKey) => {
+    if (!db) return { ok: false, error: 'Billing unavailable.', balance: 0 };
+    const ref = db.collection('users').doc(uid);
+    try {
+        return await db.runTransaction(async (t) => {
+            const snap = await t.get(ref);
+            const balance = (snap.exists && Number(snap.data().videoCreditsPence)) || 0;
+            if (balance < pence) {
+                return { ok: false, balance, error: `This clip costs £${(pence / 100).toFixed(2)} and your video credit balance is £${(balance / 100).toFixed(2)}. Top up video credits to continue.` };
+            }
+            t.set(ref, { videoCreditsPence: balance - pence, lastVideoCharge: { pence, model: modelKey, at: Date.now() } }, { merge: true });
+            return { ok: true, balance: balance - pence };
+        });
+    } catch (e) {
+        console.error('[VIDEO CREDITS] debit failed:', e.message || e);
+        return { ok: false, error: 'Billing temporarily unavailable. Please try again shortly.', balance: 0 };
+    }
+};
+const refundVideoCredits = async (uid, pence) => {
+    if (!db || !pence) return;
+    try { await db.collection('users').doc(uid).set({ videoCreditsPence: admin.firestore.FieldValue.increment(pence) }, { merge: true }); }
+    catch (e) { console.error('[VIDEO CREDITS] refund failed:', e.message || e); }
+};
+
 app.post('/api/animation/start', userAiLimiter, async (req, res) => {
     let claimed = false;
+    let chargedPence = 0;
     try {
         const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
         const preset      = sanitizeString(req.body.preset, 40);
@@ -4097,14 +4192,32 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
             }
         }
 
-        // Claimed BEFORE the model is called, not after. Google bills for the
-        // generation whether or not we manage to deliver it, so the allowance
-        // has to be spent at the moment the spend is committed.
-        const quota = await claimAnimation(req.user.uid);
-        if (!quota.allowed) {
-            return res.status(quota.status).json({ error: quota.error });
+        /**
+         * Which model, and who pays. Business includes ANIMATION_MONTHLY_LIMIT
+         * Kling clips a month; after that, or for Seedance, the clip is paid
+         * from the video credit balance at VIDEO_MODELS prices. Claimed or
+         * debited BEFORE the model is called - the provider bills whether or
+         * not we deliver - and released / refunded below if it fails.
+         */
+        const videoModel = req.body.model === 'seedance' ? 'seedance' : 'kling';
+        const vm = VIDEO_MODELS[videoModel];
+        if (!vm.available()) {
+            return res.status(400).json({ error: `${vm.label} is not switched on yet. Kling is available now.` });
         }
-        claimed = true;
+        let charge = { kind: 'included', pence: 0 };
+        if (videoModel === 'kling') {
+            const quota = await claimAnimation(req.user.uid);
+            if (quota.allowed) { claimed = true; }
+            else if (quota.status !== 402) { return res.status(quota.status).json({ error: quota.error }); }
+        }
+        if (!claimed) {
+            const debit = await debitVideoCredits(req.user.uid, vm.pricePence, videoModel);
+            if (!debit.ok) {
+                return res.status(402).json({ error: debit.error, videoCreditsPence: debit.balance, needsVideoCredits: true });
+            }
+            charge = { kind: 'credits', pence: vm.pricePence, balance: debit.balance };
+        }
+        chargedPence = charge.pence;
 
         const prompt = buildAnimationPrompt(preset, modifiers, extra);
 
@@ -4179,6 +4292,7 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
     } catch (error) {
         console.error('Animation start error:', error);
         if (claimed) await releaseAnimation(req.user.uid);
+        if (chargedPence) await refundVideoCredits(req.user.uid, chargedPence);
         // The allowance really was released above - saying so stops users
         // abandoning the feature believing a failed attempt cost them a clip.
         res.status(500).json({ error: 'The animation service is having a busy moment and the clip could not be generated. Your monthly allowance was NOT used - please try again in a few minutes.' });
@@ -4358,8 +4472,19 @@ const withEntitlements = (payload, data) => {
         canExport4K,
         fourKLimit: FOUR_K_EXPORTS_PER_MONTH,
         fourKLeft: canExport4K ? fourKLeftFor(data) : 0,
+        // Pay-as-you-go video: the balance and the price of each clip, so the
+        // Animation Studio can show "3 included left" or "£1.50 from credits".
+        videoCreditsPence: Number(data?.videoCreditsPence) || 0,
+        videoModels: Object.fromEntries(Object.entries(VIDEO_MODELS).map(([k, v]) => [k, { label: v.label, pricePence: v.pricePence, seconds: v.seconds, resolution: v.resolution, available: v.available() }])),
+        rendersPerMonth: payload.plan === 'business' ? BUSINESS_RENDERS_PER_MONTH : payload.plan === 'standard' ? STANDARD_RENDERS_PER_MONTH : payload.plan === 'tester' ? TESTER_RENDERS : null,
     };
 };
+
+/** The prices on sale, for the pricing page: key, Stripe price ID, label, pence. Unset IDs are not offered. */
+app.get('/api/billing/prices', (_req, res) => {
+    const prices = Object.fromEntries(Object.entries(BILLING_PRICES).map(([key, p]) => [key, { priceId: process.env[p.env] || null, label: p.label, pence: p.pence, plan: p.plan, mode: p.mode }]));
+    res.json({ billingEnabled: process.env.BILLING_ENABLED === 'true', prices, founding: !!FOUNDING_COUPON, videoModels: Object.fromEntries(Object.entries(VIDEO_MODELS).map(([k, v]) => [k, { label: v.label, pricePence: v.pricePence, available: v.available() }])) });
+});
 
 app.get('/api/user/credits', async (req, res) => {
     try {
@@ -4608,8 +4733,9 @@ app.post('/api/create-checkout-session', async (req, res) => {
 
         const purchaseMetadata = {
             firebase_uid: req.user.uid,
-            plan: entry.plan,
-            credits: String(entry.credits)
+            plan: entry.plan || '',
+            credits: String(entry.credits),
+            videoCreditsPence: String(entry.videoCreditsPence || 0),
         };
 
         const sessionPayload = {
@@ -4625,12 +4751,42 @@ app.post('/api/create-checkout-session', async (req, res) => {
 
         // For subscriptions, also set metadata on the Subscription object itself.
         // This is CRITICAL for invoice.paid renewal events to work — invoices
-        // inherit metadata from the Subscription, not the checkout Session.
+        // inherit metadata from the Subscription, not the customer Session.
         if (entry.mode === 'subscription') {
             sessionPayload.subscription_data = { metadata: purchaseMetadata };
         }
+        // A one-off pack has no subscription to carry the customer, so the
+        // payment must create one - the balance is keyed on the Stripe customer.
+        if (entry.mode === 'payment') sessionPayload.customer_creation = 'always';
 
-        const session = await stripe.checkout.sessions.create(sessionPayload);
+        /**
+         * Founding price on Business: the first five companies, and any trial
+         * user converting within a month of starting. Stripe enforces the five
+         * (max_redemptions) and the date; if a coupon is spent or expired the
+         * checkout is retried without it rather than failing.
+         */
+        const coupons = [];
+        if (entry.plan === 'business' && entry.mode === 'subscription') {
+            if (FOUNDING_COUPON) coupons.push(FOUNDING_COUPON);
+            if (MONTH_ONE_COUPON && db) {
+                try {
+                    const snap = await db.collection('users').doc(req.user.uid).get();
+                    const started = snap.exists ? (snap.data().testerStartedAt || snap.data().trialStartTimestamp) : null;
+                    if (started && Date.now() - started < 31 * 86400000) coupons.push(MONTH_ONE_COUPON);
+                } catch (e) { console.warn('[STRIPE] month-one lookup failed:', e.message || e); }
+            }
+        }
+        let session = null;
+        for (const coupon of [...coupons, null]) {
+            try {
+                session = await stripe.checkout.sessions.create(coupon ? { ...sessionPayload, discounts: [{ coupon }] } : sessionPayload);
+                if (coupon) console.log('[STRIPE] founding coupon applied:', coupon, 'uid:', req.user.uid);
+                break;
+            } catch (e) {
+                if (!coupon) throw e;
+                console.warn('[STRIPE] coupon not applied (' + coupon + '):', e.message || e);
+            }
+        }
 
         res.json({ sessionId: session.id, url: session.url });
     } catch (error) {

@@ -29,6 +29,18 @@ const STANDARD_PRICE_ID: Record<'monthly' | 'yearly', string> = {
     yearly: 'price_standard_yearly_TODO',
 };
 
+/**
+ * The prices on sale come from the server (/api/billing/prices), which reads
+ * the Stripe IDs from its environment - created by scripts/stripe-setup.mjs.
+ * The figures shown are the decided ones (17 Sep 2026) even before the IDs
+ * exist, so the page reads right; a plan with no ID yet cannot be bought.
+ */
+interface BillingPrice { priceId: string | null; label: string; pence: number; plan: string | null; mode: string }
+interface BillingInfo { billingEnabled: boolean; founding: boolean; prices: Record<string, BillingPrice>; videoModels: Record<string, { label: string; pricePence: number; available: boolean }> }
+const DECIDED_PENCE: Record<string, number> = { standard_monthly: 5999, standard_yearly: 59990, business_monthly: 19999, business_yearly: 199990, video_25: 2500, video_50: 5000, video_100: 10000 };
+const FOUNDING_MONTHLY_PENCE = 14099;
+const pounds = (pence: number) => (pence % 100 === 0 ? `£${pence / 100}` : `£${(pence / 100).toFixed(2)}`);
+
 type PlanKey = 'trial' | 'standard' | 'business';
 
 /**
@@ -56,17 +68,18 @@ const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: s
      * near a quarter of revenue at full usage on a 10p render, and still viable
      * at 20p. At 200 the same plan loses money on anyone who uses it properly.
      */
-    { label: 'Renders',            trial: '40 (7 days)', standard: '100 per month', business: 'Unlimited' },
-    { label: 'Render quality',     trial: 'High + Ultra', standard: 'High + Ultra', business: 'High, Ultra + Max' },
-    { label: 'Planning Checker',   trial: 'Free to all', standard: 'Free to all', business: 'Free to all' },
+    // 17 Sep 2026: every generated image counts as a render - a configurator
+    // render, a material close-up sheet, a line drawing, a weather variant.
+    { label: 'Renders, any tool',  trial: '40 over 7 days, 10 a day', standard: '100 a month', business: '250 a month' },
+    { label: '4K exports',         trial: false, standard: false, business: '50 a month' },
+    { label: '3D Configurator',    trial: true,  standard: true,  business: true },
+    { label: 'Walk Inside & Walk Outside', trial: true, standard: true, business: true },
     { label: 'Render Engine',      trial: true,  standard: true,  business: true },
-    { label: 'Line Converter',     trial: true,  standard: true,  business: true },
-    { label: 'Weather Lab',        trial: true,  standard: true,  business: true },
-    { label: 'Material Studio',    trial: true,  standard: true,  business: true },
-    { label: '3D Configurator',    trial: true,  standard: false, business: true },
-    { label: 'Walk Inside & Walk Outside', trial: true, standard: false, business: true },
-    { label: 'Animation Studio',   trial: false, standard: false, business: true },
-    { label: 'Projects & clients', trial: true,  standard: true,  business: true },
+    { label: 'Material close-ups', trial: true,  standard: true,  business: true },
+    { label: 'Line Converter & Weather Lab', trial: true, standard: true, business: true },
+    { label: 'Projects, clients & PDFs', trial: true, standard: true, business: true },
+    { label: 'Planning Checker',   trial: 'Free to all', standard: 'Free to all', business: 'Free to all' },
+    { label: 'Animation Studio',   trial: false, standard: false, business: '3 clips a month, then pay as you go' },
     { label: 'Commercial rights',  trial: false, standard: true,  business: true },
     { label: 'Priority queue',     trial: false, standard: false, business: true },
 ];
@@ -111,6 +124,19 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
      * Dismissible, because the page behind it is still worth browsing.
      */
     const [showBillingClosed, setShowBillingClosed] = React.useState(true);
+    const [billing, setBilling] = React.useState<BillingInfo | null>(null);
+    React.useEffect(() => {
+        fetch('/api/billing/prices').then(r => r.json()).then((b: BillingInfo) => {
+            setBilling(b);
+            // Once billing is open the notice has nothing to say.
+            if (b?.billingEnabled) setShowBillingClosed(false);
+        }).catch(() => { /* the decided figures still show */ });
+    }, []);
+    const priceOf = (key: string) => billing?.prices?.[key];
+    const penceOf = (key: string) => priceOf(key)?.pence ?? DECIDED_PENCE[key];
+    const priceIdOf = (key: string, fallback: string) => priceOf(key)?.priceId || fallback;
+    const standardId = priceIdOf(`standard_${billingCycle}`, STANDARD_PRICE_ID[billingCycle]);
+    const businessId = priceIdOf(`business_${billingCycle}`, billingCycle === 'monthly' ? 'price_1TM28kHtB5liiqHxBZvK7pjm' : 'price_1TM2OGHtB5liiqHx2RQXMxO3');
 
     const handleStartTrial = () => {
         if (user) {
@@ -133,10 +159,8 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
          * BILLING_ENABLED check on /api/create-checkout-session, because a
          * client-side guard alone could be bypassed by calling the endpoint.
          */
-        setShowBillingClosed(true);
-        return;
+        if (!billing?.billingEnabled) { setShowBillingClosed(true); return; }
 
-        /* eslint-disable no-unreachable */
         if (!user) {
             toast.error('Please sign in to upgrade your plan');
             onNavigate?.(AppStage.AUTH);
@@ -144,7 +168,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
         }
 
         setLoadingPlan(priceId);
-        trackBeginCheckout(planName, isOneTime ? creditsAmount / 100 : 189.99);
+        trackBeginCheckout(planName, creditsAmount / 100);
         try {
 
             const token = await user.getIdToken();
@@ -326,19 +350,20 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             <h3 className="text-2xl font-bold text-accent mb-2">Standard</h3>
                             <p className="text-sm text-secondary min-h-[40px]">Everything a smaller studio needs to sell a job.</p>
                         </div>
-                        {/* Price TBD (Charlie, 14 Sep 2026): subscriptions are locked until
-                            Stripe is set up, so no figure is shown. */}
                         <div className="mb-8 min-h-[96px] flex flex-col justify-start">
-                            <div className="text-5xl font-bold text-primary drop-shadow-md">TBD</div>
-                            <span className="text-secondary font-medium">Pricing to be confirmed</span>
+                            <div className="text-5xl font-bold text-primary drop-shadow-md">
+                                {billingCycle === 'monthly' ? pounds(penceOf('standard_monthly')) : pounds(Math.round(penceOf('standard_yearly') / 12))}
+                                <span className="text-lg font-bold text-secondary"> / month</span>
+                            </div>
+                            <span className="text-secondary font-medium">{billingCycle === 'monthly' ? 'inc VAT, cancel any time' : `${pounds(penceOf('standard_yearly'))} a year inc VAT, 2 months free`}</span>
                         </div>
 
                         <Button
                             className="w-full mb-8 shadow-xl"
-                            onClick={() => handleUpgrade('standard', STANDARD_PRICE_ID[billingCycle], 0)}
+                            onClick={() => handleUpgrade('standard', standardId, penceOf(`standard_${billingCycle}`))}
                             disabled={loadingPlan !== null}
                         >
-                            {loadingPlan === STANDARD_PRICE_ID[billingCycle] ? <Loader2 className="animate-spin" /> : 'Choose Standard'}
+                            {loadingPlan === standardId ? <Loader2 className="animate-spin" /> : 'Choose Standard'}
                         </Button>
 
                         <div className="space-y-3 flex-1">
@@ -360,22 +385,24 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             <p className="text-sm text-secondary">The absolute peak of visualization performance.</p>
                         </div>
                         <div className="mb-8 min-h-[96px] flex flex-col justify-start text-white">
-                            <div className="text-5xl font-bold text-primary dark:text-white drop-shadow-md">TBD</div>
-                            <span className="text-secondary font-medium">Pricing to be confirmed</span>
+                            <div className="text-5xl font-bold text-primary dark:text-white drop-shadow-md">
+                                {billingCycle === 'monthly' ? pounds(penceOf('business_monthly')) : pounds(Math.round(penceOf('business_yearly') / 12))}
+                                <span className="text-lg font-bold text-secondary"> / month</span>
+                            </div>
+                            <span className="text-secondary font-medium">{billingCycle === 'monthly' ? 'inc VAT, cancel any time' : `${pounds(penceOf('business_yearly'))} a year inc VAT, 2 months free`}</span>
+                            {billing?.founding && billingCycle === 'monthly' && (
+                                <span className="mt-2 inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">
+                                    Founding price {pounds(FOUNDING_MONTHLY_PENCE)} a month for your first year, first 5 companies
+                                </span>
+                            )}
                         </div>
 
-                        <Button 
-                            className="w-full mb-8 shadow-2xl" 
-                            onClick={() => handleUpgrade(
-                                'business', 
-                                billingCycle === 'monthly' ? 'price_1TM28kHtB5liiqHxBZvK7pjm' : 'price_1TM2OGHtB5liiqHx2RQXMxO3',
-                                // Business is unlimited - no credit grant. The server
-                                // ignores this value anyway and reads its own catalogue.
-                                0
-                            )}
+                        <Button
+                            className="w-full mb-8 shadow-2xl"
+                            onClick={() => handleUpgrade('business', businessId, penceOf(`business_${billingCycle}`))}
                             disabled={loadingPlan !== null}
                         >
-                            {loadingPlan === (billingCycle === 'monthly' ? 'price_1TM28kHtB5liiqHxBZvK7pjm' : 'price_1TM2OGHtB5liiqHx2RQXMxO3') ? <Loader2 className="animate-spin" /> : 'Upgrade Now'}
+                            {loadingPlan === businessId ? <Loader2 className="animate-spin" /> : 'Upgrade Now'}
                         </Button>
 
                         <div className="space-y-3 flex-1">
@@ -384,6 +411,58 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         </div>
                     </div>
 
+                </div>
+
+                {/* Animation Studio: pay as you go, and what it replaces */}
+                <div className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-[3rem] shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+                        <div>
+                            <h4 className="text-2xl font-bold text-accent mb-3">Animation, without the animator.</h4>
+                            <p className="text-sm text-secondary leading-relaxed mb-4">
+                                A studio animation of a garden room is made by hand: a 3D artist models it, lights it, plots the camera and renders every frame. It is accurate to the millimetre, and it costs £600 to £1,500 for ten seconds and £1,500 to £5,000 for thirty, with one to three weeks' turnaround and a fresh invoice for every change.
+                            </p>
+                            <p className="text-sm text-secondary leading-relaxed mb-4">
+                                Animation Studio uses Seedance and Kling, the world's leading video models, to turn the design you built in the configurator into a moving visual in about two minutes. It is the next best thing to a hand-made animation, and it costs from {pounds(billing?.videoModels?.kling?.pricePence ?? 150)} a clip.
+                            </p>
+                            <p className="text-sm text-secondary leading-relaxed">
+                                <span className="font-bold text-primary">For a small business:</span> a ten second clip of the client's actual building on every quote, a thirty second walkthrough for the website, a new clip every time the design changes, for less than the price of a coffee.
+                            </p>
+                        </div>
+                        <div className="space-y-5">
+                            <div className="overflow-hidden rounded-2xl border border-border">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-surface/60 text-[11px] uppercase tracking-widest text-secondary">
+                                        <tr><th className="text-left p-3 font-bold"></th><th className="text-left p-3 font-bold">3D artist</th><th className="text-left p-3 font-bold text-accent">Animation Studio</th></tr>
+                                    </thead>
+                                    <tbody className="text-primary/85">
+                                        <tr className="border-t border-border"><td className="p-3 text-secondary">Accuracy</td><td className="p-3">Frame-perfect, every time</td><td className="p-3">Held to your drawing, the next best thing</td></tr>
+                                        <tr className="border-t border-border"><td className="p-3 text-secondary">10 second clip</td><td className="p-3">£600 to £1,500</td><td className="p-3 font-bold">from {pounds(billing?.videoModels?.kling?.pricePence ?? 150)}</td></tr>
+                                        <tr className="border-t border-border"><td className="p-3 text-secondary">30 second clip</td><td className="p-3">£1,500 to £5,000</td><td className="p-3 font-bold">from {pounds((billing?.videoModels?.kling?.pricePence ?? 150) * 4)}</td></tr>
+                                        <tr className="border-t border-border"><td className="p-3 text-secondary">Turnaround</td><td className="p-3">1 to 3 weeks</td><td className="p-3">about 2 minutes</td></tr>
+                                        <tr className="border-t border-border"><td className="p-3 text-secondary">Design change</td><td className="p-3">New job, new invoice</td><td className="p-3">Send it again</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div>
+                                <div className="text-[11px] font-bold uppercase tracking-widest text-secondary mb-2">Video credits, Business plan</div>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {(['video_25', 'video_50', 'video_100'] as const).map(key => (
+                                        <button
+                                            key={key}
+                                            onClick={() => handleUpgrade('video_credits', priceIdOf(key, key), penceOf(key), true)}
+                                            disabled={loadingPlan !== null || plan !== 'business' && plan !== 'master'}
+                                            className="rounded-2xl border border-border bg-surface/40 hover:bg-surface/70 disabled:opacity-50 p-4 text-center transition-colors"
+                                            title={plan === 'business' || plan === 'master' ? 'Buy video credits' : 'Video credits are part of the Business plan'}
+                                        >
+                                            <div className="text-2xl font-bold text-primary">{pounds(penceOf(key))}</div>
+                                            <div className="text-[11px] text-secondary">{Math.floor(penceOf(key) / (billing?.videoModels?.kling?.pricePence ?? 150))} Kling clips</div>
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-[11px] text-secondary mt-2">Kling {pounds(billing?.videoModels?.kling?.pricePence ?? 150)} a clip, Seedance {pounds(billing?.videoModels?.seedance?.pricePence ?? 300)} a clip, 8 seconds. A failed clip is refunded automatically. Credits last 12 months.</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Managed Service */}
