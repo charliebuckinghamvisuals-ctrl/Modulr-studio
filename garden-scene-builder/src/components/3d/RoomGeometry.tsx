@@ -477,16 +477,31 @@ function DoorLeaf({ leafW, doorH, frameThickness, sashThickness, depth, style, f
       {/* Door handle, on the edge that opens, both faces - Charlie's modelled
           handle in black metal (components/3d/DoorHandleModel.tsx). +Z is
           the outside of the leaf. */}
-      {handle && (
-        <>
-          <group position={[handle === 'right' ? leafW/2 - sashThickness/2 - 0.04 : -leafW/2 + sashThickness/2 + 0.04, 0, depth*0.25]}>
-            <DoorHandle side={handle} face="outside" />
-          </group>
-          <group position={[handle === 'right' ? leafW/2 - sashThickness/2 - 0.04 : -leafW/2 + sashThickness/2 + 0.04, 0, -depth*0.25]}>
-            <DoorHandle side={handle} face="inside" />
-          </group>
-        </>
-      )}
+      {handle && (() => {
+        // On the STILE, centred on the bar that opens - never on the glass.
+        const hx = handle === 'right' ? leafW/2 - sashThickness/2 : -leafW/2 + sashThickness/2;
+        // Crittall: a handle block on the stile, as the real sets have - a
+        // flat plate the lever mounts on. The handle stands off by its depth.
+        const crittall = style === 'crittall';
+        const blockD = 0.018;
+        const faceZ = depth*0.25 + (crittall ? blockD : 0);
+        return (
+          <>
+            {crittall && (
+              <>
+                <mesh position={[hx, 0, depth*0.25 + blockD/2]} castShadow><boxGeometry args={[0.07, 0.34, blockD]} /><meshStandardMaterial color={frameColorHex} metalness={0.35} roughness={0.5} /></mesh>
+                <mesh position={[hx, 0, -depth*0.25 - blockD/2]} castShadow><boxGeometry args={[0.07, 0.34, blockD]} /><meshStandardMaterial color={frameColorInnerHex} metalness={0.35} roughness={0.5} /></mesh>
+              </>
+            )}
+            <group position={[hx, 0, faceZ]}>
+              <DoorHandle side={handle} face="outside" />
+            </group>
+            <group position={[hx, 0, -faceZ]}>
+              <DoorHandle side={handle} face="inside" />
+            </group>
+          </>
+        );
+      })()}
 
       {/*
         No "Open Door" badge on the leaf.
@@ -629,7 +644,9 @@ function AnimatedDoorLeaves({ door, frameColorHex, frameColorInnerHex, frameThic
 
   const setPivot = (i: number) => (el: THREE.Group | null) => { if (el) pivots.current[i] = el; };
   const leafProps = { leafW, doorH, frameThickness, sashThickness, depth, style: door.style, frameColorHex, frameColorInnerHex };
-  const handles = room.hasDoorHandles;
+  // Slim and ultra-slim frames have no stile to carry a handle (15-25mm
+  // bars); those sets are handle-less, as the real products are.
+  const handles = !!room.hasDoorHandles && room.frameStyle !== 'slim' && room.frameStyle !== 'ultra-slim';
 
   if (kind === 'hinged') {
     const left = hinge === 'left';
