@@ -11,10 +11,12 @@ import { DraftingBackground } from '../DraftingBackground';
  * the tile from flashing empty while the video buffers.
  */
 const CLIPS: { id: string; src: string; poster?: string; caption: string }[] = [
-    { id: 'clip-1', src: '/hero-clip-1.mp4', poster: '/hero-clip-1.jpg', caption: 'Slow push in · golden hour' },
-    { id: 'clip-2', src: '/hero-clip-2.mp4', poster: '/hero-clip-2.jpg', caption: 'Gentle breeze through the planting' },
-    { id: 'clip-3', src: '/hero-clip-3.mp4', poster: '/hero-clip-3.jpg', caption: 'Cinematic pan across the elevation' },
-    { id: 'clip-4', src: '/hero-clip-4.mp4', poster: '/hero-clip-4.jpg', caption: 'Locked-off scene with living light' },
+    { id: 'clip-2', src: '/hero-clip-2.mp4', poster: '/hero-clip-2.jpg', caption: 'Dark-clad garden room and deck at dusk' },
+    { id: 'clip-6', src: '/hero-clip-6.mp4', poster: '/hero-clip-6.jpg', caption: 'Cedar garden office with corner glazing' },
+    { id: 'clip-5', src: '/hero-clip-5.mp4', poster: '/hero-clip-5.jpg', caption: 'Gable garden room, standing-seam roof' },
+    { id: 'clip-1', src: '/hero-clip-1.mp4', poster: '/hero-clip-1.jpg', caption: 'Larch garden office, autumn evening' },
+    { id: 'clip-4', src: '/hero-clip-4.mp4', poster: '/hero-clip-4.jpg', caption: 'Curved-roof timber cabin with Crittall doors' },
+    { id: 'clip-3', src: '/hero-clip-3.mp4', poster: '/hero-clip-3.jpg', caption: 'Grey garden studio in the snow' },
 ];
 
 export const AnimationsView: React.FC = () => {

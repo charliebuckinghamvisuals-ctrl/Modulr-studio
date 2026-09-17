@@ -15,11 +15,15 @@ interface HeroClip {
     caption: string;
 }
 
+// 17 Sep 2026: six Animation Studio clips (Seedance and Kling), re-encoded
+// for the web at up to 1920 wide, no audio, fast-start.
 const CLIPS: HeroClip[] = [
-    { src: '/hero-clip-1.mp4', poster: '/hero-clip-1.jpg', caption: 'Sauna and pilates studio, golden hour' },
-    { src: '/hero-clip-2.mp4', poster: '/hero-clip-2.jpg', caption: 'Garden room and deck, evening light' },
-    { src: '/hero-clip-3.mp4', poster: '/hero-clip-3.jpg', caption: 'Cedar-clad garden studio, summer garden' },
-    { src: '/hero-clip-4.mp4', poster: '/hero-clip-4.jpg', caption: 'Charred timber annexe with a gable roof' },
+    { src: '/hero-clip-2.mp4', poster: '/hero-clip-2.jpg', caption: 'Dark-clad garden room and deck at dusk' },
+    { src: '/hero-clip-6.mp4', poster: '/hero-clip-6.jpg', caption: 'Cedar garden office with corner glazing' },
+    { src: '/hero-clip-5.mp4', poster: '/hero-clip-5.jpg', caption: 'Gable garden room, standing-seam roof, high summer' },
+    { src: '/hero-clip-1.mp4', poster: '/hero-clip-1.jpg', caption: 'Larch garden office, autumn evening' },
+    { src: '/hero-clip-4.mp4', poster: '/hero-clip-4.jpg', caption: 'Curved-roof timber cabin with Crittall doors' },
+    { src: '/hero-clip-3.mp4', poster: '/hero-clip-3.jpg', caption: 'Grey garden studio in the snow' },
 ];
 
 export const HeroVideoCarousel: React.FC = () => {
