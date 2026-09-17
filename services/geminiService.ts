@@ -60,10 +60,16 @@ const apiFetch = async (url: string, init?: RequestInit): Promise<Response> => {
  */
 const getBestAspectRatio = (width: number, height: number): string => {
   const ratio = width / height;
+  // The full set the image models accept, so a configurator frame at an
+  // in-between shape (a tall pane gives ~5:6) is not forced into a crop.
   const supported = [
     { s: "1:1", r: 1 },
+    { s: "4:5", r: 4 / 5 },
+    { s: "5:4", r: 5 / 4 },
     { s: "3:4", r: 3 / 4 },
     { s: "4:3", r: 4 / 3 },
+    { s: "2:3", r: 2 / 3 },
+    { s: "3:2", r: 3 / 2 },
     { s: "9:16", r: 9 / 16 },
     { s: "16:9", r: 16 / 9 },
   ];

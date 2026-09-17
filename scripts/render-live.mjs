@@ -36,7 +36,14 @@ const body = {
     shaded: b64(shadedPath),
     line: linePath && linePath !== '-' ? b64(linePath) : null,
     spec: specPath && specPath !== '-' ? JSON.parse(fs.readFileSync(specPath, 'utf8')) : null,
-    ratio: process.env.RATIO || '16:9',
+    ratio: process.env.RATIO || (() => {
+        // Nearest supported ratio from the shaded image, as the app does.
+        const b = fs.readFileSync(shadedPath); let w = 16, h = 9;
+        if (b[0] === 0x89 && b[1] === 0x50) { w = b.readUInt32BE(16); h = b.readUInt32BE(20); }
+        else { let i = 2; while (i < b.length) { if (b[i] !== 0xff) { i++; continue; } const m = b[i + 1]; if (m >= 0xc0 && m <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(m)) { h = b.readUInt16BE(i + 5); w = b.readUInt16BE(i + 7); break; } i += 2 + b.readUInt16BE(i + 2); } }
+        const r = w / h; const sup = [['1:1', 1], ['4:5', .8], ['5:4', 1.25], ['3:4', .75], ['4:3', 4 / 3], ['2:3', 2 / 3], ['3:2', 1.5], ['9:16', 9 / 16], ['16:9', 16 / 9]];
+        return sup.sort((a, c) => Math.abs(a[1] - r) - Math.abs(c[1] - r))[0][0];
+    })(),
     scenePreset, timePreset, sceneText: process.env.SCENE_TEXT || '',
 };
 // SURVEY=1: no spec, so ask the survey for the inventory first, as the app

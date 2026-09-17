@@ -26,7 +26,7 @@ const mm = (v) => (typeof v === 'number' && isFinite(v) ? `${Math.round(v)}mm` :
 const hex = (v) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : null);
 
 const CLADDING_LOOKS = {
-    cedar_composite: 'warm CEDAR-toned composite boards (reddish-brown, #b0764b)',
+    cedar_composite: 'CEDAR-toned composite boards - a distinctly RED-BROWN cedar, #b0764b, like fresh western red cedar; NOT golden oak, NOT honey, NOT teak',
     oak_composite: 'OAK-toned composite boards (mid golden-brown, #c9a173)',
     light_oak_composite: 'light oak-toned composite boards (pale honey, #dcc09a)',
     black_composite: 'BLACK composite boards (deep charcoal-black, #1f2123)',

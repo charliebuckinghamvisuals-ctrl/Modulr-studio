@@ -104,7 +104,12 @@ export function captureRenderInputs(gl: THREE.WebGLRenderer, scene: THREE.Scene,
     if (!o.visible) return;
     const ex = excluded || isExcludedBranch(o);
     if (o instanceof THREE.Mesh) {
-      if (ex || isHelperMesh(o) || !o.geometry?.attributes?.position) {
+      // See-through things are not drawn: glass (so the interior reads
+      // through it, as on a drawing) and the light-cone / glow meshes,
+      // whose edges came out as stray diagonals under the windows.
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      const seeThrough = mats.some(m => m && (m as any).transparent && ((m as any).opacity ?? 1) < 0.5);
+      if (ex || isHelperMesh(o) || seeThrough || !o.geometry?.attributes?.position) {
         o.visible = false; hiddenForLine.push(o);
       } else {
         swapped.push({ mesh: o, material: o.material });

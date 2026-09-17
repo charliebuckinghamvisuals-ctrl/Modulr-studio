@@ -43,6 +43,21 @@ function GlbModel({ url, type, color, worktop, finish, seed, veneer, metal }: { 
     if (!cloned.current || variantRef.current !== variant) {
         variantRef.current = variant;
         cloned.current = scene.clone(true);
+        /*
+         * Exports that were never centred (SimLab writes the model where it
+         * sat in the SketchUp file, 10m+ from the origin) are brought to a
+         * "pivot below" here: footprint centred on the origin, base on the
+         * floor. Only when the model is clearly off - a centred model with a
+         * deliberate pivot (a wall unit, a tap) is left exactly as exported.
+         */
+        cloned.current.updateMatrixWorld(true);
+        const bb = new THREE.Box3().setFromObject(cloned.current);
+        if (!bb.isEmpty()) {
+          const c = bb.getCenter(new THREE.Vector3());
+          if (Math.abs(c.x) > 1.5 || Math.abs(c.z) > 1.5 || Math.abs(bb.min.y) > 1.5) {
+            cloned.current.position.set(-c.x, -bb.min.y, -c.z);
+          }
+        }
         // Straight units lose their own tops to the continuous run slab
         // (WorktopRuns); the corner unit keeps its L-shaped one.
         matHandles.current = applyModelMaterials(type, cloned.current, color, worktop, !isCornerUnit(type), finish, seed, veneer, metal);

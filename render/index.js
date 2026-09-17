@@ -77,7 +77,8 @@ export function mountRender(app, deps) {
             imageCalls++;
             if (!image) return res.status(502).json({ error: 'The render engine produced no image. Please try again.' });
 
-            let verification = await verifyRender(ai, Type, { model: ANALYSIS_MODEL, referenceB64: verifyAgainst.b64, referenceMime: verifyAgainst.mime, renderB64: image, items });
+            const colourRef = { colourRefB64: shaded, colourRefMime: shadedMime };
+            let verification = await verifyRender(ai, Type, { model: ANALYSIS_MODEL, referenceB64: verifyAgainst.b64, referenceMime: verifyAgainst.mime, renderB64: image, items, ...colourRef });
             let attempts = [{ pass: 'finish', ...verification }];
             let shipped = 'pass1';
 
@@ -91,7 +92,7 @@ export function mountRender(app, deps) {
                     const finished = await drawImage(ai, { model: FINISH_MODEL, images: [{ b64: geometry, mime: 'image/jpeg' }], prompt: buildMaterialsPassPrompt({ inventoryText, failures: verification.failures }), ratio, label: 'retry-finish' });
                     imageCalls++;
                     const candidate = finished || geometry;
-                    const v2 = await verifyRender(ai, Type, { model: ANALYSIS_MODEL, referenceB64: verifyAgainst.b64, referenceMime: verifyAgainst.mime, renderB64: candidate, items });
+                    const v2 = await verifyRender(ai, Type, { model: ANALYSIS_MODEL, referenceB64: verifyAgainst.b64, referenceMime: verifyAgainst.mime, renderB64: candidate, items, ...colourRef });
                     attempts.push({ pass: finished ? 'retry-geometry+finish' : 'retry-geometry', ...v2 });
                     if (!v2.checked || v2.failures.length <= verification.failures.length) { image = candidate; verification = v2; shipped = finished ? 'retry' : 'retry-geometry-only'; }
                     if (!v2.passed) console.warn('[RENDER] retry still failing, shipping the better attempt:', v2.failures.map(f => `${f.label}: ${f.problem}`).join('; '));
