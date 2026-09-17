@@ -485,14 +485,23 @@ function DoorLeaf({ leafW, doorH, frameThickness, sashThickness, depth, style, f
         // material and colour as the frame it sits on, sized like the
         // product: 90 wide, 480 tall, 18 proud of the stile, each face.
         const crittall = style === 'crittall';
-        const blockW = 0.09, blockH = 0.48, blockD = 0.018;
+        // The block fills the whole pane the handle sits in: from the glazing
+        // bar below to the bar above (the same row maths as CrittallBars), so
+        // it joins the frame top and bottom rather than floating on the glass.
+        const glassH = doorH - frameThickness*2 - sashThickness*2;
+        const rows = Math.max(2, Math.round(glassH / 0.65));
+        const paneH = glassH / rows;
+        const paneIndex = Math.min(rows - 1, Math.max(0, Math.floor((0 + glassH/2) / paneH)));
+        const paneCentre = -glassH/2 + paneH * (paneIndex + 0.5);
+        const barT = 0.018;
+        const blockW = 0.12, blockH = paneH + barT, blockD = 0.018;
         const faceZ = depth*0.25 + (crittall ? blockD : 0);
         return (
           <>
             {crittall && (
               <>
-                <FrameBar position={[hx, 0, depth*0.25 + blockD/2]} args={[blockW, blockH, blockD]} outer={frameColorHex} inner={frameColorHex} castShadow />
-                <FrameBar position={[hx, 0, -depth*0.25 - blockD/2]} args={[blockW, blockH, blockD]} outer={frameColorInnerHex} inner={frameColorInnerHex} castShadow />
+                <FrameBar position={[hx, paneCentre, depth*0.25 + blockD/2]} args={[blockW, blockH, blockD]} outer={frameColorHex} inner={frameColorHex} castShadow />
+                <FrameBar position={[hx, paneCentre, -depth*0.25 - blockD/2]} args={[blockW, blockH, blockD]} outer={frameColorInnerHex} inner={frameColorInnerHex} castShadow />
               </>
             )}
             <group position={[hx, 0, faceZ]}>
