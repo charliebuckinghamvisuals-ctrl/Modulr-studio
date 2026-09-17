@@ -177,7 +177,7 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
     };
   }, [engine]);
 
-  const { plan, loading, canUseProjects } = useCredits();
+  const { plan, loading, canUseFullConfigurator } = useCredits();
 
   /**
    * Which configurator to open.
@@ -191,7 +191,9 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
    */
   const [configMode, setConfigMode] = useState<'public' | 'business' | null>(null);
   configModeRef.current = configMode;
-  const canUseBusinessConfig = canUseProjects === true;
+  // Business (and the trial) get the full configurator; Standard gets the
+  // free exterior version only (Charlie, 17 Sep 2026). Server-decided.
+  const canUseBusinessConfig = canUseFullConfigurator === true;
 
   if (loading) {
     return (

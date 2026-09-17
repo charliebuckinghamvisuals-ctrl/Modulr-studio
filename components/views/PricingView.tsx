@@ -72,8 +72,8 @@ const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: s
     // render, a material close-up sheet, a line drawing, a weather variant.
     { label: 'Renders, any tool',  trial: '40 over 7 days, 10 a day', standard: '100 a month', business: '250 a month' },
     { label: '4K exports',         trial: false, standard: false, business: '50 a month' },
-    { label: '3D Configurator',    trial: true,  standard: true,  business: true },
-    { label: 'Walk Inside & Walk Outside', trial: true, standard: true, business: true },
+    { label: '3D Configurator',    trial: 'Full version', standard: 'Free version, exterior only', business: 'Full: interiors, kitchens, saving, send to render' },
+    { label: 'Walk Inside & Walk Outside', trial: true, standard: false, business: true },
     { label: 'Render Engine',      trial: true,  standard: true,  business: true },
     { label: 'Material close-ups', trial: true,  standard: true,  business: true },
     { label: 'Line Converter & Weather Lab', trial: true, standard: true, business: true },
@@ -456,10 +456,13 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                         >
                                             <div className="text-2xl font-bold text-primary">{pounds(penceOf(key))}</div>
                                             <div className="text-[11px] text-secondary">{Math.floor(penceOf(key) / (billing?.videoModels?.kling?.pricePence ?? 150))} Kling clips</div>
+                                            <div className="text-[11px] text-secondary">or {Math.floor(penceOf(key) / (billing?.videoModels?.seedance?.pricePence ?? 300))} Seedance clips</div>
                                         </button>
                                     ))}
                                 </div>
-                                <p className="text-[11px] text-secondary mt-2">Kling {pounds(billing?.videoModels?.kling?.pricePence ?? 150)} a clip, Seedance {pounds(billing?.videoModels?.seedance?.pricePence ?? 300)} a clip, 8 seconds. A failed clip is refunded automatically. Credits last 12 months.</p>
+                                <p className="text-[11px] text-secondary mt-2">
+                                    Kling 2.6 Pro {pounds(billing?.videoModels?.kling?.pricePence ?? 150)} a clip at 1080p, Seedance 2.5 {pounds(billing?.videoModels?.seedance?.pricePence ?? 300)} a clip at 720p, both based on 8 second clips. Longer clips are priced by the second. A failed clip is refunded automatically. Credits last 12 months.
+                                </p>
                             </div>
                         </div>
                     </div>

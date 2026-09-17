@@ -18,6 +18,8 @@ interface CreditsData {
      *  worked out from `plan` here - the entitled plan list belongs in one
      *  place, and the same value is what Firestore rules enforce. */
     canUseProjects?: boolean;
+    /** The full 3D configurator (Business); Standard gets the free version. */
+    canUseFullConfigurator?: boolean;
     /** Whether this account may generate animations, and how many of the
      *  monthly allowance are left. Both decided by the server. */
     canUseAnimation?: boolean;
@@ -68,6 +70,7 @@ interface CreditsState {
     /** null while unknown, so the UI can wait rather than flashing an upsell at
      *  a subscriber whose plan has not loaded yet. */
     canUseProjects: boolean | null;
+    canUseFullConfigurator: boolean | null;
     canUseAnimation: boolean | null;
     animationsLeft: number | null;
     animationsLimit: number | null;
@@ -79,7 +82,7 @@ interface CreditsState {
 const EMPTY: CreditsState = {
     credits: null, plan: null, rendersLeft: null, rendersPerDay: null, trialDaysLeft: null,
     trialBlocked: false, trialExpiresAt: null, loading: false, hasApiAccess: null,
-    canUseProjects: null, canUseAnimation: null, animationsLeft: null, animationsLimit: null,
+    canUseProjects: null, canUseFullConfigurator: null, canUseAnimation: null, animationsLeft: null, animationsLimit: null,
     canExport4K: null, fourKLeft: null, fourKLimit: null,
 };
 
@@ -137,6 +140,7 @@ const fetchCredits = async (): Promise<void> => {
                 animationsLeft: data.animationsLeft ?? null,
                 animationsLimit: data.animationsLimit ?? null,
                 canExport4K: data.canExport4K === true,
+                canUseFullConfigurator: data.canUseFullConfigurator === true,
                 fourKLeft: data.fourKLeft ?? null,
                 fourKLimit: data.fourKLimit ?? null,
                 rendersLeft: data.rendersLeft ?? null,
@@ -221,6 +225,7 @@ export function useCredits() {
         animationsLeft: snapshot.animationsLeft,
         animationsLimit: snapshot.animationsLimit,
         canExport4K: snapshot.canExport4K,
+        canUseFullConfigurator: snapshot.canUseFullConfigurator,
         fourKLeft: snapshot.fourKLeft,
         fourKLimit: snapshot.fourKLimit,
     };

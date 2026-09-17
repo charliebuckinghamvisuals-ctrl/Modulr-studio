@@ -305,6 +305,9 @@ const PROJECT_PLANS = new Set(['standard', 'business', 'master', 'tester', 'beta
  * product, just not the one feature that bills us a pound per click.
  */
 const ANIMATION_PLANS = new Set(['business', 'master']);
+/** The full 3D configurator (interiors, kitchens, walkthrough, saving, send
+ *  to render). Standard is NOT here: it gets the free exterior version. */
+const FULL_CONFIG_PLANS = new Set(['business', 'master', 'tester', 'beta']);
 
 /**
  * Video generation settings.
@@ -4477,6 +4480,10 @@ const withEntitlements = (payload, data) => {
     return {
         ...payload,
         canUseProjects: PROJECT_PLANS.has(payload.plan),
+        // The FULL configurator (interiors, kitchens, walkthrough, saving,
+        // send to render) is Business; Standard gets the free exterior version
+        // (Charlie, 17 Sep 2026). The trial has everything but animation.
+        canUseFullConfigurator: FULL_CONFIG_PLANS.has(payload.plan),
         canUseAnimation,
         animationsLimit: ANIMATION_MONTHLY_LIMIT,
         animationsLeft: canUseAnimation ? animationsLeftFor(data) : 0,
