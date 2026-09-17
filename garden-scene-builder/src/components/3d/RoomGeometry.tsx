@@ -1224,7 +1224,9 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
 export function RoomGeometry() {
   const roomStore = useStore(s => s.scene.room);
   const viewModeStore = useStore(s => s.viewMode);
-  const room = { ...roomStore, showDimensions: roomStore.showDimensions && viewModeStore !== 'render' };
+  // The plan IS the dimensioned drawing: it always carries its dimensions.
+  // The toggle governs the 3D view, and nothing is dimensioned in a render.
+  const room = { ...roomStore, showDimensions: (roomStore.showDimensions || viewModeStore === 'plan') && viewModeStore !== 'render' };
   const { selectedElementId, setSelectedElementId, updateDoor, updateWindow, setControlsEnabled, viewMode, controlsEnabled } = useStore(useShallow(s => ({
     selectedElementId: s.selectedElementId,
     setSelectedElementId: s.setSelectedElementId,
@@ -3309,10 +3311,11 @@ export function RoomGeometry() {
               on the openings themselves. LShape skipped: offsets there are not
               relative to a single straight wall. */}
           {room.showDimensions && room.shape !== 'LShape' && (['front', 'back', 'left', 'right'] as const).filter(side => {
-            // Only chain the wall whose opening is selected. Drawing all four
-            // walls at once stacked dozens of labels on top of each other and
-            // buried the model - now you get the setting-out for the thing you
-            // are actually working on, and nothing else.
+            // The PLAN is the working drawing: every wall with an opening
+            // gets its setting-out chain, like an architect's plan. In the
+            // 3D view only the wall whose opening is selected is chained -
+            // all four at once stacked labels on top of each other there.
+            if (isPlanView) return true;
             const sel = selectedElementId;
             if (!sel) return false;
             const d0 = (room.doors || []).find(dr => dr.id === sel);
@@ -3334,8 +3337,11 @@ export function RoomGeometry() {
             pts.push(L / 2);
 
             const off = 0.45; // between the wall face and the overall dimension line
+            // The front chain sits beyond the deck on a plan, as on a drawing,
+            // so the numbers are not printed across the boards.
+            const frontClear = isPlanView && room.hasDecking ? (room.deckingSizeMm || 0) / 1000 : 0;
             const base: [number, number, number] =
-              side === 'front' ? [0, 0, d / 2 + off]
+              side === 'front' ? [0, 0, d / 2 + frontClear + off]
               : side === 'back' ? [0, 0, -d / 2 - off]
               : side === 'left' ? [-w / 2 - off, 0, 0]
               : [w / 2 + off, 0, 0];
@@ -3717,6 +3723,67 @@ export function RoomGeometry() {
         </group>
       )}
 
+      {/* INTERNAL ROOM DIMENSIONS - plan only. Each partition splits the
+          building, and a builder wants the clear room sizes it makes: inner
+          wall face to partition face to inner wall face. Partitions running
+          left-right give a chain of depths down the right-hand side; ones
+          running front-back give a chain of widths along the back. Plus the
+          deck depth, down the right past the deck. Second row out from the
+          walls: the opening chains sit at 0.45, these at 0.9, the overall
+          dimensions beyond both. */}
+      {isPlanView && room.showDimensions && room.shape !== 'LShape' && (() => {
+        const wallT = (room.wallThicknessMm || 150) / 1000;
+        const parts = (room.partitions || []) as any[];
+        const acrossDepth = parts.filter(p => p.rotation !== 90).map(p => ({ c: p.zMm / 1000, t: (p.thicknessMm || 100) / 1000 })).sort((a, b) => a.c - b.c);
+        const acrossWidth = parts.filter(p => p.rotation === 90).map(p => ({ c: p.xMm / 1000, t: (p.thicknessMm || 100) / 1000 })).sort((a, b) => a.c - b.c);
+        const chain = (inner: number, faces: { c: number; t: number }[]) => {
+          const pts: number[] = [-inner];
+          faces.forEach(f => { pts.push(Math.max(-inner, f.c - f.t / 2), Math.min(inner, f.c + f.t / 2)); });
+          pts.push(inner);
+          return pts;
+        };
+        const off = 0.9;
+        const deckFrontM = room.hasDecking ? (room.deckingSizeMm || 0) / 1000 : 0;
+        const deckRightM = room.hasDecking ? (room.deckingRightMm || 0) / 1000 : 0;
+        const depthPts = acrossDepth.length ? chain(d / 2 - wallT, acrossDepth) : null;
+        const widthPts = acrossWidth.length ? chain(w / 2 - wallT, acrossWidth) : null;
+        return (
+          <group position={[0, baseH + 0.12, 0]}>
+            {depthPts && (
+              <group position={[w / 2 + off, 0, 0]}>
+                <Line points={[[0, 0, depthPts[0]], [0, 0, depthPts[depthPts.length - 1]]]} color="#000" lineWidth={0.75} />
+                {depthPts.map((p, i) => <Line key={`dt-${i}`} points={[[-0.06, 0, p], [0.06, 0, p]]} color="#000" lineWidth={0.75} />)}
+                {depthPts.slice(0, -1).map((p, i) => {
+                  const q = depthPts[i + 1]; const mm = Math.round((q - p) * 1000);
+                  if (mm < 150) return null; // a partition's own thickness is not a room
+                  return <DimText key={`ds-${i}`} position={[0, 0, (p + q) / 2]} rotation={[-Math.PI / 2, 0, Math.PI / 2]} value={mm} />;
+                })}
+              </group>
+            )}
+            {widthPts && (
+              <group position={[0, 0, -d / 2 - off]}>
+                <Line points={[[widthPts[0], 0, 0], [widthPts[widthPts.length - 1], 0, 0]]} color="#000" lineWidth={0.75} />
+                {widthPts.map((p, i) => <Line key={`wt-${i}`} points={[[p, 0, -0.06], [p, 0, 0.06]]} color="#000" lineWidth={0.75} />)}
+                {widthPts.slice(0, -1).map((p, i) => {
+                  const q = widthPts[i + 1]; const mm = Math.round((q - p) * 1000);
+                  if (mm < 150) return null;
+                  return <DimText key={`ws-${i}`} position={[(p + q) / 2, 0, 0]} rotation={[-Math.PI / 2, 0, Math.PI]} value={mm} />;
+                })}
+              </group>
+            )}
+            {deckFrontM > 0.05 && (
+              <group position={[w / 2 + deckRightM + off, 0, 0]}>
+                <Line points={[[0, 0, d / 2], [0, 0, d / 2 + deckFrontM]]} color="#000" lineWidth={0.75} />
+                <Line points={[[-0.06, 0, d / 2], [0.06, 0, d / 2]]} color="#000" lineWidth={0.75} />
+                <Line points={[[-0.06, 0, d / 2 + deckFrontM], [0.06, 0, d / 2 + deckFrontM]]} color="#000" lineWidth={0.75} />
+                <DimText position={[0, 0, d / 2 + deckFrontM / 2]} rotation={[-Math.PI / 2, 0, Math.PI / 2]} value={Math.round(deckFrontM * 1000)}
+                  onValueChange={(val: number) => useStore.getState().updateRoom({ deckingSizeMm: Math.max(0, val) })} />
+              </group>
+            )}
+          </group>
+        );
+      })()}
+
       {/* Plan View Dimensions */}
       {isPlanView && (
         <group position={[0, baseH + 0.1, 0]}>
@@ -3763,7 +3830,9 @@ export function RoomGeometry() {
           </group>
 
           {/* Front Wall */}
-          <group position={[0, 0, d/2 + Math.max(1.2, deckFront + 0.8)]}>
+          {/* Beyond the deck AND beyond the opening chain (deck + 0.45), so
+              the overall width never prints on top of the setting-out. */}
+          <group position={[0, 0, d/2 + Math.max(1.2, deckFront + 1.3)]}>
             <Line points={[[-w/2, 0, 0], [w/2 - (room.shape === 'LShape' ? cutW : 0), 0, 0]]} color="#000" lineWidth={1} />
             <Line points={[[-w/2, 0, -0.05], [-w/2, 0, 0.05]]} color="#000" lineWidth={1} />
             <Line points={[[w/2 - (room.shape === 'LShape' ? cutW : 0), 0, -0.05], [w/2 - (room.shape === 'LShape' ? cutW : 0), 0, 0.05]]} color="#000" lineWidth={1} />

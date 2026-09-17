@@ -75,9 +75,13 @@ export function captureRenderInputs(gl: THREE.WebGLRenderer, scene: THREE.Scene,
   const hidden: THREE.Object3D[] = [];
   scene.traverse(o => {
     if (!o.visible) return;
-    // The floor grid (named in MainScene) is the one helper the shaded
-    // capture drops; sky and clouds stay because they are the view's backdrop.
-    if ((o.name || '').toLowerCase() === 'floor-grid') { o.visible = false; hidden.push(o); }
+    // Drop what is not the design: the floor grid (named in MainScene),
+    // dimension lines and their text, drag handles and selection overlays.
+    // Sky and clouds stay because they are the view's backdrop.
+    const n = (o.name || '').toLowerCase();
+    const isDimension = (o as any).isLine2 || (o as any).isLine || (o as any).isTroikaText || (o as any).isText || o.constructor?.name === 'Text';
+    const isOverlay = o instanceof THREE.Mesh && !isDimension && (Array.isArray(o.material) ? o.material : [o.material]).some(m => m && (m as any).depthTest === false);
+    if (n === 'floor-grid' || isDimension || isOverlay) { o.visible = false; hidden.push(o); }
   });
   // JPEG: a 2K PNG of a textured scene is 7MB+, a JPEG under 1MB, and this
   // one is only a colour reference. The edge drawing stays PNG (crisp lines,
