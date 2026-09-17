@@ -11,6 +11,22 @@ import { trackUserPlan } from '../services/analytics';
  */
 type CreditBalance = number | 'Unlimited';
 
+/** One video model as the server prices it (see VIDEO_MODELS in server.js). */
+export interface VideoModelInfo {
+    label: string;
+    vendor: string;
+    blurb: string;
+    available: boolean;
+    audio: boolean;
+    minSeconds: number;
+    maxSeconds: number;
+    defaultSeconds: number;
+    resolutions: string[];
+    defaultResolution: string;
+    pencePerSecond: Record<string, number>;
+    priceFor: Record<string, Record<string, number>>;
+}
+
 interface CreditsData {
     credits: CreditBalance;
     plan: string;
@@ -30,6 +46,10 @@ interface CreditsData {
     canExport4K?: boolean;
     fourKLeft?: number;
     fourKLimit?: number;
+    /** Pay-as-you-go video: balance in pence and the priced model table. */
+    videoCreditsPence?: number;
+    videoModels?: Record<string, VideoModelInfo>;
+    includedClipSeconds?: number;
     // Free trial fields
     rendersLeft?: number;
     rendersPerDay?: number;
@@ -77,6 +97,9 @@ interface CreditsState {
     canExport4K: boolean | null;
     fourKLeft: number | null;
     fourKLimit: number | null;
+    videoCreditsPence: number;
+    videoModels: Record<string, VideoModelInfo> | null;
+    includedClipSeconds: number;
 }
 
 const EMPTY: CreditsState = {
@@ -84,6 +107,7 @@ const EMPTY: CreditsState = {
     trialBlocked: false, trialExpiresAt: null, loading: false, hasApiAccess: null,
     canUseProjects: null, canUseFullConfigurator: null, canUseAnimation: null, animationsLeft: null, animationsLimit: null,
     canExport4K: null, fourKLeft: null, fourKLimit: null,
+    videoCreditsPence: 0, videoModels: null, includedClipSeconds: 8,
 };
 
 let state: CreditsState = { ...EMPTY, loading: true };
@@ -141,6 +165,9 @@ const fetchCredits = async (): Promise<void> => {
                 animationsLimit: data.animationsLimit ?? null,
                 canExport4K: data.canExport4K === true,
                 canUseFullConfigurator: data.canUseFullConfigurator === true,
+                videoCreditsPence: Number(data.videoCreditsPence) || 0,
+                videoModels: data.videoModels ?? null,
+                includedClipSeconds: data.includedClipSeconds ?? 8,
                 fourKLeft: data.fourKLeft ?? null,
                 fourKLimit: data.fourKLimit ?? null,
                 rendersLeft: data.rendersLeft ?? null,
@@ -226,6 +253,9 @@ export function useCredits() {
         animationsLimit: snapshot.animationsLimit,
         canExport4K: snapshot.canExport4K,
         canUseFullConfigurator: snapshot.canUseFullConfigurator,
+        videoCreditsPence: snapshot.videoCreditsPence,
+        videoModels: snapshot.videoModels,
+        includedClipSeconds: snapshot.includedClipSeconds,
         fourKLeft: snapshot.fourKLeft,
         fourKLimit: snapshot.fourKLimit,
     };

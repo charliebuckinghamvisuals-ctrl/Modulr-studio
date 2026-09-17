@@ -116,9 +116,92 @@ const MONTH_ONE_COUPON = process.env.STRIPE_COUPON_MONTH_ONE || null;
  * 2.5 720p £1.30 per 8s clip). Seedance is priced here but only switched on
  * once HIGGSFIELD_API_KEY is present - see /api/animation/start.
  */
+/**
+ * Video models through the Higgsfield API (17 Sep 2026), priced per second
+ * from Higgsfield's LIST rates (the console shows 30-50% promo rates; plan
+ * on list) times VIDEO_MARGIN, rounded up to 5p:
+ *   Seedance 2.5 image-to-video: token-metered, tokens = s x w x h x 24 /
+ *     1024 at $0.0214 per 1,000 -> $0.2056/s at 480p, $0.4625/s at 720p.
+ *   Kling 3.0 Pro image-to-video: $0.168/s list for 3-15s clips.
+ * USD to GBP at 0.79. Charlie sets VIDEO_MARGIN (default 2.4) and the
+ * prices follow; the UI always shows the price before the button.
+ * HF_CREDENTIALS = "KEY_ID:KEY_SECRET" from the Higgsfield console.
+ */
+const VIDEO_MARGIN = Number(process.env.VIDEO_MARGIN) > 1 ? Number(process.env.VIDEO_MARGIN) : 2.4;
+const USD_TO_GBP = 0.79;
+const hfReady = () => !!process.env.HF_CREDENTIALS;
 const VIDEO_MODELS = {
-    kling:    { label: 'Kling 2.6 Pro',    pricePence: 150, seconds: 8, resolution: '1080p', available: () => true },
-    seedance: { label: 'Seedance 2.5',     pricePence: 300, seconds: 8, resolution: '720p',  available: () => !!process.env.HIGGSFIELD_API_KEY },
+    seedance: {
+        label: 'Seedance 2.5', vendor: 'ByteDance', path: 'bytedance/seedance-2.5/image-to-video',
+        minSeconds: 4, maxSeconds: 15, defaultSeconds: 5, resolutions: ['480p', '720p'], defaultResolution: '720p', audio: true,
+        costUsdPerSecond: (res) => ((res === '480p' ? 854 * 480 : 1280 * 720) * 24 / 1024) / 1000 * 0.0214,
+        available: () => hfReady(),
+        blurb: 'The most cinematic. Cuts between shots and close-ups on a prompt.',
+    },
+    kling: {
+        label: 'Kling 3.0 Pro', vendor: 'Kling', path: 'kling-video/v3.0/pro/image-to-video',
+        minSeconds: 3, maxSeconds: 15, defaultSeconds: 5, resolutions: ['1080p'], defaultResolution: '1080p', audio: true,
+        costUsdPerSecond: () => 0.168,
+        // Without Higgsfield credentials Kling still runs on the fal.ai route
+        // below, at a fixed 8 seconds - the previous engine.
+        available: () => hfReady() || !!process.env.FAL_KEY,
+        blurb: 'Sharp, faithful camera moves. The everyday clip.',
+    },
+};
+/** What the customer pays for a clip, in pence, rounded up to 5p. */
+const videoPricePence = (modelKey, seconds, resolution) => {
+    const m = VIDEO_MODELS[modelKey];
+    const cost = m.costUsdPerSecond(resolution) * seconds * USD_TO_GBP * 100;
+    return Math.max(50, Math.ceil(cost * VIDEO_MARGIN / 5) * 5);
+};
+/** The pricing table the UI shows: pence per second per resolution. */
+const videoPricing = () => Object.fromEntries(Object.entries(VIDEO_MODELS).map(([k, m]) => [k, {
+    label: m.label, vendor: m.vendor, blurb: m.blurb, available: m.available(), audio: m.audio,
+    minSeconds: m.minSeconds, maxSeconds: m.maxSeconds, defaultSeconds: m.defaultSeconds, resolutions: m.resolutions, defaultResolution: m.defaultResolution,
+    pencePerSecond: Object.fromEntries(m.resolutions.map(r => [r, videoPricePence(k, 1, r)])),
+    priceFor: Object.fromEntries(m.resolutions.map(r => [r, Object.fromEntries([3, 4, 5, 6, 8, 10, 12, 15].filter(s => s >= m.minSeconds && s <= m.maxSeconds).map(s => [s, videoPricePence(k, s, r)]))])),
+}]));
+
+// ---- Higgsfield API (https://api.higgsfield.ai) ---------------------------
+const hfHeaders = () => ({ Authorization: `Key ${process.env.HF_CREDENTIALS}`, 'Content-Type': 'application/json' });
+/** Inputs must be public URLs: upload the frame to Higgsfield's storage first. */
+const hfUpload = async (base64, mime = 'image/jpeg') => {
+    const r = await fetch('https://api.higgsfield.ai/files/generate-upload-url', { method: 'POST', headers: hfHeaders(), body: JSON.stringify({ content_type: mime }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.upload_url || !j.public_url) throw new Error('Higgsfield upload URL failed: ' + r.status + ' ' + JSON.stringify(j).slice(0, 200));
+    const put = await fetch(j.upload_url, { method: 'PUT', headers: { 'Content-Type': mime, ...(j.upload_headers || {}) }, body: Buffer.from(base64, 'base64') });
+    if (!put.ok) throw new Error('Higgsfield upload failed: ' + put.status);
+    return j.public_url;
+};
+/** Submit a generation; returns the opaque handle "hf:<request id>". */
+const hfStart = async (modelPath, input) => {
+    const r = await fetch(`https://api.higgsfield.ai/${modelPath}`, { method: 'POST', headers: hfHeaders(), body: JSON.stringify(input) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.request_id) {
+        console.error('[HF] submit failed', r.status, JSON.stringify(j).slice(0, 400));
+        throw Object.assign(new Error('The model did not start a video job.'), { detail: j });
+    }
+    return `hf:${j.request_id}`;
+};
+const HF_HANDLE_RE = /^hf:[a-zA-Z0-9-]{8,80}$/;
+/** Poll: { done:false } or { done:true, uri }. Throws on failed / nsfw / canceled. */
+const hfResolve = async (handle) => {
+    const id = handle.slice(3);
+    const r = await fetch(`https://api.higgsfield.ai/requests/${id}/status`, { headers: hfHeaders() });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`Video status failed: ${r.status} ${JSON.stringify(j).slice(0, 200)}`);
+    const status = String(j.status || '').toLowerCase();
+    if (['failed', 'nsfw', 'canceled', 'cancelled'].includes(status)) throw new Error(`Video generation ${status}: ${JSON.stringify(j.error || j.detail || '').slice(0, 200)}`);
+    if (status !== 'completed') return { done: false };
+    let uri = j.video?.url || j.output?.video?.url || (Array.isArray(j.videos) && j.videos[0]?.url) || j.result?.video?.url;
+    if (!uri) {
+        // Some models hand the output back from the result endpoint instead.
+        const rr = await fetch(`https://api.higgsfield.ai/requests/${id}/result`, { headers: hfHeaders() });
+        const res = await rr.json().catch(() => ({}));
+        uri = res.video?.url || res.output?.video?.url || (Array.isArray(res.videos) && res.videos[0]?.url);
+        if (!uri) throw new Error('Video finished but no file was returned: ' + JSON.stringify(res).slice(0, 200));
+    }
+    return { done: true, uri };
 };
 
 /**
@@ -2123,7 +2206,10 @@ app.get('/api/share/:token', shareLimiter, async (req, res) => {
  */
 app.get('/api/public/billing-prices', (_req, res) => {
     const prices = Object.fromEntries(Object.entries(BILLING_PRICES).map(([key, p]) => [key, { priceId: process.env[p.env] || null, label: p.label, pence: p.pence, plan: p.plan, mode: p.mode }]));
-    res.json({ billingEnabled: process.env.BILLING_ENABLED === 'true', prices, founding: !!FOUNDING_COUPON, videoModels: Object.fromEntries(Object.entries(VIDEO_MODELS).map(([k, v]) => [k, { label: v.label, pricePence: v.pricePence, available: v.available() }])) });
+    const vp = videoPricing();
+    res.json({ billingEnabled: process.env.BILLING_ENABLED === 'true', prices, founding: !!FOUNDING_COUPON,
+        // The pricing page quotes the 8 second clip.
+        videoModels: Object.fromEntries(Object.entries(vp).map(([k, v]) => [k, { label: v.label, available: v.available, resolution: v.defaultResolution, pricePence: videoPricePence(k, 8, v.defaultResolution) }])) });
 });
 
 app.use('/api', verifyFirebaseToken, enforceMasterLock);
@@ -4216,24 +4302,43 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
         const videoModel = req.body.model === 'seedance' ? 'seedance' : 'kling';
         const vm = VIDEO_MODELS[videoModel];
         if (!vm.available()) {
-            return res.status(400).json({ error: `${vm.label} is not switched on yet. Kling is available now.` });
+            return res.status(400).json({ error: `${vm.label} is not switched on yet.` });
         }
+        const useHf = hfReady();
+        // The clip: length and resolution, clamped to the model; on the fal
+        // fallback Kling is fixed at 8 seconds 1080p as before.
+        const seconds = useHf ? Math.min(vm.maxSeconds, Math.max(vm.minSeconds, parseInt(req.body.duration) || vm.defaultSeconds)) : ANIMATION_SECONDS;
+        const resolution = vm.resolutions.includes(req.body.resolution) ? req.body.resolution : vm.defaultResolution;
+        const sound = req.body.sound === true || req.body.sound === 'on';
+        const freePrompt = sanitizeString(req.body.prompt, 1200);
+        const pricePence = videoPricePence(videoModel, seconds, resolution);
+        /**
+         * Included clips: Business gets ANIMATION_MONTHLY_LIMIT Kling clips a
+         * month of up to 8 seconds. Anything longer, or Seedance, is paid
+         * from the video credit balance at the price shown on the button.
+         */
         let charge = { kind: 'included', pence: 0 };
-        if (videoModel === 'kling') {
-            const quota = await claimAnimation(req.user.uid);
+        let quota = { remaining: 0 };
+        if (videoModel === 'kling' && seconds <= 8) {
+            quota = await claimAnimation(req.user.uid);
             if (quota.allowed) { claimed = true; }
             else if (quota.status !== 402) { return res.status(quota.status).json({ error: quota.error }); }
+            else quota = { remaining: 0 };
         }
         if (!claimed) {
-            const debit = await debitVideoCredits(req.user.uid, vm.pricePence, videoModel);
+            const debit = await debitVideoCredits(req.user.uid, pricePence, videoModel);
             if (!debit.ok) {
-                return res.status(402).json({ error: debit.error, videoCreditsPence: debit.balance, needsVideoCredits: true });
+                return res.status(402).json({ error: debit.error, videoCreditsPence: debit.balance, needsVideoCredits: true, pricePence });
             }
-            charge = { kind: 'credits', pence: vm.pricePence, balance: debit.balance };
+            charge = { kind: 'credits', pence: pricePence, balance: debit.balance };
         }
         chargedPence = charge.pence;
 
-        const prompt = buildAnimationPrompt(preset, modifiers, extra);
+        // A free-text prompt from the new studio replaces the preset build;
+        // the scene lock is always appended so the building never changes.
+        const prompt = freePrompt
+            ? `${freePrompt} ${ANIMATION_SCENE_LOCK_OPENING} ${ANIMATION_SCENE_LOCK_CLOSING}`
+            : buildAnimationPrompt(preset, modifiers, extra);
 
         /**
          * Kick off one generation. Veo is a long-running operation: this call
@@ -4269,7 +4374,14 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
         };
 
         let operationName;
-        if (ANIMATION_ENGINE === 'kling') {
+        if (useHf) {
+            videoAttempts = 1;
+            const imageUrl = await hfUpload(base64Image, 'image/jpeg');
+            const input = videoModel === 'seedance'
+                ? { image_url: imageUrl, prompt, duration: seconds, resolution, output_format: 'mp4', generate_audio: sound }
+                : { image_url: imageUrl, prompt, duration: seconds, sound: sound ? 'on' : 'off', cfg_scale: 0.5, multi_shots: false };
+            operationName = await hfStart(vm.path, input);
+        } else if (ANIMATION_ENGINE === 'kling') {
             videoAttempts = 1;
             operationName = await klingStart({ base64Image, prompt, negativePrompt: ANIMATION_NEGATIVE_PROMPT, aspectRatio });
         } else {
@@ -4287,11 +4399,12 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
          * the log - so "what does a project cost" could not be answered for any
          * project containing an animation.
          */
-        logRender(req, 'animation', ANIMATION_ENGINE === 'kling' ? KLING_LABEL : ANIMATION_MODEL, ANIMATION_RESOLUTION, {
-            engine: ANIMATION_ENGINE,
-            videoAttempts,
-            aspectRatio,
-            durationSeconds: ANIMATION_SECONDS,
+        logRender(req, 'animation', useHf ? vm.path : (ANIMATION_ENGINE === 'kling' ? KLING_LABEL : ANIMATION_MODEL), useHf ? resolution : ANIMATION_RESOLUTION, {
+            engine: useHf ? 'higgsfield' : ANIMATION_ENGINE,
+            videoModel, videoAttempts, aspectRatio,
+            durationSeconds: seconds, sound,
+            charge: charge.kind, pricePence: charge.pence,
+            costPenceEstimate: Math.round(vm.costUsdPerSecond(resolution) * seconds * USD_TO_GBP * 100),
         });
 
         // Named `fileName` for backwards compatibility: the client treats this
@@ -4301,6 +4414,8 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
             fileName: operationName,
             remaining: quota.remaining,
             limit: ANIMATION_MONTHLY_LIMIT,
+            charge,
+            seconds, resolution, model: videoModel,
         });
 
     } catch (error) {
@@ -4349,10 +4464,10 @@ const resolveVideoUri = async (operationName) => {
 app.get('/api/animation/status', async (req, res) => {
     try {
         const name = sanitizeString(req.query.file, 200);
-        if (!OPERATION_NAME_RE.test(name) && !KLING_HANDLE_RE.test(name)) {
+        if (!OPERATION_NAME_RE.test(name) && !KLING_HANDLE_RE.test(name) && !HF_HANDLE_RE.test(name)) {
             return res.status(400).json({ error: 'Invalid job reference.' });
         }
-        const result = await resolveVideoUri(name);
+        const result = HF_HANDLE_RE.test(name) ? await hfResolve(name) : await resolveVideoUri(name);
         res.json({ state: result.done ? 'ACTIVE' : 'PROCESSING', ready: result.done });
     } catch (error) {
         console.error('Animation status error:', error);
@@ -4363,11 +4478,12 @@ app.get('/api/animation/status', async (req, res) => {
 app.get('/api/animation/video', async (req, res) => {
     try {
         const name = sanitizeString(req.query.file, 200);
-        if (!OPERATION_NAME_RE.test(name) && !KLING_HANDLE_RE.test(name)) {
+        if (!OPERATION_NAME_RE.test(name) && !KLING_HANDLE_RE.test(name) && !HF_HANDLE_RE.test(name)) {
             return res.status(400).json({ error: 'Invalid job reference.' });
         }
 
-        const result = await resolveVideoUri(name);
+        const isHf = HF_HANDLE_RE.test(name);
+        const result = isHf ? await hfResolve(name) : await resolveVideoUri(name);
         if (!result.done) {
             return res.status(409).json({ error: 'The animation is still rendering.' });
         }
@@ -4389,7 +4505,12 @@ app.get('/api/animation/video', async (req, res) => {
         // friends), publicly, no key. Google's needs ours. Anything else is
         // refused: the URL came from an API response, not from us.
         const falHost = /(^|\.)fal\.media$/.test(target.hostname) || /(^|\.)fal\.run$/.test(target.hostname);
-        if (target.protocol !== 'https:' || (isKling ? !falHost : target.hostname !== 'generativelanguage.googleapis.com')) {
+        // Higgsfield serves finished files from its CDN, publicly. The host is
+        // whatever the API answered with, so the guard here is: https, a real
+        // public hostname (no addresses, nothing local), and no key sent.
+        const hfHost = isHf && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(target.hostname) && !/^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(target.hostname);
+        const allowed = isHf ? hfHost : isKling ? falHost : target.hostname === 'generativelanguage.googleapis.com';
+        if (target.protocol !== 'https:' || !allowed) {
             console.error('Animation download refused, unexpected host:', target.hostname);
             return res.status(502).json({ error: 'Could not fetch the finished video.' });
         }
@@ -4400,7 +4521,7 @@ app.get('/api/animation/video', async (req, res) => {
         // Use the shared apiKey (with its VITE_ fallback) — reading the env var
         // directly meant a deployment still on the deprecated name could
         // generate clips (paying for them) but never download them.
-        const upstream = await fetch(target.href, isKling ? {} : { headers: { 'x-goog-api-key': apiKey } });
+        const upstream = await fetch(target.href, (isKling || isHf) ? {} : { headers: { 'x-goog-api-key': apiKey } });
         if (!upstream.ok) {
             return res.status(upstream.status).json({ error: 'Could not fetch the finished video.' });
         }
@@ -4493,7 +4614,8 @@ const withEntitlements = (payload, data) => {
         // Pay-as-you-go video: the balance and the price of each clip, so the
         // Animation Studio can show "3 included left" or "£1.50 from credits".
         videoCreditsPence: Number(data?.videoCreditsPence) || 0,
-        videoModels: Object.fromEntries(Object.entries(VIDEO_MODELS).map(([k, v]) => [k, { label: v.label, pricePence: v.pricePence, seconds: v.seconds, resolution: v.resolution, available: v.available() }])),
+        videoModels: videoPricing(),
+        includedClipSeconds: 8,
         rendersPerMonth: payload.plan === 'business' ? BUSINESS_RENDERS_PER_MONTH : payload.plan === 'standard' ? STANDARD_RENDERS_PER_MONTH : payload.plan === 'tester' ? TESTER_RENDERS : null,
     };
 };

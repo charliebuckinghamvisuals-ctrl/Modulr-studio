@@ -5,10 +5,15 @@ import { AnimationPreset, AnimationModifier } from '../types';
  * Animation Studio client.
  *
  * Three calls rather than one because video does not behave like the image
- * endpoints. Measured against the real model: the generate call takes about 45
- * seconds and returns a file that is still processing, which then needs a few
- * more seconds before it can be read. Splitting it means the UI can show honest
- * progress across the minute instead of one silent spinner.
+ * endpoints: the start call returns a job handle in seconds, the clip renders
+ * on the provider's side over a minute or more, and /status is polled until
+ * the file can be fetched. Splitting it means the UI can show honest progress
+ * instead of one silent spinner.
+ *
+ * 17 Sep 2026: the studio picks a MODEL (Seedance 2.5 or Kling 3.0 Pro via
+ * Higgsfield), a length, a resolution, audio, and writes a PROMPT (presets
+ * fill it in). The server prices the clip, spends an included clip or the
+ * video credit balance, and appends the scene lock to the prompt.
  */
 
 const API_BASE_URL = '/api';
@@ -20,34 +25,47 @@ const authHeaders = async (base: Record<string, string> = {}) => {
 
 const readError = async (response: Response, fallback: string) => {
     const data = await response.json().catch(() => ({} as any));
-    return new Error(data?.error || fallback);
+    const err = new Error(data?.error || fallback) as Error & { needsVideoCredits?: boolean; pricePence?: number };
+    err.needsVideoCredits = data?.needsVideoCredits === true;
+    err.pricePence = data?.pricePence;
+    return err;
 };
 
+export type VideoModelKey = 'seedance' | 'kling';
+
 export interface AnimationJob {
-    /** Opaque job handle from the server - currently a Veo long-running
-     *  operation name. Never parsed here; handed straight back to
-     *  /animation/status and /animation/video. */
+    /** Opaque job handle from the server - handed straight back to
+     *  /animation/status and /animation/video. Never parsed here. */
     fileName: string;
-    /** Animations left this month after this one. */
+    /** Included clips left this month after this one (Kling, up to 8s). */
     remaining: number;
     limit: number;
+    /** How this clip was paid for. */
+    charge?: { kind: 'included' | 'credits'; pence: number; balance?: number };
+    seconds?: number;
+    resolution?: string;
+    model?: VideoModelKey;
 }
 
 export interface StartAnimationInput {
     base64Image: string;
-    preset: AnimationPreset;
-    modifiers: AnimationModifier[];
-    extraPrompt: string;
+    model: VideoModelKey;
+    /** The prompt as written or as filled by a preset. */
+    prompt: string;
+    duration: number;
+    resolution: string;
+    sound: boolean;
     aspectRatio?: '16:9' | '9:16';
+    /** Legacy fields, still accepted by the server when prompt is empty. */
+    preset?: AnimationPreset;
+    modifiers?: AnimationModifier[];
+    extraPrompt?: string;
 }
 
 /**
- * Kick off a generation.
- *
- * Returns quickly with a job handle - the rendering itself happens on Google's
- * side and is watched by fetchAnimation. It is the point at which one of the
- * month's animations is spent, whether or not the caller waits for the answer,
- * because that is the moment the cost is committed at Google's end.
+ * Kick off a generation. Returns quickly with a job handle. This is the
+ * moment the clip is paid for - an included clip or credits - because it is
+ * the moment the provider commits the cost; a failure refunds automatically.
  */
 export const startAnimation = async (input: StartAnimationInput): Promise<AnimationJob> => {
     const response = await fetch(`${API_BASE_URL}/animation/start`, {
@@ -55,10 +73,15 @@ export const startAnimation = async (input: StartAnimationInput): Promise<Animat
         headers: await authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
             base64Image: input.base64Image,
-            preset: input.preset,
-            modifiers: input.modifiers,
-            extraPrompt: input.extraPrompt,
+            model: input.model,
+            prompt: input.prompt,
+            duration: input.duration,
+            resolution: input.resolution,
+            sound: input.sound,
             aspectRatio: input.aspectRatio || '16:9',
+            preset: input.preset || 'push_in',
+            modifiers: input.modifiers || [],
+            extraPrompt: input.extraPrompt || '',
         }),
     });
 
@@ -88,12 +111,10 @@ export const fetchAnimation = async (
     signal?: AbortSignal
 ): Promise<string> => {
     const started = Date.now();
-    // Generous ceiling, and deliberately generous: the clip is ALREADY PAID FOR
-    // by the time polling starts, so giving up early throws away real money as
-    // well as one of the month's ten. Veo renders the video after the start
-    // call returns, which takes minutes rather than the previous model's
-    // seconds. This exists only so a stuck job cannot poll forever.
-    const deadline = started + 10 * 60 * 1000;
+    // Generous ceiling, deliberately: the clip is already paid for by the
+    // time polling starts, so giving up early throws money away. This exists
+    // only so a stuck job cannot poll forever.
+    const deadline = started + 15 * 60 * 1000;
 
     while (Date.now() < deadline) {
         if (signal?.aborted) throw new Error('Cancelled.');
