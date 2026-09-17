@@ -3311,11 +3311,12 @@ export function RoomGeometry() {
               on the openings themselves. LShape skipped: offsets there are not
               relative to a single straight wall. */}
           {room.showDimensions && room.shape !== 'LShape' && (['front', 'back', 'left', 'right'] as const).filter(side => {
-            // The PLAN is the working drawing: every wall with an opening
-            // gets its setting-out chain, like an architect's plan. In the
-            // 3D view only the wall whose opening is selected is chained -
-            // all four at once stacked labels on top of each other there.
-            if (isPlanView) return true;
+            // On the PLAN every wall's setting-out chain is drawn by the
+            // "Wall Openings Dimensions" block further down (editable widths),
+            // so this one stays out of plan view or the numbers print twice.
+            // In the 3D view only the wall whose opening is selected is
+            // chained - all four at once stacked labels on top of each other.
+            if (isPlanView) return false;
             const sel = selectedElementId;
             if (!sel) return false;
             const d0 = (room.doors || []).find(dr => dr.id === sel);
