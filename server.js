@@ -4090,28 +4090,91 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
 });
 
 /**
- * 4K EXPORT - the only place 4K pixels are generated.
+ * Upscale to 4K (18 Sep 2026). Decided: a TRUE upscale, not a re-draw.
  *
- * Every tool generates at 2K; this takes a finished 2K image and reproduces it
- * at 4K on the flagship model for the finals a client actually receives.
- * Metered at FOUR_K_EXPORTS_PER_MONTH per calendar month as a cost ceiling
- * (~19p a call), master accounts included - same reasoning as the animation
- * allowance.
+ * Every tool generates at 2K. This takes the finished, verified 2K image and
+ * enlarges it with Topaz (on fal.ai, "CGI" mode, built for renders) to 3840
+ * on the long edge. Pixel for pixel the same picture, sharper - it cannot
+ * move a window, which the previous version (a Sunburst / Gemini
+ * "reproduce this at 4K" generation, ~19p) could and sometimes did.
+ * Costs $0.08 an image (~6p) up to 24MP. Metered at FOUR_K_EXPORTS_PER_MONTH
+ * per calendar month, Business only; the claim is only spent on success.
  *
- * OPEN QUESTION (launch plan, "decide how 4K is produced"): a plain pixel
- * upscale of the 2K may be visually identical and free, since 4K on this model
- * buys pixels rather than fidelity. Compare one of these exports against a
- * client-side upscale before billing goes live; if they match, this endpoint
- * can become a free resize and the counter goes away.
+ * Needs FAL_KEY. Without it the route says so rather than falling back to a
+ * re-draw - the whole point is that the geometry does not change.
  */
+const UPSCALE_MODEL = 'fal-ai/topaz/upscale/image';
+const UPSCALE_LONG_EDGE = 3840;
+
+/** Pixel size of a JPEG or PNG from its header; null if unreadable. */
+const imageDims = (b64) => {
+    try {
+        const b = Buffer.from(b64.slice(0, 200_000), 'base64');
+        if (b[0] === 0x89 && b[1] === 0x50) return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+        let i = 2;
+        while (i < b.length - 9) {
+            if (b[i] !== 0xFF) return null;
+            const m = b[i + 1];
+            if (m >= 0xC0 && m <= 0xC3) return { w: b.readUInt16BE(i + 7), h: b.readUInt16BE(i + 5) };
+            i += 2 + b.readUInt16BE(i + 2);
+        }
+    } catch { /* fall through */ }
+    return null;
+};
+
+/** Submit to fal's queue and wait for the file; returns { b64, mime, width, height }. */
+const topazUpscale = async ({ base64Image, factor, format }) => {
+    const submit = await fetch(`https://queue.fal.run/${UPSCALE_MODEL}`, {
+        method: 'POST', headers: falHeaders(),
+        body: JSON.stringify({
+            image_url: `data:image/jpeg;base64,${base64Image}`,
+            model: 'CGI',
+            upscale_factor: factor,
+            output_format: format,
+            // A render has no faces to "enhance"; leaving this on invents them.
+            face_enhancement: false,
+            subject_detection: 'All',
+        }),
+    });
+    const job = await submit.json().catch(() => ({}));
+    if (!submit.ok || !job.request_id) throw new Error('Upscale did not start: ' + submit.status + ' ' + JSON.stringify(job).slice(0, 300));
+    // Status and result live under the app (owner/app), not the full path.
+    const app = UPSCALE_MODEL.split('/').slice(0, 2).join('/');
+    const t0 = Date.now();
+    let responseUrl = null;
+    while (Date.now() - t0 < 180_000) {
+        await new Promise(r => setTimeout(r, 1500));
+        const st = await fetch(`https://queue.fal.run/${app}/requests/${job.request_id}/status`, { headers: falHeaders() });
+        const status = await st.json().catch(() => ({}));
+        if (!st.ok) throw new Error('Upscale status failed: ' + st.status);
+        if (status.status === 'COMPLETED') { responseUrl = String(status.response_url || ''); break; }
+    }
+    if (!responseUrl) throw new Error('Upscale timed out');
+    if (!responseUrl.startsWith('https://queue.fal.run/')) throw new Error('Upscale result URL unexpected');
+    const rs = await fetch(responseUrl, { headers: falHeaders() });
+    const result = await rs.json().catch(() => ({}));
+    const url = result?.image?.url;
+    if (!rs.ok || !url) throw new Error('Upscale failed: ' + JSON.stringify(result?.detail || result).slice(0, 300));
+    const file = await fetch(url);
+    if (!file.ok) throw new Error('Upscale file fetch failed: ' + file.status);
+    const buf = Buffer.from(await file.arrayBuffer());
+    const b64 = buf.toString('base64');
+    // fal does not report the size; read it off the file.
+    const d = imageDims(b64) || {};
+    return { b64, mime: result.image.content_type || (format === 'png' ? 'image/png' : 'image/jpeg'), width: d.w, height: d.h };
+};
+
 app.post('/api/export4k', userAiLimiter, async (req, res) => {
     let claimed = false;
     let uid = null;
     try {
-        const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
-        const ratio       = sanitizeString(req.body.ratio, 10);
+        const base64Image = sanitizeString(req.body.base64Image, 12_000_000).replace(/^data:[^;]+;base64,/, '');
+        const format = req.body.format === 'png' ? 'png' : 'jpeg';
         if (!base64Image || base64Image.trim().length < 100) {
             return res.status(400).json({ error: 'No image supplied for export.' });
+        }
+        if (!process.env.FAL_KEY) {
+            return res.status(503).json({ error: 'The 4K upscaler is not configured on this server (FAL_KEY).' });
         }
 
         const plan = await resolveEffectivePlan(req);
@@ -4122,6 +4185,12 @@ app.post('/api/export4k', userAiLimiter, async (req, res) => {
             return res.status(403).json({ error: '4K export is a Business plan feature. Your renders are delivered at 2K.' });
         }
 
+        const dims = imageDims(base64Image);
+        const longEdge = dims ? Math.max(dims.w, dims.h) : 2048;
+        // Exactly what reaches 3840 on the long edge, within Topaz's range;
+        // an image already past 4K is sharpened at 1.5x rather than refused.
+        const factor = Math.min(4, Math.max(1.5, Math.round((UPSCALE_LONG_EDGE / longEdge) * 100) / 100));
+
         uid = req.user.uid;
         const claim = await claimFourKExport(uid);
         if (!claim.allowed) {
@@ -4129,70 +4198,16 @@ app.post('/api/export4k', userAiLimiter, async (req, res) => {
         }
         claimed = true;
 
-        const prompt = `
-      TASK: Reproduce this exact image at 4K resolution.
-
-      This is a RESOLUTION EXPORT, not a re-imagining. The output must be the
-      SAME image: the same building with the same geometry, and every door,
-      window, material, colour, plant, fence, shadow and reflection in exactly
-      the same place. Only the pixel count increases, with correspondingly
-      crisper micro-detail - timber grain, board joints, glass reflections,
-      individual grass blades.
-
-      - Do NOT add, remove, move, resize or restyle anything.
-      - Do NOT change the crop, framing, lighting, weather or colour grade.
-      - Pausing this output next to the source must show the identical scene.
-
-      CRITICAL: Output resolution 4K UHD (3840 pixels on the long edge).
-    `;
-
-        if (openAiReady()) {
-            // Sunburst draws 4K natively (3840 on the long edge, scaled
-            // down for squarer frames to stay under the pixel ceiling).
-            const { quality } = await resolveImageQuality(req);
-            const out = await openAiImageEdit({
-                prompt, images: [{ b64: base64Image, mime: 'image/jpeg' }],
-                size: openAiSizeFor(ratio || '16:9', 3840), quality, label: 'export4k',
-            });
-            if (!out.b64) throw new Error("No 4K export generated");
-            logRender(req, 'export4k', OPENAI_IMAGE_MODEL, '4K', { quality, ...openAiUsageLog(out.usage) });
-            return res.json({ result: out.b64, quality, fourKLeft: claim.remaining });
-        }
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-image',
-            contents: {
-                parts: [fileToGenerativePart(base64Image, "image/jpeg"), { text: prompt }]
-            },
-            config: {
-                outputMimeType: "image/jpeg",
-                imageConfig: {
-                    // Match the source's framing - forcing 16:9 would crop a
-                    // square or portrait export. The client sends the ratio it
-                    // measured from the image itself.
-                    aspectRatio: ratio || "16:9",
-                    imageSize: "4K"
-                },
-                temperature: 0.1
-            }
-        });
-
-        for (const part of response.candidates?.[0]?.content?.parts || []) {
-            if (part.inlineData) {
-                const rData = part.inlineData.data;
-                const b64Data = Buffer.isBuffer(rData) ? rData.toString("base64") : ((rData instanceof Uint8Array || rData instanceof ArrayBuffer) ? Buffer.from(rData).toString("base64") : rData);
-                logRender(req, 'export4k', 'gemini-3-pro-image', '4K');
-                return res.json({ result: b64Data, fourKLeft: claim.remaining });
-            }
-        }
-        throw new Error("No 4K export generated");
+        const t0 = Date.now();
+        const out = await topazUpscale({ base64Image, factor, format });
+        logRender(req, 'export4k', 'topaz-cgi', '4K', { factor, from: dims, to: { w: out.width, h: out.height }, seconds: Math.round((Date.now() - t0) / 1000) });
+        return res.json({ result: out.b64, mime: out.mime, width: out.width, height: out.height, factor, fourKLeft: claim.remaining });
     } catch (error) {
-        // The claim is only spent on success - a failure at Google's end must
-        // not cost the user one of their hundred.
+        // The claim is only spent on success - a failure at the upscaler must
+        // not cost the user one of their fifty.
         if (claimed && uid) await releaseFourKExport(uid);
         console.error("4K export error:", error);
-        if (error && error.clientMessage) return res.status(400).json({ error: error.clientMessage });
-        res.status(500).json({ error: 'The 4K export could not be completed. Your allowance was not used - please try again in a moment.' });
+        res.status(500).json({ error: 'The 4K upscale could not be completed. Your allowance was not used - please try again in a moment.' });
     }
 });
 

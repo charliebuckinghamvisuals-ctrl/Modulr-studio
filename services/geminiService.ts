@@ -415,14 +415,13 @@ export const renderBuilding = async (
  * server-side (100 per calendar month on Business), so callers should surface
  * the error message verbatim when the allowance runs out.
  */
-export const export4K = async (base64Image: string): Promise<string> => {
+export const export4K = async (base64Image: string, format: 'png' | 'jpg' = 'jpg'): Promise<string> => {
   try {
-    const { ratio } = await getImageDimensions(base64Image);
-
+    // 18 Sep 2026: a true Topaz upscale on the server (fal.ai), not a re-draw.
     const response = await apiFetch(`${API_BASE_URL}/export4k`, {
       method: 'POST',
       headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ base64Image, ratio, quality: currentImageQuality })
+      body: JSON.stringify({ base64Image, format: format === 'png' ? 'png' : 'jpeg' })
     });
 
     if (!response.ok) {

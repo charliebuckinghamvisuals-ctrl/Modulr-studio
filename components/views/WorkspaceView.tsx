@@ -290,8 +290,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                                     Save to Project
                                 </Button>
                             )}
-                            <Button variant="secondary" size="sm" onClick={() => onDownload(primaryImg, 'modulr-export.jpg')} icon={<Download size={14} />}>
-                                Save Output
+                            <Button variant="secondary" size="sm" onClick={() => onDownload(primaryImg, 'modulr-export.jpg')} title="Download at the render's own resolution (2K)">
+                                Export
                             </Button>
                             {onExport4K && canExport4K && (
                                 <Button
@@ -299,12 +299,11 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                                     size="sm"
                                     onClick={() => onExport4K(primaryImg)}
                                     disabled={isExporting4K || fourKLeft === 0}
-                                    icon={isExporting4K ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                                     title={fourKLeft === 0
-                                        ? 'All 4K exports used this month - the allowance resets on the 1st.'
-                                        : `Export this image at 4K Ultra HD.${fourKLeft != null ? ` ${fourKLeft} of your monthly exports left.` : ''}`}
+                                        ? 'All 4K upscales used this month - the allowance resets on the 1st.'
+                                        : `A true upscale of this exact image to 3840px (Topaz), then download.${fourKLeft != null ? ` ${fourKLeft} of your monthly 4K left.` : ''}`}
                                 >
-                                    {isExporting4K ? 'Exporting 4K…' : 'Export 4K'}
+                                    {isExporting4K ? 'Upscaling…' : `Upscale to 4K${fourKLeft != null ? ` · ${fourKLeft} left` : ''}`}
                                 </Button>
                             )}
                         </div>

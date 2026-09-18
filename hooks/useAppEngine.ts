@@ -708,12 +708,12 @@ export const useAppEngine = () => {
     const handleExport4K = async (imageData: string | null) => {
         if (!imageData || isExporting4K) return;
         setIsExporting4K(true);
-        const toastId = toast.loading('Exporting at 4K…');
+        const toastId = toast.loading('Upscaling to 4K - about half a minute…');
         try {
             const base64 = await toRawBase64(imageData);
-            const result = await export4K(base64);
-            handleDownload(result, 'modulr-4k-export.jpg');
-            toast.success('4K export downloaded.', { id: toastId });
+            const result = await export4K(base64, downloadFormat);
+            handleDownload(result, `modulr-4k.${downloadFormat === 'png' ? 'png' : 'jpg'}`);
+            toast.success('4K upscale downloaded.', { id: toastId });
         } catch (e: any) {
             toast.error(e?.message || 'The 4K export could not be completed.', { id: toastId });
         } finally {
