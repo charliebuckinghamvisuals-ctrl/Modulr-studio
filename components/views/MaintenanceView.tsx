@@ -9,7 +9,7 @@ import React from 'react';
  * ?preview=1 once on any URL - that sets a flag in this browser only - so
  * the site can be checked without lifting the sign for everyone.
  */
-export const UNDER_CONSTRUCTION = true;
+export const UNDER_CONSTRUCTION = false; // lifted 18 Sep 2026 with the Modulr Lock System release
 
 const BYPASS_KEY = 'modulr_preview_bypass';
 

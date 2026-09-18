@@ -130,7 +130,7 @@ export const WalkthroughShowcase: React.FC<WalkthroughShowcaseProps> = ({ chapte
             </div>
 
             {chapters && (
-                <div className={`mt-4 flex flex-wrap items-center gap-2 ${chaptersOverlay ? 'absolute left-0 right-0 top-full' : ''}`}>
+                <div className={`mt-4 flex flex-wrap items-center gap-2 ${chaptersOverlay ? 'lg:absolute lg:left-0 lg:right-0 lg:top-full' : ''}`}>
                     {CHAPTERS.map((c, i) => (
                         <button
                             key={c.label}

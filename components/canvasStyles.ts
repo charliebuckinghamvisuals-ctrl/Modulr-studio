@@ -68,6 +68,7 @@ export const WORKSPACE_HEIGHT = 'h-[calc(100vh-6rem)]';
  * the canvas column on the right. No drafting grid, no coloured blobs, no
  * floating panels; Charlie wanted them plain white and all the same size.
  */
-export const TOOL_PAGE = `${WORKSPACE_HEIGHT} flex flex-col md:flex-row bg-white relative overflow-hidden`;
-export const TOOL_SIDEBAR = 'w-full md:w-80 lg:w-96 shrink-0 flex flex-col gap-6 p-6 bg-white border-r border-slate-200 overflow-y-auto custom-scrollbar';
-export const TOOL_CANVAS_COL = 'flex-1 p-3 lg:p-4 flex flex-col gap-3 min-w-0 overflow-y-auto custom-scrollbar bg-white';
+// Written out in full: Tailwind only generates classes it can read in source.
+export const TOOL_PAGE = 'md:h-[calc(100vh-6rem)] flex flex-col md:flex-row bg-white relative md:overflow-hidden';
+export const TOOL_SIDEBAR = 'w-full md:w-80 lg:w-96 shrink-0 flex flex-col gap-6 p-4 md:p-6 bg-white border-b md:border-b-0 md:border-r border-slate-200 md:overflow-y-auto custom-scrollbar';
+export const TOOL_CANVAS_COL = 'flex-1 p-3 lg:p-4 flex flex-col gap-3 min-w-0 md:overflow-y-auto custom-scrollbar bg-white';

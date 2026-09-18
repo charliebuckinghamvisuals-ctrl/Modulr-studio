@@ -136,7 +136,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onNavigate }) 
             {/* 3. Design, walk, render - with the walkthrough recording as the
                 proof of the middle one. Three columns, one sentence each. */}
             {/* Extra bottom padding: the chapter chips hang below the frame. */}
-            <Band tone="pale" inner="pt-16 sm:pt-24 pb-28 sm:pb-36">
+            <Band tone="pale" inner="pt-16 sm:pt-24 pb-16 sm:pb-24 lg:pb-36">
                 <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-10 lg:gap-16 items-center">
                     <WalkthroughShowcase chaptersOverlay />
                     <div>
