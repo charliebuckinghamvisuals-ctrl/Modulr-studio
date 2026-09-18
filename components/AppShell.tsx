@@ -12,16 +12,15 @@ interface AppShellProps {
   headerActions?: ReactNode;
 }
 
-// Tool pages that require a full desktop - blocked on mobile. The Render
-// Engine, Line Converter, Weather Lab and Material Studio are open on mobile
-// (Charlie, 18 Sep 2026: to test and use on site) - they share the one
-// responsive tool frame. The configurator, editor and studio stay desktop.
+// Blocked on mobile: ONLY the 3D configurator (Charlie, 18 Sep 2026). The
+// Render Engine, Line Converter, Weather Lab and Material Studio all open on
+// a phone; Floor Plan Studio and Animation Studio are parked (Coming soon)
+// everywhere, see PARKED_STAGES. Editor and Studio are legacy, desktop.
 const DESKTOP_ONLY_STAGES = new Set([
+  AppStage.DESIGNER,
   AppStage.EDITOR,
   AppStage.STUDIO,
   AppStage.UPLOAD,
-  AppStage.ANIMATION_STUDIO,
-  AppStage.FLOOR_PLAN_STUDIO,
 ]);
 
 /**
@@ -385,31 +384,38 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
             );
           })}
 
-          {/* Desktop-only tools section */}
+          {/* Studio tools. The tag comes from the real gates (18 Sep 2026):
+              a tool in DESKTOP_ONLY_STAGES is tagged Desktop and greyed, a
+              parked one is tagged Coming soon, everything else opens. */}
           <div className="pt-5 pb-2 px-2">
-            <p className="text-[9px] font-bold text-secondary/50 uppercase tracking-[0.2em]">Studio Tools - Desktop Only</p>
+            <p className="text-[9px] font-bold text-secondary/50 uppercase tracking-[0.2em]">Studio Tools</p>
           </div>
-          {toolItems.map(item => (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className="w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-medium transition-all text-secondary/40 hover:bg-slate-50"
-            >
-              <span className="shrink-0 opacity-40">{item.icon}</span>
-              <span className="flex items-center">
-                {item.label}
-                {item.badge && <span className="text-[8px] font-bold uppercase tracking-wider bg-[#405a56]/10 text-[#405a56] px-1.5 py-0.5 rounded-full ml-2">{item.badge}</span>}
-                {item.locked && <Lock size={11} className="text-secondary/40 ml-2 shrink-0" />}
-              </span>
-              <span className="ml-auto text-[9px] font-bold uppercase bg-slate-100 text-secondary/50 px-2 py-0.5 rounded-full tracking-widest whitespace-nowrap">Desktop</span>
-            </button>
-          ))}
+          {toolItems.map(item => {
+            const desktop = DESKTOP_ONLY_STAGES.has(item.id);
+            const parked = PARKED_STAGES.has(item.id) && !isMasterAccount(user);
+            const open = !desktop && !parked;
+            return (
+              <button
+                key={item.id}
+                onClick={() => { onNavigate(item.id); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm transition-all ${open ? 'font-semibold text-slate-600 hover:text-accent hover:bg-slate-50' : 'font-medium text-secondary/40 hover:bg-slate-50'}`}
+              >
+                <span className={`shrink-0 ${open ? '' : 'opacity-40'}`}>{item.icon}</span>
+                <span className="flex items-center">
+                  {item.label}
+                  {item.badge && !parked && <span className="text-[8px] font-bold uppercase tracking-wider bg-[#405a56]/10 text-[#405a56] px-1.5 py-0.5 rounded-full ml-2">{item.badge}</span>}
+                </span>
+                {desktop && <span className="ml-auto text-[9px] font-bold uppercase bg-slate-100 text-secondary/50 px-2 py-0.5 rounded-full tracking-widest whitespace-nowrap">Desktop</span>}
+                {parked && <span className="ml-auto text-[9px] font-bold uppercase bg-slate-100 text-secondary/50 px-2 py-0.5 rounded-full tracking-widest whitespace-nowrap">Coming soon</span>}
+              </button>
+            );
+          })}
         </nav>
 
         {/* Drawer Footer */}
         <div className="px-6 py-5 border-t border-slate-100 shrink-0">
           <p className="text-[10px] text-secondary/50 text-center leading-relaxed">
-            Render tools require a desktop browser.<br />Sign up &amp; pricing work on mobile.
+            The 3D configurator needs a desktop browser.<br />Everything else works here.
           </p>
         </div>
       </div>
