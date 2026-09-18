@@ -70,16 +70,20 @@ export function mountRender(app, deps) {
             }
             const shadedMime = sniffMime(shaded);
             const lineMime = line ? sniffMime(line) : 'image/png';
-            const references = line ? [{ b64: line, mime: lineMime }, { b64: shaded, mime: shadedMime }] : [{ b64: shaded, mime: shadedMime }];
+            // An uploaded line drawing arrives as both: the drawing IS the source,
+            // so there is no colour reference and the inventory carries the colours.
+            const lineOnly = !!line && line === shaded;
+            if (lineOnly) lineSource = 'upload';
+            const references = lineOnly ? [{ b64: line, mime: lineMime }] : line ? [{ b64: line, mime: lineMime }, { b64: shaded, mime: shadedMime }] : [{ b64: shaded, mime: shadedMime }];
             const verifyAgainst = line ? { b64: line, mime: lineMime } : { b64: shaded, mime: shadedMime };
 
             // ---- pass 1: FINISH model on the drawing -------------------------
-            const prompt = buildRenderPrompt({ inventoryText, hasLine: !!line, scenePreset, timePreset, sceneText });
+            const prompt = buildRenderPrompt({ inventoryText, hasLine: !!line, lineOnly, scenePreset, timePreset, sceneText });
             let image = await drawImage(ai, { model: FINISH_MODEL, images: references, prompt, ratio, seed, label: 'pass1' });
             imageCalls++;
             if (!image) return res.status(502).json({ error: 'The render engine produced no image. Please try again.' });
 
-            const colourRef = { colourRefB64: shaded, colourRefMime: shadedMime };
+            const colourRef = lineOnly ? {} : { colourRefB64: shaded, colourRefMime: shadedMime };
             let verification = await verifyRender(ai, Type, { model: ANALYSIS_MODEL, referenceB64: verifyAgainst.b64, referenceMime: verifyAgainst.mime, renderB64: image, items, ...colourRef });
             let attempts = [{ pass: 'finish', ...verification }];
             let shipped = 'pass1';

@@ -377,9 +377,44 @@ export const useAppEngine = () => {
      * panel. The old five-box material detector is gone: a deck was one
      * word, a light fitting was nothing at all.
      */
+    /**
+     * Is this upload a line drawing (Line Converter output, a CAD export)?
+     * Nearly all pixels white or near-white and almost no colour. A drawing
+     * is then sent to the engine AS the drawing - no redraw, no pretending
+     * it is a colour reference (18 Sep 2026).
+     */
+    const looksLikeLineDrawing = (base64: string) => new Promise<boolean>(resolve => {
+        try {
+            const img = new Image();
+            img.onload = () => {
+                try {
+                    const c = document.createElement('canvas'); c.width = 96; c.height = 96;
+                    const ctx = c.getContext('2d', { willReadFrequently: true })!;
+                    ctx.drawImage(img, 0, 0, 96, 96);
+                    const d = ctx.getImageData(0, 0, 96, 96).data;
+                    let light = 0, coloured = 0, n = 0;
+                    for (let i = 0; i < d.length; i += 4) {
+                        const r = d[i], g = d[i + 1], b = d[i + 2];
+                        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+                        if (max > 225) light++;
+                        if (max - min > 40) coloured++;
+                        n++;
+                    }
+                    resolve(light / n > 0.6 && coloured / n < 0.03);
+                } catch { resolve(false); }
+            };
+            img.onerror = () => resolve(false);
+            img.src = base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`;
+        } catch { resolve(false); }
+    });
+
     const handleAnalyzeForRenderEngine = async (image: string) => {
         setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' }); // Explicit reset
         setRenderLineImage(null);
+        if (await looksLikeLineDrawing(image)) {
+            setRenderLineImage(image);
+            toast('Line drawing detected - the engine will render it as drawn. Add colours and materials in the inventory boxes.', { icon: '✏️', duration: 6000 });
+        }
         setRenderSpec(null);
         setInventoryItems([]);
         setProcessing({ isLoading: true, message: 'Surveying the view: building, openings, decking, lights...' });

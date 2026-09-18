@@ -77,6 +77,13 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     // generation is 2K everywhere, 4K is a metered per-image export.
     const { canExport4K, fourKLeft } = useCredits();
 
+    // With a source AND a result there are two ways to look: the compare
+    // slider, or the inspect viewer (scroll to zoom, drag to pan) on the
+    // result alone - the detail that sells the job is invisible fitted to
+    // the window (Charlie, 18 Sep 2026). Resets to compare on a new result.
+    const [viewMode, setViewMode] = React.useState<'compare' | 'inspect'>('compare');
+    React.useEffect(() => { setViewMode('compare'); }, [primaryImg]);
+
     const getImageUrl = (img: string | null) => {
         if (!img) return '';
         if (img.startsWith('http') || img.startsWith('blob:') || img.startsWith('data:')) {
@@ -115,7 +122,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
         }
 
         let content = null;
-        if (primaryImg && secondaryImg) {
+        if (primaryImg && secondaryImg && viewMode === 'compare') {
             content = <CompareSlider beforeImage={secondaryImg} afterImage={primaryImg} />;
         } else if (primaryImg) {
             // The finished render gets the real viewer - scroll to zoom, drag to
@@ -139,6 +146,12 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
             return (
                 <div className="w-full h-full absolute inset-0 flex items-center justify-center">
                     {content}
+                    {primaryImg && secondaryImg && !isLoading && (
+                        <div className="absolute top-3 left-3 z-40 flex bg-white border border-slate-200 text-[11px] font-bold uppercase tracking-wider">
+                            <button onClick={() => setViewMode('compare')} className={`px-3 py-1.5 ${viewMode === 'compare' ? 'bg-accent text-white' : 'text-slate-500 hover:text-accent'}`} title="Before / after slider">Compare</button>
+                            <button onClick={() => setViewMode('inspect')} className={`px-3 py-1.5 ${viewMode === 'inspect' ? 'bg-accent text-white' : 'text-slate-500 hover:text-accent'}`} title="Scroll to zoom, drag to pan, double-click for 100%">Inspect</button>
+                        </div>
+                    )}
                     {isLoading && (
                         <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-xl border border-accent/20 flex items-center gap-3 z-50">
                             <Loader2 className="w-4 h-4 animate-spin text-accent" />

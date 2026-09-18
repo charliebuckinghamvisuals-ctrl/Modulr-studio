@@ -44,8 +44,10 @@ const asText = (map, key, fallback) => (typeof key === 'string' && map[key] !== 
  * @param {string} o.timePreset      key of TIME_PRESETS
  * @param {string} o.sceneText       the user's own words about the setting
  */
-export function buildRenderPrompt({ inventoryText, hasLine, scenePreset, timePreset, sceneText }) {
-    const inputs = hasLine
+export function buildRenderPrompt({ inventoryText, hasLine, lineOnly = false, scenePreset, timePreset, sceneText }) {
+    const inputs = lineOnly
+        ? 'Image 1 is an exact LINE DRAWING of a finished design: every edge in it is real geometry, and it is the ONLY geometry there is. There is NO colour reference: every colour and material comes from the inventory below, and where the inventory names none, use a plain, plausible new-build finish. Keep the camera, framing and crop exactly.'
+        : hasLine
         ? 'Image 1 is an exact LINE DRAWING of a finished 3D model: every edge in it is real geometry, and it is the ONLY geometry there is. Image 2 is the same view, flat-shaded, for colour and material reference only - where its colours disagree with the inventory below, the inventory wins. Keep image 1\'s camera, framing and crop exactly.'
         : 'Image 1 is a flat-shaded view of a finished 3D model. Its geometry is final and complete. Keep its camera, framing and crop exactly.';
     const setting = [asText(SCENE_PRESETS, scenePreset, 'uk-residential'), (sceneText || '').trim()].filter(Boolean).join(' ');
