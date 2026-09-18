@@ -233,6 +233,8 @@ export interface InventoryItem {
     group: string;
     label: string;
     text: string;
+    /** The designer's colour / material for this item, e.g. "black" or "dark chocolate brown composite cladding". Sent with the item; the server appends it as an override. */
+    finish?: string;
 }
 
 export interface SceneSetting {

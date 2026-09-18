@@ -234,10 +234,16 @@ const App: React.FC = () => {
                                 {items.map(it => (
                                     <div key={it.id} className="group relative">
                                         <div className="text-[10px] font-bold text-accent/80 mb-1 pr-6">{it.label}</div>
-                                        <textarea
-                                            className="w-full p-3 rounded-2xl bg-white border border-accent/20 text-accent focus:outline-none focus:ring-2 focus:ring-accent/50 text-[11px] leading-snug placeholder-accent/30 min-h-[56px] resize-none shadow-inner"
-                                            value={it.text}
-                                            onChange={(e) => engine.updateInventoryItem(it.id, e.target.value)}
+                                        {/* The survey's words, locked (18 Sep 2026): reading and
+                                            editing a paragraph per item was the slow part. The
+                                            designer types the colour / material in the box under it
+                                            and the server appends it as the override. */}
+                                        <p className="w-full p-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-500 text-[11px] leading-snug select-text">{it.text}</p>
+                                        <input
+                                            className="mt-1.5 w-full px-3 py-2 rounded-2xl bg-white border border-accent/30 text-accent focus:outline-none focus:ring-2 focus:ring-accent/50 text-[11px] placeholder-accent/35"
+                                            placeholder={it.group === 'openings' ? 'Colour / material, e.g. black aluminium' : it.group === 'materials' ? 'e.g. dark chocolate brown composite cladding' : 'Colour / material (optional)'}
+                                            value={it.finish || ''}
+                                            onChange={(e) => engine.updateInventoryFinish(it.id, e.target.value)}
                                         />
                                         <button
                                             onClick={() => engine.removeInventoryItem(it.id)}

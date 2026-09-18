@@ -418,6 +418,7 @@ export const useAppEngine = () => {
     };
 
     const updateInventoryItem = (id: string, text: string) => setInventoryItems(prev => prev.map(it => (it.id === id ? { ...it, text } : it)));
+    const updateInventoryFinish = (id: string, finish: string) => setInventoryItems(prev => prev.map(it => (it.id === id ? { ...it, finish } : it)));
     const removeInventoryItem = (id: string) => setInventoryItems(prev => prev.filter(it => it.id !== id));
 
     const handleAnalyzeForEditor = async (image: string) => {
@@ -1189,7 +1190,7 @@ export const useAppEngine = () => {
     };
 
     return {
-        renderLineImage, setRenderLineImage, renderSpec, inventoryItems, setInventoryItems, updateInventoryItem, removeInventoryItem, isSurveying, sceneSetting, setSceneSetting, loadConfiguratorScene,
+        renderLineImage, setRenderLineImage, renderSpec, inventoryItems, setInventoryItems, updateInventoryItem, updateInventoryFinish, removeInventoryItem, isSurveying, sceneSetting, setSceneSetting, loadConfiguratorScene,
         activeStage, setActiveStage,
         originalImage, setOriginalImage, setOriginalImageForStage, lineImage, setLineImage, lineSourceImage, setLineSourceImage, renderedImage, setRenderedImage, editorImage, setEditorImage, lineEnvironmentImage, setLineEnvironmentImage, finalImage, setFinalImage, materialStudioImage, setMaterialStudioImage,
         batchImages, setBatchImages, batchRenders, setBatchRenders, batchMaterials, setBatchMaterials,

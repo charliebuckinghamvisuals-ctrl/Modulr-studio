@@ -302,7 +302,14 @@ export function inventoryFromItems(raw) {
     if (!Array.isArray(raw)) return [];
     return raw.slice(0, 40)
         .filter(x => x && typeof x === 'object' && typeof x.text === 'string' && x.text.trim())
-        .map((x, i) => item(clean(String(x.id || `item-${i + 1}`), 40).replace(/[^a-z0-9-]/gi, '') || `item-${i + 1}`, clean(String(x.group || 'other'), 20), x.label || x.text.slice(0, 60), x.text));
+        .map((x, i) => {
+            // The designer's own colour / material for this item (the box under
+            // the locked survey text, 18 Sep 2026): appended so it overrides
+            // whatever the survey read off the image, and the verifier checks it.
+            const finish = typeof x.finish === 'string' ? clean(x.finish, 160) : '';
+            const text = finish ? `${x.text.trim().replace(/[.s]+$/, '')}. COLOUR / MATERIAL, as specified by the designer - this overrides anything the drawing or the survey suggests: ${finish}.` : x.text;
+            return item(clean(String(x.id || `item-${i + 1}`), 40).replace(/[^a-z0-9-]/gi, '') || `item-${i + 1}`, clean(String(x.group || 'other'), 20), x.label || x.text.slice(0, 60), text);
+        });
 }
 
 /** The numbered list the prompt and the verifier both use. */
