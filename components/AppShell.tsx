@@ -13,15 +13,13 @@ interface AppShellProps {
 }
 
 // Tool pages that require a full desktop - blocked on mobile. The Render
-// Engine is open on mobile (Charlie, 18 Sep 2026: to test and use on site);
-// the configurator and the rest stay desktop.
+// Engine, Line Converter, Weather Lab and Material Studio are open on mobile
+// (Charlie, 18 Sep 2026: to test and use on site) - they share the one
+// responsive tool frame. The configurator, editor and studio stay desktop.
 const DESKTOP_ONLY_STAGES = new Set([
-  AppStage.LINE_CONVERT,
   AppStage.EDITOR,
-  AppStage.MATERIAL_STUDIO,
   AppStage.STUDIO,
   AppStage.UPLOAD,
-  AppStage.WEATHER_LAB,
   AppStage.ANIMATION_STUDIO,
   AppStage.FLOOR_PLAN_STUDIO,
 ]);
