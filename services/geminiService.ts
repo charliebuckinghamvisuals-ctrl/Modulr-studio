@@ -499,12 +499,23 @@ export const analyzeSceneForEditor = async (base64Image: string): Promise<{ desc
 /**
  * Modifies the weather/environment.
  */
+export interface WeatherResult {
+  result: string;
+  line?: string;
+  verification?: RenderVerification;
+  engine?: Record<string, string>;
+}
+
+/**
+ * Weather Lab (18 Sep 2026): the render's exact line drawing and inventory go
+ * with the image when the engine has them, so the weather pass is geometry-
+ * locked and verified item by item like a render.
+ */
 export const applyWeather = async (
   base64Image: string,
-  weather: WeatherConfig,
-  isHighQuality: boolean = false,
-  isProMode: boolean = false
-): Promise<string> => {
+  weather: WeatherConfig & { notes?: string },
+  extras: { line?: string | null; items?: InventoryItem[] } = {}
+): Promise<WeatherResult> => {
   let retries = 2;
   while (retries >= 0) {
     try {
@@ -513,7 +524,7 @@ export const applyWeather = async (
       const response = await apiFetch(`${API_BASE_URL}/applyWeather`, {
         method: 'POST',
         headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ base64Image, weather, isHighQuality, ratio, isProMode, quality: currentImageQuality })
+        body: JSON.stringify({ base64Image, weather, ratio, line: extras.line || null, items: extras.items?.length ? extras.items : undefined })
       });
 
       if (!response.ok) {
@@ -522,7 +533,8 @@ export const applyWeather = async (
       }
 
       const data = await response.json();
-      return data.result;
+      if (data.verification) lastVerification = data.verification;
+      return data as WeatherResult;
 
     } catch (error: any) {
       if (retries === 0 || error.message.includes('HTTP error! status: 4')) {

@@ -988,8 +988,14 @@ export const useAppEngine = () => {
 
         setProcessing({ isLoading: true, message: `Simulating ${weather.condition}...` });
         try {
-            const result = await applyWeather(source, weather, isHighQuality, isProMode);
+            // The engine's drawing and inventory lock the geometry when this
+            // render came from it; the notes box is the designer's own words.
+            const out = await applyWeather(source, { ...weather, notes: additionalPrompt }, { line: renderLineImage, items: inventoryItems });
+            const result = out.result;
             setFinalImage(result);
+            if (out.verification?.checked && !out.verification.passed) {
+                toast(`Weather applied - the checker flagged ${out.verification.failures.length} item${out.verification.failures.length === 1 ? '' : 's'}: ${out.verification.failures.slice(0, 2).map(f => f.label).join(', ')}.`, { icon: '⚠️', duration: 7000 });
+            }
             await saveToHistory({
                 stage: AppStage.WEATHER_LAB,
                 image: result,

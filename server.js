@@ -10,6 +10,11 @@ import admin from 'firebase-admin';
 import Stripe from 'stripe';
 import helmet from 'helmet';
 import { mountRender } from './render/index.js';
+import { drawImage, FINISH_MODEL, GEOMETRY_MODEL, safeRatio } from './render/providers/gemini.js';
+import { verifyRender } from './render/verify.js';
+import { inventoryFromItems } from './render/inventory.js';
+import { LINE_CONVERSION_PROMPT } from './render/prompt.js';
+import { buildWeatherPrompt, GENERIC_WEATHER_ITEMS } from './render/weather.js';
 
 dotenv.config();
 
@@ -3835,87 +3840,91 @@ app.post('/api/analyzeScene', userAiLimiter, async (req, res) => {
     }
 });
 
+/**
+ * Weather Lab (rebuilt 18 Sep 2026 on the contract engine - see
+ * render/weather.js). Weather is the ONLY thing allowed to change: the
+ * render's exact line drawing locks the geometry, the prompt says what the
+ * weather physically does, and the result is verified against the source
+ * render item by item with one strictly-better retry. The old route asked
+ * Sunburst to "re-light and compose" and checked nothing.
+ */
 app.post('/api/applyWeather', userAiLimiter, async (req, res) => {
+    const t0 = Date.now();
     try {
-        const base64Image   = sanitizeString(req.body.base64Image, 10_000_000);
-        const ratio         = sanitizeString(req.body.ratio, 10);
-        const isProMode     = sanitizeBool(req.body.isProMode);
-        const rawWeather    = req.body.weather || {};
+        const stripData = (v) => (typeof v === 'string' ? v.replace(/^data:[^;]+;base64,/, '') : '');
+        const base64Image = stripData(sanitizeString(req.body.base64Image, 12_000_000));
+        let line = stripData(sanitizeString(req.body.line, 6_000_000)) || null;
+        const ratio = safeRatio(sanitizeString(req.body.ratio, 10));
+        const rawWeather = req.body.weather || {};
         const weather = {
             condition: sanitizeString(rawWeather.condition, 100),
-            season:    sanitizeString(rawWeather.season,    50),
+            season: sanitizeString(rawWeather.season, 50),
             timeOfDay: sanitizeString(rawWeather.timeOfDay, 50),
+            notes: sanitizeString(rawWeather.notes, 300),
         };
+        if (!base64Image || base64Image.length < 100) return res.status(400).json({ error: 'No image supplied.' });
 
         // Generation is 2K on every plan - 4K is the metered /api/export4k
         // action only - so this always meters at the standard rate.
         const access = await enforceRenderAccess(req, CREDIT_COSTS.STANDARD_RES);
-        if (!access.allowed) {
-            return res.status(access.status).json(access.body);
+        if (!access.allowed) return res.status(access.status).json(access.body);
+
+        const sniff = (b64) => { const h = Buffer.from(String(b64).slice(0, 32), 'base64'); return h[0] === 0x89 && h[1] === 0x50 ? 'image/png' : 'image/jpeg'; };
+        const srcMime = sniff(base64Image);
+
+        // The geometry lock: the engine's own drawing when the render came from
+        // it, otherwise one drawn now (an ANALYSIS-priced Flash call).
+        let lineSource = line ? 'engine' : 'none';
+        let imageCalls = 0;
+        if (!line) {
+            line = await drawImage(ai, { model: GEOMETRY_MODEL, images: [{ b64: base64Image, mime: srcMime }], prompt: LINE_CONVERSION_PROMPT, ratio, label: 'weather-line' });
+            imageCalls++;
+            lineSource = line ? 'drawn' : 'none';
         }
+        const lineMime = line ? sniff(line) : 'image/png';
+        const references = line ? [{ b64: line, mime: lineMime }, { b64: base64Image, mime: srcMime }] : [{ b64: base64Image, mime: srcMime }];
 
-        const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
+        // What the verifier checks: the design's inventory when the client has
+        // one (a render straight from the engine), the generic four otherwise.
+        let items = inventoryFromItems(req.body.items);
+        if (!items.length) items = inventoryFromItems(GENERIC_WEATHER_ITEMS);
 
-        const prompt = `
-      RENDER ENGINE: Blender Cycles / Unreal Engine 5.
-      TASK: Re-light and compose this scene based on the weather config.
+        const prompt = buildWeatherPrompt({ ...weather, hasLine: !!line });
+        let image = await drawImage(ai, { model: FINISH_MODEL, images: references, prompt, ratio, label: 'weather' });
+        imageCalls++;
+        if (!image) throw new Error('No weather image generated');
 
-      SETTINGS:
-      Condition: ${weather.condition}
-      Season: ${weather.season}
-      Time of Day: ${weather.timeOfDay}
-
-      QUALITY RULES:
-      - Maintain RAW Photorealistic quality.
-      - CRITICAL DIMENSIONS: Output at 2K resolution (2048 pixels on the long edge). Do not upscale and do not increase the pixel count beyond this - it locks the pricing tier.
-      - Physically correct lighting calculations (Ray Tracing).
-      - Accurate reflections on glass and wet surfaces.
-      - Volumetric lighting where appropriate (e.g. fog, golden hour).
-      - NO loss of detail. NO cartoon filters. NO painterly brush strokes.
-      - Maintain photographic grain and sharp micro-textures for close-ups.
-      - Keep the building geometry 100% locked. Only change lighting and atmosphere.
-      - CAMERA LOCK: keep the source image's exact camera position, angle, framing
-        and crop. Do NOT zoom, re-crop or change viewpoint - every element stays
-        exactly where the source shows it.
-    `;
-
-        if (openAiReady()) {
-            const { quality } = await resolveImageQuality(req);
-            const out = await openAiImageEdit({
-                prompt, images: [{ b64: base64Image, mime: 'image/jpeg' }],
-                size: openAiSizeFor(ratio, 2048), quality, label: 'applyWeather',
-            });
-            if (!out.b64) throw new Error("No weather image generated");
-            logRender(req, 'applyWeather', OPENAI_IMAGE_MODEL, '2K', { quality, ...openAiUsageLog(out.usage) });
-            return res.json({ result: out.b64, quality });
-        }
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-image',
-            contents: {
-                parts: [
-                    imagePart,
-                    { text: prompt }
-                ]
-            },
-            config: {
-                outputMimeType: "image/jpeg",
-                imageConfig: {
-                    aspectRatio: ratio,
-                    imageSize: "2K"
-                },
-                temperature: 0.2
+        // Verified against the SOURCE RENDER, not the drawing: same camera, same
+        // items; lighting, sky and what lies on surfaces are allowed to differ.
+        const verifyArgs = { model: ANALYSIS_MODEL, referenceB64: base64Image, referenceMime: srcMime, items, kind: 'render' };
+        let verification = await verifyRender(ai, Type, { ...verifyArgs, renderB64: image });
+        const attempts = [{ pass: 'weather', ...verification }];
+        let shipped = 'pass1';
+        if (verification.checked && !verification.passed) {
+            console.warn('[WEATHER] pass 1 failed verification:', verification.failures.map(f => `${f.label}: ${f.problem}`).join('; '));
+            const promoted = 'PREVIOUS ATTEMPT REJECTED. These were changed and must stay exactly as the source shows: ' + verification.failures.map(f => `${f.label} (${f.problem})`).join('; ') + '.\n\n';
+            const retry = await drawImage(ai, { model: FINISH_MODEL, images: references, prompt: promoted + prompt, ratio, label: 'weather-retry' });
+            imageCalls++;
+            if (retry) {
+                const v2 = await verifyRender(ai, Type, { ...verifyArgs, renderB64: retry });
+                attempts.push({ pass: 'retry', ...v2 });
+                if (!v2.checked || v2.failures.length < verification.failures.length) { image = retry; verification = v2; shipped = 'retry'; }
+                if (!v2.passed) console.warn('[WEATHER] retry still failing, shipping the better attempt');
             }
+        }
+
+        logRender(req, 'applyWeather', FINISH_MODEL, '2K', {
+            condition: weather.condition, season: weather.season, timeOfDay: weather.timeOfDay,
+            imageCalls, qaCalls: attempts.length, shipped, lineSource, verified: verification.passed, verificationChecked: verification.checked,
+            failures: verification.failures.map(f => `${f.id}: ${f.problem}`).slice(0, 12), seconds: Math.round((Date.now() - t0) / 1000),
         });
-
-        for (const part of response.candidates?.[0]?.content?.parts || []) {
-            if (part.inlineData) {
-                logRender(req, 'applyWeather', 'gemini-3.1-flash-image', '2K');
-                return res.json({ result: part.inlineData.data });
-            }
-        }
-        throw new Error("No weather image generated");
-
+        return res.json({
+            result: image,
+            line: lineSource === 'drawn' ? line : undefined,
+            engine: { finish: FINISH_MODEL, shipped, lineSource },
+            verification: { ...verification, attempts: attempts.map(a => ({ pass: a.pass, checked: a.checked, passed: a.passed, failures: a.failures })) },
+            seconds: Math.round((Date.now() - t0) / 1000),
+        });
     } catch (error) {
         console.error("Weather error:", error);
         if (error && error.clientMessage) return res.status(400).json({ error: error.clientMessage });
