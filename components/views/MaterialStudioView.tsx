@@ -106,7 +106,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
             {/* Ambient Lighting */}
             <div className="absolute top-1/2 right-1/4 w-[600px] h-[600px] bg-white/5 rounded-full blur-[150px] pointer-events-none"></div>
 
-            <div className="w-full md:w-80 flex flex-col gap-6 relative z-10 p-6 m-4 md:m-4 bg-white/95 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-y-auto border border-white">
+            <div className="w-full md:w-80 flex flex-col gap-6 relative z-10 p-6 m-4 md:m-4 bg-white/95 backdrop-blur-xl rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-y-auto border border-white">
                 <div className="space-y-4">
                     <h2 className="text-[7vw] md:text-2xl lg:text-3xl font-bold text-accent w-fit inline-block leading-tight">Material Studio</h2>
                     <p className="text-slate-600 text-sm leading-relaxed">
@@ -383,7 +383,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                     spending a call rather than guessing. */}
                 {originalImage && !mode && !isLoading && (
                     <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-6 animate-in fade-in duration-300">
-                        <div className="w-full max-w-2xl bg-white rounded-[2rem] shadow-2xl border border-white p-8 md:p-10 space-y-8 relative animate-in zoom-in-95 duration-300">
+                        <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-white p-8 md:p-10 space-y-8 relative animate-in zoom-in-95 duration-300">
                             <button
                                 onClick={onOpenSceneUpload}
                                 aria-label="Choose a different image"

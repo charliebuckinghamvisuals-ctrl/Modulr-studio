@@ -71,7 +71,7 @@ export const HeroVideoCarousel: React.FC<{ fullBleed?: boolean }> = ({ fullBleed
 
     return (
         <div className="w-full">
-            <div className={`relative overflow-hidden bg-slate-100 ${fullBleed ? 'rounded-2xl md:rounded-3xl shadow-2xl' : 'rounded-3xl md:rounded-[2.5rem] border border-border shadow-2xl'}`}>
+            <div className={`relative overflow-hidden bg-slate-100 ${fullBleed ? 'rounded-2xl md:rounded-3xl shadow-2xl' : 'rounded-3xl md:rounded-xl border border-border shadow-2xl'}`}>
                 <div className="relative w-full aspect-video">
                     {CLIPS.map((clip, i) => (
                         <video

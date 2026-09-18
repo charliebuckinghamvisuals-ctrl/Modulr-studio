@@ -27,7 +27,7 @@ const TYPE = {
 };
 
 const SECTION = 'scroll-mt-24';
-const CARD = 'rounded-[2rem] border border-border bg-white/50 backdrop-blur-xl shadow-xl shadow-black/[0.03]';
+const CARD = 'rounded-xl border border-border bg-white/50 backdrop-blur-xl shadow-xl shadow-black/[0.03]';
 
 interface Tool {
     icon: React.ReactNode;

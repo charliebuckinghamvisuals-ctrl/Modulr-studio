@@ -22,6 +22,15 @@
   --color-accent-hover: var(--accent-hover);
   --font-sans: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-heading: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* Square containers (18 Sep 2026). Cards, panels, tiles and inputs use
+     rounded-lg..3xl and are now near-square - drawing-office, not app
+     store. Buttons, chips and the toolbar are rounded-full and untouched. */
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 3px;
+  --radius-2xl: 3px;
+  --radius-3xl: 4px;
+  --radius-4xl: 4px;
 }
 
 * {

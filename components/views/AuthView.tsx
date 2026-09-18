@@ -84,7 +84,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onNavigate }) => {
             <div className="absolute bottom-1/4 left-0 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[120px] pointer-events-none"></div>
 
             {/* Auth Container */}
-            <div className="w-full max-w-[1000px] relative z-10 glass-panel rounded-[3rem] border border-border bg-white shadow-[0_50px_100px_rgba(0,0,0,0.1)] overflow-hidden flex flex-col md:flex-row min-h-[600px] animate-in fade-in zoom-in-95 duration-700">
+            <div className="w-full max-w-[1000px] relative z-10 glass-panel rounded-xl border border-border bg-white shadow-[0_50px_100px_rgba(0,0,0,0.1)] overflow-hidden flex flex-col md:flex-row min-h-[600px] animate-in fade-in zoom-in-95 duration-700">
                 
                 {/* Left Side: Architectural Showcase (Desktop Only) */}
                 <div className="hidden md:flex md:w-[45%] bg-slate-50 relative overflow-hidden flex-col justify-between p-12 border-r border-border">
@@ -102,7 +102,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onNavigate }) => {
                     <div className="absolute inset-0 canvas-grid opacity-10 scale-150"></div>
                     
                     {/* Top Bubble Section: Brand & Title */}
-                    <div className="relative z-10 p-6 rounded-[2.5rem] bg-white/90 backdrop-blur-md border border-border shadow-xl space-y-4 max-w-[340px] animate-in slide-in-from-left duration-700 delay-150">
+                    <div className="relative z-10 p-6 rounded-xl bg-white/90 backdrop-blur-md border border-border shadow-xl space-y-4 max-w-[340px] animate-in slide-in-from-left duration-700 delay-150">
                         <div className="flex items-center gap-2 text-accent">
                             <Hexagon size={24} className="fill-accent/10" />
                             <span className="font-bold tracking-[0.3em] text-[10px] uppercase italic">Modulr Render Engine</span>

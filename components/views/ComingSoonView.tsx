@@ -205,7 +205,7 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
             {/* Main Coming Soon Content */}
             <main className="z-10 flex flex-col items-center text-center max-w-3xl w-full mx-auto my-auto py-12 relative">
                 {/* Hero Card */}
-                <div className="bg-white/80 backdrop-blur-2xl p-10 md:p-14 rounded-[3rem] border border-[#405a56]/20 shadow-xl flex flex-col items-center text-center w-full relative overflow-hidden">
+                <div className="bg-white/80 backdrop-blur-2xl p-10 md:p-14 rounded-xl border border-[#405a56]/20 shadow-xl flex flex-col items-center text-center w-full relative overflow-hidden">
                     
                     {/* Glowing Logo Accent */}
                     <div className="relative mb-6">

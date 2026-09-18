@@ -54,7 +54,7 @@ export const AnimationsView: React.FC = () => {
                             {CLIPS.map((clip, idx) => (
                                 <div
                                     key={clip.id}
-                                    className="group relative glass-panel rounded-[2.5rem] border border-border bg-white shadow-2xl overflow-hidden transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-3 animate-in fade-in slide-in-from-bottom-12"
+                                    className="group relative glass-panel rounded-xl border border-border bg-white shadow-2xl overflow-hidden transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-3 animate-in fade-in slide-in-from-bottom-12"
                                     style={{ animationDelay: `${idx * 120}ms` }}
                                 >
                                     <div className="relative w-full aspect-video overflow-hidden bg-slate-900">

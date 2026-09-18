@@ -92,7 +92,7 @@ export const GalleryView: React.FC = () => {
                                 {sliderItems.slice(0, 3).map((item, idx) => (
                                     <div 
                                         key={item.id} 
-                                        className="group relative glass-panel rounded-[2.5rem] border border-border bg-white shadow-2xl overflow-hidden transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-4 animate-in fade-in slide-in-from-bottom-12"
+                                        className="group relative glass-panel rounded-xl border border-border bg-white shadow-2xl overflow-hidden transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-4 animate-in fade-in slide-in-from-bottom-12"
                                         style={{ animationDelay: `${idx * 100}ms`, height: '480px' }}
                                     >
                                         <CompareSlider 
@@ -110,7 +110,7 @@ export const GalleryView: React.FC = () => {
                                 {sliderItems.slice(3, 4).map((item, idx) => (
                                     <div 
                                         key={item.id} 
-                                        className="group relative glass-panel rounded-[3rem] border border-border bg-white shadow-[0_50px_100px_rgba(0,0,0,0.1)] overflow-hidden transition-all duration-700 hover:shadow-[0_60px_120px_rgba(0,0,0,0.2)] hover:-translate-y-6 animate-in fade-in slide-in-from-bottom-16 w-full max-w-5xl"
+                                        className="group relative glass-panel rounded-xl border border-border bg-white shadow-[0_50px_100px_rgba(0,0,0,0.1)] overflow-hidden transition-all duration-700 hover:shadow-[0_60px_120px_rgba(0,0,0,0.2)] hover:-translate-y-6 animate-in fade-in slide-in-from-bottom-16 w-full max-w-5xl"
                                         style={{ animationDelay: '350ms', height: '620px' }}
                                     >
                                         <CompareSlider 
@@ -128,7 +128,7 @@ export const GalleryView: React.FC = () => {
                                 {sliderItems.slice(4, 6).map((item, idx) => (
                                     <div 
                                         key={item.id} 
-                                        className="group relative glass-panel rounded-[2.5rem] border border-border bg-white shadow-2xl overflow-hidden transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-4 animate-in fade-in slide-in-from-bottom-12 w-full md:w-[calc(50%-32px)] lg:w-[520px]"
+                                        className="group relative glass-panel rounded-xl border border-border bg-white shadow-2xl overflow-hidden transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-4 animate-in fade-in slide-in-from-bottom-12 w-full md:w-[calc(50%-32px)] lg:w-[520px]"
                                         style={{ animationDelay: `${(idx + 4) * 100}ms`, height: '480px' }}
                                     >
                                         <CompareSlider 
@@ -154,7 +154,7 @@ export const GalleryView: React.FC = () => {
                             {renderItems.map((item, idx) => (
                                 <div 
                                     key={item.id} 
-                                    className="group relative glass-panel rounded-[2.5rem] border border-border bg-white shadow-2xl overflow-hidden transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-4 animate-in fade-in slide-in-from-bottom-12"
+                                    className="group relative glass-panel rounded-xl border border-border bg-white shadow-2xl overflow-hidden transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-4 animate-in fade-in slide-in-from-bottom-12"
                                     style={{ animationDelay: `${idx * 100}ms`, height: '480px' }}
                                 >
                                     <div className="relative w-full h-full overflow-hidden">
@@ -201,7 +201,7 @@ export const GalleryView: React.FC = () => {
                             {materialItems.map((item, idx) => (
                                 <div
                                     key={item.id}
-                                    className="group relative glass-panel rounded-[2.5rem] border border-border bg-white shadow-2xl overflow-hidden aspect-square transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-4 animate-in fade-in slide-in-from-bottom-12"
+                                    className="group relative glass-panel rounded-xl border border-border bg-white shadow-2xl overflow-hidden aspect-square transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-4 animate-in fade-in slide-in-from-bottom-12"
                                     style={{ animationDelay: `${idx * 80}ms` }}
                                 >
                                     <div className="absolute inset-0 bg-slate-100 flex items-center justify-center text-slate-300">

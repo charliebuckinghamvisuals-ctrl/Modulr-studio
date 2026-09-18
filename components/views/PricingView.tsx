@@ -414,7 +414,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                 </div>
 
                 {/* Animation Studio: pay as you go, and what it replaces */}
-                <div className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-[3rem] shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
+                <div className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-xl shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
                         <div>
                             <h4 className="text-2xl font-bold text-accent mb-3">Animation, without the animator.</h4>
@@ -469,7 +469,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                 </div>
 
                 {/* Managed Service */}
-                <div className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-[3rem] shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
+                <div className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-xl shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
 
                     <div className="pt-0 pb-0 border-none">
                         <div className="flex flex-col md:flex-row items-center justify-between gap-8">

@@ -16,7 +16,7 @@ const TYPE = {
     small: 'text-sm md:text-base text-secondary leading-relaxed',
 };
 
-const CARD = 'rounded-[2rem] border border-border bg-white/50 backdrop-blur-xl shadow-xl shadow-black/[0.03]';
+const CARD = 'rounded-xl border border-border bg-white/50 backdrop-blur-xl shadow-xl shadow-black/[0.03]';
 
 interface ToolGuide {
     icon: React.ReactNode;

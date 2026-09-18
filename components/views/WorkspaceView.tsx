@@ -178,7 +178,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                 look like a demo rather than a tool. */}
             <div className="absolute top-1/3 left-1/3 w-[500px] h-[500px] bg-accent/[0.03] rounded-full blur-[140px] pointer-events-none"></div>
 
-            <div className="w-full md:w-80 flex flex-col gap-6 relative z-10 p-6 m-4 md:m-4 bg-white/95 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-y-auto border border-white">
+            <div className="w-full md:w-80 flex flex-col gap-6 relative z-10 p-6 m-4 md:m-4 bg-white/95 backdrop-blur-xl rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-y-auto border border-white">
                 <div className="space-y-4">
                     <h2 className="text-[7vw] md:text-2xl lg:text-3xl font-bold text-accent w-fit inline-block leading-tight">{title}</h2>
                     <p className="text-slate-600 text-sm leading-relaxed">{subtitle}</p>

@@ -158,7 +158,7 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                 {/* Top Row: Quick Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
                     {/* Plan Card */}
-                    <div className="glass-panel p-8 rounded-[2.5rem] border border-border bg-white shadow-xl flex flex-col justify-between group transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
+                    <div className="glass-panel p-8 rounded-xl border border-border bg-white shadow-xl flex flex-col justify-between group transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
                         <div className="space-y-4">
                             <div className="w-12 h-12 rounded-2xl bg-accent/5 border border-accent/10 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-white transition-all duration-500">
                                 <Zap size={24} />
@@ -187,7 +187,7 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                     </div>
 
                     {/* Credits Card - no Refill Balance */}
-                    <div className="glass-panel p-8 rounded-[2.5rem] border border-border bg-white shadow-xl flex flex-col justify-between group transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
+                    <div className="glass-panel p-8 rounded-xl border border-border bg-white shadow-xl flex flex-col justify-between group transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
                         <div className="space-y-6">
                             <div className="flex justify-between items-start">
                                 <div className="w-12 h-12 rounded-2xl bg-accent/5 border border-accent/10 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-white transition-all duration-500">

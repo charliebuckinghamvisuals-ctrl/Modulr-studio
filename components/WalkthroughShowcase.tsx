@@ -88,7 +88,7 @@ export const WalkthroughShowcase: React.FC<WalkthroughShowcaseProps> = ({ chapte
         <div className={`w-full ${className}`}>
             <div
                 ref={frameRef}
-                className="relative rounded-3xl md:rounded-[2.5rem] overflow-hidden border border-border bg-slate-100 shadow-2xl"
+                className="relative rounded-3xl md:rounded-xl overflow-hidden border border-border bg-slate-100 shadow-2xl"
             >
                 {/* The crop's own ratio, so the whole recording shows with no
                     further cropping - the same "see all of it" rule as the hero. */}
