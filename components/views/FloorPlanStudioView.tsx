@@ -219,7 +219,7 @@ export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavi
 
                     <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
                         <div className="space-y-2">
-                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/5 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em]">
+                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-none bg-accent/5 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em]">
                                 <LayoutGrid size={14} /> Floor Plan Studio
                             </div>
                             <h1 className="text-3xl md:text-5xl font-bold text-accent tracking-tight leading-tight">The plan, drawn properly</h1>
@@ -340,7 +340,7 @@ export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavi
                                 ) : source ? (
                                     <div className="w-full">
                                         <img src={source.shaded} alt="Plan view" className="w-full h-auto opacity-90" />
-                                        <p className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/50 text-white text-[10px] font-bold uppercase tracking-widest">Source · plan view</p>
+                                        <p className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-none bg-black/50 text-white text-[10px] font-bold uppercase tracking-widest">Source · plan view</p>
                                     </div>
                                 ) : (
                                     <div className="text-center p-10 text-slate-400">

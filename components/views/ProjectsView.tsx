@@ -382,7 +382,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                         <>
                             <div className="flex flex-wrap items-end justify-between gap-4 mb-10">
                                 <div className="space-y-2">
-                                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/5 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em]">
+                                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-none bg-accent/5 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em]">
                                         <FolderOpen size={14} />
                                         Project Directory
                                     </div>
@@ -430,7 +430,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                                                         <Box size={13} className="shrink-0 text-accent/60" aria-label="Has a saved 3D design" />
                                                     )}
                                                 </h3>
-                                                <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${STATUS_STYLES[project.status]}`}>
+                                                <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-none ${STATUS_STYLES[project.status]}`}>
                                                     {STATUS_LABELS[project.status]}
                                                 </span>
                                             </div>

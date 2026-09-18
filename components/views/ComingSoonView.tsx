@@ -178,7 +178,7 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#405a56]/10 border border-[#405a56]/20 text-[#405a56] text-xs font-semibold tracking-wide">
+                    <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-none bg-[#405a56]/10 border border-[#405a56]/20 text-[#405a56] text-xs font-semibold tracking-wide">
                         <span className="w-2 h-2 rounded-full bg-[#405a56] animate-pulse"></span>
                         Private Beta - Now Open
                     </span>
@@ -221,7 +221,7 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                         MODULR <span className="bg-gradient-to-r from-[#405a56] via-[#5c7b77] to-[#405a56] bg-clip-text text-transparent">STUDIO</span>
                     </h1>
 
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#405a56]/5 border border-[#405a56]/20 text-[#405a56] text-xs font-bold uppercase tracking-widest mb-6">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-none bg-[#405a56]/5 border border-[#405a56]/20 text-[#405a56] text-xs font-bold uppercase tracking-widest mb-6">
                         <Sparkles size={14} className="text-[#405a56]" />
                         Now in Private Beta
                     </div>
@@ -301,7 +301,7 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                         </button>
 
                         <div className="space-y-2">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#405a56]/10 text-[#405a56] text-xs font-bold uppercase tracking-wider">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-none bg-[#405a56]/10 text-[#405a56] text-xs font-bold uppercase tracking-wider">
                                 <ShieldCheck size={14} />
                                 Beta Access
                             </div>

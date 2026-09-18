@@ -509,7 +509,7 @@ export const WhyModulrView: React.FC<WhyModulrViewProps> = ({ onNavigate }) => {
                                         <div className="w-12 h-12 rounded-2xl bg-accent/8 border border-accent/15 flex items-center justify-center text-accent shrink-0">
                                             {item.icon}
                                         </div>
-                                        <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-accent/8 text-accent border border-accent/15 whitespace-nowrap">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-none bg-accent/8 text-accent border border-accent/15 whitespace-nowrap">
                                             {item.status}
                                         </span>
                                     </div>

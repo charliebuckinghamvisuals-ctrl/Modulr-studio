@@ -229,7 +229,7 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
             onClick={() => setConfigMode('public')}
             className="text-left bg-white rounded-3xl p-7 shadow-2xl border border-black/5 hover:-translate-y-0.5 transition-transform"
           >
-            <span className="inline-block text-[10px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50 rounded-full px-2.5 py-1 mb-4">Free</span>
+            <span className="inline-block text-[10px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50 rounded-none px-2.5 py-1 mb-4">Free</span>
             <h3 className="text-lg font-bold text-[#3b4d4a] mb-2">Public</h3>
             <p className="text-sm text-slate-500 leading-relaxed mb-5">Design the outside of a garden room: size, roof, cladding, doors and windows, in 3D and plan, with a PDF.</p>
             <span className="text-xs font-bold uppercase tracking-wider text-[#3b4d4a]">Open &rarr;</span>
@@ -238,7 +238,7 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
             onClick={() => { if (canUseBusinessConfig) setConfigMode('business'); else engine.setActiveStage(AppStage.PRICING); }}
             className={`text-left rounded-3xl p-7 shadow-2xl border transition-transform hover:-translate-y-0.5 ${canUseBusinessConfig ? 'bg-[#3b4d4a] border-transparent' : 'bg-[#2d3a38] border-transparent'}`}
           >
-            <span className={`inline-block text-[10px] font-bold uppercase tracking-widest rounded-full px-2.5 py-1 mb-4 ${canUseBusinessConfig ? 'text-white bg-white/15' : 'text-amber-200 bg-amber-200/15'}`}>
+            <span className={`inline-block text-[10px] font-bold uppercase tracking-widest rounded-none px-2.5 py-1 mb-4 ${canUseBusinessConfig ? 'text-white bg-white/15' : 'text-amber-200 bg-amber-200/15'}`}>
               {canUseBusinessConfig ? 'Included in your plan' : 'Business plan'}
             </span>
             <h3 className="text-lg font-bold text-white mb-2">Business</h3>
@@ -258,7 +258,7 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
         <div className="absolute top-3 right-3 z-20">
           <button
             onClick={() => setDesignsOpen(o => !o)}
-            className="flex items-center gap-2 bg-white/95 backdrop-blur-md border border-black/10 shadow-lg rounded-full px-4 py-2 text-xs font-bold text-[#3b4d4a] hover:bg-white transition-colors"
+            className="flex items-center gap-2 bg-white/95 backdrop-blur-md border border-black/10 shadow-lg rounded-none px-4 py-2 text-xs font-bold text-[#3b4d4a] hover:bg-white transition-colors"
           >
             <FolderOpen size={14} />
             My Designs ({savedDesigns.length})
@@ -322,7 +322,7 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
             )}
             <div className="flex gap-2 justify-end">
               <button onClick={() => setPendingSave(null)} className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700">Cancel</button>
-              <button onClick={confirmSave} className="px-4 py-2 text-xs font-bold text-white bg-accent rounded-full hover:opacity-90">Save design</button>
+              <button onClick={confirmSave} className="px-4 py-2 text-xs font-bold text-white bg-accent rounded-none hover:opacity-90">Save design</button>
             </div>
           </div>
         </div>

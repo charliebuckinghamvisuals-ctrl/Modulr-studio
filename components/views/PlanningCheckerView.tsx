@@ -81,7 +81,7 @@ export const PlanningCheckerView: React.FC = () => {
         <div className="min-h-screen bg-[#f7f8f6] py-16 px-4">
             <div className="max-w-2xl mx-auto">
                 <div className="text-center mb-10">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-[11px] font-bold uppercase tracking-widest mb-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-none bg-accent/10 text-accent text-[11px] font-bold uppercase tracking-widest mb-4">
                         <ShieldCheck size={13} /> Free for everyone
                     </div>
                     <h1 className="text-3xl md:text-4xl font-bold text-accent tracking-tight mb-3">Quick Planning Check</h1>

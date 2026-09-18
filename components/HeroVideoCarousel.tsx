@@ -98,7 +98,7 @@ export const HeroVideoCarousel: React.FC<{ fullBleed?: boolean }> = ({ fullBleed
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none" />
 
                     <div className={`absolute inset-x-0 bottom-0 p-4 sm:p-6 md:p-8 ${fullBleed ? 'md:px-10 lg:px-14 md:pb-10' : ''}`}>
-                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/40 border border-white/25 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-[0.2em]">
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-none bg-black/40 border border-white/25 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-[0.2em]">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                             Architectural Intelligence
                         </div>

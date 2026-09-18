@@ -241,7 +241,7 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
 
                     <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
                         <div className="space-y-2">
-                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/5 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em]">
+                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-none bg-accent/5 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em]">
                                 <Film size={14} /> Animation Studio
                             </div>
                             <h1 className="text-3xl md:text-5xl font-bold text-accent tracking-tight leading-tight">Bring a render to life</h1>

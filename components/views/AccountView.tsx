@@ -137,7 +137,7 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                 
                 {/* Header */}
                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/5 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em] backdrop-blur-sm">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-none bg-accent/5 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em] backdrop-blur-sm">
                         <Settings size={14} className="animate-spin-slow" />
                         Account Control Center
                     </div>
@@ -193,7 +193,7 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                                 <div className="w-12 h-12 rounded-2xl bg-accent/5 border border-accent/10 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-white transition-all duration-500">
                                     <Sparkles size={24} />
                                 </div>
-                                <div className="px-3 py-1 rounded-full bg-accent/10 text-accent text-[9px] font-bold uppercase tracking-widest border border-accent/20">
+                                <div className="px-3 py-1 rounded-none bg-accent/10 text-accent text-[9px] font-bold uppercase tracking-widest border border-accent/20">
                                     {isPaidPlan ? 'Monthly Allocation' : 'Trial Credits'}
                                 </div>
                             </div>

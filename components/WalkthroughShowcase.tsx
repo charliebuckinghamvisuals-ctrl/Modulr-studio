@@ -31,10 +31,13 @@ const CHAPTERS: Chapter[] = [
 interface WalkthroughShowcaseProps {
     /** Show the chapter buttons under the frame. */
     chapters?: boolean;
+    /** Hang the chapter row below the frame without taking layout height,
+     *  so a neighbour column can centre on the FRAME (home page). */
+    chaptersOverlay?: boolean;
     className?: string;
 }
 
-export const WalkthroughShowcase: React.FC<WalkthroughShowcaseProps> = ({ chapters = true, className = '' }) => {
+export const WalkthroughShowcase: React.FC<WalkthroughShowcaseProps> = ({ chapters = true, chaptersOverlay = false, className = '' }) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const frameRef = useRef<HTMLDivElement | null>(null);
     const [inView, setInView] = useState(false);
@@ -85,7 +88,7 @@ export const WalkthroughShowcase: React.FC<WalkthroughShowcaseProps> = ({ chapte
     const activeChapter = CHAPTERS.reduce((acc, c, i) => (current >= c.at ? i : acc), 0);
 
     return (
-        <div className={`w-full ${className}`}>
+        <div className={`w-full ${chaptersOverlay ? 'relative' : ''} ${className}`}>
             <div
                 ref={frameRef}
                 className="relative rounded-3xl md:rounded-xl overflow-hidden border border-border bg-slate-100 shadow-2xl"
@@ -109,7 +112,7 @@ export const WalkthroughShowcase: React.FC<WalkthroughShowcaseProps> = ({ chapte
                     />
 
                     <div className="absolute inset-x-0 top-0 p-4 sm:p-5 flex items-start justify-between pointer-events-none">
-                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/45 border border-white/25 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-[0.2em]">
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-none bg-black/45 border border-white/25 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-[0.2em]">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                             Recorded in the 3D Configurator
                         </div>
@@ -127,14 +130,14 @@ export const WalkthroughShowcase: React.FC<WalkthroughShowcaseProps> = ({ chapte
             </div>
 
             {chapters && (
-                <div className="mt-4 flex flex-wrap items-center gap-2">
+                <div className={`mt-4 flex flex-wrap items-center gap-2 ${chaptersOverlay ? 'absolute left-0 right-0 top-full' : ''}`}>
                     {CHAPTERS.map((c, i) => (
                         <button
                             key={c.label}
                             type="button"
                             onClick={() => seek(c.at)}
                             aria-current={i === activeChapter}
-                            className={`px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider border transition-colors ${
+                            className={`px-4 py-2 rounded-none text-[11px] font-bold uppercase tracking-wider border transition-colors ${
                                 i === activeChapter
                                     ? 'bg-accent text-white border-accent'
                                     : 'bg-white/60 text-secondary border-border hover:border-accent/50 hover:text-accent'

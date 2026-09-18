@@ -381,7 +381,7 @@ export const GuideView: React.FC = () => {
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {TOOLS.map(t => (
-                                    <span key={t.name} className="text-xs font-semibold px-3 py-1.5 rounded-full bg-accent/8 text-accent border border-accent/15">
+                                    <span key={t.name} className="text-xs font-semibold px-3 py-1.5 rounded-none bg-accent/8 text-accent border border-accent/15">
                                         {t.name}
                                     </span>
                                 ))}
@@ -450,7 +450,7 @@ export const GuideView: React.FC = () => {
                                                     {String(i + 1).padStart(2, '0')}
                                                 </span>
                                                 {tool.status && (
-                                                    <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-accent/8 text-accent border border-accent/15">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-none bg-accent/8 text-accent border border-accent/15">
                                                         {tool.status}
                                                     </span>
                                                 )}

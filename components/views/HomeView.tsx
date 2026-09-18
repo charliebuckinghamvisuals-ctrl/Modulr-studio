@@ -128,9 +128,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onNavigate }) 
 
             {/* 3. Design, walk, render - with the walkthrough recording as the
                 proof of the middle one. Three columns, one sentence each. */}
-            <Band tone="pale" inner="py-16 sm:py-24">
+            {/* Extra bottom padding: the chapter chips hang below the frame. */}
+            <Band tone="pale" inner="pt-16 sm:pt-24 pb-28 sm:pb-36">
                 <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-10 lg:gap-16 items-center">
-                    <WalkthroughShowcase />
+                    <WalkthroughShowcase chaptersOverlay />
                     <div>
                         <Eyebrow>How a job runs</Eyebrow>
                         <h2 className="text-2xl sm:text-3xl lg:text-4xl text-accent font-bold mt-3 mb-8">Design it. Walk it. Render it.</h2>
@@ -220,7 +221,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onNavigate }) 
                         >
                             <p className="text-accent font-bold text-sm sm:text-base inline-flex items-center gap-2">
                                 {t.label}
-                                {t.badge && <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-accent/10 text-accent">{t.badge}</span>}
+                                {t.badge && <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-none bg-accent/10 text-accent">{t.badge}</span>}
                             </p>
                             <p className="text-secondary text-xs sm:text-sm mt-1">{t.line}</p>
                             <span className="inline-flex items-center gap-1 text-xs font-bold text-accent/70 mt-3 group-hover:text-accent">Open <ArrowRight size={12} /></span>

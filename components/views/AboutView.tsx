@@ -298,7 +298,7 @@ export const AboutView: React.FC = () => {
                                             {tool.icon}
                                         </div>
                                         {tool.status && (
-                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-accent/8 text-accent border border-accent/15">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-none bg-accent/8 text-accent border border-accent/15">
                                                 {tool.status}
                                             </span>
                                         )}

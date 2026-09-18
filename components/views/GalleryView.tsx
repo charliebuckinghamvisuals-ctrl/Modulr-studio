@@ -64,7 +64,7 @@ export const GalleryView: React.FC = () => {
                     
                     {/* Header */}
                     <div className="text-center space-y-4 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/5 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em] backdrop-blur-sm">
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-none bg-accent/5 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em] backdrop-blur-sm">
                             <ImageIcon size={14} className="animate-pulse" />
                             Architectural Showcase
                         </div>

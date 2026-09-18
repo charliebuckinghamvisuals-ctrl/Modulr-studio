@@ -265,7 +265,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
 
                 {/* Header Section */}
                 <div className="text-center mb-16 max-w-2xl">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/20 mb-6 group cursor-default">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-none bg-accent/10 border border-accent/20 mb-6 group cursor-default">
                         <Sparkles size={16} className="text-accent group-hover:animate-spin-slow transition-transform" />
                         <span className="text-sm font-semibold tracking-wide text-primary">Simple, transparent pricing</span>
                     </div>
@@ -300,7 +300,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             >
                                 Yearly
                                 {billingCycle !== 'yearly' && (
-                                    <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1 bg-green-500 text-[10px] text-white rounded-full font-bold animate-bounce shadow-lg whitespace-nowrap">
+                                    <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1 bg-green-500 text-[10px] text-white rounded-none font-bold animate-bounce shadow-lg whitespace-nowrap">
                                         Save ~20% 🔥
                                     </span>
                                 )}
@@ -376,7 +376,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                     {/* Business Plan (Highlighted) */}
                     <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-gradient-to-b from-surface/80 to-accent/5 relative transition-all duration-500 shadow-[0_30px_60px_rgba(139,92,246,0.15)] group">
 
-                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-accent to-accent/80 rounded-full flex items-center gap-1.5 shadow-lg">
+                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-accent to-accent/80 rounded-none flex items-center gap-1.5 shadow-lg">
                             <span className="text-xs font-bold text-white uppercase tracking-wider">Most Popular</span>
                         </div>
 
@@ -391,7 +391,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             </div>
                             <span className="text-secondary font-medium">{billingCycle === 'monthly' ? 'inc VAT, cancel any time' : `${pounds(penceOf('business_yearly'))} a year inc VAT, 2 months free`}</span>
                             {billing?.founding && billingCycle === 'monthly' && (
-                                <span className="mt-2 inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">
+                                <span className="mt-2 inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-none bg-amber-100 text-amber-800 text-[11px] font-bold">
                                     Founding price {pounds(FOUNDING_MONTHLY_PENCE)} a month for your first year, first 5 companies
                                 </span>
                             )}

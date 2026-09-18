@@ -335,7 +335,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                             <div className={`${RENDER_CANVAS} group`}>
                                 <img src={getImageUrl(materialMaskPreview || originalImage)} className="w-full h-full object-contain absolute inset-0 transition-opacity duration-300" alt="Source" />
                                 {materialMaskPreview && (
-                                    <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-full bg-emerald-600/90 text-white text-[10px] font-bold uppercase tracking-widest shadow-lg">Green = the only pixels that will change</div>
+                                    <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-none bg-emerald-600/90 text-white text-[10px] font-bold uppercase tracking-widest shadow-lg">Green = the only pixels that will change</div>
                                 )}
                             </div>
                         ) : originalImage ? (

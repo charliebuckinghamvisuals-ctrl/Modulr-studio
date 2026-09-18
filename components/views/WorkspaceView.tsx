@@ -250,11 +250,11 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                                 the design; amber = checked, differences may remain. */}
                             {verification?.checked && (
                                 verification.passed ? (
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold" title={verification.retried ? 'An automatic correction was applied before this render was accepted.' : 'Every item in the design inventory verified against your drawing.'}>
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-none bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold" title={verification.retried ? 'An automatic correction was applied before this render was accepted.' : 'Every item in the design inventory verified against your drawing.'}>
                                         <ShieldCheck size={13} /> Checked against your design
                                     </span>
                                 ) : (
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold" title="The automatic check found differences it could not fully correct - review the render before sending it to a client.">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-none bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold" title="The automatic check found differences it could not fully correct - review the render before sending it to a client.">
                                         <ShieldAlert size={13} /> Auto-checked - review recommended
                                     </span>
                                 )

@@ -152,7 +152,7 @@ export const SaveToProjectDialog: React.FC<SaveToProjectDialogProps> = ({ image,
                                             <span className="block text-xs font-bold text-[#3b4d4a] truncate">
                                                 {p.name}
                                                 {getCurrentProject()?.id === p.id && (
-                                                    <span className="ml-2 text-[9px] font-bold uppercase tracking-wider text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">Current</span>
+                                                    <span className="ml-2 text-[9px] font-bold uppercase tracking-wider text-accent bg-accent/10 px-1.5 py-0.5 rounded-none">Current</span>
                                                 )}
                                             </span>
                                             <span className="block text-[10px] text-slate-400">

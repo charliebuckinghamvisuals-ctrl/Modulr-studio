@@ -67,7 +67,7 @@ const Panel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 const BetaBadge = () => (
-    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-bold uppercase tracking-wider">
+    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-none bg-accent/10 text-accent text-xs font-bold uppercase tracking-wider">
         <Sparkles size={14} />
         Free Tester Access
     </div>
