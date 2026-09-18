@@ -408,7 +408,7 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
                                     </div>
                                 </>
                             ) : busy ? (
-                                <div className={RENDER_CANVAS}>
+                                <div className={`${RENDER_CANVAS} min-h-[480px]`}>
                                     <GenerationProgress stages={STAGES} expectedSeconds={120} expectedLabel="one to three minutes" />
                                 </div>
                             ) : (

@@ -314,7 +314,7 @@ export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavi
             <div className={TOOL_CANVAS_COL}>
                             <div className="border border-slate-200 overflow-hidden min-h-[420px] flex-1 flex items-center justify-center relative bg-white">
                                 {busy ? (
-                                    <div className="p-10 w-full max-w-md">
+                                    <div className="absolute inset-0">
                                         <GenerationProgress stages={STAGES[mode]} expectedSeconds={mode === 'cad' ? 60 : 70} />
                                     </div>
                                 ) : result ? (

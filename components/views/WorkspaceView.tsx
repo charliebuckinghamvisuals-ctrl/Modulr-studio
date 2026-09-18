@@ -92,7 +92,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
             
             if (!currentIsRendered) {
                 return (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm z-50">
+                    <div className="absolute inset-0 z-50">
                         {/* Same waiting state as Animation Studio. loadingMessage
                             wins when the caller has something specific to say;
                             otherwise it walks the generic render stages. */}

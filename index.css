@@ -38,6 +38,13 @@
 }
 
 @layer base {
+  /* 18 Sep 2026: Charlie set the browser to 90% and preferred it, so that
+     is the default at 100%. Every rem-based size (Tailwind spacing, type,
+     widths) scales; viewport units and the tool-page height do not need to. */
+  html {
+    font-size: 90%;
+  }
+
   h1,
   h2,
   h3,
