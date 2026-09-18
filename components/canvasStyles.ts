@@ -16,8 +16,8 @@
  *  with shorter toolbars. */
 export const RENDER_CANVAS =
     'w-full flex-1 min-h-[320px] rounded-2xl overflow-hidden ' +
-    'border border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ' +
-    'relative flex items-center justify-center render-grid';
+    'border border-slate-200 ' +
+    'relative flex items-center justify-center bg-white';
 
 /** The canvas once an image is loaded: shrink-wraps the image itself.
  *
@@ -28,8 +28,8 @@ export const RENDER_CANVAS =
  *  ratio at the largest size that fits the workspace. */
 export const RENDER_CANVAS_FITTED =
     'w-fit max-w-full mx-auto rounded-2xl overflow-hidden ' +
-    'border border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ' +
-    'relative render-grid';
+    'border border-slate-200 ' +
+    'relative bg-white';
 
 /**
  * Height cap for the invisible sizing image inside RENDER_CANVAS_FITTED.
@@ -61,3 +61,13 @@ export const RENDER_CANVAS_IMG_MAX_H = 'max-h-[calc(100vh-9.5rem)]';
  * scrolls inside itself instead of stretching the page.
  */
 export const WORKSPACE_HEIGHT = 'h-[calc(100vh-6rem)]';
+
+/**
+ * The tool page frame (18 Sep 2026): every tool is the same shape - a white
+ * page one viewport tall, a flat sidebar column on the left with a hairline,
+ * the canvas column on the right. No drafting grid, no coloured blobs, no
+ * floating panels; Charlie wanted them plain white and all the same size.
+ */
+export const TOOL_PAGE = `${WORKSPACE_HEIGHT} flex flex-col md:flex-row bg-white relative overflow-hidden`;
+export const TOOL_SIDEBAR = 'w-full md:w-80 lg:w-96 shrink-0 flex flex-col gap-6 p-6 bg-white border-r border-slate-200 overflow-y-auto custom-scrollbar';
+export const TOOL_CANVAS_COL = 'flex-1 p-3 lg:p-4 flex flex-col gap-3 min-w-0 overflow-y-auto custom-scrollbar bg-white';

@@ -320,7 +320,9 @@ input[type=range]::-webkit-slider-runnable-track {
  * work without turning the panel grey.
  */
 .render-grid {
-  background-color: #fbfbfa;
+  /* 18 Sep 2026: the drafting grid is off - tool pages are plain white. */
+  background-color: #ffffff;
+  background-image: none !important;
   background-image:
     linear-gradient(to right, rgba(64, 90, 86, 0.05) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(64, 90, 86, 0.05) 1px, transparent 1px),

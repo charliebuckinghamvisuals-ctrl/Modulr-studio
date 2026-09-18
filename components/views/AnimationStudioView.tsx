@@ -3,14 +3,13 @@ import { toast } from 'react-hot-toast';
 import {
     Film, Upload, Loader2, Lock, Download, RotateCcw, Sparkles, Volume2, VolumeX, Clapperboard, Wallet,
 } from 'lucide-react';
-import { DraftingBackground } from '../DraftingBackground';
 import { Button } from '../Button';
 import { useAuth } from '../../hooks/useAuth';
 import { useCredits, VideoModelInfo } from '../../hooks/useCredits';
 import { compressImageFile } from '../../hooks/useAppEngine';
 import { AppStage } from '../../types';
 import { startAnimation, fetchAnimation, VideoModelKey } from '../../services/animationService';
-import { RENDER_CANVAS } from '../canvasStyles';
+import { RENDER_CANVAS, TOOL_PAGE, TOOL_SIDEBAR, TOOL_CANVAS_COL } from '../canvasStyles';
 import { GenerationProgress } from '../GenerationProgress';
 
 /**
@@ -54,9 +53,7 @@ const STAGES = [
 const pounds = (pence: number) => (pence % 100 === 0 ? `£${pence / 100}` : `£${(pence / 100).toFixed(2)}`);
 
 const Gate: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar">
-        <DraftingBackground pageName="ANIMATION" />
-        <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[150px] pointer-events-none" />
+    <div className="h-full flex flex-col bg-white relative overflow-y-auto custom-scrollbar">
         <div className="flex-1 flex items-center justify-center p-6 md:p-12 relative z-10">
             <div className="max-w-lg w-full text-center p-8 md:p-10 rounded-3xl bg-white border border-slate-200 shadow-sm">
                 {children}
@@ -232,22 +229,14 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
     const seg = (active: boolean, disabled = false) => `px-3 py-2 rounded-xl border text-xs font-bold transition-all ${disabled ? 'opacity-40 cursor-not-allowed' : ''} ${active ? 'border-accent bg-accent text-white' : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'}`;
 
     return (
-        <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar">
-            <DraftingBackground pageName="ANIMATION" />
-            <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[150px] pointer-events-none" />
-
-            <div className="flex-1 p-6 md:p-12 relative z-10 w-full">
-                <div className="max-w-[1400px] mx-auto">
-
-                    <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+        <div className={TOOL_PAGE}>
+            <div className={TOOL_SIDEBAR}>
+                    <div className="space-y-4">
                         <div className="space-y-2">
-                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-none bg-accent/5 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em]">
-                                <Film size={14} /> Animation Studio
-                            </div>
-                            <h1 className="text-3xl md:text-5xl font-bold text-accent tracking-tight leading-tight">Bring a render to life</h1>
-                            <p className="text-slate-600 text-sm max-w-xl">Pick a model, drop in a render, say what you want to see. The building stays exactly as drawn.</p>
+                            <h2 className="text-[7vw] md:text-2xl lg:text-3xl font-bold text-accent w-fit inline-block leading-tight">Animation Studio</h2>
+                            <p className="text-slate-600 text-sm leading-relaxed">Pick a model, drop in a render, say what you want to see. The building stays exactly as drawn.</p>
                         </div>
-                        <div className="flex items-stretch gap-3">
+                        <div className="grid grid-cols-2 gap-2">
                             {animationsLeft !== null && animationsLimit !== null && (
                                 <div className="px-5 py-3 rounded-2xl bg-white border border-slate-200 text-right">
                                     <p className={labelClass}>Included this month</p>
@@ -263,10 +252,8 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
                         </div>
                     </div>
 
-                    <div className="grid gap-6 lg:grid-cols-[440px_1fr]">
-
-                        {/* Input panel */}
-                        <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-6 h-fit">
+                    {/* Input panel */}
+                    <div className="space-y-6">
 
                             {/* Model */}
                             <div className="space-y-2">
@@ -396,10 +383,11 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
                                     <RotateCcw size={14} /> Reset
                                 </button>
                             )}
-                        </div>
+                    </div>
+            </div>
 
-                        {/* Result */}
-                        <div className="flex flex-col gap-4">
+            {/* Result */}
+            <div className={TOOL_CANVAS_COL}>
                             {videoUrl ? (
                                 <>
                                     <div className={RENDER_CANVAS}>
@@ -429,9 +417,6 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
                                     <p className="text-sm text-slate-500 px-6">{sourceImage ? 'Write or pick a prompt, then generate.' : 'Drop a render on the left to get started.'}</p>
                                 </div>
                             )}
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     );

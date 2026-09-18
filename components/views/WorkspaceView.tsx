@@ -5,7 +5,7 @@ import { Button } from '../Button';
 import { CompareSlider } from '../CompareSlider';
 import { SkeletonLoader } from '../SkeletonLoader';
 import { ImageViewport } from '../ImageViewport';
-import { RENDER_CANVAS, RENDER_CANVAS_FITTED, RENDER_CANVAS_IMG_MAX_H, WORKSPACE_HEIGHT } from '../canvasStyles';
+import { RENDER_CANVAS, RENDER_CANVAS_FITTED, RENDER_CANVAS_IMG_MAX_H, TOOL_PAGE, TOOL_SIDEBAR, TOOL_CANVAS_COL } from '../canvasStyles';
 import { GenerationProgress, RENDER_STAGES } from '../GenerationProgress';
 
 interface WorkspaceViewProps {
@@ -171,14 +171,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     };
 
     return (
-        <div className={`${WORKSPACE_HEIGHT} flex flex-col md:flex-row bg-background relative overflow-hidden`}>
-
-            {/* A whisper of warmth behind the panels. It used to be a 400px
-                accent blob at 10% - the blurred coloured glow that makes an app
-                look like a demo rather than a tool. */}
-            <div className="absolute top-1/3 left-1/3 w-[500px] h-[500px] bg-accent/[0.03] rounded-full blur-[140px] pointer-events-none"></div>
-
-            <div className="w-full md:w-80 flex flex-col gap-6 relative z-10 p-6 m-4 md:m-4 bg-white/95 backdrop-blur-xl rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-y-auto border border-white">
+        <div className={TOOL_PAGE}>
+            <div className={TOOL_SIDEBAR}>
                 <div className="space-y-4">
                     <h2 className="text-[7vw] md:text-2xl lg:text-3xl font-bold text-accent w-fit inline-block leading-tight">{title}</h2>
                     <p className="text-slate-600 text-sm leading-relaxed">{subtitle}</p>
@@ -190,7 +184,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                 + history inside a fixed-height workspace — without its own
                 scrollbar, a tall (portrait) image pushed the history strip off
                 the bottom with no way to reach it. */}
-            <div className="flex-1 p-3 lg:p-4 flex flex-col gap-3 relative z-10 min-w-0 overflow-y-auto custom-scrollbar">
+            <div className={TOOL_CANVAS_COL}>
                 {/* Shared with Material Studio and Animation Studio - see
                     canvasStyles. Once an image is loaded the frame shrink-wraps
                     it (RENDER_CANVAS_FITTED): the invisible in-flow img below

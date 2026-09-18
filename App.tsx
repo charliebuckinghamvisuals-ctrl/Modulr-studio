@@ -20,7 +20,6 @@ import { useAppEngine, compressImageFile } from './hooks/useAppEngine';
 import { HomeView } from './components/views/HomeView';
 import { MaterialStudioView } from './components/views/MaterialStudioView';
 import { StudioView } from './components/views/StudioView';
-import { BatchSlotUploader } from './components/BatchSlotUploader';
 import { WorkspaceView } from './components/views/WorkspaceView';
 import { PricingView } from './components/views/PricingView';
 import { AboutView } from './components/views/AboutView';
@@ -186,7 +185,7 @@ const App: React.FC = () => {
                         } ${o.locked ? 'opacity-60' : ''}`}
                     >
                         {o.label}
-                        {o.locked && <span className="absolute -top-1.5 -right-1 text-[7px] px-1 py-px rounded-full bg-amber-100 text-amber-700 border border-amber-200 normal-case tracking-normal">Business</span>}
+                        {o.locked && <span className="absolute -top-1.5 -right-1 text-[7px] px-1 py-px rounded-none bg-amber-100 text-amber-700 border border-amber-200 normal-case tracking-normal">Business</span>}
                     </button>
                 ))}
             </div>
@@ -195,31 +194,11 @@ const App: React.FC = () => {
 
     const renderEngineControls = (
         <>
-            <div className="flex flex-col gap-2 w-full">
-                <ToggleSwitch
-                    isOn={engine.isBatchMode}
-                    onToggle={() => {
-                        engine.setIsBatchMode(!engine.isBatchMode);
-                        setSelectedBatchIndex(0);
-                    }} 
-                    label="Batch Mode"
-                    icon={<Layers size={14} className={engine.isBatchMode ? 'text-accent' : 'text-slate-400'} />}
-                    activeColor="bg-accent"
-                />
-            </div>
-
+            {/* Batch mode retired from the Render Engine (Charlie, 18 Sep 2026). */}
             {/* No flex-1/overflow here: inside the fixed-height sidebar a
                 flex-1 basis-0 child collapses to nothing, which silently hid
                 the whole material analyser. The sidebar itself scrolls. */}
             <div className="space-y-4 pr-2 mt-4">
-                {engine.isBatchMode && (
-                    <BatchSlotUploader 
-                        batchImages={engine.batchImages}
-                        batchRenders={engine.batchRenders}
-                        onUpload={(file, index) => engine.handleSlotImageUpload(file, index, AppStage.RENDER_ENGINE)}
-                    />
-                )}
-                
                 {/* THE INVENTORY - what the engine is told to keep, item by
                     item, built from the configurator design or from the
                     survey of an upload. Editable: the words here are the
@@ -431,26 +410,14 @@ const App: React.FC = () => {
                 />
             </div>
             <div className="mt-auto pt-6">
-                {engine.isBatchMode ? (
-                    engine.batchImages.some(img => img && img.trim() !== '') ? (
-                        <Button borderless className="w-full" onClick={engine.handleBatchRender} icon={<Sparkles size={16} />} disabled={engine.processing.isLoading}>
-                            Render Batch Sequence
-                        </Button>
-                    ) : (
-                        <Button borderless className="w-full disabled" disabled={true} icon={<Sparkles size={16} />}>
-                            Upload Images First
-                        </Button>
-                    )
+                {engine.originalImage ? (
+                    <Button borderless className="w-full" onClick={() => engine.handleRender()} disabled={engine.processing.isLoading}>
+                        Render Image
+                    </Button>
                 ) : (
-                    engine.originalImage ? (
-                        <Button borderless className="w-full" onClick={() => engine.handleRender()} icon={<Sparkles size={16} />} disabled={engine.processing.isLoading}>
-                            Render Image
-                        </Button>
-                    ) : (
-                        <Button borderless className="w-full disabled" disabled={true} icon={<Sparkles size={16} />}>
-                            Upload Image First
-                        </Button>
-                    )
+                    <Button borderless className="w-full disabled" disabled={true}>
+                        Upload Image First
+                    </Button>
                 )}
                 <div className="text-center mt-3">
                     <p className="text-[9px] text-slate-400 font-medium leading-tight">
@@ -834,7 +801,7 @@ const App: React.FC = () => {
 
             <button
                 onClick={loadSampleDrawing}
-                className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-accent/30 text-accent text-sm font-bold shadow-lg hover:bg-accent hover:text-white transition-colors"
+                className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 inline-flex items-center gap-2 px-5 py-2.5 rounded-none bg-white border border-accent/30 text-accent text-sm font-bold shadow-lg hover:bg-accent hover:text-white transition-colors"
             >
                 <Sparkles size={14} /> No drawing handy? Try a sample
             </button>

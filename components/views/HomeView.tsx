@@ -1,5 +1,4 @@
 import React from 'react';
-import { Sparkles, ClipboardCheck, Gift, ArrowRight, Box, Footprints, Layers, Ruler, FileCheck } from 'lucide-react';
 import { AppStage } from '../../types';
 import { CompareSlider } from '../CompareSlider';
 import { Button } from '../Button';
@@ -24,16 +23,16 @@ import { WalkthroughShowcase } from '../WalkthroughShowcase';
 
 /** The three moves the product is sold on, in the order a job runs. */
 const WORKFLOW = [
-    { icon: <Box size={18} />, step: 'Design it', body: 'Box or gable, every door and window, cladding per elevation, the inside too. Priced as you go.' },
-    { icon: <Footprints size={18} />, step: 'Walk it', body: 'Stand in the garden, then step inside. Open the doors, change a finish, keep walking.' },
-    { icon: <Layers size={18} />, step: 'Render it', body: 'The engine is handed the building you priced, not a screenshot. What comes back matches it.' },
+    { step: 'Design it', body: 'Box or gable, every door and window, cladding per elevation, the inside too. Priced as you go.' },
+    { step: 'Walk it', body: 'Stand in the garden, then step inside. Open the doors, change a finish, keep walking.' },
+    { step: 'Render it', body: 'The engine is handed the building you priced, not a screenshot. What comes back matches it.' },
 ];
 
 /** Three reasons, each a thing the product does. */
 const REASONS = [
-    { icon: <Ruler size={18} />, title: 'Built around your product', body: 'Eaves and ridge, composite boards, anthracite frames, decking, canopies, a covered bay. It knows what a garden room is made of.' },
-    { icon: <Layers size={18} />, title: 'Renders that match the quote', body: 'Door count, sets, cladding per face - the engine is told, not left to guess. It cannot swap a bi-fold for a window.' },
-    { icon: <FileCheck size={18} />, title: 'Planning built in, by planning people', body: 'Made by NAPC, the UK planning consultancy for garden rooms and annexes. Permitted development is flagged as you design.' },
+    { title: 'Built around your product', body: 'Eaves and ridge, composite boards, anthracite frames, decking, canopies, a covered bay. It knows what a garden room is made of.' },
+    { title: 'Renders that match the quote', body: 'Door count, sets, cladding per face - the engine is told, not left to guess. It cannot swap a bi-fold for a window.' },
+    { title: 'Planning built in, by planning people', body: 'Made by NAPC, the UK planning consultancy for garden rooms and annexes. Permitted development is flagged as you design.' },
 ];
 
 /** The tools, by name. Each has its own page under Tools. */
@@ -64,7 +63,7 @@ const Band: React.FC<{ tone?: 'white' | 'pale' | 'dark'; className?: string; inn
 );
 
 const Eyebrow: React.FC<{ children: React.ReactNode; light?: boolean }> = ({ children, light }) => (
-    <span className={`text-[11px] font-bold uppercase tracking-[0.25em] ${light ? 'text-green-200' : 'text-accent'}`}>{children}</span>
+    <span className={`text-[11px] font-bold uppercase tracking-[0.25em] ${light ? 'text-white/70' : 'text-accent'}`}>{children}</span>
 );
 
 export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onNavigate }) => {
@@ -90,11 +89,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onNavigate }) 
                 <div className="offer-marquee flex items-center whitespace-nowrap py-2.5 will-change-transform">
                     {[0, 1, 2, 3].map(i => (
                         <span key={i} className="inline-flex items-center gap-4 pr-16 text-[13px] sm:text-sm" aria-hidden={i > 0}>
-                            <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-green-300">
-                                <Gift size={13} /> Limited-time offer
-                            </span>
+                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/70">Limited-time offer</span>
                             <span className="font-medium">Free 7-day access to Modulr Studio · 40 AI renders · no card needed</span>
-                            <span className="inline-flex items-center gap-1 font-bold underline underline-offset-4 decoration-green-300/70 group-hover:decoration-white">Start free <ArrowRight size={14} /></span>
+                            <span className="inline-flex items-center gap-1 font-bold underline underline-offset-4 decoration-white/60 group-hover:decoration-white">Start free</span>
                         </span>
                     ))}
                 </div>
@@ -116,11 +113,11 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onNavigate }) 
                 </p>
                 <div className="flex flex-wrap justify-center gap-4 mt-10">
                     {onNavigate && (
-                        <Button onClick={() => onNavigate(AppStage.DESIGNER)} className="px-10 py-5 text-base" icon={<Box size={20} />}>
+                        <Button onClick={() => onNavigate(AppStage.DESIGNER)} className="px-10 py-5 text-base">
                             Open the 3D Configurator
                         </Button>
                     )}
-                    <Button variant="secondary" onClick={onOpenEngine} className="px-10 py-5 text-base" icon={<Sparkles size={20} />}>
+                    <Button variant="secondary" onClick={onOpenEngine} className="px-10 py-5 text-base">
                         Launch Render Engine
                     </Button>
                 </div>
@@ -140,7 +137,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onNavigate }) 
                                 <li key={w.step} className="py-5 grid grid-cols-[2.5rem_1fr] gap-4">
                                     <span className="text-accent/60 font-bold text-sm pt-0.5">0{i + 1}</span>
                                     <div>
-                                        <p className="text-accent font-bold inline-flex items-center gap-2">{w.icon}{w.step}</p>
+                                        <p className="text-accent font-bold">{w.step}</p>
                                         <p className="text-secondary text-sm mt-1 leading-relaxed">{w.body}</p>
                                     </div>
                                 </li>
@@ -160,7 +157,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onNavigate }) 
                             Send any configurator view, CAD export or line drawing. The geometry is the foundation; the engine lights and finishes it - it does not redraw it.
                         </p>
                         <div className="mt-8">
-                            <Button variant="secondary" onClick={onOpenEngine} icon={<Sparkles size={18} />}>Try the Render Engine</Button>
+                            <Button variant="secondary" onClick={onOpenEngine}>Try the Render Engine</Button>
                         </div>
                     </div>
                     <div className="overflow-hidden border border-white/10">
@@ -178,7 +175,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onNavigate }) 
                     </div>
                     {onNavigate && (
                         <button onClick={() => onNavigate(AppStage.GALLERY)} className="inline-flex items-center gap-2 text-sm font-bold text-accent underline underline-offset-4 hover:text-accent-hover">
-                            See the gallery <ArrowRight size={16} />
+                            See the gallery
                         </button>
                     )}
                 </div>
@@ -200,8 +197,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onNavigate }) 
                 <div className="grid grid-cols-1 md:grid-cols-3 md:divide-x divide-slate-200 border-t border-slate-200">
                     {REASONS.map(r => (
                         <div key={r.title} className="pt-8 md:pr-8 md:pl-8 first:pl-0 last:pr-0 pb-4">
-                            <div className="text-accent">{r.icon}</div>
-                            <h3 className="text-accent font-bold text-base mt-4 leading-snug">{r.title}</h3>
+                            <h3 className="text-accent font-bold text-base leading-snug">{r.title}</h3>
                             <p className="text-secondary text-sm mt-2 leading-relaxed">{r.body}</p>
                         </div>
                     ))}
@@ -224,7 +220,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onNavigate }) 
                                 {t.badge && <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-none bg-accent/10 text-accent">{t.badge}</span>}
                             </p>
                             <p className="text-secondary text-xs sm:text-sm mt-1">{t.line}</p>
-                            <span className="inline-flex items-center gap-1 text-xs font-bold text-accent/70 mt-3 group-hover:text-accent">Open <ArrowRight size={12} /></span>
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-accent/70 mt-3 group-hover:text-accent">Open</span>
                         </button>
                     ))}
                 </div>
@@ -239,7 +235,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onNavigate }) 
                 </p>
                 {onNavigate && (
                     <div className="flex justify-center mt-8">
-                        <Button variant="secondary" onClick={() => onNavigate(AppStage.PLANNING_CHECKER)} className="px-10 py-4" icon={<ClipboardCheck size={20} />}>
+                        <Button variant="secondary" onClick={() => onNavigate(AppStage.PLANNING_CHECKER)} className="px-10 py-4">
                             Check a scheme
                         </Button>
                     </div>

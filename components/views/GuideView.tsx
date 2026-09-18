@@ -91,7 +91,6 @@ const TOOLS: ToolGuide[] = [
             'Sell a scheme from a rough SketchUp model before any detailed design work',
             'Show an existing house with a proposed annexe or extension in place',
             'Produce three cladding options for the same building in one sitting',
-            'Batch a full set of angles for a brochure or planning pack',
         ],
         tips: [
             'The cleaner the input, the more faithful the output. A tidy model screenshot beats a cluttered one.',

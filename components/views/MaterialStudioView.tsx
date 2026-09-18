@@ -1,7 +1,7 @@
 import React from 'react';
 import { Grid, Download, CheckCircle, Circle, Loader2, Upload, Layers, Palette, X, FolderOpen } from 'lucide-react';
 import { Button } from '../Button';
-import { RENDER_CANVAS, WORKSPACE_HEIGHT } from '../canvasStyles';
+import { RENDER_CANVAS, TOOL_PAGE, TOOL_SIDEBAR } from '../canvasStyles';
 import { MaterialVisualPicker } from '../MaterialVisualPicker';
 import { PRESET_MATERIALS } from '../../constants';
 import { MaterialConfig, MaterialLibrary } from '../../types';
@@ -102,11 +102,8 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
     };
 
     return (
-        <div className={`${WORKSPACE_HEIGHT} flex flex-col md:flex-row bg-background relative overflow-hidden`}>
-            {/* Ambient Lighting */}
-            <div className="absolute top-1/2 right-1/4 w-[600px] h-[600px] bg-white/5 rounded-full blur-[150px] pointer-events-none"></div>
-
-            <div className="w-full md:w-80 flex flex-col gap-6 relative z-10 p-6 m-4 md:m-4 bg-white/95 backdrop-blur-xl rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-y-auto border border-white">
+        <div className={TOOL_PAGE}>
+            <div className={TOOL_SIDEBAR}>
                 <div className="space-y-4">
                     <h2 className="text-[7vw] md:text-2xl lg:text-3xl font-bold text-accent w-fit inline-block leading-tight">Material Studio</h2>
                     <p className="text-slate-600 text-sm leading-relaxed">

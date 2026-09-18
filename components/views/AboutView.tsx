@@ -70,7 +70,6 @@ const TOOLS: Tool[] = [
             'Works from SketchUp and CAD exports, line drawings or photographs',
             'Automatic detection of cladding, roof, glazing, doors and ground treatment',
             'Weather, season and time-of-day control for the same scheme',
-            'Batch mode for producing a full set of angles in one pass',
             'Up to 4K output suitable for print and planning submissions',
         ],
     },

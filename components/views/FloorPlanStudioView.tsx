@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { LayoutGrid, Upload, Loader2, Lock, Download, RotateCcw, Ruler, Image as ImageIcon, CheckCircle2, AlertTriangle, FolderOpen, Box } from 'lucide-react';
-import { DraftingBackground } from '../DraftingBackground';
 import { Button } from '../Button';
 import { useAuth } from '../../hooks/useAuth';
 import { useCredits } from '../../hooks/useCredits';
 import { compressImageFile } from '../../hooks/useAppEngine';
 import { AppStage } from '../../types';
 import { GenerationProgress } from '../GenerationProgress';
+import { TOOL_PAGE, TOOL_SIDEBAR, TOOL_CANVAS_COL } from '../canvasStyles';
 import {
     FloorPlanMode, InventoryItem, FloorPlanResult,
     generateFloorPlan, surveyFloorPlan, floorPlanInventory, takePendingPlanCapture,
@@ -46,9 +46,7 @@ const imageSize = (src: string) => new Promise<{ w: number; h: number }>(resolve
 const toDataUrl = (b64: string) => (b64.startsWith('data:') ? b64 : `data:image/jpeg;base64,${b64}`);
 
 const Gate: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar">
-        <DraftingBackground pageName="FLOOR PLAN" />
-        <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[150px] pointer-events-none" />
+    <div className="h-full flex flex-col bg-white relative overflow-y-auto custom-scrollbar">
         <div className="flex-1 flex items-center justify-center p-6 md:p-12 relative z-10">
             <div className="max-w-lg w-full text-center p-8 md:p-10 rounded-3xl bg-white border border-slate-200 shadow-sm">
                 {children}
@@ -210,34 +208,16 @@ export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavi
     const failures = result?.verification?.failures || [];
 
     return (
-        <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar">
-            <DraftingBackground pageName="FLOOR PLAN" />
-            <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[150px] pointer-events-none" />
-
-            <div className="flex-1 p-6 md:p-12 relative z-10 w-full">
-                <div className="max-w-[1400px] mx-auto">
-
-                    <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
-                        <div className="space-y-2">
-                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-none bg-accent/5 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em]">
-                                <LayoutGrid size={14} /> Floor Plan Studio
-                            </div>
-                            <h1 className="text-3xl md:text-5xl font-bold text-accent tracking-tight leading-tight">The plan, drawn properly</h1>
-                            <p className="text-slate-600 text-sm max-w-xl">Send the plan view from the 3D configurator, or drop a top view from SketchUp. Get a rendered plan or a dimensioned CAD plan - every wall, opening and piece of furniture exactly where you put it.</p>
-                        </div>
-                        {rendersLeft !== null && (
-                            <div className="px-5 py-3 rounded-2xl bg-white border border-slate-200 text-right">
-                                <p className={labelClass}>Renders left</p>
-                                <p className="text-2xl font-bold text-accent leading-none mt-1">{rendersLeft}</p>
-                                <p className="text-[11px] text-slate-400 mt-1">one per plan</p>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6">
+        <div className={TOOL_PAGE}>
+            <div className={TOOL_SIDEBAR}>
+                <div className="space-y-2">
+                    <h2 className="text-[7vw] md:text-2xl lg:text-3xl font-bold text-accent w-fit inline-block leading-tight">Floor Plan Studio</h2>
+                    <p className="text-slate-600 text-sm leading-relaxed">Send the plan view from the 3D configurator, or drop a top view from SketchUp. A rendered plan or a dimensioned CAD plan - every wall, opening and piece of furniture exactly where you put it.</p>
+                    {rendersLeft !== null && <p className="text-[11px] text-slate-400"><span className="font-bold text-accent">{rendersLeft}</span> renders left · one per plan</p>}
+                </div>
                         {/* ---- controls ------------------------------------------------ */}
                         <div className="space-y-5">
-                            <div className="p-5 rounded-3xl bg-white border border-slate-200 space-y-4">
+                            <div className="pt-5 border-t border-slate-200 space-y-4">
                                 <p className={labelClass}>1 · Source</p>
                                 {source ? (
                                     <div className="flex items-center gap-3">
@@ -272,7 +252,7 @@ export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavi
                                 )}
                             </div>
 
-                            <div className="p-5 rounded-3xl bg-white border border-slate-200 space-y-3">
+                            <div className="pt-5 border-t border-slate-200 space-y-3">
                                 <p className={labelClass}>2 · Output</p>
                                 {MODES.map(m => (
                                     <button
@@ -286,7 +266,7 @@ export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavi
                                 ))}
                             </div>
 
-                            <div className="p-5 rounded-3xl bg-white border border-slate-200 space-y-3">
+                            <div className="pt-5 border-t border-slate-200 space-y-3">
                                 <p className={labelClass}>3 · Notes <span className="normal-case tracking-normal font-normal text-slate-400">(optional)</span></p>
                                 <textarea
                                     value={notes}
@@ -299,7 +279,7 @@ export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavi
                             </div>
 
                             {items.length > 0 && (
-                                <div className="p-5 rounded-3xl bg-white border border-slate-200">
+                                <div className="pt-5 border-t border-slate-200">
                                     <button onClick={() => setShowItems(v => !v)} className="w-full flex items-center justify-between">
                                         <p className={labelClass}>What the engine will keep · {items.length}</p>
                                         <span className="text-[11px] text-slate-400">{showItems ? 'hide' : 'show'}</span>
@@ -328,9 +308,11 @@ export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavi
                             </Button>
                         </div>
 
-                        {/* ---- canvas -------------------------------------------------- */}
-                        <div className="space-y-4">
-                            <div className="rounded-3xl bg-white border border-slate-200 overflow-hidden min-h-[420px] flex items-center justify-center relative">
+            </div>
+
+            {/* ---- canvas -------------------------------------------------- */}
+            <div className={TOOL_CANVAS_COL}>
+                            <div className="border border-slate-200 overflow-hidden min-h-[420px] flex-1 flex items-center justify-center relative bg-white">
                                 {busy ? (
                                     <div className="p-10 w-full max-w-md">
                                         <GenerationProgress stages={STAGES[mode]} expectedSeconds={mode === 'cad' ? 60 : 70} />
@@ -383,9 +365,6 @@ export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavi
                                     )}
                                 </>
                             )}
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     );
