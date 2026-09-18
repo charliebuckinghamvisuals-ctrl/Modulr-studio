@@ -85,47 +85,53 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onOpenMaterial
         return () => document.documentElement.classList.remove('home-fullbleed');
     }, []);
     return (
-        <div className="min-h-full flex flex-col items-center bg-background relative overflow-x-hidden pt-16 pb-20 w-full">
+        <div className="min-h-full flex flex-col items-center bg-background relative overflow-x-hidden pb-20 w-full">
 
             {/* Pro Drafting Grid (Disabled for Homepage for clean look) */}
             <DraftingBackground pageName="HOMEPAGE" hideGrid={true} />
 
+            {/* Open tester offer (14 Sep 2026), moved to the very top on 18 Sep:
+                a full-bleed strip under the header, square-edged, the line
+                drifting slowly so it reads as live. The numbers are the real
+                allowance the server enforces - 40 renders in 7 days - not a
+                marketing round-up, so the panel behind "Start free" says the
+                same thing. The marquee pauses on hover; the whole strip is the
+                button. */}
+            <button
+                type="button"
+                onClick={onOpenEngine}
+                aria-label="Free 7-day access to Modulr Studio: 40 AI renders, no card needed. Start free"
+                className="offer-strip group w-full relative z-20 overflow-hidden bg-[#2d3a38] text-white border-b border-white/10 hover:bg-[#344542] transition-colors"
+            >
+                <div className="offer-marquee flex items-center whitespace-nowrap py-2.5 will-change-transform">
+                    {[0, 1, 2, 3].map(i => (
+                        <span key={i} className="inline-flex items-center gap-4 pr-16 text-[13px] sm:text-sm" aria-hidden={i > 0}>
+                            <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-green-300">
+                                <Gift size={13} /> Limited-time offer
+                            </span>
+                            <span className="font-medium">Free 7-day access to Modulr Studio · 40 AI renders · no card needed</span>
+                            <span className="inline-flex items-center gap-1 font-bold underline underline-offset-4 decoration-green-300/70 group-hover:decoration-white">Start free <ArrowRight size={14} /></span>
+                        </span>
+                    ))}
+                </div>
+            </button>
+
             {/*
-              Hero, FULL BLEED at the top of the page (Charlie, 17 Sep 2026):
-              the work is the first thing seen, edge to edge, the headline and
-              the buttons follow. The height is set from the viewport width and
-              capped so the headline is still reachable without scrolling far.
-              The six clips are up to 1920 wide, so on a retina laptop the
-              frame is drawn a little above its source; that is the trade for
-              the impact of the full width, taken knowingly.
+              Hero at the top of the page (Charlie, 17 Sep 2026): the work is
+              the first thing seen, the headline and the buttons follow.
+
+              Wide but capped, not full bleed (18 Sep 2026). Edge to edge drew
+              the 1920-wide clips at 2880+ device px on a retina laptop and
+              Charlie saw it as blurry - the same finding as 6 Aug. 1400px is
+              the middle: bigger than the old 1088px content-column card,
+              inside what the files can cover on a 1x monitor, and only a
+              mild upscale on a 2x laptop. 16:9, no crop.
             */}
-            <div className="w-full relative z-10 -mt-16 mb-16">
+            <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 relative z-10 mt-8 mb-16">
                 <HeroVideoCarousel fullBleed />
             </div>
 
             <div className="max-w-6xl w-full flex flex-col items-center relative z-10 gap-24 px-8">
-
-                {/* Open tester offer (14 Sep 2026). Sits above the hero so it
-                    is the first thing read. The numbers are the real
-                    allowance the server enforces - 40 renders in 7 days - not
-                    a marketing round-up, so the panel behind "Start free"
-                    says the same thing. */}
-                <button
-                    type="button"
-                    onClick={onOpenEngine}
-                    className="w-full -mb-12 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 rounded-2xl bg-accent text-white px-5 py-3 shadow-lg hover:bg-accent-hover transition-colors text-left"
-                >
-                    <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider bg-white/15 rounded-full px-3 py-1">
-                        <Gift size={14} />
-                        Limited-time offer
-                    </span>
-                    <span className="text-sm sm:text-base font-semibold">
-                        Free 7-day access to Modulr Studio: 40 AI renders, no card needed.
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-sm font-bold underline underline-offset-4">
-                        Start free <ArrowRight size={16} />
-                    </span>
-                </button>
 
                 {/* 1. Hero Section. The eyebrow badge that used to open this
                     block now sits on the hero video below, so it is not said

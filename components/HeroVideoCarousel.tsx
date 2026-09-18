@@ -18,6 +18,7 @@ interface HeroClip {
 // 17 Sep 2026: six Animation Studio clips (Seedance and Kling), re-encoded
 // for the web at up to 1920 wide, no audio, fast-start.
 const CLIPS: HeroClip[] = [
+    { src: '/hero-clip-7.mp4', poster: '/hero-clip-7.jpg', caption: 'Black timber annexe with Crittall doors, summer garden' },
     { src: '/hero-clip-2.mp4', poster: '/hero-clip-2.jpg', caption: 'Dark-clad garden room and deck at dusk' },
     { src: '/hero-clip-6.mp4', poster: '/hero-clip-6.jpg', caption: 'Cedar garden office with corner glazing' },
     { src: '/hero-clip-5.mp4', poster: '/hero-clip-5.jpg', caption: 'Gable garden room, standing-seam roof, high summer' },
@@ -27,9 +28,11 @@ const CLIPS: HeroClip[] = [
 ];
 
 /**
- * `fullBleed`: edge to edge with no frame, the height set from the viewport
- * width and capped, the caption aligned to the page's content column. The
- * default is the contained card used elsewhere.
+ * `fullBleed`: the wide home-page hero - a 16:9 frame with no crop, soft
+ * corners, larger caption. The page caps its width (18 Sep 2026: 1400px);
+ * true edge-to-edge drew the 1920-wide clips at 2880+ device px on a retina
+ * laptop and read as blurry, the same finding as 6 Aug. The default is the
+ * contained card used elsewhere.
  */
 export const HeroVideoCarousel: React.FC<{ fullBleed?: boolean }> = ({ fullBleed = false }) => {
     const [active, setActive] = useState(0);
@@ -68,8 +71,8 @@ export const HeroVideoCarousel: React.FC<{ fullBleed?: boolean }> = ({ fullBleed
 
     return (
         <div className="w-full">
-            <div className={`relative overflow-hidden bg-slate-100 ${fullBleed ? '' : 'rounded-3xl md:rounded-[2.5rem] border border-border shadow-2xl'}`}>
-                <div className={`relative w-full ${fullBleed ? 'h-[52vw] min-h-[360px] max-h-[82vh]' : 'aspect-video'}`}>
+            <div className={`relative overflow-hidden bg-slate-100 ${fullBleed ? 'rounded-2xl md:rounded-3xl shadow-2xl' : 'rounded-3xl md:rounded-[2.5rem] border border-border shadow-2xl'}`}>
+                <div className="relative w-full aspect-video">
                     {CLIPS.map((clip, i) => (
                         <video
                             key={clip.src}
@@ -94,7 +97,7 @@ export const HeroVideoCarousel: React.FC<{ fullBleed?: boolean }> = ({ fullBleed
 
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none" />
 
-                    <div className={`absolute inset-x-0 bottom-0 p-4 sm:p-6 md:p-8 ${fullBleed ? 'md:px-12 lg:px-20 md:pb-12' : ''}`}>
+                    <div className={`absolute inset-x-0 bottom-0 p-4 sm:p-6 md:p-8 ${fullBleed ? 'md:px-10 lg:px-14 md:pb-10' : ''}`}>
                         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/40 border border-white/25 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-[0.2em]">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                             Architectural Intelligence

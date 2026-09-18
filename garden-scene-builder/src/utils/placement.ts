@@ -482,6 +482,26 @@ export function describeInterior(room: Room, objects: { type: string; color?: st
   };
 }
 
+/**
+ * Every placed interior object with its position, for Floor Plan Studio: the
+ * plan inventory names each piece and where it sits, so the drafting model
+ * keeps it there and the verifier can check it. Metres from the room centre
+ * become mm from the room centre (x right, z toward the front).
+ */
+export function describePlanItems(objects: { type: string; x: number; z: number; rot: number; color?: string; widthMm?: number; depthMm?: number }[]): { label: string; xMm: number; zMm: number; rotDeg: number; color?: string; widthMm?: number; depthMm?: number }[] {
+  return objects
+    .filter(o => !EXTERIOR_TYPES.has(o.type) && !isEndPanel(o.type as ObjectType))
+    .slice(0, 40)
+    .map(o => ({
+      label: (GLB_OBJECT_LABELS as Record<string, string>)[o.type] || o.type.replace(/_/g, ' '),
+      xMm: Math.round(o.x * 1000),
+      zMm: Math.round(o.z * 1000),
+      rotDeg: Math.round(((o.rot || 0) * 180) / Math.PI),
+      color: o.color,
+      widthMm: o.widthMm ?? NATIVE_WIDTH_MM[o.type as ObjectType],
+      depthMm: o.depthMm,
+    }));
+}
 export function describeExteriorLights(room: Room, objects: { type: string; x: number; z: number; rot: number; color?: string; mountHeightMm?: number }[]): { count: number; text: string }[] {
   const out: { count: number; text: string }[] = [];
   const wall = objects.filter(o => WALL_LIGHT_WORDS[o.type]);

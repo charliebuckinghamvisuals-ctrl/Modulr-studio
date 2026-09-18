@@ -72,7 +72,7 @@ function DimText({ value, onValueChange, position, rotation, children, isDraggab
     const label = String(value);
     const plateW = 0.28 + label.length * 0.11;
     return (
-      <group position={position}>
+      <group position={position} name="dimension-label">
         <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
           <mesh position={[0, 0, -0.012]}>
             <planeGeometry args={[plateW + 0.04, 0.34]} />

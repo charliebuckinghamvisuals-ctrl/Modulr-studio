@@ -192,9 +192,17 @@ export function inventoryFromSpec(spec) {
                 : kind === 'bifold' ? `bi-fold door set of ${leaves} equal folding leaves in one frame, with the slim vertical mullions between the leaves that a bi-fold has`
                 : `sliding door set of ${leaves} equal panes in one frame - large panes, slim vertical divisions, no folding hinges`;
             const wall = clean(String(dr.wall || 'front'), 10);
+            // Drawn open: the moved leaf is real geometry in the drawing, in the
+            // same frame finish and glass as the rest - never closed up, never
+            // a blank white panel.
+            const openWords = dr.open === true
+                ? (kind === 'sliding' ? ' This door set is drawn OPEN: one pane slid across in front of its neighbour, exactly as the drawing shows, in the same slim frame and clear glass as the other panes - not a solid or white panel, and not closed up.'
+                    : kind === 'bifold' ? ' This door set is drawn OPEN: the leaves folded back in a stack at the side of the opening, exactly as the drawing shows, in the same frame finish and glass - not closed up.'
+                    : ' This door is drawn OPEN: the leaf swung out at the angle the drawing shows, in the same frame finish and glass, with the room visible through the opening - not closed up.')
+                : '';
             const placeWords = wall === 'bay' ? 'in the dividing wall inside the covered outdoor section, seen only through its open front' : `on the ${wall} elevation`;
             items.push(item(`door-${i + 1}`, 'openings', `Door ${i + 1}: ${kind}, ${leaves} leaf, ${dr.style === 'solid' ? 'solid' : dr.style === 'crittall' ? 'Crittall' : 'glazed'}, ${wall}`,
-                `Door ${i + 1}: ${product}, ${mm(dr.widthMm) || 'unspecified width'} x ${mm(dr.heightMm) || 'unspecified height'}, ${style}, ${placeWords}.${where(dr)} Exactly where and how big the line drawing shows it.`));
+                `Door ${i + 1}: ${product}, ${mm(dr.widthMm) || 'unspecified width'} x ${mm(dr.heightMm) || 'unspecified height'}, ${style}, ${placeWords}.${where(dr)} Exactly where and how big the line drawing shows it.${openWords}`));
         });
         windows.forEach((wn, i) => {
             const wall = clean(String(wn.wall || 'front'), 10);
@@ -223,6 +231,24 @@ export function inventoryFromSpec(spec) {
             items.push(item('deck', 'garden', `Deck: ${front}mm deep across the front, ${deckLook(spec).split(' (')[0]}`,
                 `DECKING: one level deck of ${deckLook(spec)}, ${front}mm deep across the full front of the building${sides.length ? `, and extending ${sides.join(' and ')} - deliberately wider than the building there; the roof and canopy above do NOT extend with it` : ''}. Keep the deck exactly the size, shape and extent the line drawing shows; do not shrink it, cut it back or replace any part of it with lawn, gravel, planting or paving. Boards in exactly that colour family, running straight with visible joints and a clean fascia edge.`));
         }
+
+        // ---- internal partition walls, seen through the glazing ----------
+        // A partition's end face sits right behind the glass, so without this
+        // item the models read it as a "white pillar" and paint it out or
+        // solid. Position from the room centre, as the configurator stores it.
+        const parts = Array.isArray(spec.partitions) ? spec.partitions.slice(0, 8) : [];
+        parts.forEach((pt, i) => {
+            if (!pt || typeof pt !== 'object') return;
+            const runs = Number(pt.rotation) === 90 ? 'front-to-back' : 'left-to-right';
+            const len = mm(pt.lengthMm) || 'unspecified length', th = Number(pt.thicknessMm) || 100;
+            const x = Number(pt.xMm) || 0, z = Number(pt.zMm) || 0;
+            const place = runs === 'front-to-back'
+                ? `${Math.abs(x)}mm ${x < 0 ? 'left' : 'right'} of the room's centre line, its end face flush with the inside of the front wall`
+                : `${Math.abs(z)}mm ${z < 0 ? 'toward the back' : 'toward the front'} of the room's centre`;
+            const doorsIn = Array.isArray(pt.doors) ? pt.doors.length : 0;
+            items.push(item(`partition-${i + 1}`, 'interior', `Internal wall ${i + 1}: ${len} long, runs ${runs}`,
+                `INTERNAL PARTITION WALL ${i + 1}, INSIDE the room and seen only through the glazing: a full-height plastered wall ${len} long and ${th}mm thick, running ${runs}, ${place}, painted ${hex(spec.interiorColor) || 'white'} like the other interior walls${doorsIn ? `, with ${doorsIn} internal door${doorsIn === 1 ? '' : 's'} in it` : ''}. Where it meets the front glazing its narrow end face shows through the glass as a slim vertical white band exactly as drawn - it is a WALL END, not a pillar, post, mullion or panel; keep it exactly where and as thick as the drawing shows, and never move it, remove it or turn it into part of the door.`));
+        });
 
         // ---- interior, seen through the glazing --------------------------
         if (spec.interior && typeof spec.interior === 'object') {
@@ -259,7 +285,7 @@ export function inventoryFromSpec(spec) {
             if (typeof l?.text !== 'string' || !l.text.trim()) return;
             const n = Number(l.count) || 1;
             items.push(item(`light-${i + 1}`, 'lights', `Light fitting${n > 1 ? `s x${n}` : ''}: ${clean(l.text, 60)}`,
-                `EXTERIOR LIGHT FITTING${n > 1 ? `S, ${n} of them` : ''}: ${clean(l.text, 240)}. Exactly where the line drawing shows each one, keeping its precise shape, proportions and size - a slim flat box stays a slim flat box, it does not become a lantern, a cylinder or a different product. Only the finish colour is rendered from these words. Fittings are OFF in daylight - no glow or light cone unless the setting is dusk or night.`));
+                `EXTERIOR LIGHT FITTING${n > 1 ? `S, ${n} of them` : ''}: ${clean(l.text, 400)}. Exactly where the line drawing shows each one, keeping its precise shape, proportions and size - a slim flat box stays a slim flat box, it does not become a lantern, a cylinder or a different product. Only the finish colour is rendered from these words.`));
         });
     } catch (e) {
         console.warn('[RENDER] inventoryFromSpec skipped an item:', e.message || e);

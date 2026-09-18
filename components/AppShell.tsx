@@ -22,6 +22,7 @@ const DESKTOP_ONLY_STAGES = new Set([
   AppStage.UPLOAD,
   AppStage.WEATHER_LAB,
   AppStage.ANIMATION_STUDIO,
+  AppStage.FLOOR_PLAN_STUDIO,
 ]);
 
 // ─── Desktop-Only Screen shown on mobile for tool pages ───────────────────────
@@ -102,6 +103,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     // `canUseAnimation` is null until the plan loads - only badge on an explicit
     // false, so a subscriber never sees a lock flash on their own feature.
     { id: AppStage.ANIMATION_STUDIO, label: 'Animation Studio', locked: canUseAnimation === false },
+    // Same Business gate as Animation Studio; the page itself explains it.
+    { id: AppStage.FLOOR_PLAN_STUDIO, label: 'Floor Plan Studio', locked: canUseAnimation === false },
   ];
 
   // Top-level header items, in display order. Tools is injected between Home

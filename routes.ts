@@ -110,6 +110,14 @@ export const ROUTES: Record<AppStage, RouteMeta> = {
         keywords: `garden room video render, render to video, animated architectural visualisation, garden room reel, ${COMMON_KEYWORDS}`,
         indexable: true,
     },
+    [AppStage.FLOOR_PLAN_STUDIO]: {
+        path: '/floor-plan-studio',
+        title: 'Floor Plan Studio',
+        description:
+            'Turn a garden room or annexe design into a rendered floor plan with real materials, or a dimensioned black-and-white CAD plan - from the 3D configurator or an uploaded top view, nothing added or moved.',
+        keywords: `garden room floor plan, annexe floor plan, rendered floor plan, 2D floor plan with dimensions, CAD floor plan garden room, ${COMMON_KEYWORDS}`,
+        indexable: true,
+    },
     [AppStage.ANIMATIONS]: {
         path: '/animations',
         title: 'Animations',

@@ -366,3 +366,10 @@ input[type=range]::-webkit-slider-runnable-track {
   66%  { transform: scale(1.12) translateX(4%) translateY(2%); }
   100% { transform: scale(1.1) translateX(-4%) translateY(0%); }
 }
+/* Home offer strip (18 Sep 2026): the line drifts left at a walking pace,
+   four copies so it never shows a gap, pauses on hover, still for anyone
+   who asked for reduced motion. */
+@keyframes offerMarquee { from { transform: translateX(0); } to { transform: translateX(-25%); } }
+.offer-marquee { animation: offerMarquee 28s linear infinite; }
+.offer-strip:hover .offer-marquee { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .offer-marquee { animation: none; } }

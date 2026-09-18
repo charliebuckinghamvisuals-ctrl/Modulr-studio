@@ -391,6 +391,8 @@ const ANIMATION_PLANS = new Set(['business', 'master']);
 /** The full 3D configurator (interiors, kitchens, walkthrough, saving, send
  *  to render). Standard is NOT here: it gets the free exterior version. */
 const FULL_CONFIG_PLANS = new Set(['business', 'master', 'tester', 'beta']);
+/** Floor Plan Studio (18 Sep 2026): Business only, each plan spends a render. */
+const FLOOR_PLAN_PLANS = new Set(['business', 'master']);
 
 /**
  * Video generation settings.
@@ -2246,7 +2248,9 @@ const fileToGenerativePart = (base64Data, mimeType) => {
  * the cost log from this file without touching Firestore or a key itself.
  * /api/renderBuilding below is the previous engine and is being retired.
  */
-mountRender(app, { ai, Type, ANALYSIS_MODEL, enforceRenderAccess, CREDIT_COSTS, userAiLimiter, logRender, sanitizeString });
+// resolveEffectivePlan is declared further down (a const, not hoisted): the
+// thunk defers the lookup to request time.
+mountRender(app, { ai, Type, ANALYSIS_MODEL, enforceRenderAccess, CREDIT_COSTS, userAiLimiter, logRender, sanitizeString, resolveEffectivePlan: (req) => resolveEffectivePlan(req), FLOOR_PLAN_PLANS });
 
 app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
     try {

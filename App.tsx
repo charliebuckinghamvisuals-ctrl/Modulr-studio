@@ -29,6 +29,7 @@ import { GalleryView } from './components/views/GalleryView';
 import { AnimationsView } from './components/views/AnimationsView';
 import { ProjectsView } from './components/views/ProjectsView';
 import { AnimationStudioView } from './components/views/AnimationStudioView';
+import { FloorPlanStudioView } from './components/views/FloorPlanStudioView';
 import { WhyModulrView } from './components/views/WhyModulrView';
 import { AuthView } from './components/views/AuthView';
 import { AccountView } from './components/views/AccountView';
@@ -895,6 +896,13 @@ const App: React.FC = () => {
 
             {engine.activeStage === AppStage.ANIMATION_STUDIO && (
                 <AnimationStudioView onNavigate={engine.setActiveStage} />
+            )}
+
+            {engine.activeStage === AppStage.FLOOR_PLAN_STUDIO && (
+                <FloorPlanStudioView
+                    onNavigate={engine.setActiveStage}
+                    onSaveToProject={(img) => setProjectSave({ image: img, kind: 'floor_plan', name: 'floor-plan' })}
+                />
             )}
 
 

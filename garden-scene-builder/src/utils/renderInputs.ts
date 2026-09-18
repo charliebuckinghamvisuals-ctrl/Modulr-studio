@@ -48,7 +48,7 @@ const isHelperMesh = (m: THREE.Mesh) => {
 /** Objects the line drawing must never contain, by name or ancestry. */
 const isExcludedBranch = (o: THREE.Object3D) => {
   const n = (o.name || '').toLowerCase();
-  return n === 'environment-background' || n.includes('placement-ghost') || n.includes('drag-handle');
+  return n === 'environment-background' || n.includes('placement-ghost') || n.includes('drag-handle') || n === 'dimension-label';
 };
 
 const renderAt = (gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, w: number, h: number, type: 'image/png' | 'image/jpeg' = 'image/png') => {
@@ -75,6 +75,9 @@ export function captureRenderInputs(gl: THREE.WebGLRenderer, scene: THREE.Scene,
   const hidden: THREE.Object3D[] = [];
   scene.traverse(o => {
     if (!o.visible) return;
+    // A dimension label's plate (plan view draws them always): hide the
+    // whole group, text and plates, so no white boxes land in the capture.
+    if ((o.name || '').toLowerCase() === 'dimension-label') { o.visible = false; hidden.push(o); return; }
     // Drop what is not the design: the floor grid (named in MainScene),
     // dimension lines and their text, drag handles and selection overlays.
     // Sky and clouds stay because they are the view's backdrop.
@@ -161,4 +164,38 @@ export function captureRenderInputs(gl: THREE.WebGLRenderer, scene: THREE.Scene,
   }
 
   return { shaded, line, width, height };
+}
+
+/**
+ * Crop a shaded + line pair to the drawing's ink, plus a margin, so a plan
+ * captured from the fixed top camera fills its frame instead of sitting
+ * small in a field of lawn (which the image models then "zoom" into on
+ * their own terms). The line drawing is black on white, so its bounds are
+ * the design's bounds; the shaded image is cropped identically.
+ */
+export async function cropToInk(line: string, shaded: string, marginFrac = 0.08): Promise<{ line: string; shaded: string; width: number; height: number }> {
+  const load = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = src; });
+  const [li, si] = await Promise.all([load(line), load(shaded)]);
+  const c = document.createElement('canvas'); c.width = li.width; c.height = li.height;
+  const ctx = c.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(li, 0, 0);
+  const d = ctx.getImageData(0, 0, c.width, c.height).data;
+  let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+  for (let y = 0; y < c.height; y += 2) for (let x = 0; x < c.width; x += 2) {
+    const i = (y * c.width + x) * 4;
+    if (d[i] < 128 && d[i + 3] > 0) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  if (x1 < 0 || y1 < 0) return { line, shaded, width: c.width, height: c.height };
+  const mx = Math.round((x1 - x0) * marginFrac), my = Math.round((y1 - y0) * marginFrac);
+  const sx = Math.max(0, x0 - mx), sy = Math.max(0, y0 - my);
+  const sw = Math.min(c.width - sx, x1 - x0 + 2 * mx), sh = Math.min(c.height - sy, y1 - y0 + 2 * my);
+  const out = (img: HTMLImageElement, type: 'image/png' | 'image/jpeg') => {
+    const o = document.createElement('canvas'); o.width = sw; o.height = sh;
+    const octx = o.getContext('2d')!;
+    // Both captures share a frame size; scale the source rect if not.
+    const kx = img.width / c.width, ky = img.height / c.height;
+    octx.drawImage(img, sx * kx, sy * ky, sw * kx, sh * ky, 0, 0, sw, sh);
+    return o.toDataURL(type, 0.92);
+  };
+  return { line: out(li, 'image/png'), shaded: out(si, 'image/jpeg'), width: sw, height: sh };
 }

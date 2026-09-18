@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, createContext, useContext } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Settings, Plus, Box, Tent, Map, Settings2, Trash2, DoorOpen, DoorClosed, ChevronDown, ChevronRight, Save, FilePlus, Layers, TrendingUp } from 'lucide-react';
+import { Settings, Plus, Box, Tent, Map, Settings2, Trash2, DoorOpen, DoorClosed, ChevronDown, ChevronRight, Save, FilePlus, Layers, TrendingUp, LayoutGrid } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Link } from 'react-router-dom';
 import { gableCeilingMaxMm } from '../utils/placement';
@@ -12,7 +12,8 @@ import { DECK_MATERIALS, deckArea, describeDeck } from './3d/Decks';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
 import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS, INTERIOR_DOOR_STYLES } from '../modelRegistry';
-import { describeExteriorLights, describeInterior } from '../utils/placement';
+import { describeExteriorLights, describeInterior, describePlanItems } from '../utils/placement';
+import { cropToInk } from '../utils/renderInputs';
 import { DOOR_KINDS, LEAF_RANGE, doorKind, clampLeaves, changesForKind } from '../utils/doors';
 import type { DoorKind } from '../types';
 import { MATERIAL_DEF } from '../utils/materials';
@@ -1879,8 +1880,13 @@ export function Sidebar() {
               // The boundary rides with the room: what each run is built of,
               // in words the render prompt can repeat, so a brick wall in the
               // screenshot is rendered as brick and not guessed at.
+              // Whether each door set is drawn open (the Open Doors toggle or a
+              // single leaf), so the inventory can say so and the render keeps
+              // the slid or folded leaf instead of closing it or painting it white.
+              const { areDoorsOpen, openDoorIds } = useStore.getState();
               const roomSpec = {
                 ...room,
+                doors: (room.doors || []).map(d => ({ ...d, open: !!(areDoorsOpen || openDoorIds.includes(d.id)) })),
                 garden: (fences?.length || paths?.length || decks?.length) ? {
                   boundary: (fences || []).map(f => ({ lengthMm: Math.round(fenceLength(f) * 1000), text: describeBoundary(runStyle(f, boundaryStyle)) })),
                   paths: (paths || []).map(p => ({ lengthMm: Math.round(pathLength(p) * 1000), text: describePath(p) })),
@@ -1899,6 +1905,51 @@ export function Sidebar() {
           className="w-full bg-[#3b4d4a] hover:bg-[#2d3a38] text-white py-3.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
         >
           Send to Render Engine
+        </button>
+        )}
+        {!isPublic && (
+        /* Floor Plan Studio (18 Sep 2026): the plan view with dimensions on,
+           captured from straight above as shaded + line drawing, with the
+           spec and every placed piece of furniture with its position. The
+           host app turns it into a rendered or CAD plan. */
+        <button
+          onClick={async () => {
+            const st = useStore.getState();
+            const prevMode = st.viewMode;
+            st.setHoveredElementId(null);
+            st.setViewMode('plan');
+            st.setIsExporting(true);
+            const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
+            await wait(400);
+            window.dispatchEvent(new CustomEvent('camera-set-view', { detail: { view: 'top', snap: true } }));
+            await wait(600);
+            let captured: { shaded: string; line: string } | null = null;
+            try { captured = (window as any).__modulrCaptureRenderInputs?.() || null; } catch (e) { console.warn('plan capture failed', e); }
+            useStore.getState().setIsExporting(false);
+            useStore.getState().setViewMode(prevMode);
+            if (!captured) return;
+            // The top camera frames the whole lawn: crop both to the drawing.
+            let image = captured.shaded, lineImage: string | null = captured.line;
+            try { const c = await cropToInk(captured.line, captured.shaded); image = c.shaded; lineImage = c.line; } catch (e) { console.warn('plan crop failed, sending uncropped', e); }
+            const { room, fences, boundaryStyle, paths, decks, objects } = useStore.getState().scene;
+            const { areDoorsOpen, openDoorIds } = useStore.getState();
+            const roomSpec = {
+              ...room,
+              doors: (room.doors || []).map(d => ({ ...d, open: !!(areDoorsOpen || openDoorIds.includes(d.id)) })),
+              garden: (fences?.length || paths?.length || decks?.length) ? {
+                boundary: (fences || []).map(f => ({ lengthMm: Math.round(fenceLength(f) * 1000), text: describeBoundary(runStyle(f, boundaryStyle)) })),
+                paths: (paths || []).map(p => ({ lengthMm: Math.round(pathLength(p) * 1000), text: describePath(p) })),
+                decks: (decks || []).map(d => ({ areaM2: Math.round(deckArea(d.points) * 10) / 10, heightMm: d.heightMm, text: describeDeck(d) })),
+              } : undefined,
+              interior: describeInterior(room, objects || []),
+              planItems: describePlanItems(objects || []),
+            };
+            window.parent.postMessage({ type: 'RENDER_PLAN', image, lineImage, roomSpec }, window.location.origin);
+          }}
+          className="w-full mt-2 bg-white hover:bg-gray-50 text-[#3b4d4a] border border-[#3b4d4a]/30 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <LayoutGrid size={16} />
+          Floor Plan Studio
         </button>
         )}
       </div>

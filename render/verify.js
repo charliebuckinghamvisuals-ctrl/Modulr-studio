@@ -12,14 +12,21 @@
  * A QA outage must never take rendering down.
  */
 
-const PROMPT = (n, hasColourRef) => [
-    `Image 1 is the geometry reference for a garden building scene (a line drawing or a flat-shaded 3D view). Image 2 is a photorealistic render that must show EXACTLY the same scene.${hasColourRef ? ' Image 3 is the same view flat-shaded: the COLOUR reference for cladding, deck, fascia, frames and furniture, to be read together with the item wording.' : ''} Below is the inventory of the ${n} items in the design.`,
+/** What image 2 is, by kind: an exterior render, a rendered plan, or a CAD plan. */
+const OPENING = {
+    render: (hasColourRef) => `Image 1 is the geometry reference for a garden building scene (a line drawing or a flat-shaded 3D view). Image 2 is a photorealistic render that must show EXACTLY the same scene.${hasColourRef ? ' Image 3 is the same view flat-shaded: the COLOUR reference for cladding, deck, fascia, frames and furniture, to be read together with the item wording.' : ''}`,
+    plan: (hasColourRef) => `Image 1 is the geometry reference for a floor plan seen from directly above (a line drawing or a flat-shaded top view). Image 2 is a photorealistic rendered floor plan that must show EXACTLY the same plan - same walls, openings, partitions and furniture in the same places, same framing and orientation.${hasColourRef ? ' Image 3 is the same plan flat-shaded: the COLOUR reference for floor, furniture and deck.' : ''}`,
+    cad: () => 'Image 1 is the geometry reference for a floor plan seen from directly above (a line drawing or a flat-shaded top view, possibly with dimension lines). Image 2 is a black-and-white CAD-style floor plan drawing that must show EXACTLY the same plan - same walls, openings, partitions and furniture symbols in the same places, same framing and orientation. Where an inventory item states a dimension in millimetres, the figure written on the drawing for that element must be that number: a different figure means the item is NOT unchanged.',
+};
+
+const PROMPT = (n, hasColourRef, kind = 'render') => [
+    `${(OPENING[kind] || OPENING.render)(hasColourRef)} Below is the inventory of the ${n} items in the design.`,
     'For EACH item, judge image 2 against image 1 AND against the item\'s own words: present - the item is there; unchanged - same shape, size, position and extent as the reference (a deck that is smaller, cut back or partly replaced by lawn is NOT unchanged; a door with a different leaf count or a solid door shown glazed is NOT unchanged; a light fitting of a different style or in a different place is NOT unchanged), AND, where the item names a material or colour, the render shows THAT material in THAT colour family (cedar-toned cladding rendered pale oak is NOT unchanged; black composite decking rendered as light timber is NOT unchanged; a black fascia rendered as timber is NOT unchanged; furniture listed as inside the room but missing through the glass is NOT present). Lighting, sky, planting beyond the boundary and fine surface texture are allowed to differ and never count against an item.',
     'Also report cameraMatch: true only if image 2 keeps image 1\'s camera angle, framing and crop with nothing the reference shows cropped out and no zoom in or pull back; and added: a short list of BUILT or PLACED things in image 2 that are NOT in image 1 - extra openings, steps, pots, planters, raised beds, paths, paving, structures, furniture - or an empty list. Lawn, planting, shrubs, flowers, trees, sky, neighbouring rooftops, and a boundary fence, wall or hedge at the EDGE of the garden where the reference shows none, are the setting and are ALLOWED; never list them as added unless they cover or replace an inventory item.',
     'note: for any item that is not present or not unchanged, one short sentence saying what is wrong. Judge only what both images can show; an item on an elevation the camera cannot see counts as present and unchanged.',
 ].join('\n');
 
-export async function verifyRender(ai, Type, { model, referenceB64, referenceMime, renderB64, items, colourRefB64, colourRefMime }) {
+export async function verifyRender(ai, Type, { model, referenceB64, referenceMime, renderB64, items, colourRefB64, colourRefMime, kind = 'render' }) {
     if (!items?.length) return { checked: false, passed: true, failures: [], added: [], cameraMatch: true };
     try {
         const inventory = items.map((it, i) => `${i + 1}. [${it.id}] ${it.text}`).join('\n');
@@ -27,8 +34,8 @@ export async function verifyRender(ai, Type, { model, referenceB64, referenceMim
             { inlineData: { data: referenceB64, mimeType: referenceMime || 'image/png' } },
             { inlineData: { data: renderB64, mimeType: 'image/jpeg' } },
         ];
-        if (colourRefB64 && colourRefB64 !== referenceB64) parts.push({ inlineData: { data: colourRefB64, mimeType: colourRefMime || 'image/jpeg' } });
-        parts.push({ text: PROMPT(items.length, parts.length === 3) + '\n\nINVENTORY:\n' + inventory });
+        if (kind !== 'cad' && colourRefB64 && colourRefB64 !== referenceB64) parts.push({ inlineData: { data: colourRefB64, mimeType: colourRefMime || 'image/jpeg' } });
+        parts.push({ text: PROMPT(items.length, parts.length === 3, kind) + '\n\nINVENTORY:\n' + inventory });
         const response = await ai.models.generateContent({
             model,
             contents: { parts },

@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast';
 import { createProject, listProjects, updateProject } from '../../services/projectService';
 import { setConfigSpec } from '../../services/geminiService';
 import { consumePendingDesign } from '../../services/designHandoff';
+import { setPendingPlanCapture } from '../../services/floorPlanService';
 
 export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
 
@@ -112,6 +113,19 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
       // The free configurator's upsell button: show the plans.
       if (event.data && event.data.type === 'OPEN_PRICING') {
         engine.setActiveStage(AppStage.PRICING);
+        return;
+      }
+
+      // Floor Plan Studio: the plan-view capture, parked for the Studio to
+      // pick up on mount. Business only - the free configurator has no
+      // button, and the server gates the call as well.
+      if (event.data && event.data.type === 'RENDER_PLAN') {
+        if (configModeRef.current !== 'business') return;
+        const image: string = typeof event.data.image === 'string' ? event.data.image : '';
+        if (!image) return;
+        const lineImage: string | null = typeof event.data.lineImage === 'string' ? event.data.lineImage : null;
+        setPendingPlanCapture({ shaded: image, line: lineImage, spec: event.data.roomSpec || null });
+        engine.setActiveStage(AppStage.FLOOR_PLAN_STUDIO);
         return;
       }
 

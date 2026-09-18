@@ -50,6 +50,7 @@ export function buildRenderPrompt({ inventoryText, hasLine, scenePreset, timePre
         : 'Image 1 is a flat-shaded view of a finished 3D model. Its geometry is final and complete. Keep its camera, framing and crop exactly.';
     const setting = [asText(SCENE_PRESETS, scenePreset, 'uk-residential'), (sceneText || '').trim()].filter(Boolean).join(' ');
     const time = asText(TIME_PRESETS, timePreset, 'afternoon');
+    const lightsOn = timePreset === 'dusk' || timePreset === 'night';
     return [
         'HARD RULES - these override everything below.',
         inputs,
@@ -58,7 +59,7 @@ export function buildRenderPrompt({ inventoryText, hasLine, scenePreset, timePre
         'INVENTORY - everything in the design. Each item is rendered exactly where and how the drawing shows it:',
         inventoryText || '(no inventory supplied - the drawing is the complete list)',
         '',
-        'FORBIDDEN: any door, window, rooflight or opening not in the drawing; any deck, patio, path, paving, step, wall, fence, pergola or structure not in the drawing; shrinking or cutting back a deck; moving the camera, zooming, cropping tighter or pulling back; furniture, pots, planters, bikes, parasols or people; restyling a door, frame or light fitting; changing a cladding colour family; glazing a door listed as solid; weathering, dirt, moss or staining - everything is newly built and clean.',
+        'FORBIDDEN: ' + (lightsOn ? 'any exterior or interior light fitting left OFF - every fitting is ON and glowing; ' : 'any exterior light fitting switched ON - every wall light, soffit light and garden light is OFF, unlit, no glow, no light cone, no warm pool on the wall; ') + 'any door, window, rooflight or opening not in the drawing; any deck, patio, path, paving, step, wall, fence, pergola or structure not in the drawing; shrinking or cutting back a deck; moving the camera, zooming, cropping tighter or pulling back; furniture, pots, planters, bikes, parasols or people; restyling a door, frame or light fitting; changing a cladding colour family; glazing a door listed as solid; weathering, dirt, moss or staining - everything is newly built and clean.',
         '',
         'LOOK: a photorealistic architectural visualisation, sharp from front to back, no depth of field, natural exposure. Materials rendered as real: timber with grain and board joints, metal with seams, glass with true reflections of the sky and garden and a dim view of the interior, decking boards with joints, brick with real coursing. ' + time,
         `SETTING - the only thing you may dress, and only OUTSIDE the drawn items: ${setting || 'a simple lawn with a few shrubs beyond the boundary.'} Lawn, planting, sky, distant trees and neighbours live where the drawing shows plain ground or nothing at all; they never cover, replace or cut into a drawn item. A boundary fence, wall or hedge from the setting goes only where the drawing shows NO boundary; where a boundary run is drawn, render that run as listed and nothing else.`,
@@ -75,7 +76,7 @@ export function buildMaterialsPassPrompt({ inventoryText, failures }) {
         'INVENTORY:',
         inventoryText,
         '',
-        'Improve only: material realism (grain, joints, seams, coursing), glass reflections, lighting softness, shadow and ambient occlusion in reveals and under the eaves and deck edge, sky and lawn texture. Output 2K, same aspect ratio as the input.',
+        'Improve only: material realism (grain, joints, seams, coursing), glass reflections, lighting softness, shadow and ambient occlusion in window and door reveals, along the fascia line and at the deck edge, sky and lawn texture. Output 2K, same aspect ratio as the input.',
     ].filter(l => l !== undefined).join('\n');
 }
 

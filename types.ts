@@ -17,6 +17,8 @@ export enum AppStage {
   PLANNING_CHECKER = 'planning_checker',
   PROJECTS = 'projects',
   ANIMATION_STUDIO = 'animation_studio',
+  /** Floor Plan Studio: rendered and CAD floor plans from a plan capture or an uploaded top view (Business). */
+  FLOOR_PLAN_STUDIO = 'floor_plan_studio',
   /** Public showcase of finished animation clips — the moving Gallery. */
   ANIMATIONS = 'animations',
   WHY = 'why'
