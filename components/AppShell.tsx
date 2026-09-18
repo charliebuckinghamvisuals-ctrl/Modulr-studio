@@ -406,9 +406,11 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
 
 
       {/* ── Footer ── */}
-      <footer className="w-full pt-20 md:pt-40 pb-12 px-6 md:px-8 border-t border-border bg-white flex flex-col md:flex-row items-center justify-between text-xs text-secondary shrink-0 z-50 gap-6 md:gap-0">
+      <footer className="w-full pt-10 pb-8 px-6 md:px-8 border-t border-border bg-white flex flex-col md:flex-row items-center justify-between text-xs text-secondary shrink-0 z-50 gap-6">
+        {/* NAPC on the left, Modulr in the middle under the contact line
+            (Charlie, 18 Sep 2026): the product made it, the company backs it. */}
         <div className="flex-[1] flex items-center justify-center md:justify-start">
-          <img src="/Logo.png" alt="Modulr Studio Logo" className="h-24 md:h-36 w-auto object-contain" />
+          <img src="/napc-logo.png" alt="NAPC Logo" className="h-12 md:h-14 object-contain" />
         </div>
         <div className="flex-[1] flex flex-col items-center gap-3">
           {/* Two addresses on purpose: the studio's own for anything about the
@@ -420,7 +422,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
             Contact us &nbsp;|&nbsp; info@modulrstudio.co.uk
           </a>
           <p className="text-[10px] text-accent/60 tracking-wide text-center">Created by NAPC Ltd &nbsp;|&nbsp; 01285 283 200 &nbsp;|&nbsp; info@napc.uk</p>
-          <img src="/napc-logo.png" alt="NAPC Logo" className="h-16 md:h-20 object-contain" />
+          <img src="/Logo.png" alt="Modulr Studio Logo" className="h-14 md:h-20 w-auto object-contain mt-1" />
         </div>
         <div className="flex-[1] flex justify-center md:justify-end items-center text-accent/60 font-bold uppercase tracking-widest text-[10px]">
           v3.2
