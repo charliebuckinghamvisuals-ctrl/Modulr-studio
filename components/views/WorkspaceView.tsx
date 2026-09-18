@@ -26,6 +26,8 @@ interface WorkspaceViewProps {
     isExporting4K?: boolean;
     /** The server's automatic quality check on the last render. */
     verification?: { checked: boolean; passed?: boolean; retried?: boolean; failures?: { id: string; label: string; problem: string }[] } | null;
+    /** How many inventory items the check covered, for the badge count. */
+    inventoryCount?: number;
     /** Re-render: sameLook=true reuses the last seed, false rolls a new one. */
     onRerender?: (sameLook: boolean) => void;
     onInputClick: () => void;
@@ -58,6 +60,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
     onExport4K,
     isExporting4K,
     verification,
+    inventoryCount,
     onRerender,
     onInputClick,
     onReset,
@@ -258,11 +261,11 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                             {verification?.checked && (
                                 verification.passed ? (
                                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-none bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold" title={verification.retried ? 'An automatic correction was applied before this render was accepted.' : 'Every item in the design inventory verified against your drawing.'}>
-                                        <ShieldCheck size={13} /> Checked against your design
+                                        <ShieldCheck size={13} /> Modulr Locked{inventoryCount ? ` · ${inventoryCount} / ${inventoryCount} verified` : ''}
                                     </span>
                                 ) : (
                                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-none bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold" title="The automatic check found differences it could not fully correct - review the render before sending it to a client.">
-                                        <ShieldAlert size={13} /> Auto-checked - review recommended
+                                        <ShieldAlert size={13} /> Modulr Lock{inventoryCount && verification.failures ? ` · ${Math.max(0, inventoryCount - verification.failures.length)} / ${inventoryCount} verified` : ''} - review recommended
                                     </span>
                                 )
                             )}

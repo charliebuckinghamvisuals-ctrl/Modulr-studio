@@ -28,10 +28,20 @@ const WORKFLOW = [
     { step: 'Render it', body: 'The engine is handed the building you priced, not a screenshot. What comes back matches it.' },
 ];
 
+/**
+ * The Modulr Lock System, as outcomes. Deliberately not the recipe - no
+ * mention of how the lock is built - only what it guarantees.
+ */
+const LOCKS = [
+    { title: 'Locked to the design', body: 'The engine is given the building you configured - its exact form, every opening, every edge - not a screenshot to reinterpret. It cannot add a window or move a door.' },
+    { title: 'Locked to the specification', body: 'Every door set, window, deck, boundary, fitting and finish is stated to the engine item by item, in your words. The cladding you chose is the cladding you get.' },
+    { title: 'Checked before it ships', body: 'Each render is inspected against that specification, item by item. Anything that drifted is corrected automatically, and you are told what was checked.' },
+];
+
 /** Three reasons, each a thing the product does. */
 const REASONS = [
     { title: 'Built around your product', body: 'Eaves and ridge, composite boards, anthracite frames, decking, canopies, a covered bay. It knows what a garden room is made of.' },
-    { title: 'Renders that match the quote', body: 'Door count, sets, cladding per face - the engine is told, not left to guess. It cannot swap a bi-fold for a window.' },
+    { title: 'Renders that match the quote', body: 'The Modulr Lock System: every render is locked to the design and checked item by item before it ships.' },
     { title: 'Planning built in, by planning people', body: 'Made by NAPC, the UK planning consultancy for garden rooms and annexes. Permitted development is flagged as you design.' },
 ];
 
@@ -163,6 +173,31 @@ export const HomeView: React.FC<HomeViewProps> = ({ onOpenEngine, onNavigate }) 
                     <div className="overflow-hidden border border-white/10">
                         <CompareSlider beforeImage="/demo-line-drawing.jpg" afterImage="/demo-render.jpg" beforeLabel="Line drawing" afterLabel="Render" />
                     </div>
+                </div>
+            </Band>
+
+            {/* 4b. The Modulr Lock System. Why the renders are accurate, without
+                the recipe: three locks stated as outcomes, not mechanisms. */}
+            <Band tone="white" inner="py-16 sm:py-24">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-10 lg:gap-16 items-start">
+                    <div>
+                        <Eyebrow>Why the render matches the quote</Eyebrow>
+                        <h2 className="text-2xl sm:text-3xl lg:text-4xl text-accent font-bold mt-3">The Modulr Lock System</h2>
+                        <p className="text-secondary text-sm sm:text-base mt-5 leading-relaxed max-w-md">
+                            Most AI render tools are handed a picture and asked to imagine a better one. That is why they add a window, lose a door, or quietly change the cladding. Modulr Studio does not work from a picture. Every render is locked to the design three ways, and nothing ships until it passes.
+                        </p>
+                    </div>
+                    <ol className="divide-y divide-slate-200 border-y border-slate-200">
+                        {LOCKS.map((l, i) => (
+                            <li key={l.title} className="py-5 grid grid-cols-[2.5rem_1fr] gap-4">
+                                <span className="text-accent/60 font-bold text-sm pt-0.5">0{i + 1}</span>
+                                <div>
+                                    <p className="text-accent font-bold">{l.title}</p>
+                                    <p className="text-secondary text-sm mt-1 leading-relaxed">{l.body}</p>
+                                </div>
+                            </li>
+                        ))}
+                    </ol>
                 </div>
             </Band>
 

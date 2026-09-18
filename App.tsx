@@ -936,7 +936,7 @@ const App: React.FC = () => {
             {engine.activeStage === AppStage.RENDER_ENGINE && (
                 <WorkspaceView
                     title="Render Engine"
-                    subtitle="Configure exterior materials and lighting."
+                    subtitle="Renders with the Modulr Lock System: locked to your design, checked item by item before it ships."
                     controls={renderEngineControls}
                     primaryImg={engine.isBatchMode && engine.batchRenders.length > 0 ? engine.getRenderUrl(engine.batchRenders[Math.min(selectedBatchIndex, engine.batchRenders.length - 1)]) : engine.getRenderUrl(engine.renderedImage)}
                     secondaryImg={engine.isBatchMode && engine.batchImages.length > 0 ? engine.getRenderUrl(engine.batchImages[Math.min(selectedBatchIndex, engine.batchImages.length - 1)]) : engine.getRenderUrl(engine.originalImage)}
@@ -950,6 +950,7 @@ const App: React.FC = () => {
                     onExport4K={engine.handleExport4K}
                     isExporting4K={engine.isExporting4K}
                     verification={engine.renderVerification}
+                    inventoryCount={engine.inventoryItems.length}
                     onRerender={(sameLook) => engine.handleRender({ reuseSeed: sameLook })}
                     onFormatChange={engine.setDownloadFormat}
                     downloadFormat={engine.downloadFormat}
