@@ -18,6 +18,7 @@ interface HeroClip {
 // 17 Sep 2026: six Animation Studio clips (Seedance and Kling), re-encoded
 // for the web at up to 1920 wide, no audio, fast-start.
 const CLIPS: HeroClip[] = [
+    { src: '/hero-clip-8.mp4', poster: '/hero-clip-8.jpg', caption: 'Sage garden office in autumn rain, wet deck and falling leaves' },
     { src: '/hero-clip-7.mp4', poster: '/hero-clip-7.jpg', caption: 'Black timber annexe with Crittall doors, summer garden' },
     { src: '/hero-clip-2.mp4', poster: '/hero-clip-2.jpg', caption: 'Dark-clad garden room and deck at dusk' },
     { src: '/hero-clip-6.mp4', poster: '/hero-clip-6.jpg', caption: 'Cedar garden office with corner glazing' },
