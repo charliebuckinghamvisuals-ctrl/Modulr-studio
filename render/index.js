@@ -34,7 +34,7 @@ const sniffMime = (b64) => {
 };
 
 export function mountRender(app, deps) {
-    const { ai, Type, ANALYSIS_MODEL, enforceRenderAccess, CREDIT_COSTS, userAiLimiter, logRender, sanitizeString, resolveEffectivePlan, FLOOR_PLAN_PLANS } = deps;
+    const { ai, Type, ANALYSIS_MODEL, enforceRenderAccess, CREDIT_COSTS, userAiLimiter, logRender, sanitizeString, resolveEffectivePlan, FLOOR_PLAN_PLANS, isMasterUser } = deps;
 
     app.post('/api/render', userAiLimiter, async (req, res) => {
         const t0 = Date.now();
@@ -145,6 +145,8 @@ export function mountRender(app, deps) {
             const notes = sanitizeString(req.body.notes, 400);
             if (!shaded) return res.status(400).json({ error: 'No plan image.' });
 
+            // Parked for launch (18 Sep 2026): master only until tested through the real route.
+            if (!(isMasterUser && isMasterUser(req.user))) return res.status(403).json({ error: 'Floor Plan Studio is coming soon.' });
             const plan = await resolveEffectivePlan(req);
             if (plan === null) return res.status(503).json({ error: 'Could not verify your plan. Please try again shortly.' });
             if (!FLOOR_PLAN_PLANS.has(plan)) return res.status(403).json({ error: 'Floor Plan Studio is part of the Business plan.', needsBusiness: true });

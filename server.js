@@ -2255,7 +2255,7 @@ const fileToGenerativePart = (base64Data, mimeType) => {
  */
 // resolveEffectivePlan is declared further down (a const, not hoisted): the
 // thunk defers the lookup to request time.
-mountRender(app, { ai, Type, ANALYSIS_MODEL, enforceRenderAccess, CREDIT_COSTS, userAiLimiter, logRender, sanitizeString, resolveEffectivePlan: (req) => resolveEffectivePlan(req), FLOOR_PLAN_PLANS });
+mountRender(app, { ai, Type, ANALYSIS_MODEL, enforceRenderAccess, CREDIT_COSTS, userAiLimiter, logRender, sanitizeString, resolveEffectivePlan: (req) => resolveEffectivePlan(req), FLOOR_PLAN_PLANS, isMasterUser: (u) => isMasterUser(u) });
 
 app.post('/api/generateLineDrawing', userAiLimiter, async (req, res) => {
     try {
@@ -4286,6 +4286,8 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
     let claimed = false;
     let chargedPence = 0;
     try {
+        // Parked for launch (18 Sep 2026): master only until the Higgsfield key is on and tested.
+        if (!isMasterUser(req.user)) return res.status(403).json({ error: 'Animation Studio is coming soon.' });
         const base64Image = sanitizeString(req.body.base64Image, 10_000_000);
         const preset      = sanitizeString(req.body.preset, 40);
         const extra       = sanitizeString(req.body.extraPrompt, 800);

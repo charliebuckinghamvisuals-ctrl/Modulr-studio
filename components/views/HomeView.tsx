@@ -49,8 +49,8 @@ const REASONS = [
 const TOOLS: { label: string; line: string; stage: AppStage; badge?: string }[] = [
     { label: '3D Configurator', line: 'Design to real dimensions', stage: AppStage.DESIGNER },
     { label: 'Render Engine', line: 'Pro-level CGI from the design', stage: AppStage.RENDER_ENGINE },
-    { label: 'Floor Plan Studio', line: 'Rendered and CAD plans', stage: AppStage.FLOOR_PLAN_STUDIO, badge: 'New' },
-    { label: 'Animation Studio', line: 'A render, brought to life', stage: AppStage.ANIMATION_STUDIO },
+    { label: 'Floor Plan Studio', line: 'Rendered and CAD plans', stage: AppStage.FLOOR_PLAN_STUDIO, badge: 'Coming soon' },
+    { label: 'Animation Studio', line: 'A render, brought to life', stage: AppStage.ANIMATION_STUDIO, badge: 'Coming soon' },
     { label: 'Material Studio', line: 'Swap any surface, honestly', stage: AppStage.MATERIAL_STUDIO },
     { label: 'Weather Lab', line: 'Same scheme, any season', stage: AppStage.WEATHER_LAB },
     { label: 'Projects', line: 'One job, one place, one link', stage: AppStage.PROJECTS },

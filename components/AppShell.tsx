@@ -1,7 +1,7 @@
 import React, { ReactNode } from 'react';
 import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool, Lock } from 'lucide-react';
 import { AppStage } from '../types';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth, isMasterAccount } from '../hooks/useAuth';
 import { useCredits } from '../hooks/useCredits';
 
 interface AppShellProps {
@@ -25,6 +25,31 @@ const DESKTOP_ONLY_STAGES = new Set([
   AppStage.ANIMATION_STUDIO,
   AppStage.FLOOR_PLAN_STUDIO,
 ]);
+
+/**
+ * Parked for launch (Charlie, 18 Sep 2026): live for the 3D configurator,
+ * the Render Engine, Material Studio, Line Converter and Weather Lab only.
+ * Floor Plan Studio is not yet tested through the real route and Animation
+ * Studio has no Higgsfield key on the server. Both show Coming soon to
+ * everyone except the master account, which can still test them; the
+ * server refuses their routes for everyone else too.
+ */
+const PARKED_STAGES = new Set([AppStage.FLOOR_PLAN_STUDIO, AppStage.ANIMATION_STUDIO]);
+const PARKED_LABELS: Partial<Record<AppStage, string>> = {
+  [AppStage.FLOOR_PLAN_STUDIO]: 'Floor Plan Studio',
+  [AppStage.ANIMATION_STUDIO]: 'Animation Studio',
+};
+
+const ParkedScreen: React.FC<{ label: string; onNavigate: (stage: AppStage) => void }> = ({ label, onNavigate }) => (
+  <div className="flex flex-col items-center justify-center min-h-[70vh] px-8 py-16 text-center bg-white">
+    <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-accent/60 mb-4">Coming soon</p>
+    <h1 className="text-2xl md:text-3xl font-bold text-accent tracking-tight mb-4 leading-tight">{label}</h1>
+    <p className="text-sm text-secondary leading-relaxed max-w-sm mb-8">
+      {label} is in final testing and opens to Business accounts shortly. Everything else in the studio is live.
+    </p>
+    <button onClick={() => onNavigate(AppStage.RENDER_ENGINE)} className="px-6 py-3 bg-accent text-white text-sm font-bold hover:bg-accent-hover transition-colors">Open the Render Engine</button>
+  </div>
+);
 
 // ─── Desktop-Only Screen shown on mobile for tool pages ───────────────────────
 const DesktopOnlyScreen: React.FC<{ onNavigate: (stage: AppStage) => void }> = ({ onNavigate }) => (
@@ -103,9 +128,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     // actual enforcement is ANIMATION_PLANS on /api/animation/start.
     // `canUseAnimation` is null until the plan loads - only badge on an explicit
     // false, so a subscriber never sees a lock flash on their own feature.
-    { id: AppStage.ANIMATION_STUDIO, label: 'Animation Studio', locked: canUseAnimation === false },
-    // Same Business gate as Animation Studio; the page itself explains it.
-    { id: AppStage.FLOOR_PLAN_STUDIO, label: 'Floor Plan Studio', locked: canUseAnimation === false },
+    { id: AppStage.ANIMATION_STUDIO, label: 'Animation Studio', locked: true },
+    { id: AppStage.FLOOR_PLAN_STUDIO, label: 'Floor Plan Studio', locked: true },
   ];
 
   // Top-level header items, in display order. Tools is injected between Home
@@ -145,6 +169,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
   ];
 
   const isDesktopOnly = DESKTOP_ONLY_STAGES.has(activeStage);
+  const isParked = PARKED_STAGES.has(activeStage) && !isMasterAccount(user);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#ffffff] to-[#e2e8f0] text-primary flex flex-col font-sans selection:bg-accent selection:text-white">
@@ -394,9 +419,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
       {/* ── Main Content ── */}
       <main className="flex-1 flex flex-col relative overflow-hidden min-h-screen">
         {/* Children always render once - no duplicate refs */}
+        {isParked ? (
+          <ParkedScreen label={PARKED_LABELS[activeStage] || 'This tool'} onNavigate={onNavigate} />
+        ) : (
         <div className={`flex-1 flex flex-col ${isDesktopOnly ? 'hidden lg:flex' : 'flex'}`}>
           {children}
         </div>
+        )}
         {/* On mobile, gate tool pages with the Desktop Required screen */}
         {isDesktopOnly && (
           <div className="block lg:hidden">
