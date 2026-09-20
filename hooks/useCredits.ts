@@ -34,8 +34,12 @@ interface CreditsData {
      *  worked out from `plan` here - the entitled plan list belongs in one
      *  place, and the same value is what Firestore rules enforce. */
     canUseProjects?: boolean;
-    /** The full 3D configurator (Business); Standard gets the free version. */
+    /** The full 3D configurator: every paid plan and the trial. */
     canUseFullConfigurator?: boolean;
+    /** The AI image tools (Render Engine, material close-ups, Line Converter,
+     *  Weather Lab, Floor Plan Studio). False on the Configurator plan, which
+     *  is the 3D configurator, projects and PDFs with no AI generation. */
+    canUseRenderTools?: boolean;
     /** Whether this account may generate animations, and how many of the
      *  monthly allowance are left. Both decided by the server. */
     canUseAnimation?: boolean;
@@ -91,6 +95,7 @@ interface CreditsState {
      *  a subscriber whose plan has not loaded yet. */
     canUseProjects: boolean | null;
     canUseFullConfigurator: boolean | null;
+    canUseRenderTools: boolean | null;
     canUseAnimation: boolean | null;
     animationsLeft: number | null;
     animationsLimit: number | null;
@@ -105,7 +110,7 @@ interface CreditsState {
 const EMPTY: CreditsState = {
     credits: null, plan: null, rendersLeft: null, rendersPerDay: null, trialDaysLeft: null,
     trialBlocked: false, trialExpiresAt: null, loading: false, hasApiAccess: null,
-    canUseProjects: null, canUseFullConfigurator: null, canUseAnimation: null, animationsLeft: null, animationsLimit: null,
+    canUseProjects: null, canUseFullConfigurator: null, canUseRenderTools: null, canUseAnimation: null, animationsLeft: null, animationsLimit: null,
     canExport4K: null, fourKLeft: null, fourKLimit: null,
     videoCreditsPence: 0, videoModels: null, includedClipSeconds: 8,
 };
@@ -165,6 +170,9 @@ const fetchCredits = async (): Promise<void> => {
                 animationsLimit: data.animationsLimit ?? null,
                 canExport4K: data.canExport4K === true,
                 canUseFullConfigurator: data.canUseFullConfigurator === true,
+                // Older servers do not send it; treat absent as allowed so a
+                // deploy ordering slip never locks a paying account out.
+                canUseRenderTools: data.canUseRenderTools !== false,
                 videoCreditsPence: Number(data.videoCreditsPence) || 0,
                 videoModels: data.videoModels ?? null,
                 includedClipSeconds: data.includedClipSeconds ?? 8,
@@ -253,6 +261,7 @@ export function useCredits() {
         animationsLimit: snapshot.animationsLimit,
         canExport4K: snapshot.canExport4K,
         canUseFullConfigurator: snapshot.canUseFullConfigurator,
+        canUseRenderTools: snapshot.canUseRenderTools,
         videoCreditsPence: snapshot.videoCreditsPence,
         videoModels: snapshot.videoModels,
         includedClipSeconds: snapshot.includedClipSeconds,

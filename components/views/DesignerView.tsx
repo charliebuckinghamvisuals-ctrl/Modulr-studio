@@ -117,7 +117,7 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
       }
 
       // Floor Plan Studio: the plan-view capture, parked for the Studio to
-      // pick up on mount. Business only - the free configurator has no
+      // pick up on mount. Full configurator only - the free one has no
       // button, and the server gates the call as well.
       if (event.data && event.data.type === 'RENDER_PLAN') {
         if (configModeRef.current !== 'business') return;
@@ -198,15 +198,15 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
    *
    * Two tiles first: the free Public one - the building's exterior in 3D
    * and plan, no interiors, no renders, costs nothing to serve - and the
-   * Business one, which is everything. Business is gated on the same
+   * full one, which is everything. The full one is gated on the same
    * server-decided entitlement as Projects (business, master, tester, beta),
    * so the client never keeps its own plan list. The iframe gets the mode in
    * its URL and again by message, and it defaults to public on its own.
    */
   const [configMode, setConfigMode] = useState<'public' | 'business' | null>(null);
   configModeRef.current = configMode;
-  // Business (and the trial) get the full configurator; Standard gets the
-  // free exterior version only (Charlie, 17 Sep 2026). Server-decided.
+  // Every paid plan and the trial get the full configurator (20 Sep 2026);
+  // the public one is for signed-out visitors. Server-decided.
   const canUseBusinessConfig = canUseFullConfigurator === true;
 
   if (loading) {
@@ -239,11 +239,11 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
             className={`text-left rounded-3xl p-7 shadow-2xl border transition-transform hover:-translate-y-0.5 ${canUseBusinessConfig ? 'bg-[#3b4d4a] border-transparent' : 'bg-[#2d3a38] border-transparent'}`}
           >
             <span className={`inline-block text-[10px] font-bold uppercase tracking-widest rounded-none px-2.5 py-1 mb-4 ${canUseBusinessConfig ? 'text-white bg-white/15' : 'text-amber-200 bg-amber-200/15'}`}>
-              {canUseBusinessConfig ? 'Included in your plan' : 'Business plan'}
+              {canUseBusinessConfig ? 'Included in your plan' : 'Configurator plan and up'}
             </span>
-            <h3 className="text-lg font-bold text-white mb-2">Business</h3>
-            <p className="text-sm text-white/70 leading-relaxed mb-5">Everything: interiors, kitchens, furniture, the walkthrough, lighting plan and AI renders of the finished design.</p>
-            <span className="text-xs font-bold uppercase tracking-wider text-white">{canUseBusinessConfig ? 'Open →' : 'See the Business plan →'}</span>
+            <h3 className="text-lg font-bold text-white mb-2">Full</h3>
+            <p className="text-sm text-white/70 leading-relaxed mb-5">Everything: interiors, kitchens, furniture, the walkthrough and lighting plan. Send it to the Render Engine on The Hub.</p>
+            <span className="text-xs font-bold uppercase tracking-wider text-white">{canUseBusinessConfig ? 'Open →' : 'See the plans →'}</span>
           </button>
         </div>
       </div>

@@ -402,3 +402,18 @@ input[type=range]::-webkit-slider-runnable-track {
 @keyframes genDrift2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-40%, 30%) scale(0.9); } }
 @keyframes genDrift3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(20%, -45%) scale(1.2); } }
 @media (prefers-reduced-motion: reduce) { .gen-blob { animation: none; } }
+
+/* Editorial home (20 Sep 2026, components/views/HomeViewEditorial.tsx).
+   Each block fades up once as it scrolls into view; the hero settles from a
+   4% zoom over two seconds. Transitions end on `transform: none`, which
+   unlike a fill-forwards keyframe leaves no containing block behind, and
+   the home page holds no fixed overlays anyway. Both are still for anyone
+   who asked for reduced motion. */
+[data-reveal] { opacity: 0; transform: translateY(18px); transition: opacity 900ms cubic-bezier(0.16, 1, 0.3, 1), transform 900ms cubic-bezier(0.16, 1, 0.3, 1); }
+[data-reveal].is-visible { opacity: 1; transform: none; }
+@keyframes heroSettle { from { transform: scale(1.04); } to { transform: scale(1); } }
+.hero-settle { animation: heroSettle 2.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] { opacity: 1; transform: none; transition: none; }
+  .hero-settle { animation: none; }
+}

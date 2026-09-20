@@ -64,7 +64,7 @@ type Source = { kind: 'configurator' | 'upload'; shaded: string; line: string | 
 
 export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavigate, onSaveToProject }) => {
     const { user } = useAuth();
-    // Floor Plan Studio shares the Business gate with Animation Studio (the
+    // Floor Plan Studio shares The Hub gate with Animation Studio (the
     // server's FLOOR_PLAN_PLANS set); `canUseAnimation` is the client's view of it.
     const { canUseAnimation, rendersLeft, plan, loading: planLoading, refreshCredits } = useCredits();
     const isBeta = plan === 'beta' || plan === 'tester';
@@ -167,7 +167,7 @@ export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavi
                 </div>
                 <h1 className="text-2xl font-bold text-accent tracking-tight mb-3">Floor Plan Studio</h1>
                 <p className="text-sm text-slate-600 leading-relaxed mb-8">
-                    Rendered and CAD floor plans from your design, nothing added or moved. Sign in to your Business account to use it.
+                    Rendered and CAD floor plans from your design, nothing added or moved. Sign in to The Hub to use it.
                 </p>
                 <Button onClick={() => onNavigate?.(AppStage.AUTH)}>Sign in</Button>
             </Gate>
@@ -191,13 +191,13 @@ export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavi
                 <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mb-6">
                     <Lock size={22} className="text-amber-600" />
                 </div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-600 mb-3">{isBeta ? 'Not in the trial' : 'Business plan feature'}</p>
-                <h1 className="text-2xl font-bold text-accent tracking-tight mb-3">Floor Plan Studio is part of Business</h1>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-600 mb-3">{isBeta ? 'Not in the trial' : 'The Hub feature'}</p>
+                <h1 className="text-2xl font-bold text-accent tracking-tight mb-3">Floor Plan Studio is part of The Hub</h1>
                 <p className="text-sm text-slate-600 leading-relaxed mb-8">
-                    A rendered floor plan with the real floor and furniture, or a dimensioned black-and-white CAD plan, straight from the 3D configurator or an uploaded top view. Each plan uses one render from the Business allowance.
+                    A rendered floor plan with the real floor and furniture, or a dimensioned black-and-white CAD plan, straight from the 3D configurator or an uploaded top view. Each plan uses one render from The Hub allowance.
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
-                    <Button onClick={() => onNavigate?.(AppStage.PRICING)}>See Business plan</Button>
+                    <Button onClick={() => onNavigate?.(AppStage.PRICING)}>See The Hub</Button>
                     <button onClick={() => onNavigate?.(AppStage.HOME)} className="text-sm text-slate-500 hover:text-accent transition-colors px-3 py-2">Back to home</button>
                 </div>
             </Gate>

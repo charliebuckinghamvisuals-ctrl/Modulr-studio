@@ -666,25 +666,10 @@ export const useAppEngine = () => {
             }
             ctx.drawImage(img, 0, 0);
 
-            // Watermark for Free users.
-            // Charlie asked for the trial watermark to be off "for now"
-            // (7 Aug 2026) - flip this to re-enable rather than rewriting it.
-            const TRIAL_WATERMARK_ENABLED = false;
-            if (TRIAL_WATERMARK_ENABLED && (userPlan === 'free' || userPlan === 'trial')) {
-                ctx.save();
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-                ctx.font = 'bold 36px "Inter", sans-serif';
-                ctx.textAlign = 'right';
-                ctx.textBaseline = 'bottom';
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-                ctx.shadowBlur = 10;
-                ctx.fillText('MODULR STUDIO', canvas.width - 40, canvas.height - 40);
-                
-                ctx.font = 'italic 20px "Inter", sans-serif';
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-                ctx.fillText('Trial Render', canvas.width - 40, canvas.height - 15);
-                ctx.restore();
-            }
+            // No watermark, on any plan. The "MODULR STUDIO / Trial Render"
+            // burn-in that used to sit here (off since 7 Aug 2026) is gone for
+            // good: Charlie, 20 Sep 2026 - it looked smudged on the old site
+            // images and is not something the product does any more.
 
             // Convert and trigger download
             const dataUrl = canvas.toDataURL(mimeType, downloadFormat === 'jpg' ? 0.95 : undefined);

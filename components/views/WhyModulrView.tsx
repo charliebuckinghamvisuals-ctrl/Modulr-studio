@@ -235,7 +235,7 @@ const NUMBERS = [
     { figure: '£400-800', label: 'Typical UK cost of a single commissioned exterior render' },
     { figure: '2-5 days', label: 'Typical turnaround from a visualisation studio' },
     { figure: 'Under a minute', label: 'Turnaround in Modulr Studio' },
-    { figure: 'Unlimited', label: 'Renders included on the Business plan' },
+    { figure: '250 a month', label: 'Renders included on The Hub' },
 ];
 
 interface WhyModulrViewProps {

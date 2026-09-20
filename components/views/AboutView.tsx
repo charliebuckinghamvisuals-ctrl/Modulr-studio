@@ -143,7 +143,7 @@ const TOOLS: Tool[] = [
             'Optional motion blur, breeze, golden hour or a distant figure',
             'Eight seconds at 1080p, downloaded as an MP4',
             'Works from any finished render, or from an exterior photograph',
-            'Included with the Business plan, with a monthly allowance',
+            'Included with The Hub, with a monthly allowance',
         ],
         status: 'New',
     },

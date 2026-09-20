@@ -191,7 +191,7 @@ const TOOLS: ToolGuide[] = [
         tips: [
             'Describe what you want to see, not what you do not. This model reads "no cars" as a request for cars.',
             'Clips are 8 seconds at 1080p and every one carries an invisible watermark.',
-            'Included with the Business plan, with a monthly allowance shown at the top of the page.',
+            'Included with The Hub, with a monthly allowance shown at the top of the page.',
         ],
         status: 'New',
     },

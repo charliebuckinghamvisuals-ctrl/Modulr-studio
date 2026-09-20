@@ -8,12 +8,18 @@
  *   STRIPE_SECRET_KEY=sk_test_... node scripts/stripe-setup.mjs   (test mode first)
  *
  * Prices are inc VAT (Stripe automatic tax is on in checkout, so the amounts
- * are set as tax-inclusive). Decided by Charlie 17 Sep 2026:
- *   Standard £59.99 / £599.90 a year, Business £199.99 / £1,999.90 a year,
+ * are set as tax-inclusive). Restructured by Charlie 20 Sep 2026:
+ *   Configurator £49.99 / £499.90 a year (lookup keys stay standard_*),
+ *   The Hub £199 / £1,990 a year (lookup keys stay business_*),
  *   video credit packs £25 / £50 / £100 (one-off),
- *   founding coupon: Business at £140.99 for 12 months, first 5 companies,
+ *   founding coupon: The Hub at £140 for 12 months, first 5 companies,
  *   month-one coupon: same price, for trial users converting in their
  *   first month (expires on the date you set below).
+ *
+ * Stripe prices are immutable. If the 17 Sep prices (£59.99 / £199.99) were
+ * already created under these lookup keys, this script will find and keep
+ * them: archive those prices in the Stripe dashboard first (or move their
+ * lookup keys), then re-run so the new amounts are created.
  */
 import Stripe from 'stripe';
 
@@ -27,22 +33,22 @@ console.log(`Stripe ${live ? 'LIVE' : 'TEST'} mode`);
 const MONTH_ONE_ENDS = process.env.MONTH_ONE_ENDS || '2026-12-31';
 
 const PRODUCTS = [
-    { key: 'standard', name: 'Modulr Studio Standard', description: '100 renders a month, 3D configurator, render engine, projects and PDFs.' },
-    { key: 'business', name: 'Modulr Studio Business', description: '250 renders a month, 50 4K exports, 3 animation clips, everything in Standard.' },
-    { key: 'video',    name: 'Modulr Video Credits',   description: 'Pay-as-you-go credit for Animation Studio clips.' },
+    { key: 'standard', name: 'Modulr Studio Configurator', description: 'Full 3D configurator, walk inside and outside, projects, saved designs, clients and PDFs. No AI tools.' },
+    { key: 'business', name: 'Modulr Studio The Hub',      description: 'Everything in Configurator plus 250 renders a month, the Render Engine, material close-ups, Line Converter, 4K and Animation Studio.' },
+    { key: 'video',    name: 'Modulr Video Credits',       description: 'Pay-as-you-go credit for Animation Studio clips.' },
 ];
 
 const PRICES = [
-    { env: 'STRIPE_PRICE_STANDARD_MONTHLY', lookup: 'standard_monthly', product: 'standard', pence: 5999,   recurring: { interval: 'month' } },
-    { env: 'STRIPE_PRICE_STANDARD_YEARLY',  lookup: 'standard_yearly',  product: 'standard', pence: 59990,  recurring: { interval: 'year' } },
-    { env: 'STRIPE_PRICE_BUSINESS_MONTHLY', lookup: 'business_monthly', product: 'business', pence: 19999,  recurring: { interval: 'month' } },
-    { env: 'STRIPE_PRICE_BUSINESS_YEARLY',  lookup: 'business_yearly',  product: 'business', pence: 199990, recurring: { interval: 'year' } },
+    { env: 'STRIPE_PRICE_STANDARD_MONTHLY', lookup: 'standard_monthly', product: 'standard', pence: 4999,   recurring: { interval: 'month' } },
+    { env: 'STRIPE_PRICE_STANDARD_YEARLY',  lookup: 'standard_yearly',  product: 'standard', pence: 49990,  recurring: { interval: 'year' } },
+    { env: 'STRIPE_PRICE_BUSINESS_MONTHLY', lookup: 'business_monthly', product: 'business', pence: 19900,  recurring: { interval: 'month' } },
+    { env: 'STRIPE_PRICE_BUSINESS_YEARLY',  lookup: 'business_yearly',  product: 'business', pence: 199000, recurring: { interval: 'year' } },
     { env: 'STRIPE_PRICE_VIDEO_25',         lookup: 'video_25',         product: 'video',    pence: 2500 },
     { env: 'STRIPE_PRICE_VIDEO_50',         lookup: 'video_50',         product: 'video',    pence: 5000 },
     { env: 'STRIPE_PRICE_VIDEO_100',        lookup: 'video_100',        product: 'video',    pence: 10000 },
 ];
 
-// £199.99 -> £140.99 is £59.00 off a month for 12 months.
+// £199 -> £140 is £59.00 off a month for 12 months.
 const COUPONS = [
     { env: 'STRIPE_COUPON_FOUNDING',  id: 'FOUNDING5',  name: 'Founding price (first 5 companies)', amount_off: 5900, currency: 'gbp', duration: 'repeating', duration_in_months: 12, max_redemptions: 5 },
     { env: 'STRIPE_COUPON_MONTH_ONE', id: 'FOUNDINGM1', name: 'Founding price (trial, first month)', amount_off: 5900, currency: 'gbp', duration: 'repeating', duration_in_months: 12, redeem_by: Math.floor(new Date(MONTH_ONE_ENDS + 'T23:59:59Z').getTime() / 1000) },

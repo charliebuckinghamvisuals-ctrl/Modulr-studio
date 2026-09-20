@@ -220,16 +220,9 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                         />
                     )}
                     {renderViewer()}
-                    {/* Trial watermark overlay - off for now at Charlie's
-                        request (7 Aug 2026). The matching burn-in on download
-                        is gated in useAppEngine.handleDownload; re-enable both
-                        together. */}
-                    {false && (userPlan === 'free' || userPlan === 'trial') && primaryImg && (
-                        <div className="absolute inset-0 pointer-events-none flex flex-col items-end justify-end p-8 z-50">
-                            <h1 className="text-4xl md:text-5xl font-bold text-white/80 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] tracking-tighter">MODULR STUDIO</h1>
-                            <p className="text-lg text-white/60 font-medium italic drop-shadow-[0_2px_5px_rgba(0,0,0,0.8)]">Trial Render</p>
-                        </div>
-                    )}
+                    {/* No trial watermark overlay: removed for good on
+                        20 Sep 2026 (Charlie), along with the download
+                        burn-in in useAppEngine.handleDownload. */}
                 </div>
                     );
                 })()}

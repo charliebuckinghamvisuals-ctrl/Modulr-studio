@@ -21,7 +21,7 @@ export const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
         <div 
             className={`flex items-center justify-between gap-4 p-2.5 rounded-xl bg-white border border-accent/20 hover:border-accent/40 transition-all shadow-sm hover:shadow-md ${disabled ? "opacity-50 cursor-not-allowed grayscale" : "cursor-pointer group"}`}
             onClick={disabled ? undefined : onToggle}
-            title={disabled ? "Locked. Requires Business Plan." : ""}
+            title={disabled ? "Locked. Requires The Hub." : ""}
         >
             <div className="flex items-center gap-3">
                 {icon && <div className={`transition-colors duration-300 ${isOn ? 'text-accent' : 'text-slate-400'}`}>{icon}</div>}

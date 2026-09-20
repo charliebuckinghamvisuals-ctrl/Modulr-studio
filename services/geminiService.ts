@@ -352,7 +352,7 @@ export const describeGarden = async (base64Image?: string, notes?: string): Prom
  *
  * Every image is drawn by GPT Image 2.5 Sunburst; what varies is how much
  * the model spends on it. 'high' is the default, 'xhigh' ("Ultra") costs
- * about twice, 'max' about four times and is Business-only - the server
+ * about twice, 'max' about four times and is Hub-only - the server
  * clamps a max request from any other plan to xhigh and says so in the
  * response. Kept as a module setting like the config spec, so every image
  * call sends it, and remembered in localStorage so it survives a reload.
@@ -412,7 +412,7 @@ export const renderBuilding = async (
  * 4K export: reproduce a finished 2K image at 4K on the server.
  *
  * The only route to 4K pixels - every tool generates at 2K. Metered
- * server-side (100 per calendar month on Business), so callers should surface
+ * server-side (50 per calendar month on The Hub), so callers should surface
  * the error message verbatim when the allowance runs out.
  */
 export const export4K = async (base64Image: string, format: 'png' | 'jpg' = 'jpg'): Promise<string> => {

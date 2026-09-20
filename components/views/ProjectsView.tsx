@@ -316,7 +316,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                 <h1 className="text-2xl font-bold text-accent tracking-tight mb-3">Projects</h1>
                 <p className="text-sm text-slate-600 leading-relaxed mb-8">
                     Keep every client, address, quote value and file with the job it belongs to,
-                    and see what you have quoted and won at a glance. Sign in to your Business
+                    and see what you have quoted and won at a glance. Sign in to your Hub
                     account to open your directory.
                 </p>
                 <Button onClick={() => onNavigate?.(AppStage.AUTH)}>Sign in</Button>
@@ -352,7 +352,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                 <p className="text-sm text-slate-600 leading-relaxed mb-8">
                     Store clients, addresses, quote values, renders and documents against every
                     job, and track what you have quoted and won across the year. It is included
-                    on Standard and Business, and the renders you save stay on your account
+                    on Configurator and The Hub, and the renders you save stay on your account
                     rather than in the browser you made them in.
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3">

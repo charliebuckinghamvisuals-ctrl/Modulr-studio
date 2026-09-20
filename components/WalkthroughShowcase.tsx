@@ -34,10 +34,12 @@ interface WalkthroughShowcaseProps {
     /** Hang the chapter row below the frame without taking layout height,
      *  so a neighbour column can centre on the FRAME (home page). */
     chaptersOverlay?: boolean;
+    /** No shadow or rounded corners on the frame: a hairline only (editorial home, 20 Sep 2026). */
+    plain?: boolean;
     className?: string;
 }
 
-export const WalkthroughShowcase: React.FC<WalkthroughShowcaseProps> = ({ chapters = true, chaptersOverlay = false, className = '' }) => {
+export const WalkthroughShowcase: React.FC<WalkthroughShowcaseProps> = ({ chapters = true, chaptersOverlay = false, plain = false, className = '' }) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const frameRef = useRef<HTMLDivElement | null>(null);
     const [inView, setInView] = useState(false);
@@ -91,7 +93,7 @@ export const WalkthroughShowcase: React.FC<WalkthroughShowcaseProps> = ({ chapte
         <div className={`w-full ${chaptersOverlay ? 'relative' : ''} ${className}`}>
             <div
                 ref={frameRef}
-                className="relative rounded-3xl md:rounded-xl overflow-hidden border border-border bg-slate-100 shadow-2xl"
+                className={`relative overflow-hidden bg-slate-100 ${plain ? 'border border-slate-200' : 'rounded-3xl md:rounded-xl border border-border shadow-2xl'}`}
             >
                 {/* The crop's own ratio, so the whole recording shows with no
                     further cropping - the same "see all of it" rule as the hero. */}

@@ -35,7 +35,13 @@ const CLIPS: HeroClip[] = [
  * laptop and read as blurry, the same finding as 6 Aug. The default is the
  * contained card used elsewhere.
  */
-export const HeroVideoCarousel: React.FC<{ fullBleed?: boolean }> = ({ fullBleed = false }) => {
+/**
+ * `quiet` (editorial home, 20 Sep 2026): no chrome at all - no corner
+ * radius, shadow, badge or caption sentence - just the clips, a light
+ * gradient, the clip name and the dots tucked bottom right. `children` is
+ * the page's own headline block, laid over the bottom left of the frame.
+ */
+export const HeroVideoCarousel: React.FC<{ fullBleed?: boolean; quiet?: boolean; children?: React.ReactNode }> = ({ fullBleed = false, quiet = false, children }) => {
     const [active, setActive] = useState(0);
     const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
@@ -70,9 +76,31 @@ export const HeroVideoCarousel: React.FC<{ fullBleed?: boolean }> = ({ fullBleed
         });
     }, [active, prefersReducedMotion]);
 
+    const dots = (
+        <div className={`flex items-center gap-1 ${quiet ? '' : 'mt-4'}`}>
+            {CLIPS.map((clip, i) => (
+                <button
+                    key={clip.src}
+                    onClick={() => setActive(i)}
+                    aria-label={`Show clip ${i + 1}: ${clip.caption}`}
+                    aria-current={i === active}
+                    className="p-2 group"
+                >
+                    <span
+                        className={`block h-1.5 rounded-full transition-all duration-500 ${
+                            i === active
+                                ? 'w-8 bg-white'
+                                : 'w-1.5 bg-white/45 group-hover:bg-white/80'
+                        }`}
+                    />
+                </button>
+            ))}
+        </div>
+    );
+
     return (
         <div className="w-full">
-            <div className={`relative overflow-hidden bg-slate-100 ${fullBleed ? 'rounded-2xl md:rounded-3xl shadow-2xl' : 'rounded-3xl md:rounded-xl border border-border shadow-2xl'}`}>
+            <div className={`relative overflow-hidden ${quiet ? 'bg-[#141a19]' : `bg-slate-100 ${fullBleed ? 'rounded-2xl md:rounded-3xl shadow-2xl' : 'rounded-3xl md:rounded-xl border border-border shadow-2xl'}`}`}>
                 <div className="relative w-full aspect-video">
                     {CLIPS.map((clip, i) => (
                         <video
@@ -96,6 +124,21 @@ export const HeroVideoCarousel: React.FC<{ fullBleed?: boolean }> = ({ fullBleed
                         />
                     ))}
 
+                    {quiet ? (
+                        <>
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#141a19]/80 via-[#141a19]/20 to-transparent pointer-events-none" />
+                            {/* The page's headline block, bottom left. */}
+                            {children && <div className="absolute inset-x-0 bottom-0">{children}</div>}
+                            {/* Clip name and dots, bottom right, out of the copy's way. */}
+                            <div className="absolute right-4 sm:right-6 lg:right-10 bottom-4 sm:bottom-6 lg:bottom-9 flex flex-col items-end gap-1">
+                                <p className="hidden md:block text-[10px] uppercase tracking-[0.25em] text-white/60 text-right max-w-xs" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                                    {CLIPS[active].caption}
+                                </p>
+                                {dots}
+                            </div>
+                        </>
+                    ) : (
+                    <>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none" />
 
                     <div className={`absolute inset-x-0 bottom-0 p-4 sm:p-6 md:p-8 ${fullBleed ? 'md:px-10 lg:px-14 md:pb-10' : ''}`}>
@@ -114,26 +157,10 @@ export const HeroVideoCarousel: React.FC<{ fullBleed?: boolean }> = ({ fullBleed
 
                         {/* Wide hit targets on a narrow mark: the dot is 8px but
                             the button around it is 24px, so it is tappable. */}
-                        <div className="mt-4 flex items-center gap-1">
-                            {CLIPS.map((clip, i) => (
-                                <button
-                                    key={clip.src}
-                                    onClick={() => setActive(i)}
-                                    aria-label={`Show clip ${i + 1}: ${clip.caption}`}
-                                    aria-current={i === active}
-                                    className="p-2 group"
-                                >
-                                    <span
-                                        className={`block h-1.5 rounded-full transition-all duration-500 ${
-                                            i === active
-                                                ? 'w-8 bg-white'
-                                                : 'w-1.5 bg-white/45 group-hover:bg-white/80'
-                                        }`}
-                                    />
-                                </button>
-                            ))}
-                        </div>
+                        {dots}
                     </div>
+                    </>
+                    )}
                 </div>
             </div>
         </div>

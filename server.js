@@ -89,19 +89,31 @@ const PRICE_CATALOG = {
 };
 
 /**
- * PRICING DECIDED 17 Sep 2026 (Charlie): Standard £59.99 / £599.90 a year,
- * Business £199.99 / £1,999.90 a year, video credit packs £25 / £50 / £100,
- * founding price £140.99 for the first five companies and for trial users
- * who convert in their first month (Stripe coupons, so they expire on their
- * own). The Stripe objects are created by scripts/stripe-setup.mjs, which
- * prints the IDs below as environment variables; nothing is typed by hand.
- * A price with no ID set is simply not on sale yet.
+ * PRICING RESTRUCTURED 20 Sep 2026 (Charlie), superseding 17 Sep:
+ *
+ *   Configurator  £49.99 a month / £499.90 a year (plan key 'standard')
+ *                 full 3D configurator, walk inside/outside, projects, saved
+ *                 designs, clients and PDFs. NO AI tools: no Render Engine,
+ *                 material close-ups, plan or line-converter AI, Animation
+ *                 Studio or 4K.
+ *   The Hub       £199 a month / £1,990 a year (plan key 'business')
+ *                 everything in Configurator plus 250 renders a month and the
+ *                 AI tools.
+ *
+ * The plan keys 'standard' and 'business' are kept as they were: they are in
+ * Stripe metadata, Firestore user documents and the webhook, so renaming them
+ * would mean a migration for a label. Only the labels and prices changed.
+ * Video credit packs £25 / £50 / £100 and the founding coupon (£59 off The
+ * Hub for 12 months, first five companies and month-one trial converts) are
+ * unchanged. The Stripe objects are created by scripts/stripe-setup.mjs,
+ * which prints the IDs below as environment variables; nothing is typed by
+ * hand. A price with no ID set is simply not on sale yet.
  */
 const BILLING_PRICES = {
-    standard_monthly: { env: 'STRIPE_PRICE_STANDARD_MONTHLY', plan: 'standard', mode: 'subscription', label: 'Standard, monthly',   pence: 5999 },
-    standard_yearly:  { env: 'STRIPE_PRICE_STANDARD_YEARLY',  plan: 'standard', mode: 'subscription', label: 'Standard, yearly',    pence: 59990 },
-    business_monthly: { env: 'STRIPE_PRICE_BUSINESS_MONTHLY', plan: 'business', mode: 'subscription', label: 'Business, monthly',   pence: 19999 },
-    business_yearly:  { env: 'STRIPE_PRICE_BUSINESS_YEARLY',  plan: 'business', mode: 'subscription', label: 'Business, yearly',    pence: 199990 },
+    standard_monthly: { env: 'STRIPE_PRICE_STANDARD_MONTHLY', plan: 'standard', mode: 'subscription', label: 'Configurator, monthly', pence: 4999 },
+    standard_yearly:  { env: 'STRIPE_PRICE_STANDARD_YEARLY',  plan: 'standard', mode: 'subscription', label: 'Configurator, yearly',  pence: 49990 },
+    business_monthly: { env: 'STRIPE_PRICE_BUSINESS_MONTHLY', plan: 'business', mode: 'subscription', label: 'The Hub, monthly',      pence: 19900 },
+    business_yearly:  { env: 'STRIPE_PRICE_BUSINESS_YEARLY',  plan: 'business', mode: 'subscription', label: 'The Hub, yearly',       pence: 199000 },
     video_25:         { env: 'STRIPE_PRICE_VIDEO_25',         plan: null, mode: 'payment', label: '£25 video credits',  pence: 2500,  videoCreditsPence: 2500 },
     video_50:         { env: 'STRIPE_PRICE_VIDEO_50',         plan: null, mode: 'payment', label: '£50 video credits',  pence: 5000,  videoCreditsPence: 5000 },
     video_100:        { env: 'STRIPE_PRICE_VIDEO_100',        plan: null, mode: 'payment', label: '£100 video credits', pence: 10000, videoCreditsPence: 10000 },
@@ -394,10 +406,29 @@ const PROJECT_PLANS = new Set(['standard', 'business', 'master', 'tester', 'beta
  */
 const ANIMATION_PLANS = new Set(['business', 'master']);
 /** The full 3D configurator (interiors, kitchens, walkthrough, saving, send
- *  to render). Standard is NOT here: it gets the free exterior version. */
-const FULL_CONFIG_PLANS = new Set(['business', 'master', 'tester', 'beta']);
-/** Floor Plan Studio (18 Sep 2026): Business only, each plan spends a render. */
+ *  to render). 20 Sep 2026: the Configurator plan ('standard') is here - the
+ *  full configurator IS that plan; what it lacks is the AI tools. */
+const FULL_CONFIG_PLANS = new Set(['standard', 'business', 'master', 'tester', 'beta']);
+/** Floor Plan Studio (18 Sep 2026): The Hub only, each plan spends a render. */
 const FLOOR_PLAN_PLANS = new Set(['business', 'master']);
+/**
+ * Plans that may generate images at all: the Render Engine, material
+ * close-ups, Line Converter, Weather Lab and Floor Plan Studio.
+ *
+ * The Configurator plan ('standard') is deliberately absent (Charlie, 20 Sep
+ * 2026): at £49.99 it is the 3D configurator, projects and PDFs, with no AI
+ * generation of any kind. The trial has the tools so a prospect can judge the
+ * output; The Hub has them with the 250-a-month allowance. The render
+ * allowance check below refuses this plan outright, and the entitlement is
+ * sent to the client so the tool pages can show the upgrade screen instead
+ * of a failed render.
+ *
+ * Written as the plans WITHOUT the tools rather than a list of those with
+ * them, so an unexpected plan value keeps the behaviour it had before (it
+ * falls through to the credit-balance path, which refuses at zero).
+ */
+const NO_RENDER_TOOL_PLANS = new Set(['standard']);
+const canUseRenderTools = (plan) => !NO_RENDER_TOOL_PLANS.has(plan);
 
 /**
  * Video generation settings.
@@ -818,8 +849,9 @@ const TESTER_RENDERS = 40;
  *  be emptied in an hour (Charlie, 17 Sep 2026). */
 const TESTER_RENDERS_PER_DAY = 10;
 
-/** Standard plan: renders per calendar month. Matches the pricing page. */
-const STANDARD_RENDERS_PER_MONTH = 100;
+/** Configurator plan ('standard'): renders per calendar month. Zero since the
+ *  20 Sep 2026 restructure - the plan has no AI tools (RENDER_TOOL_PLANS). */
+const STANDARD_RENDERS_PER_MONTH = 0;
 const TESTER_DAYS = 7;
 /** Business: renders per calendar month (17 Sep 2026: 250, alongside the
  *  daily ceiling below). Every generated image counts as one. */
@@ -894,7 +926,7 @@ const deductCredits = async (user, amount) => {
 
             // Feature gate: 4K requires Business plan
             if (amount === CREDIT_COSTS.UHD_4K && plan !== 'business' && plan !== 'master') {
-                return { success: false, balance: currentCredits, error: "4K Ultra HD requires the Business Plan" };
+                return { success: false, balance: currentCredits, error: "4K Ultra HD requires The Hub" };
             }
 
             if (currentCredits < amount) {
@@ -950,13 +982,13 @@ const checkTrialRender = async (user) => {
             const msElapsed = now - trialStart;
 
             if (msElapsed >= TRIAL_HOURS * 3600000) {
-                return { allowed: false, error: 'Your 24-hour trial has ended. Upgrade to the Business Plan to continue rendering.' };
+                return { allowed: false, error: 'Your 24-hour trial has ended. Upgrade to The Hub to continue rendering.' };
             }
 
             const rendersUsed = data.trialRendersUsed || 0;
 
             if (rendersUsed >= RENDERS_PER_DAY) {
-                return { allowed: false, error: 'Trial limit reached (5 renders). Upgrade to Business for unlimited access.' };
+                return { allowed: false, error: 'Trial limit reached (5 renders). Upgrade to The Hub for 250 renders a month.' };
             }
 
             transaction.update(userRef, { trialRendersUsed: rendersUsed + 1 });
@@ -1037,39 +1069,8 @@ const checkTesterRender = async (user) => {
 };
 
 /**
- * Standard plan allowance: N renders per CALENDAR month.
- *
- * Same transactional, fail-closed shape as the tester counter. Keyed on the
- * month string so the counter resets itself - no cron, no cleanup job; a new
- * month simply reads as zero used.
- */
-const checkStandardRender = async (user) => {
-    if (!db) return { allowed: true };
-    const userRef = db.collection('users').doc(user.uid);
-    const monthKey = new Date().toISOString().slice(0, 7); // e.g. "2026-08"
-    try {
-        return await db.runTransaction(async (transaction) => {
-            const snap = await transaction.get(userRef);
-            const data = snap.exists ? snap.data() : null;
-            const used = (data?.standardMonth === monthKey ? data?.standardRendersUsed : 0) || 0;
-            if (used >= STANDARD_RENDERS_PER_MONTH) {
-                return { allowed: false, status: 402, error: `You've used all ${STANDARD_RENDERS_PER_MONTH} renders this month. Your allowance resets on the 1st, or upgrade to Business for unlimited renders.` };
-            }
-            transaction.set(userRef, {
-                standardMonth: monthKey,
-                standardRendersUsed: used + 1,
-            }, { merge: true });
-            return { allowed: true, rendersLeft: STANDARD_RENDERS_PER_MONTH - (used + 1) };
-        });
-    } catch (e) {
-        console.error('[STANDARD] Check failed:', e.message || e);
-        return { allowed: false, status: 503, error: 'Render service temporarily unavailable. Please try again shortly.' };
-    }
-};
-
-/**
  * Business fair-use: claim one render from today's allowance. Same transactional
- * counter as checkStandardRender, keyed on the UTC day so it resets overnight
+ * counter as the tester one, keyed on the UTC day so it resets overnight
  * rather than on the 1st. This is an abuse ceiling, not a meter - see
  * BUSINESS_RENDERS_PER_DAY.
  */
@@ -1085,7 +1086,7 @@ const checkBusinessRender = async (user) => {
             const monthKey = dayKey.slice(0, 7);
             const usedMonth = (data?.businessMonth === monthKey ? data?.businessMonthRendersUsed : 0) || 0;
             if (usedMonth >= BUSINESS_RENDERS_PER_MONTH) {
-                return { allowed: false, status: 402, error: `You've used all ${BUSINESS_RENDERS_PER_MONTH} renders in your Business plan this month. Your allowance resets on the 1st.` };
+                return { allowed: false, status: 402, error: `You've used all ${BUSINESS_RENDERS_PER_MONTH} renders in The Hub this month. Your allowance resets on the 1st.` };
             }
             if (used >= BUSINESS_RENDERS_PER_DAY) {
                 return { allowed: false, status: 402, error: `You've reached today's ceiling of ${BUSINESS_RENDERS_PER_DAY} renders. It resets at midnight, with ${BUSINESS_RENDERS_PER_MONTH - usedMonth} of this month's ${BUSINESS_RENDERS_PER_MONTH} still to use.` };
@@ -1164,21 +1165,20 @@ const enforceRenderAccess = async (req, creditCost) => {
     }
 
     /**
-     * Standard: monthly render counter. Resolution needs no clamping any more -
-     * every endpoint generates at 2K regardless of plan, and 4K exists only as
-     * the /api/export4k action, which Standard is not entitled to. Analysis
-     * calls ride free, same reasoning as testers: every upload triggers one
-     * automatically.
+     * Configurator plan ('standard'): no AI generation at all (20 Sep 2026).
+     * Refused here, at the one gate every image endpoint passes through, so
+     * a client that shows the tool anyway still cannot spend money. The
+     * client reads `canUseRenderTools` and shows the upgrade screen first.
      */
-    if (userPlan === 'standard') {
-        if (creditCost === CREDIT_COSTS.ANALYSIS) {
-            return { allowed: true, plan: 'standard' };
-        }
-        const check = await checkStandardRender(req.user);
-        if (!check.allowed) {
-            return { allowed: false, status: check.status || 402, body: { error: check.error } };
-        }
-        return { allowed: true, rendersLeft: check.rendersLeft, plan: 'standard' };
+    if (!canUseRenderTools(userPlan)) {
+        return {
+            allowed: false,
+            status: 403,
+            body: {
+                error: 'AI rendering is not part of the Configurator plan. Upgrade to The Hub for 250 renders a month and every studio tool.',
+                upgradeRequired: true,
+            },
+        };
     }
 
     if (userPlan === 'free') {
@@ -4191,7 +4191,7 @@ app.post('/api/export4k', userAiLimiter, async (req, res) => {
             return res.status(503).json({ error: '4K export temporarily unavailable. Please try again shortly.' });
         }
         if (!FOUR_K_PLANS.has(plan)) {
-            return res.status(403).json({ error: '4K export is a Business plan feature. Your renders are delivered at 2K.' });
+            return res.status(403).json({ error: '4K export is part of The Hub. Your renders are delivered at 2K.' });
         }
 
         const dims = imageDims(base64Image);
@@ -4318,7 +4318,7 @@ app.post('/api/animation/start', userAiLimiter, async (req, res) => {
                 }
             }
             if (!override) {
-                return res.status(403).json({ error: 'Animation Studio is part of the Business plan.' });
+                return res.status(403).json({ error: 'Animation Studio is part of The Hub.' });
             }
         }
 
@@ -4632,9 +4632,12 @@ const withEntitlements = (payload, data) => {
         ...payload,
         canUseProjects: PROJECT_PLANS.has(payload.plan),
         // The FULL configurator (interiors, kitchens, walkthrough, saving,
-        // send to render) is Business; Standard gets the free exterior version
-        // (Charlie, 17 Sep 2026). The trial has everything but animation.
+        // send to render) is on every paid plan and the trial (20 Sep 2026).
         canUseFullConfigurator: FULL_CONFIG_PLANS.has(payload.plan),
+        // AI image tools (Render Engine, material close-ups, Line Converter,
+        // Weather Lab, Floor Plan Studio). False on the Configurator plan
+        // only; the render allowance check refuses it server-side as well.
+        canUseRenderTools: canUseRenderTools(payload.plan),
         canUseAnimation,
         animationsLimit: ANIMATION_MONTHLY_LIMIT,
         animationsLeft: canUseAnimation ? animationsLeftFor(data) : 0,

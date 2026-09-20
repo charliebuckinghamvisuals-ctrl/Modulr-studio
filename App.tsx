@@ -17,7 +17,10 @@ import { AppStage, HistoryItem, ProjectAssetKind } from './types';
 import { SaveToProjectDialog } from './components/SaveToProjectDialog';
 import { WEATHER_CONDITIONS, SEASONS } from './constants';
 import { useAppEngine, compressImageFile } from './hooks/useAppEngine';
-import { HomeView } from './components/views/HomeView';
+// Editorial home (20 Sep 2026). To revert to the 18 Sep bands, import
+// HomeView from './components/views/HomeView' here and render <HomeView>
+// below; the old file is untouched.
+import { HomeViewEditorial as HomeView } from './components/views/HomeViewEditorial';
 import { MaterialStudioView } from './components/views/MaterialStudioView';
 import { StudioView } from './components/views/StudioView';
 import { WorkspaceView } from './components/views/WorkspaceView';
@@ -39,6 +42,7 @@ import { UpdateNotice } from './components/UpdateNotice';
 import { FirstRunTour } from './components/FirstRunTour';
 import { ClientShareView } from './components/views/ClientShareView';
 import { BetaGate } from './components/BetaGate';
+import { PlanGate } from './components/PlanGate';
 import { useAuth } from './hooks/useAuth';
 import { useCredits } from './hooks/useCredits';
 
@@ -46,7 +50,7 @@ import { useCredits } from './hooks/useCredits';
 const App: React.FC = () => {
     const engine = useAppEngine();
     const { isMaster, user } = useAuth();
-    const { hasApiAccess, plan } = useCredits();
+    const { hasApiAccess, plan, canUseRenderTools } = useCredits();
     const [maskImage, setMaskImage] = React.useState<string | null>(null);
     const [selectedBatchIndex, setSelectedBatchIndex] = React.useState(0);
     const [imageQuality, setImageQualityState] = React.useState<ImageQuality>(getImageQuality());
@@ -157,7 +161,7 @@ const App: React.FC = () => {
      * Quality tier, 15 Sep 2026. Every image is drawn by GPT Image 2.5
      * Sunburst; the tier is how much it spends on the picture. High is the
      * default, Ultra roughly twice the cost, Max about four times and
-     * Business-only - the chip is shown locked to everyone else and the
+     * Hub-only - the chip is shown locked to everyone else and the
      * server clamps it regardless of what the client sends. One setting for
      * every tool: renders, edits, weather, the material board, line work
      * and the 4K export all read it.
@@ -166,7 +170,7 @@ const App: React.FC = () => {
     const QUALITY_OPTIONS: { id: ImageQuality; label: string; hint: string; locked?: boolean }[] = [
         { id: 'high', label: 'High', hint: 'Sunburst, high tier - the everyday setting' },
         { id: 'xhigh', label: 'Ultra', hint: 'Sunburst, extra-high tier - about twice the render cost' },
-        { id: 'max', label: 'Max', hint: canUseMax ? 'Sunburst at its highest tier - for the final image' : 'Max quality is a Business plan feature', locked: !canUseMax },
+        { id: 'max', label: 'Max', hint: canUseMax ? 'Sunburst at its highest tier - for the final image' : 'Max quality is part of The Hub', locked: !canUseMax },
     ];
     const QualityChips = () => (
         <div className="w-full">
@@ -185,7 +189,7 @@ const App: React.FC = () => {
                         } ${o.locked ? 'opacity-60' : ''}`}
                     >
                         {o.label}
-                        {o.locked && <span className="absolute -top-1.5 -right-1 text-[7px] px-1 py-px rounded-none bg-amber-100 text-amber-700 border border-amber-200 normal-case tracking-normal">Business</span>}
+                        {o.locked && <span className="absolute -top-1.5 -right-1 text-[7px] px-1 py-px rounded-none bg-amber-100 text-amber-700 border border-amber-200 normal-case tracking-normal">Hub</span>}
                     </button>
                 ))}
             </div>
@@ -1087,6 +1091,27 @@ const App: React.FC = () => {
 
     const showBetaGate = !hasAccess && GATED_STAGES.has(engine.activeStage);
 
+    /**
+     * The AI tools are a plan feature, not just a signed-in feature.
+     *
+     * The Configurator plan (20 Sep 2026) is the 3D configurator, projects and
+     * PDFs with no AI generation. Its subscribers can still reach the Render
+     * Engine, Line Converter, Weather Lab and Material Studio from the menu -
+     * hiding headline tools from a paying customer is how they never learn
+     * The Hub exists - but the page opens under an upgrade panel instead of a
+     * render button that fails. The server refuses the render regardless
+     * (canUseRenderTools in server.js); this is the explanation, not the lock.
+     * Only an explicit false gates: null is "plan not loaded yet".
+     */
+    const AI_TOOL_STAGES = new Set<AppStage>([
+        AppStage.RENDER_ENGINE,
+        AppStage.LINE_CONVERT,
+        AppStage.WEATHER_LAB,
+        AppStage.MATERIAL_STUDIO,
+        AppStage.STUDIO,
+    ]);
+    const showPlanGate = hasAccess && !isMaster && canUseRenderTools === false && AI_TOOL_STAGES.has(engine.activeStage);
+
     // The whole site is parked while the render engine is rebuilt - see
     // MaintenanceView. ?preview=1 once on any URL lets Charlie through.
     if (maintenanceActive()) return <MaintenanceView />;
@@ -1094,9 +1119,10 @@ const App: React.FC = () => {
     return (
         <>
             <div className="animate-app-startup opacity-0">
-                <div className={showBetaGate ? 'relative' : undefined}>
+                <div className={showBetaGate || showPlanGate ? 'relative' : undefined}>
                     {renderAppContent()}
                     {showBetaGate && <BetaGate onGranted={() => engine.setActiveStage(engine.activeStage)} />}
+                    {showPlanGate && <PlanGate onNavigate={engine.setActiveStage} />}
                 </div>
             </div>
             {/* Overlays live OUTSIDE the animated root. While that div animates

@@ -15,14 +15,16 @@ interface PricingViewProps {
 }
 
 /**
- * Stripe price IDs for the Standard tier.
+ * Stripe price IDs for the Configurator tier (plan key 'standard').
  *
- * PLACEHOLDERS. No Standard product exists in Stripe yet, so these will not
+ * PLACEHOLDERS. No Configurator product exists in Stripe yet, so these will not
  * resolve at checkout - which is harmless while BILLING_ENABLED is off, because
  * the button opens the "not open yet" notice and never reaches Stripe. Before
- * billing is switched on, create the products, paste the real IDs here, and add
- * them to PRICE_CATALOGUE in server.js. The server rejects any price ID it does
- * not recognise, so a forgotten one fails closed rather than charging wrongly.
+ * billing is switched on, run scripts/stripe-setup.mjs and set the printed
+ * environment variables on the server; the server then serves the real IDs
+ * through /api/public/billing-prices and these fallbacks are never used. The
+ * server rejects any price ID it does not recognise, so a forgotten one fails
+ * closed rather than charging wrongly.
  */
 const STANDARD_PRICE_ID: Record<'monthly' | 'yearly', string> = {
     monthly: 'price_standard_monthly_TODO',
@@ -30,15 +32,31 @@ const STANDARD_PRICE_ID: Record<'monthly' | 'yearly', string> = {
 };
 
 /**
- * The prices on sale come from the server (/api/billing/prices), which reads
- * the Stripe IDs from its environment - created by scripts/stripe-setup.mjs.
- * The figures shown are the decided ones (17 Sep 2026) even before the IDs
- * exist, so the page reads right; a plan with no ID yet cannot be bought.
+ * The prices on sale come from the server (/api/public/billing-prices), which
+ * reads the Stripe IDs from its environment - created by
+ * scripts/stripe-setup.mjs. The figures shown are the decided ones even before
+ * the IDs exist, so the page reads right; a plan with no ID yet cannot be
+ * bought.
+ *
+ * PRICING RESTRUCTURED 20 Sep 2026 (Charlie), superseding 17 Sep:
+ *   Trial         7 days, no card, 40 renders. No Animation Studio, no 4K.
+ *   Configurator  £49.99 a month. The full 3D configurator, walk inside and
+ *                 outside, projects and saved designs, clients, and the PDF
+ *                 outputs that were already part of the non-AI workflow.
+ *                 NO Render Engine, material close-ups, plan or line-converter
+ *                 AI tools, Animation Studio or 4K.
+ *   The Hub       £199 a month. Everything in Configurator plus 250 renders a
+ *                 month and every AI tool.
+ *
+ * The internal plan keys ('standard' for Configurator, 'business' for The
+ * Hub) are unchanged: they live in Stripe metadata, Firestore and the
+ * webhook, and renaming them would be a migration for a label.
  */
 interface BillingPrice { priceId: string | null; label: string; pence: number; plan: string | null; mode: string }
 interface BillingInfo { billingEnabled: boolean; founding: boolean; prices: Record<string, BillingPrice>; videoModels: Record<string, { label: string; pricePence: number; available: boolean }> }
-const DECIDED_PENCE: Record<string, number> = { standard_monthly: 5999, standard_yearly: 59990, business_monthly: 19999, business_yearly: 199990, video_25: 2500, video_50: 5000, video_100: 10000 };
-const FOUNDING_MONTHLY_PENCE = 14099;
+const DECIDED_PENCE: Record<string, number> = { standard_monthly: 4999, standard_yearly: 49990, business_monthly: 19900, business_yearly: 199000, video_25: 2500, video_50: 5000, video_100: 10000 };
+/** The founding coupon is £59 off The Hub for 12 months (scripts/stripe-setup.mjs). */
+const FOUNDING_DISCOUNT_PENCE = 5900;
 const pounds = (pence: number) => (pence % 100 === 0 ? `£${pence / 100}` : `£${(pence / 100).toFixed(2)}`);
 
 type PlanKey = 'trial' | 'standard' | 'business';
@@ -54,34 +72,30 @@ type PlanKey = 'trial' | 'standard' | 'business';
  */
 const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: string | boolean; business: string | boolean }> = [
     /**
-     * 100 renders on Standard.
-     *
-     * Sized against two numbers. A small garden room firm runs about four
-     * projects a month, and a project takes somewhere around 15-25 renders once
-     * you count angles, material options and weather - so 100 covers the
-     * typical customer comfortably while still being a real ceiling for a busy
-     * one, which is what makes the upgrade to Business mean something. 200 was
-     * above what anyone would ever reach, so it was not a tier boundary at all.
-     *
-     * It is also the safer half of the cost question. At 49.99 inc VAT roughly
-     * 40 pounds survives VAT and Stripe, so 100 renders keeps generation costs
-     * near a quarter of revenue at full usage on a 10p render, and still viable
-     * at 20p. At 200 the same plan loses money on anyone who uses it properly.
+     * 20 Sep 2026 structure. The Configurator plan is the design and
+     * organisation half of the studio - the full 3D configurator, the
+     * walkthroughs, projects, saved designs, clients and the PDFs that were
+     * already part of the non-AI workflow - with no AI generation at all. The
+     * Hub is everything, with the 250-a-month render allowance. The trial has
+     * the AI tools so a prospect can judge the output, but no animation and
+     * no 4K.
      */
-    // 17 Sep 2026: every generated image counts as a render - a configurator
-    // render, a material close-up sheet, a line drawing, a weather variant.
-    { label: 'Renders, any tool',  trial: '40 over 7 days, 10 a day', standard: '100 a month', business: '250 a month' },
-    { label: '4K exports',         trial: false, standard: false, business: '50 a month' },
-    { label: '3D Configurator',    trial: 'Full version', standard: 'Free version, exterior only', business: 'Full: interiors, kitchens, saving, send to render' },
-    { label: 'Walk Inside & Walk Outside', trial: true, standard: false, business: true },
-    { label: 'Render Engine',      trial: true,  standard: true,  business: true },
-    { label: 'Material close-ups', trial: true,  standard: true,  business: true },
-    { label: 'Line Converter & Weather Lab', trial: true, standard: true, business: true },
-    { label: 'Projects, clients & PDFs', trial: true, standard: true, business: true },
-    { label: 'Planning Checker',   trial: 'Free to all', standard: 'Free to all', business: 'Free to all' },
-    { label: 'Animation Studio',   trial: false, standard: false, business: '3 clips a month, then pay as you go' },
-    { label: 'Commercial rights',  trial: false, standard: true,  business: true },
-    { label: 'Priority queue',     trial: false, standard: false, business: true },
+    { label: '3D Configurator',              trial: 'Full version', standard: 'Full version', business: 'Full version' },
+    { label: 'Walk inside & walk outside',   trial: true,  standard: true,  business: true },
+    { label: 'Projects & saved designs',     trial: true,  standard: true,  business: true },
+    { label: 'Client organisation',          trial: true,  standard: true,  business: true },
+    { label: 'Project & PDF outputs',        trial: true,  standard: true,  business: true },
+    // Every generated image counts as a render - a configurator render, a
+    // material close-up sheet, a line drawing, a weather variant, a floor plan.
+    { label: 'Renders, any tool',            trial: '40 over 7 days, 10 a day', standard: false, business: '250 a month' },
+    { label: 'Render Engine',                trial: true,  standard: false, business: true },
+    { label: 'Material close-ups',           trial: true,  standard: false, business: true },
+    { label: 'Plan & line AI tools',         trial: 'Line Converter & Weather Lab', standard: false, business: 'Line Converter, Weather Lab & Floor Plan Studio' },
+    { label: '4K enhancement',               trial: false, standard: false, business: '50 a month' },
+    { label: 'Animation Studio',             trial: false, standard: false, business: '3 clips a month, then pay as you go' },
+    { label: 'Planning Checker',             trial: 'Free to all', standard: 'Free to all', business: 'Free to all' },
+    { label: 'Commercial rights',            trial: false, standard: true,  business: true },
+    { label: 'Priority queue',               trial: false, standard: false, business: true },
 ];
 
 const FeatureList: React.FC<{ plan: PlanKey }> = ({ plan }) => (
@@ -321,8 +335,8 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                     {/* Free Trial Entry */}
                     <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-surface/40 hover:bg-surface/60 transition-all duration-300 relative group shadow-[0_20px_50px_rgba(0,0,0,0.1)]">
                         <div className="mb-6 text-white">
-                            <h3 className="text-xl font-bold text-accent mb-2 flex items-center gap-2">Try Before You Buy</h3>
-                            <p className="text-sm text-secondary min-h-[40px]">Experience the full power of our engine. No card required.</p>
+                            <h3 className="text-2xl font-bold text-accent mb-2 flex items-center gap-2">Trial</h3>
+                            <p className="text-sm text-secondary min-h-[40px]">The studio for a week, renders included. No card required.</p>
                         </div>
                         {/* Same fixed height as the paid cards' price blocks so the three
                             buttons sit on one line. */}
@@ -339,16 +353,16 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         </Button>
 
                         <div className="space-y-3 flex-1">
-                            <div className="text-xs font-bold uppercase tracking-widest text-secondary mb-2">The Taster Package</div>
+                            <div className="text-xs font-bold uppercase tracking-widest text-secondary mb-2">What's in the trial</div>
                             <FeatureList plan="trial" />
                         </div>
                     </div>
 
-                    {/* Standard Plan */}
+                    {/* Configurator plan (plan key 'standard') */}
                     <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-surface/40 hover:bg-surface/60 transition-all duration-300 relative group shadow-[0_20px_50px_rgba(0,0,0,0.1)]">
                         <div className="mb-6">
-                            <h3 className="text-2xl font-bold text-accent mb-2">Standard</h3>
-                            <p className="text-sm text-secondary min-h-[40px]">Everything a smaller studio needs to sell a job.</p>
+                            <h3 className="text-2xl font-bold text-accent mb-2">Configurator</h3>
+                            <p className="text-sm text-secondary min-h-[40px]">The full 3D configurator, projects and PDFs. No AI tools.</p>
                         </div>
                         <div className="mb-8 min-h-[96px] flex flex-col justify-start">
                             <div className="text-5xl font-bold text-primary drop-shadow-md">
@@ -363,7 +377,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             onClick={() => handleUpgrade('standard', standardId, penceOf(`standard_${billingCycle}`))}
                             disabled={loadingPlan !== null}
                         >
-                            {loadingPlan === standardId ? <Loader2 className="animate-spin" /> : 'Choose Standard'}
+                            {loadingPlan === standardId ? <Loader2 className="animate-spin" /> : 'Choose Configurator'}
                         </Button>
 
                         <div className="space-y-3 flex-1">
@@ -373,7 +387,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                     </div>
 
 
-                    {/* Business Plan (Highlighted) */}
+                    {/* The Hub (plan key 'business', highlighted) */}
                     <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-gradient-to-b from-surface/80 to-accent/5 relative transition-all duration-500 shadow-[0_30px_60px_rgba(139,92,246,0.15)] group">
 
                         <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-accent to-accent/80 rounded-none flex items-center gap-1.5 shadow-lg">
@@ -381,8 +395,8 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         </div>
 
                         <div className="mb-6 mt-2">
-                            <h3 className="text-2xl font-bold text-accent dark:text-accent mb-2 flex items-center gap-2">Business</h3>
-                            <p className="text-sm text-secondary">The absolute peak of visualization performance.</p>
+                            <h3 className="text-2xl font-bold text-accent dark:text-accent mb-2 flex items-center gap-2">The Hub</h3>
+                            <p className="text-sm text-secondary min-h-[40px]">Everything in Configurator, plus 250 renders a month and every studio tool.</p>
                         </div>
                         <div className="mb-8 min-h-[96px] flex flex-col justify-start text-white">
                             <div className="text-5xl font-bold text-primary dark:text-white drop-shadow-md">
@@ -392,7 +406,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             <span className="text-secondary font-medium">{billingCycle === 'monthly' ? 'inc VAT, cancel any time' : `${pounds(penceOf('business_yearly'))} a year inc VAT, 2 months free`}</span>
                             {billing?.founding && billingCycle === 'monthly' && (
                                 <span className="mt-2 inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-none bg-amber-100 text-amber-800 text-[11px] font-bold">
-                                    Founding price {pounds(FOUNDING_MONTHLY_PENCE)} a month for your first year, first 5 companies
+                                    Founding price {pounds(penceOf('business_monthly') - FOUNDING_DISCOUNT_PENCE)} a month for your first year, first 5 companies
                                 </span>
                             )}
                         </div>
@@ -402,11 +416,11 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             onClick={() => handleUpgrade('business', businessId, penceOf(`business_${billingCycle}`))}
                             disabled={loadingPlan !== null}
                         >
-                            {loadingPlan === businessId ? <Loader2 className="animate-spin" /> : 'Upgrade Now'}
+                            {loadingPlan === businessId ? <Loader2 className="animate-spin" /> : 'Choose The Hub'}
                         </Button>
 
                         <div className="space-y-3 flex-1">
-                            <div className="text-xs font-bold uppercase tracking-widest text-primary dark:text-white mb-2">The Complete Architectural Toolkit:</div>
+                            <div className="text-xs font-bold uppercase tracking-widest text-primary dark:text-white mb-2">Everything in Configurator, plus:</div>
                             <FeatureList plan="business" />
                         </div>
                     </div>
@@ -444,7 +458,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                 </table>
                             </div>
                             <div>
-                                <div className="text-[11px] font-bold uppercase tracking-widest text-secondary mb-2">Video credits, Business plan</div>
+                                <div className="text-[11px] font-bold uppercase tracking-widest text-secondary mb-2">Video credits, The Hub</div>
                                 <div className="grid grid-cols-3 gap-3">
                                     {(['video_25', 'video_50', 'video_100'] as const).map(key => (
                                         <button
@@ -452,7 +466,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                             onClick={() => handleUpgrade('video_credits', priceIdOf(key, key), penceOf(key), true)}
                                             disabled={loadingPlan !== null || plan !== 'business' && plan !== 'master'}
                                             className="rounded-2xl border border-border bg-surface/40 hover:bg-surface/70 disabled:opacity-50 p-4 text-center transition-colors"
-                                            title={plan === 'business' || plan === 'master' ? 'Buy video credits' : 'Video credits are part of the Business plan'}
+                                            title={plan === 'business' || plan === 'master' ? 'Buy video credits' : 'Video credits are part of The Hub'}
                                         >
                                             <div className="text-2xl font-bold text-primary">{pounds(penceOf(key))}</div>
                                             <div className="text-[11px] text-secondary">{Math.floor(penceOf(key) / (billing?.videoModels?.kling?.pricePence ?? 150))} Kling clips</div>
@@ -468,35 +482,93 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                     </div>
                 </div>
 
-                {/* Managed Service */}
+                {/*
+                  * Managed Service: priced per design, not per month (Charlie,
+                  * 20 Sep 2026). The old £100-a-month add-on priced a person's
+                  * time at a few pounds an hour and sat under a table saying an
+                  * agency render costs £400 to £800. A design is two to three
+                  * hours of real work, so it is "from £200" and quoted, which is
+                  * why the button is a request rather than a Stripe checkout: a
+                  * quoted price cannot be a fixed price ID. The managed_service
+                  * subscription price stays in PRICE_CATALOG so the server keeps
+                  * honouring anyone who already holds it.
+                  *
+                  * Two routes to the same work, no subscription required. A Hub
+                  * member pays £200 and gets the design in their projects to
+                  * edit; anyone else pays £300 and gets files plus a share link,
+                  * with the design held on our account. The £100 gap is smaller
+                  * than a month of The Hub, so a firm doing two designs a month
+                  * works out the subscription for itself.
+                  */}
                 <div className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-xl shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
-
-                    <div className="pt-0 pb-0 border-none">
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-                            <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <h4 className="text-xl font-bold text-accent">Modulr Managed Service</h4>
+                    <div className="max-w-3xl mb-10">
+                        <h4 className="text-2xl font-bold text-accent mb-3">Modulr Managed Service</h4>
+                        <p className="text-sm text-secondary leading-relaxed mb-4">
+                            Short on time, or don't want the software at all? Send us the client's brief, drawings or sketch and a Modulr designer builds the scheme in the 3D Configurator for you: the building, the interior, the garden and the finishes.
+                        </p>
+                        <p className="text-sm text-secondary leading-relaxed mb-5">
+                            Every design comes with a set of renders, a material specification and a client PDF. One round of changes is included. Two working days from brief to delivery. No subscription needed.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
+                            {[
+                                'Full 3D Configurator build, interior included',
+                                'Walk inside and walk outside',
+                                'Render set: several angles, day and dusk',
+                                'Material specification sheet',
+                                'Project PDF for the client',
+                                'One round of changes',
+                            ].map(item => (
+                                <div key={item} className="flex items-start gap-2.5">
+                                    <Check size={16} className="text-accent shrink-0 mt-0.5" strokeWidth={3} />
+                                    <span className="text-sm leading-tight text-primary/85">{item}</span>
                                 </div>
-                                <p className="text-sm text-secondary leading-relaxed max-w-2xl">
-                                    Short on time? Even though our engine is incredibly fast, we at Modulr Studio can handle the entire creative process for you. We'll generate your high-end visuals and material specs to your exact requirements.
-                                </p>
-                            </div>
-                            <div className="flex flex-col items-center md:items-end gap-3 shrink-0">
-                                <div className="flex flex-col items-end">
-                                    <span className="text-4xl font-bold text-primary">£100 <span className="text-xs font-bold text-secondary uppercase">inc VAT</span></span>
-                                    <span className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em]">Extra / Month</span>
-                                </div>
-                                <Button 
-                                    className="px-10 py-4 text-xs font-bold uppercase tracking-wider" 
-                                    onClick={() => handleUpgrade('managed_service', 'price_1TMS40HtB5liiqHxq6XkJGK4', 0)}
-                                    disabled={loadingPlan !== null}
-                                >
-                                    {loadingPlan === 'price_1TMS40HtB5liiqHxq6XkJGK4' ? <Loader2 className="animate-spin" /> : 'Add to Plan'}
-                                </Button>
-                            </div>
+                            ))}
                         </div>
                     </div>
 
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                        {/* Route 1: no subscription, files plus a share link. */}
+                        <div className="rounded-2xl border border-border bg-surface/40 p-6 flex flex-col">
+                            <div className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em] mb-2">Design Package</div>
+                            <div className="text-4xl font-bold text-primary drop-shadow-md mb-1">from £300 <span className="text-xs font-bold text-secondary uppercase">inc VAT</span></div>
+                            <p className="text-sm text-secondary leading-relaxed mb-4">No subscription. We do it all and you get the renders, PDF and spec as files, plus a link your client can open on their phone and walk through.</p>
+                            <div className="overflow-hidden rounded-xl border border-border mb-5">
+                                <table className="w-full text-sm">
+                                    <tbody className="text-primary/85">
+                                        <tr><td className="p-2.5 text-secondary">One design, everything above</td><td className="p-2.5 font-bold text-right">from £300</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Five designs, paid up front</td><td className="p-2.5 font-bold text-right">£1,350</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Extra round of changes</td><td className="p-2.5 font-bold text-right">£75</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Extra render angle after delivery</td><td className="p-2.5 font-bold text-right">£20</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <a className="mt-auto" href={`mailto:info@napc.uk?subject=${encodeURIComponent('Design Package request')}&body=${encodeURIComponent('Hi Modulr,\n\nI would like a Design Package (no subscription).\n\nCompany:\nClient / project name:\nBuilding size and type:\nBrief, drawings or sketch attached:\nDeadline:\n')}`}>
+                                <Button className="px-10 py-4 text-xs font-bold uppercase tracking-wider w-full">Request a Design Package</Button>
+                            </a>
+                            <p className="text-[11px] text-secondary mt-3">Paid up front. Larger or unusual schemes are quoted before any work starts.</p>
+                        </div>
+
+                        {/* Route 2: Hub members, the design lands in their projects. */}
+                        <div className="rounded-2xl border border-accent/30 bg-gradient-to-b from-surface/80 to-accent/5 p-6 flex flex-col">
+                            <div className="text-[10px] font-bold text-accent uppercase tracking-[0.2em] mb-2">Managed design, The Hub members</div>
+                            <div className="text-4xl font-bold text-primary drop-shadow-md mb-1">from £200 <span className="text-xs font-bold text-secondary uppercase">inc VAT</span></div>
+                            <p className="text-sm text-secondary leading-relaxed mb-4">The design lands in your own projects, so you can walk through it, change it yourself and send it on with your own branding. Cheaper than the package after two designs a month.</p>
+                            <div className="overflow-hidden rounded-xl border border-border mb-5">
+                                <table className="w-full text-sm">
+                                    <tbody className="text-primary/85">
+                                        <tr><td className="p-2.5 text-secondary">One design, everything above</td><td className="p-2.5 font-bold text-right">from £200</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Five designs, paid up front</td><td className="p-2.5 font-bold text-right">£900</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Extra round of changes</td><td className="p-2.5 font-bold text-right">£50</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Extra render angle after delivery</td><td className="p-2.5 font-bold text-right">£20</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <a className="mt-auto" href={`mailto:info@napc.uk?subject=${encodeURIComponent('Managed design request')}&body=${encodeURIComponent('Hi Modulr,\n\nI would like a managed design on my Hub account.\n\nMy Modulr account email:\nClient / project name:\nBuilding size and type:\nBrief, drawings or sketch attached:\nDeadline:\n')}`}>
+                                <Button className="px-10 py-4 text-xs font-bold uppercase tracking-wider w-full">Request a design</Button>
+                            </a>
+                            <p className="text-[11px] text-secondary mt-3">Invoiced on delivery. Larger or unusual schemes are quoted before any work starts.</p>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Footer FAQ Teaser */}

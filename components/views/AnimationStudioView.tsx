@@ -176,7 +176,7 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
                 </div>
                 <h1 className="text-2xl font-bold text-accent tracking-tight mb-3">Animation Studio</h1>
                 <p className="text-sm text-slate-600 leading-relaxed mb-8">
-                    Turn a finished render into a short cinematic clip. Sign in to your Business account to use it.
+                    Turn a finished render into a short cinematic clip. Sign in to The Hub to use it.
                 </p>
                 <Button onClick={() => onNavigate?.(AppStage.AUTH)}>Sign in</Button>
             </Gate>
@@ -201,22 +201,22 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
                     <Lock size={22} className="text-amber-600" />
                 </div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-600 mb-3">
-                    {isBeta ? 'Not in the trial' : 'Business plan feature'}
+                    {isBeta ? 'Not in the trial' : 'The Hub feature'}
                 </p>
                 <h1 className="text-2xl font-bold text-accent tracking-tight mb-3">
-                    {isBeta ? 'Animation Studio is not part of the trial' : 'Animation Studio is part of Business'}
+                    {isBeta ? 'Animation Studio is not part of the trial' : 'Animation Studio is part of The Hub'}
                 </h1>
                 <p className="text-sm text-slate-600 leading-relaxed mb-8">
                     {isBeta
-                        ? 'Every other studio tool is open to you - this is the one exception. Video generation costs real money to run, so it comes with the Business plan.'
-                        : 'Turn any finished render into a cinematic clip for your website, socials or a client quote. Three clips a month are included with Business, then pay as you go.'}
+                        ? 'Every other studio tool is open to you - this is the one exception. Video generation costs real money to run, so it comes with The Hub.'
+                        : 'Turn any finished render into a cinematic clip for your website, socials or a client quote. Three clips a month are included with The Hub, then pay as you go.'}
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
                     {isBeta ? (
                         <Button onClick={() => onNavigate?.(AppStage.RENDER_ENGINE)}>Back to the Render Engine</Button>
                     ) : (
                         <>
-                            <Button onClick={() => onNavigate?.(AppStage.PRICING)}>See Business plan</Button>
+                            <Button onClick={() => onNavigate?.(AppStage.PRICING)}>See The Hub</Button>
                             <button onClick={() => onNavigate?.(AppStage.HOME)} className="text-sm text-slate-500 hover:text-accent transition-colors px-3 py-2">Back to home</button>
                         </>
                     )}

@@ -42,7 +42,7 @@ const ParkedScreen: React.FC<{ label: string; onNavigate: (stage: AppStage) => v
     <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-accent/60 mb-4">Coming soon</p>
     <h1 className="text-2xl md:text-3xl font-bold text-accent tracking-tight mb-4 leading-tight">{label}</h1>
     <p className="text-sm text-secondary leading-relaxed max-w-sm mb-8">
-      {label} is in final testing and opens to Business accounts shortly. Everything else in the studio is live.
+      {label} is in final testing and opens to Hub accounts shortly. Everything else in the studio is live.
     </p>
     <button onClick={() => onNavigate(AppStage.RENDER_ENGINE)} className="px-6 py-3 bg-accent text-white text-sm font-bold hover:bg-accent-hover transition-colors">Open the Render Engine</button>
   </div>
@@ -120,7 +120,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     { id: AppStage.MATERIAL_STUDIO, label: 'Material Studio' },
     // Shown but badged for accounts without it (beta, tester, free) rather than
     // hidden. It is a headline feature and hiding it entirely would mean beta
-    // users never learn the Business plan has it. Clicking through lands on the
+    // users never learn The Hub has it. Clicking through lands on the
     // explanation screen in AnimationStudioView, which is the real gate; the
     // actual enforcement is ANIMATION_PLANS on /api/animation/start.
     // `canUseAnimation` is null until the plan loads - only badge on an explicit

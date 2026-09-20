@@ -89,30 +89,36 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
         if (!p) return "Free Trial";
         if (p.toLowerCase() === 'master') return 'Modulr Master';
         if (p.toLowerCase() === 'tester') return 'Tester Access';
-        if (p.includes('business') || p.includes('price_1TKI8')) return 'Business Plan';
+        if (p.toLowerCase() === 'standard') return 'Configurator';
+        if (p.includes('business') || p.includes('price_1TKI8')) return 'The Hub';
         return 'Free Trial';
     };
 
-    // Business is unlimited - it is no longer metered by a credit balance, so
+    // The Hub is unlimited - it is no longer metered by a credit balance, so
     // there is no total to show or fill a progress bar against.
     const getCreditTotal = (p: string | null) => {
         if (p?.toLowerCase() === 'master') return '∞';
         if (p?.toLowerCase() === 'tester') return rendersPerDay ?? 40;
+        // Configurator (20 Sep 2026): a paid plan with no AI rendering at all.
+        if (p?.toLowerCase() === 'standard') return 0;
         if (p?.includes('business') || p?.includes('price_1TKI8')) return '∞';
         return 5;
     };
 
     const isUnlimited = credits === 'Unlimited' || getCreditTotal(plan) === '∞';
-    const isPaidPlan = plan && (plan.includes('business') || plan.toLowerCase() === 'master');
+    const isConfigurator = plan?.toLowerCase() === 'standard';
+    const isPaidPlan = !!plan && (plan.includes('business') || plan.toLowerCase() === 'master' || isConfigurator);
     const totalCreditsForBar = getCreditTotal(plan);
     // Testers fall through the numeric branch below: credits holds the renders
     // remaining and totalCreditsForBar holds their allowance, so the same
-    // calculation applies without a special case.
-    const progressPercent = isUnlimited
-        ? 100
-        : (typeof credits === 'number' && typeof totalCreditsForBar === 'number'
-            ? Math.min((credits / totalCreditsForBar) * 100, 100)
-            : (rendersLeft !== null ? Math.min((rendersLeft / 5) * 100, 100) : 0));
+    // calculation applies without a special case. Configurator has no meter.
+    const progressPercent = isConfigurator
+        ? 0
+        : isUnlimited
+            ? 100
+            : (typeof credits === 'number' && typeof totalCreditsForBar === 'number'
+                ? Math.min((credits / totalCreditsForBar) * 100, 100)
+                : (rendersLeft !== null ? Math.min((rendersLeft / 5) * 100, 100) : 0));
 
     const userDisplay = {
         name: user?.displayName || "No Name Set",
@@ -194,23 +200,27 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                                     <Sparkles size={24} />
                                 </div>
                                 <div className="px-3 py-1 rounded-none bg-accent/10 text-accent text-[9px] font-bold uppercase tracking-widest border border-accent/20">
-                                    {isPaidPlan ? 'Monthly Allocation' : 'Trial Credits'}
+                                    {isConfigurator ? 'Configurator plan' : isPaidPlan ? 'Monthly Allocation' : 'Trial Credits'}
                                 </div>
                             </div>
                             <div className="space-y-4">
                                 <div>
                                     <p className="text-[10px] font-bold text-accent/50 uppercase tracking-[0.2em]">
-                                        {isTester ? 'Tester Renders Remaining' : isPaidPlan ? 'Credits Remaining' : 'Trial Renders Remaining'}
+                                        {isTester ? 'Tester Renders Remaining' : isConfigurator ? 'AI Renders' : isPaidPlan ? 'Credits Remaining' : 'Trial Renders Remaining'}
                                     </p>
                                     <div className="flex items-baseline gap-2">
-                                        <h3 className="text-3xl font-bold text-accent tracking-tight">{userDisplay.credits.remaining}</h3>
-                                        {!isUnlimited && <span className="text-secondary font-medium text-sm">/ {userDisplay.credits.total} {!isPaidPlan || isTester ? 'renders' : 'credits'}</span>}
+                                        <h3 className="text-3xl font-bold text-accent tracking-tight">{isConfigurator ? 'None' : userDisplay.credits.remaining}</h3>
+                                        {!isUnlimited && !isConfigurator && <span className="text-secondary font-medium text-sm">/ {userDisplay.credits.total} {!isPaidPlan || isTester ? 'renders' : 'credits'}</span>}
                                     </div>
                                     {isTester ? (
                                         <p className="text-[10px] text-secondary mt-1">
                                             {trialDaysLeft !== null && trialDaysLeft > 0
                                                 ? `Tester access - ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} remaining.`
                                                 : 'Your tester access has ended.'}
+                                        </p>
+                                    ) : isConfigurator ? (
+                                        <p className="text-[10px] text-secondary mt-1">
+                                            The Configurator plan has no AI rendering. The Hub includes 250 renders a month.
                                         </p>
                                     ) : !isPaidPlan && (
                                         <p className="text-[10px] text-secondary mt-1">
@@ -229,15 +239,15 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                             </div>
                         </div>
                         <div className="pt-6 mt-6 border-t border-slate-100">
-                            {!isPaidPlan && (
+                            {(!isPaidPlan || isConfigurator) && (
                                 <button
                                     onClick={() => onNavigate?.(AppStage.PRICING)}
                                     className="text-[10px] font-bold text-accent uppercase tracking-widest flex items-center gap-2 hover:opacity-70 transition-opacity"
                                 >
-                                    Get More Credits with a Plan <ChevronRight size={12} />
+                                    {isConfigurator ? 'Upgrade to The Hub' : 'Get More Credits with a Plan'} <ChevronRight size={12} />
                                 </button>
                             )}
-                            {isPaidPlan && (
+                            {isPaidPlan && !isConfigurator && (
                                 <p className="text-[10px] text-secondary/60 uppercase tracking-widest font-bold">Credits reset on next billing cycle</p>
                             )}
                         </div>

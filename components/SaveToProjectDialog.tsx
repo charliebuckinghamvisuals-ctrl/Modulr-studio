@@ -106,7 +106,7 @@ export const SaveToProjectDialog: React.FC<SaveToProjectDialogProps> = ({ image,
                 {!canUseProjects ? (
                     <p className="text-xs text-slate-500 mt-3 flex items-start gap-2">
                         <Lock size={14} className="shrink-0 mt-0.5" />
-                        Projects is included on Standard and Business. Subscribe to keep your renders filed against the client they belong to.
+                        Projects is included on Configurator and The Hub. Subscribe to keep your renders filed against the client they belong to.
                     </p>
                 ) : (
                     <>

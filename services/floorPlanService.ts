@@ -7,7 +7,7 @@ import { auth } from './firebase';
  * uploaded top view, the design spec or the surveyed items, and a mode -
  * 'rendered' (photoreal top-down) or 'cad' (black-on-white, dimensioned).
  * The server runs the same contract engine as exterior renders, from above,
- * and charges one render. Business only.
+ * and charges one render. The Hub only.
  */
 
 const API_BASE_URL = '/api';
