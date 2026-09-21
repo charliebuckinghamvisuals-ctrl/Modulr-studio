@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool } from 'lucide-react';
+import { Monitor, Image as ImageIcon, Sparkles, X, Zap, Hexagon, Grid, Palette, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool } from 'lucide-react';
 import { AppStage } from '../types';
 import { useAuth, isMasterAccount } from '../hooks/useAuth';
 import { useCredits } from '../hooks/useCredits';
@@ -204,7 +204,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
             <button
               className={`px-4 py-2.5 text-xs font-light uppercase tracking-[0.2em] rounded-full flex items-center gap-2 transition-all duration-300 hover:scale-105 ${toolItems.some(item => activeStage === item.id) ? 'text-slate-900 bg-white/60' : 'text-white hover:bg-white/10'}`}
             >
-              <Layers size={16} />
               <span>Tools</span>
               <ChevronDown size={14} className={`transition-transform duration-300 ${isToolsDropdownOpen ? 'rotate-180' : ''}`} />
             </button>

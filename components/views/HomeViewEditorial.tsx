@@ -246,12 +246,16 @@ export const HomeViewEditorial: React.FC<HomeViewProps> = ({ onOpenEngine, onNav
                 type="button"
                 onClick={onOpenEngine}
                 aria-label="Free 7-day access to Modulr Studio: 40 AI renders, no card needed. Start free"
-                className="group w-full relative z-20 bg-[#2d3a38] text-white border-b border-white/10 hover:bg-[#344542] transition-colors py-2.5 px-4"
+                /* Off-white, not a second dark band under the dark header
+                   (Charlie, 21 Sep 2026): the header keeps the weight, the
+                   offer reads as a notice on the page rather than part of
+                   the chrome. Brand green text, hairline underneath. */
+                className="group w-full relative z-20 bg-[#f6f7f5] text-accent border-b border-slate-200 hover:bg-[#eef0ec] transition-colors py-2.5 px-4"
             >
                 <span className="inline-flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[12px] sm:text-[13px]">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-white/75">Limited-time offer</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-accent/80">Limited-time offer</span>
                     <span className="font-light">Free 7-day access to Modulr Studio · 40 AI renders · no card needed</span>
-                    <span className="font-semibold underline underline-offset-4 decoration-white/50 group-hover:decoration-white">Start free</span>
+                    <span className="font-semibold underline underline-offset-4 decoration-accent/40 group-hover:decoration-accent">Start free</span>
                 </span>
             </button>
 
