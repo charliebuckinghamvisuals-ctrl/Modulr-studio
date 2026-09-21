@@ -359,7 +359,6 @@ export const GuideView: React.FC = () => {
     return (
         <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar">
             <DraftingBackground pageName="GUIDE" />
-            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[150px] pointer-events-none" />
 
             <div className="flex-1 relative z-10 px-6 md:px-12 lg:px-16 py-16 md:py-24">
                 <div className="max-w-[1200px] mx-auto space-y-24 md:space-y-32">

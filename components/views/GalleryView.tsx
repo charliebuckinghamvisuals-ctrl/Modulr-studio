@@ -56,8 +56,6 @@ export const GalleryView: React.FC = () => {
             <DraftingBackground pageName="GALLERY" />
 
             {/* Ambient Lighting */}
-            <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[150px] pointer-events-none"></div>
-            <div className="absolute bottom-1/4 left-0 w-[400px] h-[400px] bg-accent/5 rounded-full blur-[120px] pointer-events-none"></div>
 
             <div className="flex-1 p-8 md:p-16 lg:p-24 relative z-10 w-full">
                 <div className="max-w-[1600px] mx-auto space-y-32">

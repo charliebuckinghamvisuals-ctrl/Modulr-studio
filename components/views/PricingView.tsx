@@ -90,9 +90,11 @@ const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: s
     { label: 'Renders, any tool',            trial: '40 over 7 days, 10 a day', standard: false, business: '250 a month' },
     { label: 'Render Engine',                trial: true,  standard: false, business: true },
     { label: 'Material close-ups',           trial: true,  standard: false, business: true },
-    { label: 'Plan & line AI tools',         trial: 'Line Converter & Weather Lab', standard: false, business: 'Line Converter, Weather Lab & Floor Plan Studio' },
+    // "Coming soon" here matches the Tools menu and the home page: Floor Plan
+    // Studio and Animation Studio are parked for launch (QA, 21 Sep 2026).
+    { label: 'Plan & line AI tools',         trial: 'Line Converter & Weather Lab', standard: false, business: 'Line Converter, Weather Lab & Floor Plan Studio (coming soon)' },
     { label: '4K enhancement',               trial: false, standard: false, business: '50 a month' },
-    { label: 'Animation Studio',             trial: false, standard: false, business: '3 clips a month, then pay as you go' },
+    { label: 'Animation Studio',             trial: false, standard: false, business: '3 clips a month, then pay as you go (coming soon)' },
     { label: 'Planning Checker',             trial: 'Free to all', standard: 'Free to all', business: 'Free to all' },
     { label: 'Commercial rights',            trial: false, standard: true,  business: true },
     { label: 'Priority queue',               trial: false, standard: false, business: true },
@@ -113,7 +115,7 @@ const FeatureList: React.FC<{ plan: PlanKey }> = ({ plan }) => (
                     <span className={`text-sm leading-tight ${included ? 'text-primary/85' : 'text-slate-400 line-through decoration-slate-300'}`}>
                         {row.label}
                         {typeof value === 'string' && (
-                            <span className="block text-[11px] font-bold text-accent/70 mt-0.5">{value}</span>
+                            <span className="block text-[11px] font-bold text-accent mt-0.5">{value}</span>
                         )}
                     </span>
                 </div>
@@ -272,8 +274,6 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
             ), document.body)}
 
             {/* Ambient Background Effects */}
-            <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse-slow"></div>
-            <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[150px] pointer-events-none -z-10"></div>
 
             <div className="max-w-7xl mx-auto w-full flex flex-col items-center relative z-10">
 
@@ -330,7 +330,9 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                 </div>
 
                 {/* Pricing Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl items-stretch pb-20 mx-auto">
+                {/* Three across from lg only (QA 21 Sep 2026): at tablet width
+                    the cards were 217px wide and the plan names overflowed. */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full max-w-6xl items-stretch pb-20 mx-auto">
 
                     {/* Free Trial Entry */}
                     <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-surface/40 hover:bg-surface/60 transition-all duration-300 relative group shadow-[0_20px_50px_rgba(0,0,0,0.1)]">
@@ -388,13 +390,18 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
 
 
                     {/* The Hub (plan key 'business', highlighted) */}
-                    <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-gradient-to-b from-surface/80 to-accent/5 relative transition-all duration-500 shadow-[0_30px_60px_rgba(139,92,246,0.15)] group">
+                    {/* QA 21 Sep 2026: the shadow was still the old purple theme's
+                        rgba(139,92,246) and the badge a gradient; both are the
+                        brand green now, matching the other two cards. */}
+                    <div className="glass-panel border-2 border-transparent hover:border-accent rounded-3xl p-8 flex flex-col h-full bg-gradient-to-b from-surface/80 to-accent/5 relative transition-all duration-500 shadow-[0_20px_50px_rgba(64,90,86,0.15)] group">
 
-                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-accent to-accent/80 rounded-none flex items-center gap-1.5 shadow-lg">
+                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-accent rounded-none flex items-center gap-1.5">
                             <span className="text-xs font-bold text-white uppercase tracking-wider">Most Popular</span>
                         </div>
 
-                        <div className="mb-6 mt-2">
+                        {/* No extra top margin: it pushed this card's button 6px below
+                            the other two (QA 21 Sep 2026); the badge hangs outside the card. */}
+                        <div className="mb-6">
                             <h3 className="text-2xl font-bold text-accent dark:text-accent mb-2 flex items-center gap-2">The Hub</h3>
                             <p className="text-sm text-secondary min-h-[40px]">Everything in Configurator, plus 250 renders a month and every studio tool.</p>
                         </div>

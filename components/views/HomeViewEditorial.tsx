@@ -103,7 +103,7 @@ const Band: React.FC<{ tone?: 'white' | 'pale' | 'dark'; className?: string; inn
 );
 
 const Eyebrow: React.FC<{ children: React.ReactNode; light?: boolean }> = ({ children, light }) => (
-    <span className={`block text-[11px] font-semibold uppercase tracking-[0.3em] ${light ? 'text-white/60' : 'text-accent/70'}`}>{children}</span>
+    <span className={`block text-[11px] font-semibold uppercase tracking-[0.3em] ${light ? 'text-white/75' : 'text-accent'}`}>{children}</span>
 );
 
 /** A quiet text link, the page's secondary action everywhere. */
@@ -120,7 +120,7 @@ const TextLink: React.FC<{ onClick?: () => void; children: React.ReactNode; ligh
 
 /** Small caption under an image: what it is, honestly. */
 const Caption: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <p className="mt-3 text-[11px] uppercase tracking-[0.2em] text-secondary/70">{children}</p>
+    <p className="mt-3 text-[11px] uppercase tracking-[0.2em] text-secondary">{children}</p>
 );
 
 /**
@@ -212,11 +212,11 @@ const Step: React.FC<{
     <div data-reveal className={`grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start ${flip ? 'lg:[&>*:first-child]:order-2' : ''}`}>
         <div className="lg:col-span-8">{children}</div>
         <div className="lg:col-span-4 max-w-md lg:pt-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-accent/60">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-accent/80">
                 <span className="tabular-nums">{n}</span>
                 <span className="mx-3 text-accent/30">/</span>
                 {name}
-                {badge && <span className="ml-3 px-2 py-0.5 border border-accent/25 text-accent/70 text-[9px] tracking-[0.2em]">{badge}</span>}
+                {badge && <span className="ml-3 px-2 py-0.5 border border-accent/25 text-accent text-[9px] tracking-[0.2em]">{badge}</span>}
             </p>
             <h3 className="text-xl sm:text-2xl lg:text-[1.7rem] text-accent mt-4 leading-snug">{title}</h3>
             <p className="text-secondary text-base font-light leading-relaxed mt-4">{body}</p>
@@ -249,7 +249,7 @@ export const HomeViewEditorial: React.FC<HomeViewProps> = ({ onOpenEngine, onNav
                 className="group w-full relative z-20 bg-[#2d3a38] text-white border-b border-white/10 hover:bg-[#344542] transition-colors py-2.5 px-4"
             >
                 <span className="inline-flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[12px] sm:text-[13px]">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-white/60">Limited-time offer</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-white/75">Limited-time offer</span>
                     <span className="font-light">Free 7-day access to Modulr Studio · 40 AI renders · no card needed</span>
                     <span className="font-semibold underline underline-offset-4 decoration-white/50 group-hover:decoration-white">Start free</span>
                 </span>
@@ -395,7 +395,7 @@ export const HomeViewEditorial: React.FC<HomeViewProps> = ({ onOpenEngine, onNav
                     <ol className="lg:col-span-7 border-t border-slate-300/70">
                         {LOCKS.map((l, i) => (
                             <li key={l.title} className="py-7 grid grid-cols-[3.5rem_1fr] gap-4 border-b border-slate-300/70">
-                                <span className="text-accent/40 text-2xl font-light tabular-nums leading-none pt-1">0{i + 1}</span>
+                                <span className="text-accent/60 text-2xl font-light tabular-nums leading-none pt-1">0{i + 1}</span>
                                 <div>
                                     <p className="text-accent font-semibold text-base">{l.title}</p>
                                     <p className="text-secondary text-base font-light mt-2 leading-relaxed max-w-xl">{l.body}</p>
@@ -459,7 +459,7 @@ export const HomeViewEditorial: React.FC<HomeViewProps> = ({ onOpenEngine, onNav
                             >
                                 <span className="flex items-baseline gap-3 min-w-0">
                                     <span className="text-accent font-semibold text-base group-hover:underline underline-offset-[6px] decoration-1 decoration-accent/40">{t.label}</span>
-                                    {t.badge && <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-accent/60 border border-accent/25 px-1.5 py-0.5">{t.badge}</span>}
+                                    {t.badge && <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-accent/80 border border-accent/25 px-1.5 py-0.5">{t.badge}</span>}
                                 </span>
                                 <span className="text-secondary text-sm font-light text-right shrink-0">{t.line}</span>
                             </button>

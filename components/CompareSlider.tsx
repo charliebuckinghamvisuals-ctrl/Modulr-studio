@@ -69,7 +69,7 @@ export const CompareSlider: React.FC<CompareSliderProps> = ({
           src={getImageUrl(afterImage)}
           className="absolute inset-0 w-full h-full object-cover pointer-events-none"
           onLoad={handleImageLoad}
-          alt="After"
+          alt={afterLabel}
         />
 
         {/* Foreground Image (Before) */}
@@ -82,7 +82,7 @@ export const CompareSlider: React.FC<CompareSliderProps> = ({
           <img
             src={getImageUrl(beforeImage)}
             className="absolute inset-0 w-full h-full object-cover"
-            alt="Before"
+            alt={beforeLabel}
           />
         </div>
 

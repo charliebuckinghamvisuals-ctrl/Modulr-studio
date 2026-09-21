@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool, Lock } from 'lucide-react';
+import { Monitor, Image as ImageIcon, Sparkles, Layers, X, Zap, Hexagon, Grid, Palette, BookOpen, Coins, ChevronDown, User, Settings, Menu, PenTool } from 'lucide-react';
 import { AppStage } from '../types';
 import { useAuth, isMasterAccount } from '../hooks/useAuth';
 import { useCredits } from '../hooks/useCredits';
@@ -229,7 +229,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
                     >
                       <span>{item.label}</span>
                       {item.badge && <span className="text-[8px] font-semibold uppercase tracking-wider text-slate-400">{item.badge}</span>}
-                      {item.locked && <Lock size={11} className="text-slate-400 shrink-0" />}
+                      {item.locked && <span className="text-[8px] font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Coming soon</span>}
                     </button>
                   );
                 })}
@@ -354,6 +354,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
           <img src="/Logo.png" alt="Modulr Studio" className="h-12 w-auto object-contain" />
           <button
             onClick={() => setIsMobileMenuOpen(false)}
+            aria-label="Close menu"
             className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all"
           >
             <X size={18} className="text-white" />

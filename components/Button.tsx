@@ -33,7 +33,7 @@ export const Button: React.FC<ButtonProps> = ({
   if (variant === 'primary') {
     return (
       <button
-        className={`${baseStyles} relative bg-accent text-white hover:bg-accent-hover ${borderless ? '' : 'shadow-[0_2px_12px_rgba(64,90,86,0.25)]'} ${className}`}
+        className={`${baseStyles} relative border border-transparent bg-accent text-white hover:bg-accent-hover ${borderless ? '' : 'shadow-[0_2px_12px_rgba(64,90,86,0.25)]'} ${className}`}
         style={style}
         {...props}
       >

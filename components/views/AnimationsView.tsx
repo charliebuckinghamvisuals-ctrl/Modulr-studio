@@ -27,8 +27,6 @@ export const AnimationsView: React.FC = () => {
             <DraftingBackground pageName="ANIMATIONS" />
 
             {/* Ambient Lighting */}
-            <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[150px] pointer-events-none"></div>
-            <div className="absolute bottom-1/4 left-0 w-[400px] h-[400px] bg-accent/5 rounded-full blur-[120px] pointer-events-none"></div>
 
             <div className="flex-1 p-8 md:p-16 lg:p-24 relative z-10 w-full">
                 <div className="max-w-[1600px] mx-auto space-y-24">
@@ -44,7 +42,7 @@ export const AnimationsView: React.FC = () => {
                             Animation Gallery
                         </h1>
                         <p className="text-lg text-secondary max-w-2xl mx-auto font-medium">
-                            Cinematic clips generated in Animation Studio — a render brought to life
+                            Cinematic clips generated in Animation Studio: a render brought to life
                             with camera moves, breeze and light, in seconds.
                         </p>
                     </div>
@@ -67,6 +65,7 @@ export const AnimationsView: React.FC = () => {
                                             loop
                                             playsInline
                                             preload="metadata"
+                                            aria-label={`Animation Studio clip: ${clip.caption}`}
                                             className="absolute inset-0 w-full h-full object-cover"
                                         />
                                         <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 z-20 transform translate-y-4 group-hover:translate-y-0">

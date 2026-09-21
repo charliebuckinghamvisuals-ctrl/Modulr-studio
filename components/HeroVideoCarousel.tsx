@@ -131,7 +131,7 @@ export const HeroVideoCarousel: React.FC<{ fullBleed?: boolean; quiet?: boolean;
                             {children && <div className="absolute inset-x-0 bottom-0">{children}</div>}
                             {/* Clip name and dots, bottom right, out of the copy's way. */}
                             <div className="absolute right-4 sm:right-6 lg:right-10 bottom-4 sm:bottom-6 lg:bottom-9 flex flex-col items-end gap-1">
-                                <p className="hidden md:block text-[10px] uppercase tracking-[0.25em] text-white/60 text-right max-w-xs" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                                <p className="hidden md:block text-[10px] uppercase tracking-[0.25em] text-white/75 text-right max-w-xs" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
                                     {CLIPS[active].caption}
                                 </p>
                                 {dots}
@@ -151,7 +151,7 @@ export const HeroVideoCarousel: React.FC<{ fullBleed?: boolean; quiet?: boolean;
                             className={`hidden sm:block mt-3 text-white font-light leading-snug ${fullBleed ? 'text-lg md:text-2xl lg:text-3xl max-w-2xl' : 'text-base md:text-xl max-w-lg'}`}
                             style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 2px 14px rgba(0,0,0,0.75)' }}
                         >
-                            {CLIPS[active].caption} — rendered in Modulr Studio, then brought to
+                            {CLIPS[active].caption}, rendered in Modulr Studio, then brought to
                             life in Animation Studio.
                         </p>
 
