@@ -318,10 +318,15 @@ export const HomeViewEditorial: React.FC<HomeViewProps> = ({ onOpenEngine, onNav
                     body="Material Studio takes a finished render to macro: the cladding grain, the glazing bars, the bench in the sauna. Swap a surface and only that surface changes; the rest of the image is left exactly as it was."
                     action={{ label: 'Open Material Studio', onClick: go(AppStage.MATERIAL_STUDIO) }}
                 >
-                    <div className="aspect-square max-h-[720px] mx-auto overflow-hidden bg-[#eef0ec]">
-                        <img src="/sauna-materials.jpg" alt="Material Studio sheet of the garden gym and sauna: bronze glazing bars, the sauna bench, oak cladding grain and a frame corner against lavender" loading="lazy" className="w-full h-full object-cover" />
+                    {/* The sheet is square and narrower than the column; it and
+                        its caption share one left-aligned wrapper so the caption
+                        starts under the image's edge, not the column's. */}
+                    <div className="max-w-[720px]">
+                        <div className="aspect-square overflow-hidden bg-[#eef0ec]">
+                            <img src="/sauna-materials.jpg" alt="Material Studio sheet of the garden gym and sauna: bronze glazing bars, the sauna bench, oak cladding grain and a frame corner against lavender" loading="lazy" className="w-full h-full object-cover" />
+                        </div>
+                        <Caption>Material Studio sheet · the garden gym and sauna at the top of the page</Caption>
                     </div>
-                    <Caption>Material Studio sheet · the garden gym and sauna at the top of the page</Caption>
                 </Step>
 
                 <Step
