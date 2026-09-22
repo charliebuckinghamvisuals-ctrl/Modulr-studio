@@ -1,4 +1,7 @@
 export type ShapeType = 'Box' | 'LShape' | 'Gable';
+
+/** The corner an L-shape's cut-out is taken from. */
+export type LShapeCorner = 'front-left' | 'front-right' | 'back-left' | 'back-right';
 export type CladdingType =
   // Composite range offered in the sidebar picker. These must match the keys in
   // MATERIAL_DEF, or the swatch applies a value that falls back to 'default'.
@@ -275,6 +278,10 @@ export interface Room {
   overhangBackMm?: number;
   lShapeCutoutWidthMm?: number;
   lShapeCutoutDepthMm?: number;
+  /** Which corner of the footprint the L's cut-out is taken from, looking at
+   *  the building from the garden. Unset = 'front-right', which is where it
+   *  always was before the corner became a choice (22 Sep 2026). */
+  lShapeCutoutCorner?: LShapeCorner;
   /** The covered outdoor section - see utils/bay. Unset = none. */
   bay?: BayData;
 }

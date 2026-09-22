@@ -2,6 +2,7 @@ import React from 'react';
 import { useMemo, useState, useRef, useEffect, useDeferredValue } from 'react';
 import { Room, Door, FrameMaterialType } from '../../types';
 import { doorKind } from '../../utils/doors';
+import { clampCutoutWidthMm, clampCutoutDepthMm } from '../../utils/lshape';
 import { bayRange, enclosedRange, wallSpanMm, openingRemovedByBay } from '../../utils/bay';
 import { BayParts } from './BayParts';
 import { useFrame } from '@react-three/fiber';
@@ -1347,6 +1348,43 @@ export function RoomGeometry() {
   const isLShape = room.shape === 'LShape';
   const cutW = isLShape ? Math.min(((room.lShapeCutoutWidthMm ?? 2000) / 1000), w - 0.35) : 0;
   const cutD = isLShape ? Math.min(((room.lShapeCutoutDepthMm ?? 1500) / 1000), d - 0.35) : 0;
+  /**
+   * Which corner the cut-out comes out of (22 Sep 2026). It was welded to
+   * the front-right, which is the wrong one for half of all plots - "make it
+   * easy to change which side the L is" (Charlie). Everything below is
+   * written for the front-right and mirrored by these two signs, so there is
+   * one piece of geometry rather than four.
+   */
+  const cutCorner = room.lShapeCutoutCorner ?? 'front-right';
+  /** +1 = the cut is on the right (+x), -1 = on the left. */
+  const cutSX = cutCorner.endsWith('left') ? -1 : 1;
+  /** +1 = the cut is at the front (+z), -1 = at the back. */
+  const cutSZ = cutCorner.startsWith('back') ? -1 : 1;
+  const clampCutW = (val: number) => clampCutoutWidthMm(room, val);
+  const clampCutD = (val: number) => clampCutoutDepthMm(room, val);
+  /** The notch's inner corner, on the building's own wall lines. */
+  const cutLineX = cutSX * (w / 2 - cutW);
+  const cutLineZ = cutSZ * (d / 2 - cutD);
+  /**
+   * How far each elevation runs in plan once the notch has eaten its end.
+   * The notch shortens exactly two walls - a front-right cut takes the end
+   * off the front and right elevations, a back-left one off the back and
+   * left - and it always takes it from the corner it sits in, so the run
+   * starts at the corner it does not touch. An untouched wall comes back as
+   * the full width or depth.
+   */
+  const spanAcross = (touched: boolean): [number, number] => {
+    const take = touched ? cutW : 0;
+    return cutSX > 0 ? [-w/2, w/2 - take] : [-w/2 + take, w/2];
+  };
+  const spanAlong = (touched: boolean): [number, number] => {
+    const take = touched ? cutD : 0;
+    return cutSZ > 0 ? [-d/2, d/2 - take] : [-d/2 + take, d/2];
+  };
+  const spanFront = spanAcross(isLShape && cutSZ > 0);
+  const spanBack = spanAcross(isLShape && cutSZ < 0);
+  const spanRight = spanAlong(isLShape && cutSX > 0);
+  const spanLeft = spanAlong(isLShape && cutSX < 0);
 
 
   // Heights and pitch
@@ -1579,11 +1617,16 @@ export function RoomGeometry() {
   const gableFascia = Math.min(0.4, Math.max(0.05, (room.gableFasciaMm ?? 100) / 1000));
 
   const cutBoxSize = 50;
-  // LShape
-  const cutBoxPosX = (w/2 - cutW + ohRight) - roofX + cutBoxSize/2;
-  const cutBoxPosZ = (d/2 - cutD + ohFront) - roofZ + cutBoxSize/2;
-  const baseCutBoxPosX = (w/2 - cutW + ohRight) - baseX + cutBoxSize/2;
-  const baseCutBoxPosZ = (d/2 - cutD + deckFront) - baseZ + cutBoxSize/2;
+  // LShape. The cut box is anchored on the notch line and runs out past the
+  // corner, so it is mirrored by moving its anchor and flipping which side of
+  // it the 50m body sits on. The roof keeps its own overhang INTO the recess,
+  // hence the overhang on whichever two sides the cut touches.
+  const cutOhX = cutSX > 0 ? ohRight : ohLeft;
+  const cutOhZ = cutSZ > 0 ? ohFront : ohBack;
+  const cutBoxPosX = (cutLineX + cutSX * cutOhX) - roofX + cutSX * cutBoxSize/2;
+  const cutBoxPosZ = (cutLineZ + cutSZ * cutOhZ) - roofZ + cutSZ * cutBoxSize/2;
+  const baseCutBoxPosX = (cutLineX + cutSX * cutOhX) - baseX + cutSX * cutBoxSize/2;
+  const baseCutBoxPosZ = (cutLineZ + cutSZ * deckFront) - baseZ + cutSZ * cutBoxSize/2;
 
   // TShape
   const tCutBoxPosXRight = (w/2 - tCutW + ohRight) - roofX + cutBoxSize/2;
@@ -1821,27 +1864,42 @@ export function RoomGeometry() {
       onPointerOut: () => useStore.getState().setHoveredElementId(null)
     };
 
-    if (isLShape) {
-      const leftW = baseW - cutW;
-      const leftD = baseD;
-      const leftX = baseX - baseW/2 + leftW/2;
-      const leftZ = baseZ;
+    /**
+     * A slab with the L's notch taken out of it, as one or two boxes.
+     *
+     * The old version cut the notch out of the slab's FRONT half while
+     * placing the kept piece at the front as well, so the plinth ran under
+     * the recess and the building's back corner stood on thin air - the floor
+     * finish hovering 10mm over the grass is what "l shapes wall messed up"
+     * looked like (Charlie, 22 Sep 2026). It is now cut where the notch
+     * actually is, and it follows whichever corner the cut-out is set to.
+     */
+    const lParts = (cx: number, cz: number, bw: number, bd: number) => {
+      const x0 = cx - bw/2, x1 = cx + bw/2, z0 = cz - bd/2, z1 = cz + bd/2;
+      // The long leg: everything on the far side of the notch line in x,
+      // over the full depth.
+      const aX0 = cutSX > 0 ? x0 : cutLineX, aX1 = cutSX > 0 ? cutLineX : x1;
+      // The short leg: beside the notch, stopping at the notch line in z.
+      const bX0 = cutSX > 0 ? cutLineX : x0, bX1 = cutSX > 0 ? x1 : cutLineX;
+      const bZ0 = cutSZ > 0 ? z0 : cutLineZ, bZ1 = cutSZ > 0 ? cutLineZ : z1;
+      return [
+        { w: aX1 - aX0, d: z1 - z0, x: (aX0 + aX1) / 2, z: (z0 + z1) / 2 },
+        { w: bX1 - bX0, d: bZ1 - bZ0, x: (bX0 + bX1) / 2, z: (bZ0 + bZ1) / 2 },
+      ].filter(p => p.w > 0.01 && p.d > 0.01);
+    };
 
-      const rightW = cutW;
-      const rightD = baseD - cutD;
-      const rightX = baseX + baseW/2 - rightW/2;
-      const rightZ = baseZ + baseD/2 - rightD/2;
-
+    // Decking is handled below, whatever the footprint: an L with a deck gets
+    // an L plinth under a deck slab, not this bare slab. It used to return
+    // here first, so choosing L-Shape silently threw the deck away.
+    if (isLShape && !isDecking) {
       return (
         <group {...pointerEvents}>
-          <mesh position={[leftX, baseH/2, leftZ]} receiveShadow>
-            <primitive object={createWorldScaleBoxGeometry(leftW, baseH, leftD, isDeckingMaterial, leftX, 0, leftZ)} attach="geometry" />
-            {boxMats(boxKey)}
-          </mesh>
-          <mesh position={[rightX, baseH/2, rightZ]} receiveShadow>
-            <primitive object={createWorldScaleBoxGeometry(rightW, baseH, rightD, isDeckingMaterial, rightX, 0, rightZ)} attach="geometry" />
-            {boxMats(boxKey)}
-          </mesh>
+          {lParts(baseX, baseZ, baseW, baseD).map((p, i) => (
+            <mesh key={i} position={[p.x, baseH/2, p.z]} receiveShadow>
+              <primitive object={createWorldScaleBoxGeometry(p.w, baseH, p.d, isDeckingMaterial, p.x, 0, p.z)} attach="geometry" />
+              {boxMats(boxKey)}
+            </mesh>
+          ))}
         </group>
       );
     }
@@ -1885,10 +1943,15 @@ export function RoomGeometry() {
       const matKey = `${room.deckingMaterial || room.cladding || 'default'}-${room.baseMaterial}-${isDeckingMaterial}`;
       return (
         <group>
-          <mesh position={[pf.plinthX, plinthH / 2, pf.plinthZ]} receiveShadow {...pointerEvents}>
-            <primitive object={createWorldScaleBoxGeometry(pf.plinthW, plinthH, pf.plinthD, false, pf.plinthX - baseX, 0, pf.plinthZ - baseZ)} attach="geometry" />
-            <meshStandardMaterial key={`${matKey}-skirt`} attach="material" {...skirtProps} />
-          </mesh>
+          {(isLShape
+            ? lParts(pf.plinthX, pf.plinthZ, pf.plinthW, pf.plinthD)
+            : [{ x: pf.plinthX, z: pf.plinthZ, w: pf.plinthW, d: pf.plinthD }]
+          ).map((p, i) => (
+            <mesh key={i} position={[p.x, plinthH / 2, p.z]} receiveShadow {...pointerEvents}>
+              <primitive object={createWorldScaleBoxGeometry(p.w, plinthH, p.d, false, p.x - baseX, 0, p.z - baseZ)} attach="geometry" />
+              <meshStandardMaterial key={`${matKey}-skirt`} attach="material" {...skirtProps} />
+            </mesh>
+          ))}
           <DeckSlab room={room} materialProps={materialProps as Record<string, unknown>} materialKey={boxKey} sideProps={skirtProps} />
         </group>
       );
@@ -2075,7 +2138,7 @@ export function RoomGeometry() {
 
             {/* LShape Outer Cutout */}
             {isLShape && (
-              <Subtraction position={[w/2 - cutW/2 + 0.1, h/2, d/2 - cutD/2 + 0.1]}>
+              <Subtraction position={[cutSX * (w/2 - cutW/2 + 0.1), h/2, cutSZ * (d/2 - cutD/2 + 0.1)]}>
                 <primitive object={lShapeCutOuterGeom} attach="geometry" />
                 <meshStandardMaterial
                   color="#ffffff"
@@ -2156,13 +2219,13 @@ export function RoomGeometry() {
 
             {isLShape && (
               <>
-                {/* Left part of the L */}
-                <Subtraction position={[-cutW/2, h/2, 0]}>
+                {/* The long leg: full depth, on the far side of the notch. */}
+                <Subtraction position={[-cutSX * cutW/2, h/2, 0]}>
                   <primitive object={interiorCut(w - cutW - wallThickness*2, h + 1, d - wallThickness*2)} attach="geometry" />
                   <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
                 </Subtraction>
-                {/* Back-right part of the L */}
-                <Subtraction position={[w/2 - cutW/2 - wallThickness, h/2, -cutD/2]}>
+                {/* The short leg: beside the notch, stopping at its wall. */}
+                <Subtraction position={[cutSX * (w/2 - cutW/2 - wallThickness), h/2, -cutSZ * cutD/2]}>
                   <primitive object={interiorCut(cutW + wallThickness*2, h + 1, d - cutD - wallThickness*2)} attach="geometry" />
                   <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
                 </Subtraction>
@@ -2414,7 +2477,7 @@ export function RoomGeometry() {
                 </Subtraction>
              )}
              {isLShape && (
-                <Subtraction position={[w/2 - cutW/2 + 0.1, 0, d/2 - cutD/2 + 0.1]}>
+                <Subtraction position={[cutSX * (w/2 - cutW/2 + 0.1), 0, cutSZ * (d/2 - cutD/2 + 0.1)]}>
                   <boxGeometry args={[cutW + 0.2, 0.02, cutD + 0.2]} />
                 </Subtraction>
              )}
@@ -2573,7 +2636,7 @@ export function RoomGeometry() {
                  <primitive object={ceilingGeom} attach="geometry" />
                </Base>
                {isLShape && (
-                  <Subtraction position={[w/2 - cutW/2 + 0.1, 0, d/2 - cutD/2 + 0.1]}>
+                  <Subtraction position={[cutSX * (w/2 - cutW/2 + 0.1), 0, cutSZ * (d/2 - cutD/2 + 0.1)]}>
                     <boxGeometry args={[cutW + 0.2, 0.02, cutD + 0.2]} />
                   </Subtraction>
                )}
@@ -3913,17 +3976,17 @@ export function RoomGeometry() {
       {/* Plan View Dimensions */}
       {isPlanView && (
         <group position={[0, baseH + 0.1, 0]}>
-          {/* Back Wall (Always full width w) */}
+          {/* Back Wall - full width unless the notch is in a back corner. */}
           <group position={[0, 0, -d/2 - Math.max(1.2, ohBack + 0.8)]}>
-            <Line points={[[-w/2, 0, 0], [w/2, 0, 0]]} color="#000" lineWidth={1} />
-            <Line points={[[-w/2, 0, -0.05], [-w/2, 0, 0.05]]} color="#000" lineWidth={1} />
-            <Line points={[[w/2, 0, -0.05], [w/2, 0, 0.05]]} color="#000" lineWidth={1} />
+            <Line points={[[spanBack[0], 0, 0], [spanBack[1], 0, 0]]} color="#000" lineWidth={1} />
+            <Line points={[[spanBack[0], 0, -0.05], [spanBack[0], 0, 0.05]]} color="#000" lineWidth={1} />
+            <Line points={[[spanBack[1], 0, -0.05], [spanBack[1], 0, 0.05]]} color="#000" lineWidth={1} />
             {room.showDimensions && (isPlanView) && (
               <DimText 
-                position={[0, 0, 0]} 
+                position={[(spanBack[0] + spanBack[1])/2, 0, 0]} 
                 rotation={[-Math.PI/2, 0, Math.PI]}
-                value={Math.round(w * 1000)}
-                onValueChange={isPlanView ? ((val: number) => useStore.getState().updateRoom({ widthMm: Math.max(10, val) })) : undefined}
+                value={Math.round((spanBack[1] - spanBack[0]) * 1000)}
+                onValueChange={isPlanView && !isLShape ? ((val: number) => useStore.getState().updateRoom({ widthMm: Math.max(10, val) })) : undefined}
               />
             )}
             {room.showDimensions && isPlanView && (
@@ -3934,17 +3997,17 @@ export function RoomGeometry() {
             )}
           </group>
 
-          {/* Left Wall (Always full depth d) */}
+          {/* Left Wall - full depth unless the notch is in a left corner. */}
           <group position={[-w/2 - Math.max(1.2, ohLeft + 0.8), 0, 0]}>
-            <Line points={[[0, 0, -d/2], [0, 0, d/2]]} color="#000" lineWidth={1} />
-            <Line points={[[-0.05, 0, -d/2], [0.05, 0, -d/2]]} color="#000" lineWidth={1} />
-            <Line points={[[-0.05, 0, d/2], [0.05, 0, d/2]]} color="#000" lineWidth={1} />
+            <Line points={[[0, 0, spanLeft[0]], [0, 0, spanLeft[1]]]} color="#000" lineWidth={1} />
+            <Line points={[[-0.05, 0, spanLeft[0]], [0.05, 0, spanLeft[0]]]} color="#000" lineWidth={1} />
+            <Line points={[[-0.05, 0, spanLeft[1]], [0.05, 0, spanLeft[1]]]} color="#000" lineWidth={1} />
             {room.showDimensions && (isPlanView) && (
               <DimText 
-                position={[0, 0, 0]} 
+                position={[0, 0, (spanLeft[0] + spanLeft[1])/2]} 
                 rotation={[-Math.PI/2, 0, -Math.PI/2]}
-                value={Math.round(d * 1000)}
-                onValueChange={isPlanView ? ((val: number) => useStore.getState().updateRoom({ depthMm: Math.max(10, val) })) : undefined}
+                value={Math.round((spanLeft[1] - spanLeft[0]) * 1000)}
+                onValueChange={isPlanView && !isLShape ? ((val: number) => useStore.getState().updateRoom({ depthMm: Math.max(10, val) })) : undefined}
               />
             )}
             {room.showDimensions && isPlanView && (
@@ -3959,15 +4022,15 @@ export function RoomGeometry() {
           {/* Beyond the deck AND beyond the opening chain (deck + 0.45), so
               the overall width never prints on top of the setting-out. */}
           <group position={[0, 0, d/2 + Math.max(1.2, deckFront + 1.3)]}>
-            <Line points={[[-w/2, 0, 0], [w/2 - (room.shape === 'LShape' ? cutW : 0), 0, 0]]} color="#000" lineWidth={1} />
-            <Line points={[[-w/2, 0, -0.05], [-w/2, 0, 0.05]]} color="#000" lineWidth={1} />
-            <Line points={[[w/2 - (room.shape === 'LShape' ? cutW : 0), 0, -0.05], [w/2 - (room.shape === 'LShape' ? cutW : 0), 0, 0.05]]} color="#000" lineWidth={1} />
+            <Line points={[[spanFront[0], 0, 0], [spanFront[1], 0, 0]]} color="#000" lineWidth={1} />
+            <Line points={[[spanFront[0], 0, -0.05], [spanFront[0], 0, 0.05]]} color="#000" lineWidth={1} />
+            <Line points={[[spanFront[1], 0, -0.05], [spanFront[1], 0, 0.05]]} color="#000" lineWidth={1} />
             {room.showDimensions && (isPlanView) && (
               <DimText 
-                position={[-(room.shape === 'LShape' ? cutW : 0)/2, 0, 0]} 
+                position={[(spanFront[0] + spanFront[1])/2, 0, 0]} 
                 rotation={[-Math.PI/2, 0, 0]}
-                value={Math.round((w - (room.shape === 'LShape' ? cutW : 0)) * 1000)}
-                onValueChange={isPlanView ? ((val: number) => { if (room.shape !== 'LShape') useStore.getState().updateRoom({ widthMm: Math.max(10, val) }); }) : undefined}
+                value={Math.round((spanFront[1] - spanFront[0]) * 1000)}
+                onValueChange={isPlanView && !isLShape ? ((val: number) => useStore.getState().updateRoom({ widthMm: Math.max(10, val) })) : undefined}
               />
             )}
             {room.showDimensions && isPlanView && (
@@ -3980,15 +4043,15 @@ export function RoomGeometry() {
 
           {/* Right Wall */}
           <group position={[w/2 + Math.max(1.2, ohRight + 0.8), 0, 0]}>
-            <Line points={[[0, 0, -d/2], [0, 0, d/2 - (room.shape === 'LShape' ? cutD : 0)]]} color="#000" lineWidth={1} />
-            <Line points={[[-0.05, 0, -d/2], [0.05, 0, -d/2]]} color="#000" lineWidth={1} />
-            <Line points={[[-0.05, 0, d/2 - (room.shape === 'LShape' ? cutD : 0)], [0.05, 0, d/2 - (room.shape === 'LShape' ? cutD : 0)]]} color="#000" lineWidth={1} />
+            <Line points={[[0, 0, spanRight[0]], [0, 0, spanRight[1]]]} color="#000" lineWidth={1} />
+            <Line points={[[-0.05, 0, spanRight[0]], [0.05, 0, spanRight[0]]]} color="#000" lineWidth={1} />
+            <Line points={[[-0.05, 0, spanRight[1]], [0.05, 0, spanRight[1]]]} color="#000" lineWidth={1} />
             {room.showDimensions && (isPlanView) && (
               <DimText 
-                position={[0, 0, -(room.shape === 'LShape' ? cutD : 0)/2]} 
+                position={[0, 0, (spanRight[0] + spanRight[1])/2]} 
                 rotation={[-Math.PI/2, 0, Math.PI/2]}
-                value={Math.round((d - (room.shape === 'LShape' ? cutD : 0)) * 1000)}
-                onValueChange={isPlanView ? ((val: number) => { if (room.shape !== 'LShape') useStore.getState().updateRoom({ depthMm: Math.max(10, val) }); }) : undefined}
+                value={Math.round((spanRight[1] - spanRight[0]) * 1000)}
+                onValueChange={isPlanView && !isLShape ? ((val: number) => useStore.getState().updateRoom({ depthMm: Math.max(10, val) })) : undefined}
               />
             )}
             {room.showDimensions && isPlanView && (
@@ -4002,8 +4065,13 @@ export function RoomGeometry() {
           {/* LShape Inner Walls */}
           {room.shape === 'LShape' && (
             <>
-              {/* Inner Front-facing wall (cutW width) */}
-              <group position={[w/2 - cutW/2, 0, d/2 - cutD + 0.3]}>
+              {/* The notch's own two walls, measured and draggable. The drag
+                  runs against the cut, so pulling the handle away from the
+                  building always makes the cut-out bigger whichever corner
+                  it sits in. Clamped to the same limits as the sidebar, so a
+                  drag can never take the cut past the far wall and leave a
+                  sliver the CSG cannot resolve. */}
+              <group position={[cutSX * (w/2 - cutW/2), 0, cutLineZ + cutSZ * 0.3]}>
                 <Line points={[[-cutW/2, 0, 0], [cutW/2, 0, 0]]} color="#000" lineWidth={1} />
                 <Line points={[[-cutW/2, 0, -0.05], [-cutW/2, 0, 0.05]]} color="#000" lineWidth={1} />
                 <Line points={[[cutW/2, 0, -0.05], [cutW/2, 0, 0.05]]} color="#000" lineWidth={1} />
@@ -4011,17 +4079,14 @@ export function RoomGeometry() {
                   position={[0, 0, 0]} 
                   rotation={[-Math.PI/2, 0, 0]}
                   value={Math.round(cutW * 1000)}
-                  onValueChange={(val: number) => useStore.getState().updateRoom({ lShapeCutoutWidthMm: Math.max(10, val) })}
+                  onValueChange={(val: number) => useStore.getState().updateRoom({ lShapeCutoutWidthMm: clampCutW(val) })}
                 />
                 {room.showDimensions && (
-                  <>
-                    <DragHandle position={[-cutW/2, 0, -0.3]} axis="x" label="Cutout" color="#ff8c00" onChange={(dx) => useStore.getState().updateRoom({ lShapeCutoutWidthMm: Math.max(100, Math.round(((useStore.getState().scene.room.lShapeCutoutWidthMm ?? 2000) - dx * 1000) / 100) * 100) })} />
-                  </>
+                  <DragHandle position={[-cutSX * cutW/2, 0, -cutSZ * 0.3]} axis="x" label="Cut-out" color="#ff8c00" onChange={(dx) => useStore.getState().updateRoom({ lShapeCutoutWidthMm: clampCutW(Math.round(((useStore.getState().scene.room.lShapeCutoutWidthMm ?? 2000) - cutSX * dx * 1000) / 100) * 100) })} />
                 )}
               </group>
 
-              {/* Inner Right-facing wall (cutD depth) */}
-              <group position={[w/2 - cutW + 0.3, 0, d/2 - cutD/2]}>
+              <group position={[cutLineX + cutSX * 0.3, 0, cutSZ * (d/2 - cutD/2)]}>
                 <Line points={[[0, 0, -cutD/2], [0, 0, cutD/2]]} color="#000" lineWidth={1} />
                 <Line points={[[-0.05, 0, -cutD/2], [0.05, 0, -cutD/2]]} color="#000" lineWidth={1} />
                 <Line points={[[-0.05, 0, cutD/2], [0.05, 0, cutD/2]]} color="#000" lineWidth={1} />
@@ -4029,12 +4094,10 @@ export function RoomGeometry() {
                   position={[0, 0, 0]} 
                   rotation={[-Math.PI/2, 0, Math.PI/2]}
                   value={Math.round(cutD * 1000)}
-                  onValueChange={(val: number) => useStore.getState().updateRoom({ lShapeCutoutDepthMm: Math.max(10, val) })}
+                  onValueChange={(val: number) => useStore.getState().updateRoom({ lShapeCutoutDepthMm: clampCutD(val) })}
                 />
                 {room.showDimensions && (
-                  <>
-                    <DragHandle position={[-0.3, 0, -cutD/2]} axis="z" label="Cutout" color="#ff8c00" onChange={(dz) => useStore.getState().updateRoom({ lShapeCutoutDepthMm: Math.max(100, Math.round(((useStore.getState().scene.room.lShapeCutoutDepthMm ?? 1500) - dz * 1000) / 100) * 100) })} />
-                  </>
+                  <DragHandle position={[-cutSX * 0.3, 0, -cutSZ * cutD/2]} axis="z" label="Cut-out" color="#ff8c00" onChange={(dz) => useStore.getState().updateRoom({ lShapeCutoutDepthMm: clampCutD(Math.round(((useStore.getState().scene.room.lShapeCutoutDepthMm ?? 1500) - cutSZ * dz * 1000) / 100) * 100) })} />
                 )}
               </group>
             </>
@@ -4073,12 +4136,16 @@ export function RoomGeometry() {
             let startEdge = -totalLen / 2;
             let endEdge = totalLen / 2;
 
-            // Adjust LShape cutout boundaries so dimensions don't overlap empty space
+            // The notch eats the end of two elevations, so their opening
+            // chains must stop at it rather than run on over the recess.
+            // Which two, and which end, follow the cut-out's corner - the
+            // right wall's limit used to be taken off its BACK end for a
+            // cut at the FRONT, which dimensioned straight through the gap.
             if (room.shape === 'LShape') {
-              if (wall === 'front') {
-                endEdge = w/2 - cutW; // Only measure to the cutout
-              } else if (wall === 'right') {
-                startEdge = -d/2 + cutD; // Only measure past cutout
+              if (wall === (cutSZ > 0 ? 'front' : 'back')) {
+                if (cutSX > 0) endEdge = w/2 - cutW; else startEdge = -w/2 + cutW;
+              } else if (wall === (cutSX > 0 ? 'right' : 'left')) {
+                if (cutSZ > 0) endEdge = d/2 - cutD; else startEdge = -d/2 + cutD;
               }
             }
 

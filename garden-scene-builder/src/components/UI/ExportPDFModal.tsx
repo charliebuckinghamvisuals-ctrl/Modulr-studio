@@ -427,6 +427,10 @@ export function ExportPDFModal({ onClose }: { onClose: () => void }) {
       }
       if (scene.room.lShapeCutoutWidthMm && !['Box', 'Quba', 'Gable'].includes(scene.room.shape as string)) {
         leftY = specRow('Cutout width', `${scene.room.lShapeCutoutWidthMm} mm`, M, leftY, colW);
+        leftY = specRow('Cutout depth', `${scene.room.lShapeCutoutDepthMm ?? 1500} mm`, M, leftY, colW);
+        // Which corner it comes out of is half the drawing - a builder
+        // reading "2500 x 2000 cut-out" has no idea which end it is at.
+        leftY = specRow('Cutout corner', (scene.room.lShapeCutoutCorner ?? 'front-right').replace('-', ' '), M, leftY, colW);
       }
 
       const rightX = M + colW + colGap;

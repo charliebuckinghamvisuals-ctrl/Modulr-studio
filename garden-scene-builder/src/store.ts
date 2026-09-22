@@ -349,6 +349,7 @@ const initialState: SceneState = {
     partitions: [],
     lShapeCutoutWidthMm: 2000,
     lShapeCutoutDepthMm: 1500,
+    lShapeCutoutCorner: 'front-right',
     hasPictureFrame: false,
   },
   objects: [],

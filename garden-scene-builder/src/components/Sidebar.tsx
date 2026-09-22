@@ -15,6 +15,7 @@ import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS, INTERIOR_DOOR_STYLES } from '../mo
 import { describeExteriorLights, describeInterior, describePlanItems } from '../utils/placement';
 import { cropToInk } from '../utils/renderInputs';
 import { DOOR_KINDS, LEAF_RANGE, doorKind, clampLeaves, changesForKind } from '../utils/doors';
+import { clampCutoutWidthMm, clampCutoutDepthMm } from '../utils/lshape';
 import type { DoorKind } from '../types';
 import { MATERIAL_DEF, resolveDeckingKey } from '../utils/materials';
 
@@ -374,8 +375,8 @@ export function Sidebar() {
                   4ab526b): "once we have L shapes that's pretty much the most
                   popular shapes we have". Flat roof only for now - a gable
                   over an L needs two ridges or a hip, which is its own job,
-                  so the button is shown but disabled under a gable. The
-                  cutout is taken out of the front-right corner. */}
+                  so the button is shown but disabled under a gable. Which
+                  corner the cut-out comes out of is the customer's, below. */}
               <div className="mt-3">
                 <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Footprint</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -400,18 +401,58 @@ export function Sidebar() {
                   <p className="text-[10px] text-gray-400 mt-1.5">L-shape is flat roof only for now.</p>
                 )}
                 {room.shape === 'LShape' && (
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-3 space-y-3">
+                    {/* Which corner. It was welded to the front-right, which
+                        is the wrong one on half of all plots. The tiles are
+                        laid out as the plan reads - back along the top, the
+                        garden side along the bottom - so the one you click
+                        is the shape you get. */}
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Cut-out corner</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['back-left', 'back-right', 'front-left', 'front-right'] as const).map((corner) => {
+                          const active = (room.lShapeCutoutCorner ?? 'front-right') === corner;
+                          const left = corner.endsWith('left');
+                          const back = corner.startsWith('back');
+                          // A 24x20 footprint with a 9x7 notch out of the
+                          // named corner; z runs back (top) to front (bottom).
+                          const x0 = 2, x1 = 22, z0 = 2, z1 = 18;
+                          const nx = left ? x0 + 9 : x1 - 9;
+                          const nz = back ? z0 + 7 : z1 - 7;
+                          const pts = back
+                            ? (left ? [[nx, z0], [x1, z0], [x1, z1], [x0, z1], [x0, nz], [nx, nz]]
+                                    : [[x0, z0], [nx, z0], [nx, nz], [x1, nz], [x1, z1], [x0, z1]])
+                            : (left ? [[x0, z0], [x1, z0], [x1, z1], [nx, z1], [nx, nz], [x0, nz]]
+                                    : [[x0, z0], [x1, z0], [x1, nz], [nx, nz], [nx, z1], [x0, z1]]);
+                          return (
+                            <button
+                              key={corner}
+                              onClick={() => updateRoom({ lShapeCutoutCorner: corner })}
+                              className={`flex items-center gap-2 px-2.5 py-2 rounded-xl transition-all ${active ? 'bg-[#3b4d4a] text-white shadow-md' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}
+                            >
+                              <svg width="24" height="20" viewBox="0 0 24 20" aria-hidden="true">
+                                <polygon points={pts.map(p => p.join(',')).join(' ')} fill="currentColor" opacity={0.85} />
+                              </svg>
+                              <span className="text-[10px] font-semibold tracking-wide capitalize">{corner.replace('-', ' ')}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-medium text-gray-600 w-28">Cut-out width</span>
-                      <DeferredInput type="number" step={100} value={room.lShapeCutoutWidthMm ?? 2000} onChange={(e) => updateRoom({ lShapeCutoutWidthMm: Math.max(100, Math.min(room.widthMm - 400, parseInt(e.target.value) || 0)) })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
+                      <DeferredInput type="number" step={100} value={room.lShapeCutoutWidthMm ?? 2000} onChange={(e) => updateRoom({ lShapeCutoutWidthMm: clampCutoutWidthMm(room, parseInt(e.target.value) || 0) })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
                       <span className="text-[10px] text-gray-400">mm</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-medium text-gray-600 w-28">Cut-out depth</span>
-                      <DeferredInput type="number" step={100} value={room.lShapeCutoutDepthMm ?? 1500} onChange={(e) => updateRoom({ lShapeCutoutDepthMm: Math.max(100, Math.min(room.depthMm - 400, parseInt(e.target.value) || 0)) })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
+                      <DeferredInput type="number" step={100} value={room.lShapeCutoutDepthMm ?? 1500} onChange={(e) => updateRoom({ lShapeCutoutDepthMm: clampCutoutDepthMm(room, parseInt(e.target.value) || 0) })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
                       <span className="text-[10px] text-gray-400">mm</span>
                     </div>
-                    <p className="text-[10px] text-gray-400">Taken out of the front-right corner. Drag the cut-out's own handles in Plan View.</p>
+                    <p className="text-[10px] text-gray-400">
+                      Leaves {Math.round(room.widthMm - clampCutoutWidthMm(room, room.lShapeCutoutWidthMm ?? 2000))} x {Math.round(room.depthMm)} mm and {Math.round(clampCutoutWidthMm(room, room.lShapeCutoutWidthMm ?? 2000))} x {Math.round(room.depthMm - clampCutoutDepthMm(room, room.lShapeCutoutDepthMm ?? 1500))} mm of room.
+                      Both figures are draggable in Plan View.
+                    </p>
                   </div>
                 )}
               </div>
