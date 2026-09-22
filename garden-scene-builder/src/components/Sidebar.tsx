@@ -708,7 +708,7 @@ export function Sidebar() {
                             return (
                               <div
                                 key={cladding.id}
-                                onClick={() => updateRoom({ [field.key]: cladding.id })}
+                                onClick={() => updateRoom({ [field.key]: cladding.id, ...(def.horizontalOnly ? { claddingOrientation: 'horizontal' } : {}) })}
                                 className={`w-7 h-7 rounded-md cursor-pointer transition-all overflow-hidden ${isActive ? 'ring-2 ring-[#3b4d4a] ring-offset-1 shadow-sm scale-110' : 'ring-1 ring-black/10 hover:scale-105'}`}
                                 title={cladding.name}
                                 style={{ backgroundImage: `url(${img})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: tint, backgroundBlendMode: 'multiply' }}
@@ -716,9 +716,10 @@ export function Sidebar() {
                             );
                           })}
                         </div>
-                        {/* Painted boards take any colour: the paint is the
-                            room's claddingTint, shared by every face using it. */}
-                        {((field.key === 'cladding' ? room.cladding : (room as any)[field.key]) === 'painted_planks') && (
+                        {/* Tintable claddings (painted boards, timber siding) take
+                            any colour: the paint is the room's claddingTint,
+                            shared by every face using one. */}
+                        {(MATERIAL_DEF as any)[(field.key === 'cladding' ? room.cladding : (room as any)[field.key]) as string]?.tintable && (
                           <div className="flex items-center gap-2 pt-1">
                             <span className="text-[10px] font-medium text-gray-500">Paint</span>
                             <input type="color" value={room.claddingTint || '#e8e6e1'} onChange={(e) => updateRoom({ claddingTint: e.target.value })} className="w-7 h-7 rounded-md cursor-pointer border-0 shadow-sm overflow-hidden" title="Paint colour" />
