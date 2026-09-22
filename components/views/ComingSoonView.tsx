@@ -248,7 +248,7 @@ export const ComingSoonView: React.FC<ComingSoonViewProps> = ({ onUnlockSuccess 
                         <div className="p-4 rounded-2xl bg-white/60 border border-[#405a56]/10 space-y-1">
                             <div className="flex items-center gap-2 text-[#405a56] text-xs font-bold uppercase tracking-wider">
                                 <Layers size={12} />
-                                <span>Material Studio</span>
+                                <span>Material Editor</span>
                             </div>
                             <p className="text-[11px] text-slate-500 leading-tight">AI cladding, timber, brick, and finish swapping.</p>
                         </div>

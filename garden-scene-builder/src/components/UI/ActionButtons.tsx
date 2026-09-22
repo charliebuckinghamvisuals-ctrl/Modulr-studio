@@ -44,6 +44,8 @@ export function ActionButtons() {
               className="w-24 accent-[#3b4d4a] cursor-pointer"
             />
           </div>
+          {/* Rendering is imported from the Cameras panel (UI/CameraPanel.tsx),
+              in 3D and walk views alike, 21 Sep 2026. */}
           <button
             onClick={handleSaveDesign}
             className="bg-white/90 backdrop-blur-md text-[#3b4d4a] border border-[#3b4d4a]/20 px-6 py-3 rounded-full font-semibold shadow-md hover:bg-[#3b4d4a] hover:text-white transition-all flex items-center gap-2 text-sm cursor-pointer"

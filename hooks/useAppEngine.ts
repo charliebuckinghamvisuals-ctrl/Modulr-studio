@@ -42,7 +42,7 @@ export const compressImageFile = (file: File, maxWidth = 1920): Promise<string> 
     });
 };
 
-/** The surface label each Material Studio category is segmented under. */
+/** The surface label each Material Editor category is segmented under. */
 const MATERIAL_SEGMENT_LABELS = {
     walls: 'cladding',
     roof: 'roof',
@@ -126,7 +126,10 @@ export const useAppEngine = () => {
     const [editorImage, setEditorImage] = useState<string | null>(null);
     const [lineEnvironmentImage, setLineEnvironmentImage] = useState<string | null>(null);
     const [finalImage, setFinalImage] = useState<string | null>(null);
-    const [materialStudioImage, setMaterialStudioImage] = useState<string | null>(null);
+    /** Detail Studio result: the 2x2 sheet or the single camera shot. */
+    const [detailStudioImage, setDetailStudioImage] = useState<string | null>(null);
+    /** Material Editor result: the source with only the changed surfaces repainted. */
+    const [materialEditorImage, setMaterialEditorImage] = useState<string | null>(null);
 
     // Batch Rendering State
     const [batchImages, setBatchImages] = useState<string[]>([]);
@@ -165,11 +168,13 @@ export const useAppEngine = () => {
     const [renderSpec, setRenderSpec] = useState<Record<string, unknown> | null>(null);
     const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
     const [isSurveying, setIsSurveying] = useState(false);
-    const [sceneSetting, setSceneSetting] = useState<SceneSetting>({ preset: 'uk-residential', time: 'afternoon', text: '' });
+    // Default is the golden-hour summer shot (Charlie, 21 Sep 2026): evening
+    // sun, lights on, clear sky - the magazine cover.
+    const [sceneSetting, setSceneSetting] = useState<SceneSetting>({ preset: 'uk-residential', time: 'evening', weather: 'summer', text: '' });
     const [isBatchMode, setIsBatchMode] = useState(false);
     const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
     const [isAnalyzingMaterials, setIsAnalyzingMaterials] = useState(false);
-    /** Material Studio masked edit: what the analysis found (a change is
+    /** Material Editor masked edit: what the analysis found (a change is
      *  detected against it), one mask per surface, the free instruction, and
      *  a tinted preview of exactly which pixels the next Apply may touch. */
     const [detectedMaterials, setDetectedMaterials] = useState<MaterialConfig | null>(null);
@@ -182,12 +187,15 @@ export const useAppEngine = () => {
     const [selectedAngle, setSelectedAngle] = useState<string>('Front');
 
     /**
-     * Material Studio operates in one of two modes, chosen after upload:
-     *   'closeup' - the original 2x2 macro detail sheet
-     *   'change' - detect the building's materials and swap them
-     * null means an image is loaded but the user hasn't chosen yet.
+     * Detail Studio operates in one of two modes, chosen after upload:
+     *   'closeup' - the 2x2 macro detail sheet (four focal points)
+     *   'shots'   - one suggested camera shot (21 Sep 2026)
+     * null means an image is loaded but the user hasn't chosen yet. The
+     * masked material edit used to be a third mode here; it is its own tool
+     * now (Material Editor, 21 Sep 2026) and needs no mode - it analyses on
+     * upload.
      */
-    const [materialStudioMode, setMaterialStudioMode] = useState<'closeup' | 'change' | null>(null);
+    const [detailStudioMode, setDetailStudioMode] = useState<'closeup' | 'shots' | null>(null);
 
     // Typed as MaterialConfig so the optional `orientation` field is part of the
     // state's type. Without the annotation TypeScript inferred a narrower shape
@@ -312,7 +320,10 @@ export const useAppEngine = () => {
     };
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    /** Uploads that target a specific tool from another page (Home, the
+     *  mode pickers). Each lands its file on its own tool's stage. */
     const materialInputRef = useRef<HTMLInputElement>(null);
+    const materialEditorInputRef = useRef<HTMLInputElement>(null);
 
     /**
      * Empty the workspace but stay where you are.
@@ -334,7 +345,9 @@ export const useAppEngine = () => {
         setRenderedImage(null);
         setEditorImage(null);
         setFinalImage(null);
-        setMaterialStudioImage(null);
+        setDetailStudioImage(null);
+        setMaterialEditorImage(null);
+        setDetectedMaterials(null); setMaterialMasks({}); setMaterialPrompt(''); setMaterialMaskPreview(null);
         setBatchImages([]);
         setBatchRenders([]);
         setBatchMaterials([]);
@@ -349,6 +362,7 @@ export const useAppEngine = () => {
 
         if (fileInputRef.current) fileInputRef.current.value = '';
         if (materialInputRef.current) materialInputRef.current.value = '';
+        if (materialEditorInputRef.current) materialEditorInputRef.current.value = '';
     };
 
     /** Clear everything AND leave the tool - what the header's Start Over does. */
@@ -357,10 +371,10 @@ export const useAppEngine = () => {
         setActiveStage(AppStage.HOME);
     };
 
-    const handleAnalyzeForMaterialStudio = async (image: string) => {
-        setProcessing({ isLoading: true, message: 'Analyzing material details...' });
+    const handleAnalyzeForDetailStudio = async (image: string, kind: 'materials' | 'shots' = 'materials') => {
+        setProcessing({ isLoading: true, message: kind === 'shots' ? 'Reading the render for the shots worth taking...' : 'Analyzing material details...' });
         try {
-            const details = await analyzeExteriorDetails(image);
+            const details = await analyzeExteriorDetails(image, kind);
             setDetectedDetails(details);
             setSelectedDetails([]); // Reset selection
         } catch (error) {
@@ -485,7 +499,8 @@ export const useAppEngine = () => {
                 setRenderedImage(null);
                 setEditorImage(null);
                 setFinalImage(null);
-                setMaterialStudioImage(null);
+                setDetailStudioImage(null);
+                setMaterialEditorImage(null);
                 setDetectedDetails([]);
                 setSelectedDetails([]);
 
@@ -493,13 +508,16 @@ export const useAppEngine = () => {
 
                 if (targetStage === AppStage.LINE_CONVERT) {
                     setLineSourceImage(base64Data);
-                } else if (targetStage === AppStage.MATERIAL_STUDIO) {
-                    // Do NOT analyse yet. Material Studio now has two modes, and
-                    // they need different analyses - close-up detail extraction
-                    // vs. component material detection. Running one on upload
-                    // would waste a call and a credit whenever the user picked
-                    // the other. The view prompts for a mode first.
-                    setMaterialStudioMode(null);
+                } else if (targetStage === AppStage.DETAIL_STUDIO) {
+                    // Do NOT analyse yet. Detail Studio has two modes and they
+                    // need different analyses - focal-point extraction vs.
+                    // shot suggestions. Running one on upload would waste a
+                    // call whenever the user picked the other. The view
+                    // prompts for a mode first.
+                    setDetailStudioMode(null);
+                } else if (targetStage === AppStage.MATERIAL_EDITOR) {
+                    // One job, no mode to choose: find the surfaces straight away.
+                    await analyseForMaterialEditor(base64Data);
                 } else if (targetStage === AppStage.RENDER_ENGINE) {
                     setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
                     // Always auto-detect materials - works for photos, B&W line drawings, and SketchUp models
@@ -622,12 +640,14 @@ export const useAppEngine = () => {
     };
 
     const toggleDetailSelection = (detail: string) => {
+        // Camera shots: one at a time, a new pick replaces the last. Material
+        // close-up: up to four focal points for the 2x2 sheet (21 Sep 2026).
         if (selectedDetails.includes(detail)) {
             setSelectedDetails(selectedDetails.filter(d => d !== detail));
-        } else {
-            if (selectedDetails.length < 4) {
-                setSelectedDetails([...selectedDetails, detail]);
-            }
+        } else if (detailStudioMode === 'shots') {
+            setSelectedDetails([detail]);
+        } else if (selectedDetails.length < 4) {
+            setSelectedDetails([...selectedDetails, detail]);
         }
     };
 
@@ -1032,26 +1052,30 @@ export const useAppEngine = () => {
     };
 
     /**
-     * Commit to a Material Studio mode and run the analysis that mode needs.
+     * Commit to a Detail Studio mode and run the analysis that mode needs.
      *
      * 'closeup' extracts architectural focal points for the 2x2 detail sheet.
-     * 'change'  detects the building's existing components (walls, roof,
-     *           windows, doors, decking) so each can be swapped - the same
-     *           analysis the Render Engine uses.
+     * 'shots'   asks for the close-up photographs worth taking of the render.
      */
-    const startMaterialStudioMode = async (mode: 'closeup' | 'change') => {
-        const source = stageImages[AppStage.MATERIAL_STUDIO];
+    const startDetailStudioMode = async (mode: 'closeup' | 'shots') => {
+        const source = stageImages[AppStage.DETAIL_STUDIO];
         if (!source) return;
 
-        setMaterialStudioMode(mode);
-        setMaterialStudioImage(null);
+        setDetailStudioMode(mode);
+        setDetailStudioImage(null);
+        setDetectedDetails([]);
+        setSelectedDetails([]);
+        await handleAnalyzeForDetailStudio(source, mode === 'shots' ? 'shots' : 'materials');
+    };
 
-        if (mode === 'closeup') {
-            setDetectedDetails([]);
-            setSelectedDetails([]);
-            await handleAnalyzeForMaterialStudio(source);
-            return;
-        }
+    /**
+     * Material Editor: detect the building's existing components (walls,
+     * roof, windows, doors, decking) so each can be swapped - the same
+     * analysis the Render Engine uses - and map where each one is. Runs on
+     * upload; the tool has no mode to pick.
+     */
+    const analyseForMaterialEditor = async (source: string) => {
+        setMaterialEditorImage(null);
         setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
         setDetectedMaterials(null); setMaterialMasks({}); setMaterialPrompt(''); setMaterialMaskPreview(null);
         setProcessing({ isLoading: true, message: 'Analysing the building’s materials...' });
@@ -1098,8 +1122,8 @@ export const useAppEngine = () => {
      * the user sees the mask before spending a credit on it.
      */
     useEffect(() => {
-        const source = stageImages[AppStage.MATERIAL_STUDIO];
-        if (!source || materialStudioMode !== 'change' || !detectedMaterials) { setMaterialMaskPreview(null); return; }
+        const source = stageImages[AppStage.MATERIAL_EDITOR];
+        if (!source || !detectedMaterials) { setMaterialMaskPreview(null); return; }
         const keys = changedMaterialKeys();
         const masks = keys.map(k => materialMasks[k]).filter(Boolean) as MaskCanvas[];
         if (!masks.length) { setMaterialMaskPreview(null); return; }
@@ -1113,7 +1137,7 @@ export const useAppEngine = () => {
         })();
         return () => { alive = false; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [materials, detectedMaterials, materialMasks, materialStudioMode]);
+    }, [materials, detectedMaterials, materialMasks, stageImages]);
 
     /**
      * Apply the material changes as TRUE masked edits.
@@ -1123,8 +1147,8 @@ export const useAppEngine = () => {
      * mask of whatever it names. Nothing outside a mask is ever touched - the
      * photograph is never re-rendered. See services/maskedEdit for how.
      */
-    const handleMaterialStudioApply = async () => {
-        const source = stageImages[AppStage.MATERIAL_STUDIO];
+    const handleMaterialEditorApply = async () => {
+        const source = stageImages[AppStage.MATERIAL_EDITOR];
         if (!source) return;
         const keys = changedMaterialKeys();
         const instruction = materialPrompt.trim();
@@ -1158,10 +1182,10 @@ export const useAppEngine = () => {
             }
             if (current === source) throw new Error('Nothing could be changed - no surface was mapped.');
 
-            trackFeatureUsage('material_studio_change');
-            setMaterialStudioImage(current);
+            trackFeatureUsage('material_editor');
+            setMaterialEditorImage(current);
             await saveToHistory({
-                stage: AppStage.MATERIAL_STUDIO,
+                stage: AppStage.MATERIAL_EDITOR,
                 image: current,
                 originalImage: source,
                 prompt: [...keys.map(k => `${MATERIAL_SEGMENT_LABELS[k as keyof typeof MATERIAL_SEGMENT_LABELS]} -> ${(materials as any)[k]}`), instruction].filter(Boolean).join('; ') || 'Material change',
@@ -1175,7 +1199,7 @@ export const useAppEngine = () => {
         }
     };
 
-    const handleMaterialStudio = async (sourceImg?: string | null) => {
+    const handleDetailStudio = async (sourceImg?: string | null) => {
         /**
          * Only a string counts as a source image.
          *
@@ -1192,16 +1216,17 @@ export const useAppEngine = () => {
         const explicit = typeof sourceImg === 'string' ? sourceImg : null;
         const targetImage = explicit || originalImage;
         if (!targetImage) return;
-        if (selectedDetails.length !== 4) return;
+        const isShot = detailStudioMode === 'shots';
+        if (selectedDetails.length !== (isShot ? 1 : 4)) return;
 
-        setProcessing({ isLoading: true, message: 'Generating Material Sheet (2x2 Grid)...' });
+        setProcessing({ isLoading: true, message: isShot ? 'Taking the shot: same building, same light, framed closer...' : 'Generating Material Sheet (2x2 Grid)...' });
         try {
             const result = await generatePresentationBoard(targetImage, selectedDetails, isHighQuality, isProMode);
-            trackFeatureUsage('material_studio');
-            setMaterialStudioImage(result);
+            trackFeatureUsage('detail_studio');
+            setDetailStudioImage(result);
 
             await saveToHistory({
-                stage: AppStage.MATERIAL_STUDIO,
+                stage: AppStage.DETAIL_STUDIO,
                 image: result,
                 originalImage: targetImage,
                 prompt: 'Generated Architecture Detailed Callouts',
@@ -1209,7 +1234,7 @@ export const useAppEngine = () => {
             });
             window.dispatchEvent(new Event('aiarchviz-history-updated'));
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to generate Material Studio board');
+            toast.error(error instanceof Error ? error.message : 'Failed to generate the detail sheet');
         } finally {
             setProcessing({ isLoading: false, message: '' });
         }
@@ -1218,7 +1243,7 @@ export const useAppEngine = () => {
     return {
         renderLineImage, setRenderLineImage, renderSpec, inventoryItems, setInventoryItems, updateInventoryItem, updateInventoryFinish, removeInventoryItem, isSurveying, sceneSetting, setSceneSetting, loadConfiguratorScene,
         activeStage, setActiveStage,
-        originalImage, setOriginalImage, setOriginalImageForStage, lineImage, setLineImage, lineSourceImage, setLineSourceImage, renderedImage, setRenderedImage, editorImage, setEditorImage, lineEnvironmentImage, setLineEnvironmentImage, finalImage, setFinalImage, materialStudioImage, setMaterialStudioImage,
+        originalImage, setOriginalImage, setOriginalImageForStage, lineImage, setLineImage, lineSourceImage, setLineSourceImage, renderedImage, setRenderedImage, editorImage, setEditorImage, lineEnvironmentImage, setLineEnvironmentImage, finalImage, setFinalImage, detailStudioImage, setDetailStudioImage, materialEditorImage, setMaterialEditorImage,
         batchImages, setBatchImages, batchRenders, setBatchRenders, batchMaterials, setBatchMaterials,
         detectedDetails, setDetectedDetails, selectedDetails, setSelectedDetails, toggleDetailSelection,
         processing,
@@ -1232,7 +1257,7 @@ export const useAppEngine = () => {
         materials, setMaterials,
         isAnalyzingMaterials,
         weather, setWeather,
-        fileInputRef, materialInputRef,
+        fileInputRef, materialInputRef, materialEditorInputRef,
         handleReset, clearWorkspace, handleImageUpload, handleBatchImageUpload, handleDownload,
         handleExport4K, isExporting4K,
         refinementPrompt, setRefinementPrompt,
@@ -1245,8 +1270,8 @@ export const useAppEngine = () => {
         studioBackground, setStudioBackground, selectedAngle, setSelectedAngle,
         materialLibrary, addToLibrary, removeFromLibrary,
         activeProfileId, setActiveProfileId,
-        handleGenerateLineDrawing, handleAnalyzeMaterials, handleRender, handleBatchRender, handleRefineRender, handleEditImage, handleWeather, handleMaterialStudio, handleAnalyzeForEditor, handleAnalyzeForMaterialStudio, handleAnalyzeForRenderEngine,
-        materialStudioMode, setMaterialStudioMode, startMaterialStudioMode, handleMaterialStudioApply,
+        handleGenerateLineDrawing, handleAnalyzeMaterials, handleRender, handleBatchRender, handleRefineRender, handleEditImage, handleWeather, handleDetailStudio, handleAnalyzeForEditor, handleAnalyzeForDetailStudio, handleAnalyzeForRenderEngine,
+        detailStudioMode, setDetailStudioMode, startDetailStudioMode, handleMaterialEditorApply,
         detectedMaterials, materialMasks, materialPrompt, setMaterialPrompt, materialMaskPreview,
         handleSlotImageUpload,
         getRenderUrl

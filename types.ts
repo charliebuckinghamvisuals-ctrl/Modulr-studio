@@ -6,7 +6,12 @@ export enum AppStage {
   STUDIO = 'studio',
   EDITOR = 'editor',
   WEATHER_LAB = 'weather_lab',
-  MATERIAL_STUDIO = 'material_studio',
+  /** Detail Studio (was Material Studio until 21 Sep 2026): close-up material
+   *  sheets and camera shots of a finished render. */
+  DETAIL_STUDIO = 'detail_studio',
+  /** Material Editor: the masked material edit, split out of Material Studio
+   *  on 21 Sep 2026 so it stands as its own tool. */
+  MATERIAL_EDITOR = 'material_editor',
   PRICING = 'pricing',
   ABOUT = 'about',
   GUIDE = 'guide',

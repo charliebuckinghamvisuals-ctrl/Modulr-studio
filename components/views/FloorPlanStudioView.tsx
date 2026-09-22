@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { drawCadPlan } from '../../services/cadPlan';
 import { toast } from 'react-hot-toast';
 import { LayoutGrid, Upload, Loader2, Lock, Download, RotateCcw, Ruler, Image as ImageIcon, CheckCircle2, AlertTriangle, FolderOpen, Box } from 'lucide-react';
 import { Button } from '../Button';
@@ -124,6 +125,26 @@ export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavi
         setBusy(true);
         setResult(null);
         try {
+            /**
+             * A CAD plan of a configurator design is DRAWN, not rendered
+             * (21 Sep 2026): every wall, opening, partition and figure comes
+             * straight from the design data (services/cadPlan.ts), so the
+             * dimensions are exact and nothing is spent. Uploads, which have
+             * no data behind them, still go to the engine.
+             */
+            if (which === 'cad' && source.kind === 'configurator' && source.spec) {
+                const t0 = Date.now();
+                const image = await drawCadPlan(source.spec as any, { notes: notes.trim() || undefined });
+                setResult({
+                    image, mode: 'cad', items, inventoryText: '',
+                    engine: { finish: 'drawn', shipped: 'drawn', lineSource: 'configurator', inventorySource: 'spec' },
+                    verification: { checked: true, passed: true, failures: [] },
+                    seconds: Math.max(1, Math.round((Date.now() - t0) / 1000)),
+                });
+                setMode('cad');
+                toast.success('CAD plan drawn from the design');
+                return;
+            }
             const r = await generateFloorPlan({
                 shaded: source.shaded, line: source.line, spec: source.spec,
                 items: source.kind === 'upload' ? items : undefined,
@@ -304,7 +325,7 @@ export const FloorPlanStudioView: React.FC<FloorPlanStudioViewProps> = ({ onNavi
                                 disabled={!source || busy || surveying}
                                 className="w-full py-4 text-sm"
                             >
-                                {busy ? <span className="inline-flex items-center gap-2"><Loader2 className="animate-spin" size={16} /> Drawing…</span> : `Generate ${mode === 'cad' ? 'CAD plan' : 'rendered plan'} · 1 render`}
+                                {busy ? <span className="inline-flex items-center gap-2"><Loader2 className="animate-spin" size={16} /> Drawing…</span> : mode === 'cad' && source?.kind === 'configurator' ? 'Draw CAD plan · exact, no render used' : `Generate ${mode === 'cad' ? 'CAD plan' : 'rendered plan'} · 1 render`}
                             </Button>
                         </div>
 

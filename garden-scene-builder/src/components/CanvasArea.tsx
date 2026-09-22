@@ -14,6 +14,7 @@ import { WalkFloorPanel } from './UI/WalkFloorPanel';
 import { WalkWallPanel } from './UI/WalkWallPanel';
 import { WalkFramePanel } from './UI/WalkFramePanel';
 import { WalkDoorPanel } from './UI/WalkDoorPanel';
+import { CameraPanel } from './UI/CameraPanel';
 import { useRef, useState, useEffect } from 'react';
 import { useProgress } from '@react-three/drei';
 import * as THREE from 'three';
@@ -137,6 +138,10 @@ export function CanvasArea() {
     e.preventDefault();
   };
 
+  // Camera mode (21 Sep 2026): every overlay but the camera panel and the
+  // walk panels goes, so the view is the whole screen.
+  const cameraMode = useStore(s => s.cameraMode);
+
   return (
     <div 
       className="absolute inset-0 w-full h-full" 
@@ -174,19 +179,28 @@ export function CanvasArea() {
           <span className="opacity-60">R rotate · Esc cancel</span>
         </div>
       )}
-      <ViewModeToggle />
-      <LightingPanel />
-      <CameraWidget />
-      <HistoryButtons />
-      <PricePill />
+      {!cameraMode && (
+        <>
+          <ViewModeToggle />
+          <LightingPanel />
+          <CameraWidget />
+          <HistoryButtons />
+          <PricePill />
+        </>
+      )}
       <WalkHud />
       <WalkFloorPanel />
       <WalkWallPanel />
       <WalkFramePanel />
       <WalkDoorPanel />
-      <ObjectEditorPanel />
-      <ElementEditorPanel />
-      <ActionButtons />
+      {!cameraMode && (
+        <>
+          <ObjectEditorPanel />
+          <ElementEditorPanel />
+        </>
+      )}
+      <CameraPanel />
+      {!cameraMode && <ActionButtons />}
       <LoadingScreen />
     </div>
   );

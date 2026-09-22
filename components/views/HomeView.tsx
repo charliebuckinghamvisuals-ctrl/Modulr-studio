@@ -51,7 +51,8 @@ const TOOLS: { label: string; line: string; stage: AppStage; badge?: string }[] 
     { label: 'Render Engine', line: 'Pro-level CGI from the design', stage: AppStage.RENDER_ENGINE },
     { label: 'Floor Plan Studio', line: 'Rendered and CAD plans', stage: AppStage.FLOOR_PLAN_STUDIO, badge: 'Coming soon' },
     { label: 'Animation Studio', line: 'A render, brought to life', stage: AppStage.ANIMATION_STUDIO, badge: 'Coming soon' },
-    { label: 'Material Studio', line: 'Swap any surface, honestly', stage: AppStage.MATERIAL_STUDIO },
+    { label: 'Detail Studio', line: 'The finish, up close', stage: AppStage.DETAIL_STUDIO },
+    { label: 'Material Editor', line: 'Swap any surface, honestly', stage: AppStage.MATERIAL_EDITOR },
     { label: 'Weather Lab', line: 'Same scheme, any season', stage: AppStage.WEATHER_LAB },
     { label: 'Projects', line: 'One job, one place, one link', stage: AppStage.PROJECTS },
     { label: 'Planning Checker', line: 'Will it need permission?', stage: AppStage.PLANNING_CHECKER, badge: 'Free' },
@@ -61,7 +62,6 @@ const SHOWCASE = ['/gallery-6.jpg', '/gallery-5.jpg', '/gallery-9.jpg', '/galler
 
 interface HomeViewProps {
     onOpenEngine: () => void;
-    onOpenMaterialStudio: () => void;
     onNavigate?: (stage: AppStage) => void;
 }
 

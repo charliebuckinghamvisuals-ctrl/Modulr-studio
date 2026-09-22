@@ -46,3 +46,9 @@ ds-bundle/
 .design-sync/learnings/
 .design-sync/node_modules
 raw-animations/
+
+# Local-only: A/B render outputs and design-import tooling (21 Sep 2026)
+test-designs/*/out_*
+test-designs/*/compare.html
+.design-sync/
+brand-templates/

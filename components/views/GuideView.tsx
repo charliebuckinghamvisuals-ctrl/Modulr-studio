@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-    BookOpen, Box, Layers, PenTool, CloudSun, Palette, FolderOpen, Film,
+    BookOpen, Box, Layers, PenTool, CloudSun, Palette, FolderOpen, Film, Grid,
     Lightbulb, AlertTriangle, CheckCircle2, ArrowRight, ClipboardCheck,
 } from 'lucide-react';
 import { DraftingBackground } from '../DraftingBackground';
@@ -47,7 +47,7 @@ const TOOLS: ToolGuide[] = [
             'Press Walk Outside to stand in the garden facing the building, or Walk Inside to stand in the room. Move with the keyboard, click a wall, floor, frame, door or unit to change its finish, and press Open Doors to open the sets.',
             'Use the Lighting view to set out spotlights on a ceiling plan, in rows or a grid.',
             'Watch the live cost estimate update as you go. Save Design keeps it on your account.',
-            'Press Send to Render Engine from any view - including from inside the walkthrough - to push what you are looking at into the Render Engine with the full specification attached.',
+            'Open Camera mode, frame the shot with a saved camera, press Capture, and upload the file in the Render Engine. Cameras save with the design, so a scheme renders from the same angles every time.',
         ],
         uses: [
             'Design live on a client call and agree the size before anyone draws anything',
@@ -76,7 +76,7 @@ const TOOLS: ToolGuide[] = [
             'SketchUp or CAD screenshot',
             'Line drawing or elevation',
             'Photograph of an existing building',
-            'A view sent over from the 3D Configurator',
+            'A capture from the 3D Configurator',
         ],
         steps: [
             'No image to hand? Press Try a sample on the empty state and the engine runs on one of ours.',
@@ -143,29 +143,50 @@ const TOOLS: ToolGuide[] = [
         ],
         tips: [
             'Overcast is the honest choice for planning. Golden hour is the persuasive choice for sales.',
-            'If you want to change the building rather than the weather, use Material Studio instead.',
+            'If you want to change the building rather than the weather, use the Material Editor instead.',
+        ],
+    },
+    {
+        icon: <Grid size={22} />,
+        name: 'Detail Studio',
+        purpose:
+            'Take a finished render to macro. A 2x2 close-up sheet of the materials, or a single camera shot of any detail.',
+        inputs: ['A finished render, a photograph, or a model screenshot'],
+        steps: [
+            'Upload your image, then choose a mode when prompted.',
+            'Material Close-up: pick four focal points, then generate a 2x2 macro detail sheet.',
+            'Camera shots: the engine suggests the close-ups worth taking; pick one and it takes that photograph.',
+            'Download the sheet or the shot, or save it to the Project.',
+        ],
+        uses: [
+            'Build a specification page showing the actual texture of every finish',
+            'A close-up through the glazing or at a corner for the brochure',
+            'Show the client the cladding grain and the glazing bars before they commit',
+        ],
+        tips: [
+            'The mode prompt appears after upload. Both modes photograph the building as it is; nothing is redesigned.',
+            'To change a material rather than show it, use the Material Editor.',
         ],
     },
     {
         icon: <Palette size={22} />,
-        name: 'Material Studio',
+        name: 'Material Editor',
         purpose:
-            'Two jobs in one tool. Generate a close-up material detail sheet, or change the materials on a building.',
+            'Change the materials on a building as a masked edit. Only the surface you change is repainted.',
         inputs: ['A render, a photograph, or a model screenshot'],
         steps: [
-            'Upload your image, then choose a mode when prompted.',
-            'Material Close-up: pick four focal points, then generate a 2x2 macro detail sheet.',
-            'Change Materials: the engine analyses the building and detects its cladding, roof, glazing, doors and ground.',
-            'In Change Materials, swap any category from the presets or your own saved library, then apply.',
+            'Upload your image. The engine detects its cladding, roof, glazing, doors and ground straight away.',
+            'Swap any category from the presets or your own saved library. The image shows in green exactly which pixels will change.',
+            'Or type a change the pickers do not cover, such as "make the fascia board anthracite grey".',
+            'Apply, then download or save to the Project.',
         ],
         uses: [
-            'Build a specification page showing the actual texture of every finish',
             'Show three cladding options during a single client meeting',
             'Save a supplier sample to your library and reuse it across every job',
             'Answer "what would it look like in cedar instead" without redrawing anything',
         ],
         tips: [
-            'The mode prompt appears after upload. Close-up is for showing materials, Change is for choosing them.',
+            'Everything outside the green tint stays byte-for-byte identical, so two versions line up exactly side by side.',
             'Anything you save to your material library appears in the pickers on every future project.',
         ],
     },
@@ -268,8 +289,8 @@ const WORKFLOWS = [
             '3D Configurator to build the actual dimensions, outside and in',
             'Walk Inside and Walk Outside with the client to settle finishes',
             'Export the plan and elevation PDF',
-            'Send to Render Engine for the hero exterior view',
-            'Material Studio close-up sheet for the specification page',
+            'Capture the hero exterior view and upload it to the Render Engine',
+            'Detail Studio close-up sheet for the specification page',
             'Weather Lab for a seasonal alternate',
             'Everything attached to one Project',
         ],
@@ -301,7 +322,7 @@ const WORKFLOWS = [
             'Screenshot your model from the best angle',
             'Line Converter to clean up the line work',
             'Render Engine in SketchUp mode',
-            'Material Studio to produce two alternative finishes',
+            'Material Editor to produce two alternative finishes',
         ],
     },
     {
@@ -309,7 +330,7 @@ const WORKFLOWS = [
         time: 'About 3 minutes',
         steps: [
             'Open the existing render from the Project',
-            'Material Studio, Change Materials mode',
+            'Material Editor',
             'Swap the cladding, then apply',
             'Send both versions to the client side by side',
         ],

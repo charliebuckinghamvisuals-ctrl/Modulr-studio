@@ -1,7 +1,7 @@
 /**
  * One definition for every render canvas in the app.
  *
- * Render Engine, Line Converter, Weather Lab, Material Studio and Animation
+ * Render Engine, Line Converter, Weather Lab, Detail Studio, Material Editor and Animation
  * Studio all show work on the same surface, and they each used to hard-code
  * their own copy of these classes - which is how they drifted apart. Import
  * this rather than writing the sizing inline.

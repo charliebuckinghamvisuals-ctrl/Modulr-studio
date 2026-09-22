@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SceneState, SceneObject, BoundaryStyle, PathRun, PathSurface, DeckArea, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData } from './types';
+import { SceneState, SceneObject, BoundaryStyle, PathRun, PathSurface, DeckArea, ViewMode, ObjectType, ToolMode, CladdingType, ShapeType, WindowData, SkylightData, PartitionData, PartitionDoor, Door, InteriorDoorData, SavedCamera } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { isInteriorType, clampToRoomInterior, snapTap } from './utils/placement';
 import { bayRange, wallSpanMm } from './utils/bay';
@@ -93,6 +93,17 @@ interface AppState {
   walkStart: 'inside' | 'outside';
   setWalkStart: (where: 'inside' | 'outside') => void;
   setWalkPointerLocked: (locked: boolean) => void;
+  /** Saved cameras (21 Sep 2026): the list lives on the scene so it saves
+   *  with the design; the selection is UI state. See types.ts SavedCamera. */
+  activeCameraId: string | null;
+  setActiveCameraId: (id: string | null) => void;
+  /** Camera mode: the whole screen is the view - toolbars and sidebar hide,
+   *  only the camera panel stays (Charlie, 21 Sep 2026). */
+  cameraMode: boolean;
+  setCameraMode: (on: boolean) => void;
+  addCamera: (camera: SavedCamera) => void;
+  updateCamera: (id: string, updates: Partial<SavedCamera>) => void;
+  removeCamera: (id: string) => void;
   /** True when the walkthrough floor-finish panel is open. */
   walkFloorOpen: boolean;
   setWalkFloorOpen: (open: boolean) => void;
@@ -558,6 +569,13 @@ export const useStore = create<AppState>((set, get) => ({
   walkPointerLocked: false,
   walkStart: 'outside',
   setWalkStart: (where) => set({ walkStart: where }),
+  activeCameraId: null,
+  setActiveCameraId: (id) => set({ activeCameraId: id }),
+  cameraMode: false,
+  setCameraMode: (on) => set({ cameraMode: on }),
+  addCamera: (camera) => set((state) => ({ scene: { ...state.scene, cameras: [...(state.scene.cameras || []), camera] } })),
+  updateCamera: (id, updates) => set((state) => ({ scene: { ...state.scene, cameras: (state.scene.cameras || []).map(c => (c.id === id ? { ...c, ...updates } : c)) } })),
+  removeCamera: (id) => set((state) => ({ scene: { ...state.scene, cameras: (state.scene.cameras || []).filter(c => c.id !== id) }, activeCameraId: state.activeCameraId === id ? null : state.activeCameraId })),
   setWalkPointerLocked: (locked) => set({ walkPointerLocked: locked }),
   walkFloorOpen: false,
   setWalkFloorOpen: (open) => set({ walkFloorOpen: open }),
@@ -665,9 +683,13 @@ export const useStore = create<AppState>((set, get) => ({
         fences: Array.isArray(saved.fences) ? saved.fences : state.scene.fences,
         paths: Array.isArray(saved.paths) ? saved.paths : state.scene.paths,
         decks: Array.isArray(saved.decks) ? saved.decks : state.scene.decks,
+        // A design's saved cameras come back with it; an older save without
+        // any keeps whatever cameras are on the current scene.
+        cameras: Array.isArray((saved as { cameras?: SavedCamera[] }).cameras) ? (saved as { cameras?: SavedCamera[] }).cameras : state.scene.cameras,
       },
       selectedElementId: null,
       selectedObjectId: null,
+      activeCameraId: null,
     };
   }),
 

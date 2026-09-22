@@ -1,7 +1,7 @@
 import { inpaintMasked, SegmentRegion } from './geminiService';
 
 /**
- * Pixel-level masked editing for the Material Studio.
+ * Pixel-level masked editing for the Material Editor.
  *
  * The rule: when the user changes the cladding, ONLY the cladding pixels
  * change. Nothing else is re-synthesised, resampled or re-encoded. So the

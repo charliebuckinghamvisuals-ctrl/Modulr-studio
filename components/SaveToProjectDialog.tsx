@@ -11,7 +11,7 @@ import { useCredits } from '../hooks/useCredits';
  *
  * The tools hand over a finished image; the user picks an existing project or
  * names a new one, and the image lands in that project's assets. Kept as one
- * dialog so Render Engine, Weather Lab, Material Studio et al. all save the
+ * dialog so Render Engine, Weather Lab, Detail Studio, Material Editor et al. all save the
  * same way - the alternative was five subtly different save flows.
  */
 interface SaveToProjectDialogProps {

@@ -239,7 +239,10 @@ export interface InventoryItem {
 
 export interface SceneSetting {
     preset: string;
+    /** morning | midday | evening | night (server TIME_PRESETS). */
     time: string;
+    /** summer | winter | overcast | rain | snow (server WEATHER_PRESETS). */
+    weather: string;
     text: string;
 }
 
@@ -260,7 +263,7 @@ export const renderScene = async (o: {
         headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
             shaded: o.shaded, line: o.line || null, spec: o.spec || null, items: o.items?.length ? o.items : undefined, ratio,
-            scenePreset: o.setting.preset, timePreset: o.setting.time, sceneText: o.setting.text, seed: o.seed,
+            scenePreset: o.setting.preset, timePreset: o.setting.time, weatherPreset: o.setting.weather, sceneText: o.setting.text, seed: o.seed,
         }),
     });
     if (!response.ok) {
@@ -552,12 +555,13 @@ export const applyWeather = async (
 /**
  * Analyzes the image to detect 16 high-quality details suitable for macro shots.
  */
-export const analyzeExteriorDetails = async (base64Image: string): Promise<string[]> => {
+/** 'materials': 16 textures/fixtures for the 2x2 sheet. 'shots': 8 camera shots to pick one from. */
+export const analyzeExteriorDetails = async (base64Image: string, kind: 'materials' | 'shots' = 'materials'): Promise<string[]> => {
   try {
     const response = await apiFetch(`${API_BASE_URL}/analyzeExteriorDetails`, {
       method: 'POST',
       headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ base64Image })
+      body: JSON.stringify({ base64Image, kind })
     });
 
     if (!response.ok) {
@@ -569,11 +573,22 @@ export const analyzeExteriorDetails = async (base64Image: string): Promise<strin
     return data.result as string[];
   } catch (error) {
     console.error("Detail analysis error:", error);
-    return [
+    if (kind === 'materials') return [
       "Cladding Texture", "Roof Detail", "Window Frame Corner", "Garden Feature",
       "External Lighting", "Paving Texture", "Door Handle", "Glass Reflection",
       "Gutter Detail", "Timber Grain", "Brickwork Texture", "Threshold Detail",
       "Fascia Board", "Planting Texture", "Fence Panel", "Step Detail"
+    ];
+    // Camera shots (21 Sep 2026), matching the server's fallback.
+    return [
+      "Close-up through the main glazing at the interior, focused on the furniture inside",
+      "Tight three-quarter shot of the front corner where the cladding meets the fascia",
+      "Detail of a door frame and handle with the cladding soft either side",
+      "Close-up of the wall light against the cladding boards",
+      "Low shot along the deck edge towards the doors",
+      "Reflection of the garden and sky in the glazing, the interior just visible behind",
+      "Detail of the roof edge and fascia line against the sky",
+      "Close-up of the window frame corner and the boards around it",
     ];
   }
 };
@@ -583,8 +598,9 @@ export const analyzeExteriorDetails = async (base64Image: string): Promise<strin
  */
 export const generatePresentationBoard = async (base64Image: string, focusPoints: string[], isHighQuality: boolean = false, isProMode: boolean = false): Promise<string> => {
   try {
-    if (focusPoints.length !== 4) {
-      throw new Error("Must select exactly 4 focus points");
+    // Four focal points = the 2x2 material sheet; one = a camera shot (21 Sep 2026).
+    if (focusPoints.length !== 4 && focusPoints.length !== 1) {
+      throw new Error("Pick one camera shot, or four material focal points");
     }
 
     const response = await apiFetch(`${API_BASE_URL}/generatePresentationBoard`, {
@@ -651,7 +667,7 @@ export interface SegmentRegion { label: string; box_2d: [number, number, number,
 
 /**
  * Segmentation masks for named surfaces (cladding, roof...) or the subject of
- * a free-text instruction. Feeds the Material Studio's masked edit, where the
+ * a free-text instruction. Feeds the Material Editor's masked edit, where the
  * union of a label's regions is the only area the change may touch.
  */
 export const segmentMaterials = async (base64Image: string, labels: string[]): Promise<SegmentRegion[]> => {

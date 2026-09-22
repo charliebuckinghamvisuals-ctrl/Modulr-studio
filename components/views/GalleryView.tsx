@@ -22,7 +22,7 @@ export const GalleryView: React.FC = () => {
     ];
 
     /**
-     * Material Studio close-up sheets.
+     * Detail Studio close-up sheets.
      *
      * These are 2x2 macro grids and are square, so they get their own section
      * and a square tile rather than being forced into the landscape render grid.
@@ -187,7 +187,7 @@ export const GalleryView: React.FC = () => {
                         <div className="flex flex-col items-center text-center space-y-4">
                             <h2 className="text-2xl md:text-4xl font-bold text-accent tracking-tight">Material Close-Ups</h2>
                             <p className="text-secondary text-sm max-w-xl">
-                                Macro detail sheets generated in Material Studio, showing the actual
+                                Macro detail sheets generated in Detail Studio, showing the actual
                                 grain, seam and finish of every specified surface.
                             </p>
                             <div className="h-px w-24 bg-accent/20"></div>
@@ -207,14 +207,14 @@ export const GalleryView: React.FC = () => {
                                     </div>
                                     <img
                                         src={item.image}
-                                        alt="Material Studio close-up detail sheet"
+                                        alt="Detail Studio close-up detail sheet"
                                         loading="lazy"
                                         className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 z-10"
                                     />
                                     <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 z-20 transform translate-y-4 group-hover:translate-y-0">
                                         <div className="flex items-center justify-between">
                                             <div className="space-y-1">
-                                                <span className="text-white text-[10px] uppercase font-bold tracking-[0.3em] block">Material Studio</span>
+                                                <span className="text-white text-[10px] uppercase font-bold tracking-[0.3em] block">Detail Studio</span>
                                                 <span className="text-white/80 text-xs font-medium">2x2 Macro Detail Sheet</span>
                                             </div>
                                             <div className="p-3 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white">

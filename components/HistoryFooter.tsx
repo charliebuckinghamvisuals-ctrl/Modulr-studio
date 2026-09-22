@@ -192,7 +192,8 @@ function formatStageName(stage: AppStage): string {
         case AppStage.EDITOR: return 'Edit';
         case AppStage.WEATHER_LAB: return 'Weather Lab';
         case AppStage.LINE_CONVERT: return 'Line Art';
-        case AppStage.MATERIAL_STUDIO: return 'Material Studio';
+        case AppStage.DETAIL_STUDIO: return 'Detail Studio';
+        case AppStage.MATERIAL_EDITOR: return 'Material Editor';
         default: return stage;
     }
 }

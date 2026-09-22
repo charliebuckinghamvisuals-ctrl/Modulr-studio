@@ -21,7 +21,8 @@ import { useAppEngine, compressImageFile } from './hooks/useAppEngine';
 // HomeView from './components/views/HomeView' here and render <HomeView>
 // below; the old file is untouched.
 import { HomeViewEditorial as HomeView } from './components/views/HomeViewEditorial';
-import { MaterialStudioView } from './components/views/MaterialStudioView';
+import { DetailStudioView } from './components/views/DetailStudioView';
+import { MaterialEditorView } from './components/views/MaterialEditorView';
 import { StudioView } from './components/views/StudioView';
 import { WorkspaceView } from './components/views/WorkspaceView';
 import { PricingView } from './components/views/PricingView';
@@ -93,7 +94,8 @@ const App: React.FC = () => {
         engine.setRenderedImage(null);
         engine.setEditorImage(null);
         engine.setFinalImage(null);
-        engine.setMaterialStudioImage(null);
+        engine.setDetailStudioImage(null);
+        engine.setMaterialEditorImage(null);
 
         switch (item.stage) {
             case AppStage.RENDER_ENGINE:
@@ -112,12 +114,16 @@ const App: React.FC = () => {
                 if (item.settings?.condition) engine.setWeather(item.settings);
                 if (item.image && !item.settings?.condition) engine.setFinalImage(item.image);
                 break;
-            case AppStage.MATERIAL_STUDIO:
-                engine.setMaterialStudioImage(item.image);
+            case AppStage.DETAIL_STUDIO:
+                engine.setDetailStudioImage(item.image);
                 engine.setSelectedDetails(item.settings?.selectedDetails || []);
                 if (item.settings?.detectedDetails) {
                     engine.setDetectedDetails(item.settings.detectedDetails);
                 }
+                break;
+            case AppStage.MATERIAL_EDITOR:
+                engine.setMaterialEditorImage(item.image);
+                if (item.settings?.walls) engine.setMaterials(item.settings);
                 break;
             case AppStage.WEATHER_LAB:
                 // Weather Lab renders a HistoryFooter but had no restore case,
@@ -395,20 +401,37 @@ const App: React.FC = () => {
                             <option value="none">Plain lawn only</option>
                         </select>
                     </div>
-                    <div>
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Time and weather</label>
-                        <select
-                            value={engine.sceneSetting.time}
-                            onChange={(e) => engine.setSceneSetting(prev => ({ ...prev, time: e.target.value }))}
-                            className="w-full bg-white border border-slate-300 text-sm font-bold text-accent rounded-xl px-3 py-2 outline-none shadow-sm focus:ring-2 focus:ring-accent/50"
-                        >
-                            <option value="afternoon">Late afternoon sun</option>
-                            <option value="morning">Early morning</option>
-                            <option value="midday">Midday, clear</option>
-                            <option value="overcast">Overcast, soft light</option>
-                            <option value="dusk">Dusk, lights on</option>
-                            <option value="night">Night, lights on</option>
-                        </select>
+                    {/* Time and weather are two choices (Charlie, 21 Sep 2026):
+                        any time with any weather. Keys match the server's
+                        TIME_PRESETS and WEATHER_PRESETS in render/prompt.js. */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Time</label>
+                            <select
+                                value={engine.sceneSetting.time}
+                                onChange={(e) => engine.setSceneSetting(prev => ({ ...prev, time: e.target.value }))}
+                                className="w-full bg-white border border-slate-300 text-sm font-bold text-accent rounded-xl px-3 py-2 outline-none shadow-sm focus:ring-2 focus:ring-accent/50"
+                            >
+                                <option value="morning">Morning, 9am</option>
+                                <option value="midday">Midday, 12pm</option>
+                                <option value="evening">Evening, 6pm · golden hour</option>
+                                <option value="night">Night, 9pm</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Weather</label>
+                            <select
+                                value={engine.sceneSetting.weather}
+                                onChange={(e) => engine.setSceneSetting(prev => ({ ...prev, weather: e.target.value }))}
+                                className="w-full bg-white border border-slate-300 text-sm font-bold text-accent rounded-xl px-3 py-2 outline-none shadow-sm focus:ring-2 focus:ring-accent/50"
+                            >
+                                <option value="summer">Summer's day</option>
+                                <option value="winter">Winter's day</option>
+                                <option value="overcast">Overcast</option>
+                                <option value="rain">Rainy day</option>
+                                <option value="snow">Snow</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -442,7 +465,7 @@ const App: React.FC = () => {
      * Weather Lab controls.
      *
      * Scope is deliberately limited to weather, season and atmosphere. Anything
-     * that changes the building itself belongs in Material Studio, so the two
+     * that changes the building itself belongs in the Material Editor, so the two
      * tools stay distinct rather than overlapping the way the old Refinement
      * Studio did.
      */
@@ -777,35 +800,25 @@ const App: React.FC = () => {
         <div className="flex flex-col md:flex-row gap-6 items-center justify-center w-full h-full p-8 pb-20 relative canvas-grid">
             <div className="absolute inset-0 bg-accent/10 backdrop-blur-3xl pointer-events-none"></div>
 
+            {/* One way in (Charlie, 21 Sep 2026): upload a view. The "Pre-Added
+                Materials (SketchUp)" tile and its mode are gone, and so is any
+                "from the 3D Configurator" route - a configurator shot is
+                captured there as a file and uploaded here like anything else.
+                Every image goes through the same path, the engine drawing its
+                own black-line drawing first. */}
             <div
                 onClick={() => {
                     engine.setIsSketchUpMode(false);
                     engine.fileInputRef.current?.click();
                 }}
-                className="flex-1 max-w-sm w-full h-72 glass-panel border border-accent/20 hover:border-accent/50 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer group transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_40px_rgba(64,90,86,0.2)] relative overflow-hidden text-center p-6 bg-white"
+                className="flex-1 max-w-md w-full h-72 glass-panel border border-accent/20 hover:border-accent/50 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer group transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_40px_rgba(64,90,86,0.2)] relative overflow-hidden text-center p-6 bg-white"
             >
                 <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center group-hover:bg-accent group-hover:scale-110 transition-all duration-300 shadow-xl relative z-10">
                     <PenTool className="text-accent group-hover:text-white transition-colors" size={24} />
                 </div>
                 <div className="relative z-10">
-                    <h3 className="text-accent font-bold text-lg mb-2">Upload B&W Line Drawing</h3>
-                    <p className="text-secondary text-sm leading-relaxed">Auto-detect materials from structural lines and CAD patterns.</p>
-                </div>
-            </div>
-
-            <div
-                onClick={() => {
-                    engine.setIsSketchUpMode(true);
-                    engine.fileInputRef.current?.click();
-                }}
-                className="flex-1 max-w-sm w-full h-72 glass-panel border border-border hover:border-accent/50 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer group transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_40px_rgba(64,90,86,0.2)] relative overflow-hidden text-center p-6 bg-white"
-            >
-                <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center group-hover:bg-accent group-hover:scale-110 transition-all duration-300 shadow-xl relative z-10">
-                    <ImageIcon className="text-accent group-hover:text-white transition-colors" size={24} />
-                </div>
-                <div className="relative z-10">
-                    <h3 className="text-accent font-bold text-lg mb-2">Pre-Added Materials (SketchUp)</h3>
-                    <p className="text-secondary text-sm leading-relaxed">Upload a basic 3D model. AI auto-detects your materials for a photoreal render.</p>
+                    <h3 className="text-accent font-bold text-lg mb-2">Upload a view</h3>
+                    <p className="text-secondary text-sm leading-relaxed">A screenshot, line drawing, CAD view or photo. The engine draws its own line drawing, lists every item, and checks the render against it.</p>
                 </div>
             </div>
 
@@ -898,38 +911,52 @@ const App: React.FC = () => {
             {engine.activeStage === AppStage.HOME && (
                 <HomeView
                     onOpenEngine={() => engine.setActiveStage(AppStage.RENDER_ENGINE)}
-                    onOpenMaterialStudio={() => engine.materialInputRef.current?.click()}
                     onNavigate={engine.setActiveStage}
                 />
             )}
 
-            {engine.activeStage === AppStage.MATERIAL_STUDIO && (
-                <MaterialStudioView
+            {engine.activeStage === AppStage.DETAIL_STUDIO && (
+                <DetailStudioView
                     detectedDetails={engine.detectedDetails}
                     selectedDetails={engine.selectedDetails}
                     toggleDetailSelection={engine.toggleDetailSelection}
-                    handleMaterialStudio={engine.handleMaterialStudio}
+                    handleDetailStudio={engine.handleDetailStudio}
                     originalImage={engine.getRenderUrl(engine.originalImage)}
-                    materialStudioImage={engine.getRenderUrl(engine.materialStudioImage)}
+                    detailStudioImage={engine.getRenderUrl(engine.detailStudioImage)}
                     handleDownload={engine.handleDownload}
-                    onSaveToProject={(img) => setProjectSave({ image: img, kind: 'exterior_render', name: 'material-studio' })}
+                    onSaveToProject={(img) => setProjectSave({ image: img, kind: 'exterior_render', name: 'detail-studio' })}
                     downloadFormat={engine.downloadFormat}
                     onFormatChange={engine.setDownloadFormat}
                     onOpenSceneUpload={() => engine.materialInputRef.current?.click()}
-                    isLoading={engine.activeStage === AppStage.MATERIAL_STUDIO && engine.processing.isLoading}
+                    isLoading={engine.activeStage === AppStage.DETAIL_STUDIO && engine.processing.isLoading}
                     loadingMessage={engine.processing.message}
-                    historyFooter={<HistoryFooter currentStage={AppStage.MATERIAL_STUDIO} onLoadHistoryItem={handleLoadHistory} />}
+                    historyFooter={<HistoryFooter currentStage={AppStage.DETAIL_STUDIO} onLoadHistoryItem={handleLoadHistory} />}
                     isHighQuality={engine.isHighQuality}
                     setIsHighQuality={engine.setIsHighQuality}
                     isProMode={engine.isProMode}
                     setIsProMode={engine.setIsProMode}
-                    mode={engine.materialStudioMode}
-                    onChooseMode={engine.startMaterialStudioMode}
-                    onResetMode={() => engine.setMaterialStudioMode(null)}
+                    mode={engine.detailStudioMode}
+                    onChooseMode={engine.startDetailStudioMode}
+                    onResetMode={() => engine.setDetailStudioMode(null)}
+                />
+            )}
+
+            {engine.activeStage === AppStage.MATERIAL_EDITOR && (
+                <MaterialEditorView
+                    originalImage={engine.getRenderUrl(engine.originalImage)}
+                    materialEditorImage={engine.getRenderUrl(engine.materialEditorImage)}
+                    handleDownload={engine.handleDownload}
+                    onSaveToProject={(img) => setProjectSave({ image: img, kind: 'exterior_render', name: 'material-editor' })}
+                    downloadFormat={engine.downloadFormat}
+                    onFormatChange={engine.setDownloadFormat}
+                    onOpenSceneUpload={() => engine.materialEditorInputRef.current?.click()}
+                    isLoading={engine.activeStage === AppStage.MATERIAL_EDITOR && engine.processing.isLoading}
+                    loadingMessage={engine.processing.message}
+                    historyFooter={<HistoryFooter currentStage={AppStage.MATERIAL_EDITOR} onLoadHistoryItem={handleLoadHistory} />}
                     materials={engine.materials}
                     setMaterials={engine.setMaterials}
                     materialLibrary={engine.materialLibrary}
-                    onApplyMaterials={engine.handleMaterialStudioApply}
+                    onApplyMaterials={engine.handleMaterialEditorApply}
                     isAnalyzingMaterials={engine.isAnalyzingMaterials}
                     materialPrompt={engine.materialPrompt}
                     setMaterialPrompt={engine.setMaterialPrompt}
@@ -1047,7 +1074,14 @@ const App: React.FC = () => {
                 ref={engine.materialInputRef}
                 className="hidden"
                 accept="image/*"
-                onChange={(e) => engine.handleImageUpload(e, AppStage.MATERIAL_STUDIO)}
+                onChange={(e) => engine.handleImageUpload(e, AppStage.DETAIL_STUDIO)}
+            />
+            <input
+                type="file"
+                ref={engine.materialEditorInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={(e) => engine.handleImageUpload(e, AppStage.MATERIAL_EDITOR)}
             />
         </AppShell>
     );
@@ -1082,7 +1116,8 @@ const App: React.FC = () => {
         AppStage.RENDER_ENGINE,
         AppStage.LINE_CONVERT,
         AppStage.WEATHER_LAB,
-        AppStage.MATERIAL_STUDIO,
+        AppStage.DETAIL_STUDIO,
+        AppStage.MATERIAL_EDITOR,
         AppStage.STUDIO,
         AppStage.DESIGNER,
         AppStage.PROJECTS,
@@ -1096,7 +1131,7 @@ const App: React.FC = () => {
      *
      * The Configurator plan (20 Sep 2026) is the 3D configurator, projects and
      * PDFs with no AI generation. Its subscribers can still reach the Render
-     * Engine, Line Converter, Weather Lab and Material Studio from the menu -
+     * Engine, Line Converter, Weather Lab, Detail Studio and Material Editor from the menu -
      * hiding headline tools from a paying customer is how they never learn
      * The Hub exists - but the page opens under an upgrade panel instead of a
      * render button that fails. The server refuses the render regardless
@@ -1107,7 +1142,8 @@ const App: React.FC = () => {
         AppStage.RENDER_ENGINE,
         AppStage.LINE_CONVERT,
         AppStage.WEATHER_LAB,
-        AppStage.MATERIAL_STUDIO,
+        AppStage.DETAIL_STUDIO,
+        AppStage.MATERIAL_EDITOR,
         AppStage.STUDIO,
     ]);
     const showPlanGate = hasAccess && !isMaster && canUseRenderTools === false && AI_TOOL_STAGES.has(engine.activeStage);

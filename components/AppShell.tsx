@@ -13,7 +13,7 @@ interface AppShellProps {
 }
 
 // Blocked on mobile: ONLY the 3D configurator (Charlie, 18 Sep 2026). The
-// Render Engine, Line Converter, Weather Lab and Material Studio all open on
+// Render Engine, Line Converter, Weather Lab, Detail Studio and Material Editor all open on
 // a phone; Floor Plan Studio and Animation Studio are parked (Coming soon)
 // everywhere, see PARKED_STAGES. Editor and Studio are legacy, desktop.
 const DESKTOP_ONLY_STAGES = new Set([
@@ -25,7 +25,7 @@ const DESKTOP_ONLY_STAGES = new Set([
 
 /**
  * Parked for launch (Charlie, 18 Sep 2026): live for the 3D configurator,
- * the Render Engine, Material Studio, Line Converter and Weather Lab only.
+ * the Render Engine, Detail Studio, Material Editor, Line Converter and Weather Lab only.
  * Floor Plan Studio is not yet tested through the real route and Animation
  * Studio has no Higgsfield key on the server. Both show Coming soon to
  * everyone except the master account, which can still test them; the
@@ -117,7 +117,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
     { id: AppStage.RENDER_ENGINE, label: 'Render Engine' },
     { id: AppStage.LINE_CONVERT, label: 'Line Converter' },
     { id: AppStage.WEATHER_LAB, label: 'Weather Lab' },
-    { id: AppStage.MATERIAL_STUDIO, label: 'Material Studio' },
+    { id: AppStage.DETAIL_STUDIO, label: 'Detail Studio' },
+    { id: AppStage.MATERIAL_EDITOR, label: 'Material Editor' },
     // Shown but badged for accounts without it (beta, tester, free) rather than
     // hidden. It is a headline feature and hiding it entirely would mean beta
     // users never learn The Hub has it. Clicking through lands on the

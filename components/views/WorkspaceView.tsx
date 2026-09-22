@@ -201,7 +201,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
                 scrollbar, a tall (portrait) image pushed the history strip off
                 the bottom with no way to reach it. */}
             <div className={TOOL_CANVAS_COL}>
-                {/* Shared with Material Studio and Animation Studio - see
+                {/* Shared with Detail Studio and Animation Studio - see
                     canvasStyles. Once an image is loaded the frame shrink-wraps
                     it (RENDER_CANVAS_FITTED): the invisible in-flow img below
                     gives the box the image's exact aspect ratio, and every

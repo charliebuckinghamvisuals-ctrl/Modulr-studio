@@ -138,9 +138,35 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
   // MainScene's job, through the controls - restoring the camera itself
   // here is undone the moment CameraControls remounts, because it reads
   // the walk pose into its own state during render, before any cleanup.)
+  /**
+   * A saved camera (UI/CameraPanel.tsx) arrives as a pose: where to stand
+   * and what to look at, world metres. Yaw and pitch are derived from the
+   * look direction the way the walker holds them (rotation order YXZ,
+   * rotation.y = yaw looks along (-sin yaw, 0, -cos yaw)).
+   */
+  const applyPose = (pose: { position: number[]; target: number[] }) => {
+    const camera = get().camera;
+    const [px, py, pz] = pose.position, [tx, ty, tz] = pose.target;
+    const d = new THREE.Vector3(tx - px, ty - py, tz - pz);
+    if (d.lengthSq() < 1e-6) d.set(0, 0, -1);
+    d.normalize();
+    position.current.set(px, py, pz);
+    velocity.current.set(0, 0, 0);
+    yaw.current = Math.atan2(-d.x, -d.z);
+    pitch.current = Math.asin(Math.max(-1, Math.min(1, d.y)));
+    camera.position.copy(position.current);
+    camera.rotation.set(0, 0, 0);
+    camera.rotation.order = 'YXZ';
+    camera.rotation.y = yaw.current;
+    camera.rotation.x = pitch.current;
+  };
+
   useEffect(() => {
     teleport(useStore.getState().walkStart);
-    const onTeleport = (e: any) => teleport(e.detail?.where === 'inside' || (e.detail?.where === 'toggle' && !isInside()) ? 'inside' : 'outside');
+    const onTeleport = (e: any) => {
+      if (e.detail?.pose?.position && e.detail?.pose?.target) { applyPose(e.detail.pose); return; }
+      teleport(e.detail?.where === 'inside' || (e.detail?.where === 'toggle' && !isInside()) ? 'inside' : 'outside');
+    };
     window.addEventListener('walk-teleport', onTeleport);
     return () => window.removeEventListener('walk-teleport', onTeleport);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -545,7 +571,16 @@ export function MainScene() {
     const handleCameraView = (e: any) => {
       const detail = typeof e.detail === 'string' ? { view: e.detail, snap: false } : e.detail;
       const { view, snap } = detail;
-      
+
+      // A saved orbit camera (UI/CameraPanel.tsx): position and target in
+      // world metres, straight into the controls.
+      if (detail.pose?.position && detail.pose?.target && controlsRef.current) {
+        const [px, py, pz] = detail.pose.position, [tx, ty, tz] = detail.pose.target;
+        setIsSpinning(false);
+        controlsRef.current.setLookAt(px, py, pz, tx, ty, tz, !snap);
+        return;
+      }
+
       if (view === 'toggle-projection') {
         setIsOrthographic(prev => !prev);
       } else if (view === 'spin') {

@@ -9,7 +9,7 @@ import { AppStage } from '../types';
  * The Configurator plan (20 Sep 2026) is the 3D configurator, walkthroughs,
  * projects, saved designs, clients and PDFs, with no AI generation at all.
  * Its subscribers can still open the Render Engine, Line Converter, Weather
- * Lab and Material Studio from the menu - the tools stay visible so the
+ * Lab, Detail Studio and Material Editor from the menu - the tools stay visible so the
  * upgrade is a thing they can see rather than a thing they never hear of -
  * and this panel sits over the page to say why the render button is not
  * for them yet.

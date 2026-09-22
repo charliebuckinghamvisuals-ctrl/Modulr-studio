@@ -3946,21 +3946,43 @@ app.post('/api/analyzeExteriorDetails', userAiLimiter, async (req, res) => {
         }
 
         const imagePart = fileToGenerativePart(base64Image, "image/png");
-        const prompt = `
+        /**
+         * Two kinds of analysis share this route (Charlie, 21 Sep 2026):
+         * 'materials' - the original 16 textures and fixtures for the 2x2
+         * macro sheet - and 'shots', which reads the render like a
+         * photographer and suggests the camera shots worth taking of THIS
+         * building, each a single framed picture the user picks from. Same
+         * string[] shape either way, so the client's list is unchanged.
+         */
+        const kind = req.body.kind === 'shots' ? 'shots' : 'materials';
+        const prompt = kind === 'materials' ? `
             Analyze this exterior architectural image.
-            
+
             TASK: Identify 16 distinct, physical exterior details of the building itself that would look excellent in a close-up 'macro' photograph.
-            
+
             CRITICAL RULES:
-            - ONLY focus on the MAIN BUILDING ROOM/STRUCTURE. 
+            - ONLY focus on the MAIN BUILDING ROOM/STRUCTURE.
             - DO NOT include ANY landscape or garden details whatsoever (NO grass, NO stones, NO pebbles, NO paving, NO trees, NO plants).
             - Focus on TEXTURES (e.g., 'Western Red Cedar Grain', 'Slate Roof Texture', 'Zinc Seam Detail', 'Brickwork Bond').
             - Focus on FIXTURES (e.g., 'Exterior Wall Light', 'Bifold Door Mechanism', 'Timber Window Frame Joint', 'Guttering Profile').
             - Focus on ARCHITECTURAL JUNCTIONS (e.g., 'Roof Overhang Detail', 'Cladding Corner Trim', 'Threshold Detail').
-            
+
             OUTPUT:
             - Return ONLY a JSON array of strings.
             - Example: ["Cedar Cladding Texture", "Timber Window Frame", "Brickwork Bond", "Exterior Downlight", "Door Handle"]
+        ` : `
+            You are an architectural photographer looking at this finished render of a garden building.
+
+            TASK: Suggest 8 distinct close-up or detail SHOTS of this exact scene that would sit well in a brochure or on an architect's website. Each shot is one sentence: what the camera frames, what it focuses on, and roughly where it is looking from.
+
+            RULES:
+            - Every shot must be of something ACTUALLY VISIBLE in this image - name the real thing (the pool table seen through the sliding doors, the corner where the cladding meets the fascia, the wall light beside the window). Never invent a feature.
+            - Mix them: two or three looking IN through the glazing at the interior, two or three tight on exterior materials or junctions (cladding, frames, fascia, deck edge, a light fitting), one or two at three-quarter angles that show a corner of the building, and one that catches a reflection in the glass.
+            - Same building, same materials, same time of day and weather as the image; the shots are just closer and differently framed.
+            - No garden-only shots (no lawn, plants or fences on their own).
+
+            OUTPUT:
+            - Return ONLY a JSON array of 8 strings, each a short sentence, e.g. "Close-up through the sliding doors of the pool table, focused on the table with the cladding soft in the foreground".
         `;
 
         const response = await ai.models.generateContent({
@@ -3978,11 +4000,20 @@ app.post('/api/analyzeExteriorDetails', userAiLimiter, async (req, res) => {
         });
 
         const text = response.text;
-        const fallback = [
+        const fallback = kind === 'materials' ? [
             "Cladding Texture", "Roof Detail", "Window Frame Corner", "Soffit Detail",
             "External Lighting", "Exterior Trim", "Door Handle", "Glass Reflection",
             "Gutter Detail", "Timber Grain", "Brickwork Texture", "Threshold Detail",
             "Fascia Board", "Wall Junction", "Panel Seam", "Step Detail"
+        ] : [
+            "Close-up through the main glazing at the interior, focused on the furniture inside",
+            "Tight three-quarter shot of the front corner where the cladding meets the fascia",
+            "Detail of a door frame and handle with the cladding soft either side",
+            "Close-up of the wall light against the cladding boards",
+            "Low shot along the deck edge towards the doors",
+            "Reflection of the garden and sky in the glazing, the interior just visible behind",
+            "Detail of the roof edge and fascia line against the sky",
+            "Close-up of the window frame corner and the boards around it",
         ];
 
         if (!text) return res.json({ result: fallback });
@@ -4017,26 +4048,36 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
             return res.status(access.status).json(access.body);
         }
 
-        if (focusPoints.length !== 4) {
-            throw new Error("Must select exactly 4 focus points");
+        /**
+         * ONE shot, not a 2x2 sheet (Charlie, 21 Sep 2026). The user picks a
+         * camera shot the analysis suggested ("close-up through the sliding
+         * doors of the pool table, focused on the table") and this produces
+         * that single picture from the render: a second camera on the same
+         * scene, same building, same light, nothing redesigned.
+         */
+        if (focusPoints.length !== 1 && focusPoints.length !== 4) {
+            throw new Error("Pick one camera shot, or four material focal points");
         }
+        const shot = focusPoints[0];
 
         const imagePart = fileToGenerativePart(base64Image, "image/jpeg");
 
-        const prompt = `
+        // Four focal points: the original 2x2 material sheet (kept, Charlie
+        // 21 Sep). One: a single camera shot.
+        const prompt = focusPoints.length === 4 ? `
         TASK: Create an "Architectural Presentation Sheet" for this project in a 2x2 Grid Layout.
-        
+
         INPUT: Use the provided image as the absolute source of truth.
-        
+
         OUTPUT LAYOUT (2x2 GRID):
-        Generate 4 DISTINCT close-up/macro shots based on the user's selection. 
+        Generate 4 DISTINCT close-up/macro shots based on the user's selection.
         DO NOT include the full 'Master Shot'. Only specific details.
-        
+
         Quadrant 1 (Top Left): ${focusPoints[0]}
         Quadrant 2 (Top Right): ${focusPoints[1]}
         Quadrant 3 (Bottom Left): ${focusPoints[2]}
         Quadrant 4 (Bottom Right): ${focusPoints[3]}
-        
+
         PRECISION & ACCURACY RULES (CRITICAL):
         - ACT AS A MACRO CAMERA LENS: You are OPTICALLY ZOOMING into the EXACT geometry of the provided input image.
         - You MUST strictly keep to the base design. DO NOT add extra details, DO NOT invent new window frame angles, sizes, or structural changes that are not visible in the source image.
@@ -4044,7 +4085,7 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
         - PRESERVE 100% of the original wall planes, structural geometry, and material direction.
         - The close-up must physically align and make logical sense contextually when compared to the source image.
         - If the user asks for a 'Timber window frame', zoom in directly on the exact timber window frame shown in the source without altering the surrounding structural shape or adding bevels.
-        
+
         STYLE:
         - High-End ArchViz Portfolio style.
         - Macro Photography with Depth of Field (Bokeh).
@@ -4052,6 +4093,20 @@ app.post('/api/generatePresentationBoard', userAiLimiter, async (req, res) => {
         - Thin white separator lines between the 4 grid items.
         - Maintain RAW true-to-life photorealism. Ensure extreme micro-texture detail as this is a macro shot. DO NOT allow texture painting/smoothing.
         - CRITICAL DIMENSIONS: Strictly lock the output resolution to exactly 2048 x 2048 pixels (2K Square limit). Do not exceed this pixel count to ensure pricing tier.
+      ` : `
+        TASK: You are a second camera on the SAME scene as the provided render. Take this one shot: ${shot}
+
+        HARD RULES - these override everything below.
+        - The provided image is the absolute source of truth. It shows a finished building; you are photographing it again from closer, not redesigning it.
+        - Every wall, opening, frame, board, fitting and piece of furniture in your shot is exactly as the source shows it: same count, same position, same size, same shape, same colour, same material and board direction. Nothing is added, removed, moved, restyled or repeated.
+        - Keep the same time of day, weather, sky and lighting as the source; the light simply falls on things from closer.
+        - What is beyond the edge of the source image is unknown: frame the shot so it stays within what the source actually shows.
+        - No people, no props, no new furniture, no text.
+
+        STYLE:
+        - A single photograph, editorial architectural photography: one strong key light as in the source, deep but open shadows, real contrast, a subtle warm grade.
+        - A real camera's shallow depth of field where the shot calls for it - the subject sharp, the near and far softly out of focus - and true micro-texture on every material in focus: grain, joints, seams, fabric weave, glass with real reflections.
+        - Square, 2048 x 2048 pixels.
       `;
 
         if (openAiReady()) {

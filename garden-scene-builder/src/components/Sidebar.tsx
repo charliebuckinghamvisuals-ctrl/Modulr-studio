@@ -1862,50 +1862,12 @@ export function Sidebar() {
             </button>
           </div>
         ) : (
-        <button
-          onClick={() => {
-            const canvas = document.querySelector('canvas');
-            if (canvas) {
-              // The render engine's two inputs off the live scene: the shaded
-              // view at 2K and an exact edge drawing of the same frame (the
-              // geometry lock). Falls back to the on-screen canvas if the
-              // capture helper is not mounted.
-              let captured: { shaded: string; line: string } | null = null;
-              try { captured = (window as any).__modulrCaptureRenderInputs?.() || null; } catch (e) { console.warn('render capture failed, using the canvas', e); }
-              const dataUrl = captured?.shaded || canvas.toDataURL('image/png');
-              const lineImage = captured?.line || null;
-              // Same payload as the canvas button: screenshot for composition,
-              // room spec so the AI obeys the configured building exactly.
-              const { room, fences, boundaryStyle, paths, decks, objects } = useStore.getState().scene;
-              // The boundary rides with the room: what each run is built of,
-              // in words the render prompt can repeat, so a brick wall in the
-              // screenshot is rendered as brick and not guessed at.
-              // Whether each door set is drawn open (the Open Doors toggle or a
-              // single leaf), so the inventory can say so and the render keeps
-              // the slid or folded leaf instead of closing it or painting it white.
-              const { areDoorsOpen, openDoorIds } = useStore.getState();
-              const roomSpec = {
-                ...room,
-                doors: (room.doors || []).map(d => ({ ...d, open: !!(areDoorsOpen || openDoorIds.includes(d.id)) })),
-                garden: (fences?.length || paths?.length || decks?.length) ? {
-                  boundary: (fences || []).map(f => ({ lengthMm: Math.round(fenceLength(f) * 1000), text: describeBoundary(runStyle(f, boundaryStyle)) })),
-                  paths: (paths || []).map(p => ({ lengthMm: Math.round(pathLength(p) * 1000), text: describePath(p) })),
-                  decks: (decks || []).map(d => ({ areaM2: Math.round(deckArea(d.points) * 10) / 10, heightMm: d.heightMm, text: describeDeck(d) })),
-                } : undefined,
-                // The exterior fittings, so the render keeps each one's shape,
-                // place and finish rather than inventing a lantern.
-                exteriorLights: describeExteriorLights(room, objects || []),
-                // What is inside, seen through the glazing: wall colour,
-                // floor, every piece of furniture with its colour.
-                interior: describeInterior(room, objects || []),
-              };
-              window.parent.postMessage({ type: 'RENDER_3D_SCENE', image: dataUrl, lineImage, roomSpec }, window.location.origin);
-            }
-          }}
-          className="w-full bg-[#3b4d4a] hover:bg-[#2d3a38] text-white py-3.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
-        >
-          Send to Render Engine
-        </button>
+        /* "Send to Render Engine" is gone (Charlie, 21 Sep 2026): a view is
+           framed with a saved camera and imported from the Cameras panel on
+           the canvas (UI/CameraPanel.tsx), in the 3D or walk view. */
+        <p className="text-[11px] text-gray-500 leading-snug text-center">
+          To render, frame the view with a <span className="font-bold text-[#3b4d4a]">camera</span> on the canvas and press Import into Render Engine.
+        </p>
         )}
         {!isPublic && (
         /* Floor Plan Studio (18 Sep 2026): the plan view with dimensions on,

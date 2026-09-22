@@ -80,11 +80,19 @@ export const ROUTES: Record<AppStage, RouteMeta> = {
         keywords: `render weather change, seasonal render garden room, golden hour render, overcast planning render, ${COMMON_KEYWORDS}`,
         indexable: true,
     },
-    [AppStage.MATERIAL_STUDIO]: {
-        path: '/material-studio',
-        title: 'Material Studio',
+    [AppStage.DETAIL_STUDIO]: {
+        path: '/detail-studio',
+        title: 'Detail Studio',
         description:
-            'Swap cladding, roofing, glazing, doors and decking on an existing garden room render without redrawing it. Upload a supplier sample and see it on the building.',
+            'Take a finished garden room render to macro: a 2x2 close-up sheet of the cladding grain, glazing bars and joinery for the specification page, or a single camera shot of any detail - same building, same light.',
+        keywords: `garden room material close-up, cladding detail render, architectural detail sheet, material specification sheet, garden room close-up render, ${COMMON_KEYWORDS}`,
+        indexable: true,
+    },
+    [AppStage.MATERIAL_EDITOR]: {
+        path: '/material-editor',
+        title: 'Material Editor',
+        description:
+            'Swap cladding, roofing, glazing, doors and decking on an existing garden room render without redrawing it. Only the surface you change is repainted; every other pixel stays as it was.',
         keywords: `garden room cladding visualiser, cladding colour visualiser, composite cladding render, cedar cladding render, material swap render, ${COMMON_KEYWORDS}`,
         indexable: true,
     },
@@ -195,9 +203,20 @@ export const ROUTES: Record<AppStage, RouteMeta> = {
     },
 };
 
+/**
+ * Paths that were shipped and then renamed. They may be bookmarked or indexed,
+ * so they keep opening a page instead of falling through to Home.
+ */
+const LEGACY_PATHS: Record<string, AppStage> = {
+    // Material Studio was split on 21 Sep 2026: the material swap it was
+    // indexed for became the Material Editor; close-ups moved to Detail Studio.
+    '/material-studio': AppStage.MATERIAL_EDITOR,
+};
+
 /** The stage a URL path opens, or null when the path is not a page. */
 export const stageFromPath = (pathname: string): AppStage | null => {
     const clean = pathname.replace(/\/+$/, '') || '/';
+    if (LEGACY_PATHS[clean]) return LEGACY_PATHS[clean];
     for (const stage of Object.keys(ROUTES) as AppStage[]) {
         // UPLOAD shares /render-engine; the first match wins, and
         // RENDER_ENGINE is declared before it.

@@ -18,10 +18,11 @@
  *   log       both attempts' verdicts, so QA can be read back later
  */
 import { inventoryFromSpec, inventoryFromItems, inventoryToText } from './inventory.js';
-import { buildRenderPrompt, buildMaterialsPassPrompt, LINE_CONVERSION_PROMPT, SURVEY_PROMPT, SCENE_PRESETS, TIME_PRESETS } from './prompt.js';
+import { buildRenderPrompt, buildMaterialsPassPrompt, LINE_CONVERSION_PROMPT, SURVEY_PROMPT, SCENE_PRESETS, TIME_PRESETS, WEATHER_PRESETS } from './prompt.js';
 import { drawImage, GEOMETRY_MODEL, FINISH_MODEL, safeRatio } from './providers/gemini.js';
 import { verifyRender } from './verify.js';
 import { planInventoryFromSpec, buildPlanPrompt, PLAN_SURVEY_PROMPT } from './plan.js';
+import { isInteriorSpec, interiorInventoryFromSpec, buildInteriorRenderPrompt, buildInteriorMaterialsPassPrompt } from './interior.js';
 
 const stripDataUrl = (s) => (typeof s === 'string' ? s.replace(/^data:[^;]+;base64,/, '') : '');
 
@@ -44,6 +45,7 @@ export function mountRender(app, deps) {
             const ratio = safeRatio(sanitizeString(req.body.ratio, 10));
             const scenePreset = sanitizeString(req.body.scenePreset, 30);
             const timePreset = sanitizeString(req.body.timePreset, 30);
+            const weatherPreset = sanitizeString(req.body.weatherPreset, 30);
             const sceneText = sanitizeString(req.body.sceneText, 600);
             const seed = req.body.seed !== undefined ? parseInt(req.body.seed) : undefined;
             if (!shaded) return res.status(400).json({ error: 'No source image.' });
@@ -51,14 +53,21 @@ export function mountRender(app, deps) {
             const access = await enforceRenderAccess(req, CREDIT_COSTS.STANDARD_RES);
             if (!access.allowed) return res.status(access.status).json(access.body);
 
+            // ---- interior or exterior: the configurator stamps `view` on the
+            // spec when the capture came from inside the room (walk mode).
+            // Same engine, different knowledge: inventory, prompt, materials
+            // pass and the verifier's judging all switch (render/interior.js).
+            const interior = isInteriorSpec(req.body.spec) || req.body.view === 'interior';
+            const verifyKind = interior ? 'interior' : 'render';
+
             // ---- inventory: the user's confirmed items win over the raw spec
             let items = inventoryFromItems(req.body.items);
             let inventorySource = 'items';
-            if (!items.length) { items = inventoryFromSpec(req.body.spec); inventorySource = items.length ? 'spec' : 'none'; }
+            if (!items.length) { items = interior ? interiorInventoryFromSpec(req.body.spec) : inventoryFromSpec(req.body.spec); inventorySource = items.length ? 'spec' : 'none'; }
             const inventoryText = inventoryToText(items);
             // The whole brief, in the log, so a wrong render can be read back
             // against exactly what the engine was told.
-            console.log(`[RENDER] inventory (${inventorySource}, ${items.length} items):\n` + inventoryText);
+            console.log(`[RENDER] ${interior ? 'INTERIOR ' : ''}inventory (${inventorySource}, ${items.length} items):\n` + inventoryText);
 
             // ---- an upload has no drawing: draw one --------------------------
             let lineSource = line ? 'configurator' : 'none';
@@ -78,13 +87,13 @@ export function mountRender(app, deps) {
             const verifyAgainst = line ? { b64: line, mime: lineMime } : { b64: shaded, mime: shadedMime };
 
             // ---- pass 1: FINISH model on the drawing -------------------------
-            const prompt = buildRenderPrompt({ inventoryText, hasLine: !!line, lineOnly, scenePreset, timePreset, sceneText });
+            const prompt = (interior ? buildInteriorRenderPrompt : buildRenderPrompt)({ inventoryText, hasLine: !!line, lineOnly, scenePreset, timePreset, weatherPreset, sceneText });
             let image = await drawImage(ai, { model: FINISH_MODEL, images: references, prompt, ratio, seed, label: 'pass1' });
             imageCalls++;
             if (!image) return res.status(502).json({ error: 'The render engine produced no image. Please try again.' });
 
             const colourRef = lineOnly ? {} : { colourRefB64: shaded, colourRefMime: shadedMime };
-            let verification = await verifyRender(ai, Type, { model: ANALYSIS_MODEL, referenceB64: verifyAgainst.b64, referenceMime: verifyAgainst.mime, renderB64: image, items, ...colourRef });
+            let verification = await verifyRender(ai, Type, { model: ANALYSIS_MODEL, referenceB64: verifyAgainst.b64, referenceMime: verifyAgainst.mime, renderB64: image, items, kind: verifyKind, ...colourRef });
             let attempts = [{ pass: 'finish', ...verification }];
             let shipped = 'pass1';
 
@@ -97,20 +106,20 @@ export function mountRender(app, deps) {
                 const geometry = await drawImage(ai, { model: GEOMETRY_MODEL, images: references, prompt: promoted + prompt, ratio, label: 'retry-geometry' });
                 imageCalls++;
                 if (geometry) {
-                    const finished = await drawImage(ai, { model: FINISH_MODEL, images: [{ b64: geometry, mime: 'image/jpeg' }], prompt: buildMaterialsPassPrompt({ inventoryText, failures: verification.failures }), ratio, label: 'retry-finish' });
+                    const finished = await drawImage(ai, { model: FINISH_MODEL, images: [{ b64: geometry, mime: 'image/jpeg' }], prompt: (interior ? buildInteriorMaterialsPassPrompt : buildMaterialsPassPrompt)({ inventoryText, failures: verification.failures }), ratio, label: 'retry-finish' });
                     imageCalls++;
                     const candidate = finished || geometry;
-                    const v2 = await verifyRender(ai, Type, { model: ANALYSIS_MODEL, referenceB64: verifyAgainst.b64, referenceMime: verifyAgainst.mime, renderB64: candidate, items, ...colourRef });
+                    const v2 = await verifyRender(ai, Type, { model: ANALYSIS_MODEL, referenceB64: verifyAgainst.b64, referenceMime: verifyAgainst.mime, renderB64: candidate, items, kind: verifyKind, ...colourRef });
                     attempts.push({ pass: finished ? 'retry-geometry+finish' : 'retry-geometry', ...v2 });
                     if (!v2.checked || v2.failures.length < verification.failures.length) { image = candidate; verification = v2; shipped = finished ? 'retry' : 'retry-geometry-only'; }
                     if (!v2.passed) console.warn('[RENDER] retry still failing, shipping the better attempt:', v2.failures.map(f => `${f.label}: ${f.problem}`).join('; '));
                 }
             }
 
-            logRender(req, 'render', FINISH_MODEL, '2K', {
+            logRender(req, interior ? 'render-interior' : 'render', FINISH_MODEL, '2K', {
                 imageCalls, qaCalls: attempts.length, shipped, lineSource, inventorySource, inventoryItems: items.length,
                 verified: verification.passed, verificationChecked: verification.checked, failures: verification.failures.map(f => `${f.id}: ${f.problem}`).slice(0, 12),
-                scenePreset: scenePreset || null, timePreset: timePreset || null, seconds: Math.round((Date.now() - t0) / 1000),
+                scenePreset: scenePreset || null, timePreset: timePreset || null, weatherPreset: weatherPreset || null, seconds: Math.round((Date.now() - t0) / 1000),
             });
 
             res.json({
@@ -118,7 +127,7 @@ export function mountRender(app, deps) {
                 line: lineSource === 'engine' ? line : undefined,
                 items,
                 inventoryText,
-                engine: { finish: FINISH_MODEL, geometry: GEOMETRY_MODEL, shipped, lineSource, inventorySource },
+                engine: { finish: FINISH_MODEL, geometry: GEOMETRY_MODEL, shipped, lineSource, inventorySource, view: interior ? 'interior' : 'exterior' },
                 verification: { ...verification, attempts: attempts.map(a => ({ pass: a.pass, checked: a.checked, passed: a.passed, failures: a.failures })) },
                 rendersLeft: access.rendersLeft,
                 seconds: Math.round((Date.now() - t0) / 1000),
@@ -284,17 +293,20 @@ export function mountRender(app, deps) {
         }
     });
 
-    /** A design's inventory for the bar, before any render: no AI, no credits. */
+    /** A design's inventory for the bar, before any render: no AI, no credits.
+     *  An interior capture (spec.view === 'interior') gets the interior list. */
     app.post('/api/render/inventory', (req, res) => {
-        const items = inventoryFromSpec(req.body?.spec);
-        res.json({ items, inventoryText: inventoryToText(items) });
+        const interior = isInteriorSpec(req.body?.spec);
+        const items = interior ? interiorInventoryFromSpec(req.body?.spec) : inventoryFromSpec(req.body?.spec);
+        res.json({ items, inventoryText: inventoryToText(items), view: interior ? 'interior' : 'exterior' });
     });
 
     /** The presets, so the UI and the server never disagree on the keys. */
     app.get('/api/render/presets', (_req, res) => {
         res.json({
             scenes: Object.entries(SCENE_PRESETS).map(([key, text]) => ({ key, text })),
-            times: Object.entries(TIME_PRESETS).map(([key, text]) => ({ key, text })),
+            times: Object.entries(TIME_PRESETS).map(([key, t]) => ({ key, label: t.label, text: t.sun })),
+            weathers: Object.entries(WEATHER_PRESETS).map(([key, w]) => ({ key, label: w.label, text: w.text })),
         });
     });
 

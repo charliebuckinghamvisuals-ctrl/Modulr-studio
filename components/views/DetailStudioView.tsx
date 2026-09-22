@@ -1,21 +1,27 @@
 import React from 'react';
-import { Grid, Download, CheckCircle, Circle, Loader2, Upload, Layers, Palette, X, FolderOpen } from 'lucide-react';
+import { Grid, Download, CheckCircle, Circle, Loader2, Upload, X, FolderOpen, Camera } from 'lucide-react';
 import { Button } from '../Button';
-import { RENDER_CANVAS, TOOL_PAGE, TOOL_SIDEBAR } from '../canvasStyles';
-import { MaterialVisualPicker } from '../MaterialVisualPicker';
-import { PRESET_MATERIALS } from '../../constants';
-import { MaterialConfig, MaterialLibrary } from '../../types';
+import { RENDER_CANVAS, TOOL_PAGE, TOOL_SIDEBAR, TOOL_CANVAS_COL } from '../canvasStyles';
 
-export type MaterialStudioMode = 'closeup' | 'change';
+/**
+ * Detail Studio - was Material Studio until 21 Sep 2026.
+ *
+ * Two modes on one upload: 'closeup' = the 2x2 material sheet from four focal
+ * points, 'shots' = one suggested camera shot. The masked material edit that
+ * used to be a third mode here is its own tool now (MaterialEditorView): it
+ * changes the building, these two only photograph it, and one page doing both
+ * confused the choice.
+ */
+export type DetailStudioMode = 'closeup' | 'shots';
 
-interface MaterialStudioViewProps {
+interface DetailStudioViewProps {
     onSaveToProject?: (image: string) => void;
     detectedDetails: string[];
     selectedDetails: string[];
     toggleDetailSelection: (detail: string) => void;
-    handleMaterialStudio: () => void;
+    handleDetailStudio: () => void;
     originalImage: string | null;
-    materialStudioImage: string | null;
+    detailStudioImage: string | null;
     handleDownload: (image: string | null, prefix: string) => void;
     onOpenSceneUpload: () => void;
     downloadFormat?: 'png' | 'jpg';
@@ -30,38 +36,18 @@ interface MaterialStudioViewProps {
     userPlan?: string;
 
     // Mode selection
-    mode: MaterialStudioMode | null;
-    onChooseMode: (mode: MaterialStudioMode) => void;
+    mode: DetailStudioMode | null;
+    onChooseMode: (mode: DetailStudioMode) => void;
     onResetMode: () => void;
-
-    // 'change' mode
-    materials: MaterialConfig;
-    setMaterials: React.Dispatch<React.SetStateAction<MaterialConfig>>;
-    materialLibrary?: MaterialLibrary;
-    onApplyMaterials: () => void;
-    isAnalyzingMaterials?: boolean;
-    /** Masked edit: the free instruction, and a tint of the pixels the next
-     *  Apply is allowed to change (null when nothing is changed yet). */
-    materialPrompt?: string;
-    setMaterialPrompt?: (v: string) => void;
-    materialMaskPreview?: string | null;
 }
 
-const MATERIAL_CATEGORIES: Array<{ key: keyof MaterialLibrary; label: string }> = [
-    { key: 'walls', label: 'Cladding / Walls' },
-    { key: 'roof', label: 'Roof' },
-    { key: 'windows', label: 'Windows' },
-    { key: 'doors', label: 'Doors' },
-    { key: 'decking', label: 'Decking / Ground' },
-];
-
-export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
+export const DetailStudioView: React.FC<DetailStudioViewProps> = ({
     detectedDetails,
     selectedDetails,
     toggleDetailSelection,
-    handleMaterialStudio,
+    handleDetailStudio,
     originalImage,
-    materialStudioImage,
+    detailStudioImage,
     handleDownload,
     onSaveToProject,
     onOpenSceneUpload,
@@ -70,29 +56,10 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
     isLoading,
     loadingMessage,
     historyFooter,
-    isHighQuality,
-    setIsHighQuality,
-    isProMode,
-    setIsProMode,
     mode,
     onChooseMode,
     onResetMode,
-    materials,
-    setMaterials,
-    materialLibrary,
-    onApplyMaterials,
-    isAnalyzingMaterials,
-    materialPrompt = '',
-    setMaterialPrompt,
-    materialMaskPreview,
 }) => {
-    /** Presets plus anything the user saved to their own library. */
-    const optionsFor = (key: keyof MaterialLibrary): string[] => {
-        const presets = (PRESET_MATERIALS as any)[key] as string[] | undefined;
-        const saved = (materialLibrary?.[key] || []).map(item => item.text || item.name);
-        return Array.from(new Set([...(presets || []), ...saved]));
-    };
-
     const getImageUrl = (img: string | null) => {
         if (!img) return '';
         if (img.startsWith('http') || img.startsWith('blob:') || img.startsWith('data:')) {
@@ -105,10 +72,10 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
         <div className={TOOL_PAGE}>
             <div className={TOOL_SIDEBAR}>
                 <div className="space-y-4">
-                    <h2 className="text-[7vw] md:text-2xl lg:text-3xl font-bold text-accent w-fit inline-block leading-tight">Material Studio</h2>
+                    <h2 className="text-[7vw] md:text-2xl lg:text-3xl font-bold text-accent w-fit inline-block leading-tight">Detail Studio</h2>
                     <p className="text-slate-600 text-sm leading-relaxed">
-                        {mode === 'change'
-                            ? 'Change the cladding, roof, glazing, doors or ground - as a true masked edit. Only the pixels of the surface you change are repainted; every other pixel of your image is left exactly as it is.'
+                        {mode === 'shots'
+                            ? 'Close-up shots of a finished render. The engine reads the picture like a photographer and suggests the shots worth taking; pick one and it takes that photograph of the same building, same light, nothing redesigned.'
                             : 'Architectural material detail sheet generator. The engine compiles a high-resolution 2x2 presentation grid based on your specific material focal points.'}
                     </p>
                     {mode && originalImage && (
@@ -121,62 +88,16 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                     )}
                 </div>
 
-                {/* ── Change Materials mode ── */}
-                {mode === 'change' ? (
-                    <div className="flex-1 flex flex-col gap-5">
-                        {isAnalyzingMaterials ? (
-                            <div className="flex flex-col items-center gap-4 py-10">
-                                <Loader2 className="w-8 h-8 animate-spin text-accent" />
-                                <span className="text-accent font-medium animate-pulse text-sm">Analysing materials…</span>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-400">
-                                    Detected materials - change any
-                                </div>
-                                <div className="flex flex-col gap-4">
-                                    {MATERIAL_CATEGORIES.map(cat => (
-                                        <MaterialVisualPicker
-                                            key={cat.key}
-                                            label={cat.label}
-                                            options={optionsFor(cat.key)}
-                                            value={(materials as any)[cat.key] || 'none'}
-                                            onChange={val =>
-                                                setMaterials(prev => ({ ...prev, [cat.key]: val }))
-                                            }
-                                        />
-                                    ))}
-                                </div>
-                                {/* A typed instruction for anything the five pickers do not
-                                    cover. It gets its own mask - whatever it names is
-                                    found in the image and only that is repainted. */}
-                                <div className="flex flex-col gap-2 pt-2">
-                                    <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-400">Or tell it what to change</div>
-                                    <textarea
-                                        value={materialPrompt}
-                                        onChange={e => setMaterialPrompt?.(e.target.value)}
-                                        rows={3}
-                                        placeholder="e.g. make the fascia board anthracite grey · change the door frames to bronze"
-                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-accent/30 resize-none"
-                                    />
-                                    <p className="text-[10px] text-slate-400 leading-snug">
-                                        Name the surface plainly. It is found in the image and repainted inside its own outline; nothing else is touched.
-                                    </p>
-                                </div>
-                                <div className="rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-[11px] text-emerald-900 leading-snug">
-                                    <span className="font-bold">Pixel-level masked edit.</span> {materialMaskPreview ? 'The green tint on the image is every pixel this change may touch. Everything else stays byte-for-byte identical.' : 'Change a material above and the image will show, in green, exactly which pixels will be repainted.'}
-                                </div>
-                            </>
-                        )}
-                    </div>
-                ) : detectedDetails.length > 0 ? (
+                {detectedDetails.length > 0 ? (
                     <div className="flex-1 flex flex-col gap-5">
                         {/* Dark-theme leftovers: white text on the white sidebar made
                             this instruction invisible, so the 16 chips looked
                             unexplained and the hidden Generate button confusing. */}
                         <div className="flex justify-between items-center text-[10px] uppercase tracking-[0.2em] font-bold text-slate-400">
-                            <span>Select 4 Focus Details</span>
-                            <span className={`${selectedDetails.length === 4 ? 'text-accent' : 'text-slate-300'}`}>{selectedDetails.length} / 4 Selected</span>
+                            <span>{mode === 'shots' ? 'Suggested camera shots' : 'Select 4 Focus Details'}</span>
+                            {mode === 'shots'
+                                ? <span className={`${selectedDetails.length === 1 ? 'text-accent' : 'text-slate-300'}`}>{selectedDetails.length === 1 ? 'Shot picked' : 'Pick one shot'}</span>
+                                : <span className={`${selectedDetails.length === 4 ? 'text-accent' : 'text-slate-300'}`}>{selectedDetails.length} / 4 Selected</span>}
                         </div>
 
                         <div className="grid grid-cols-1 gap-3">
@@ -220,7 +141,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                                 </div>
                                 <h3 className="text-accent font-medium tracking-tight">Awaiting Scene</h3>
                                 <p className="text-slate-400 text-xs leading-relaxed">
-                                    Upload an image to detect surface materials and architectural details for your grid.
+                                    Upload a finished render to pick out the details worth a close-up.
                                 </p>
                             </>
                         )}
@@ -228,48 +149,39 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                 )}
 
                 <div className="mt-auto pt-6 border-t border-white/10">
-                    {mode === 'change' && !isAnalyzingMaterials && (
+                    {((mode === 'closeup' && selectedDetails.length === 4) || (mode === 'shots' && selectedDetails.length === 1)) && (
                         <div className="pt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <Button
                                 className="w-full"
-                                onClick={onApplyMaterials}
-                                disabled={isLoading}
-                                icon={<Palette size={16} />}
-                            >
-                                Apply Materials
-                            </Button>
-                        </div>
-                    )}
-
-                    {mode === 'closeup' && selectedDetails.length === 4 && (
-                        <div className="pt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <Button
-                                className="w-full"
-                                // Wrapped, NOT passed directly. handleMaterialStudio
+                                // Wrapped, NOT passed directly. handleDetailStudio
                                 // takes an optional source image as its first
                                 // argument, so handing it straight to onClick made
                                 // React pass the click event as that image - and the
                                 // event is truthy, so it was sent to the API and
                                 // JSON.stringify choked on the React fiber inside
                                 // the button element.
-                                onClick={() => handleMaterialStudio()}
+                                onClick={() => handleDetailStudio()}
                                 disabled={isLoading}
                                 icon={<Grid size={16} />}
                             >
-                                Generate Grid (2x2)
+                                {mode === 'shots' ? 'Generate shot' : 'Generate Grid (2x2)'}
                             </Button>
                         </div>
                     )}
                 </div>
             </div>
 
-            <div className="flex-1 p-6 md:p-12 flex items-center justify-center relative z-10 w-full overflow-hidden">
+            {/* Same column as every other tool page (TOOL_CANVAS_COL), so the
+                canvas fills the workspace height instead of sitting at its
+                320px minimum in a centred wrapper (Charlie, 21 Sep 2026: "the
+                render box is much thinner than all the others"). */}
+            <div className={`${TOOL_CANVAS_COL} relative z-10 justify-center`}>
                 {isLoading ? (
                     <div className={`${RENDER_CANVAS} flex-col bg-white z-50`}>
                         <Loader2 className="w-10 h-10 animate-spin text-accent mb-4 mx-auto" />
                         <p className="text-accent font-medium text-lg tracking-wide text-center mx-auto">{loadingMessage}</p>
                     </div>
-                ) : materialStudioImage ? (
+                ) : detailStudioImage ? (
                     <div className="flex-1 flex items-center justify-center p-8 relative z-10 transition-all duration-700 opacity-100 scale-100">
                         {/*
                           * Bounded by HEIGHT as well as width.
@@ -282,9 +194,9 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                           */}
                         <div className="relative group rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 max-w-5xl max-h-full">
                             <img
-                                src={getImageUrl(materialStudioImage)}
+                                src={getImageUrl(detailStudioImage)}
                                 className="max-h-[68vh] w-auto max-w-full object-contain bg-black block"
-                                alt="Material Studio Generation"
+                                alt="Detail Studio Generation"
                             />
                             {/* Always visible, not hover-only: on a tall sheet the
                                 hover target sat off-screen, so the only way to
@@ -304,9 +216,9 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                                         JPG
                                     </button>
                                 </div>
-                                {onSaveToProject && materialStudioImage && (
+                                {onSaveToProject && detailStudioImage && (
                                     <button
-                                        onClick={() => onSaveToProject(materialStudioImage)}
+                                        onClick={() => onSaveToProject(detailStudioImage)}
                                         className="p-3 bg-white text-black rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center border border-white/20 shadow-2xl scale-100 active:scale-95"
                                         title="Save to Project"
                                     >
@@ -314,9 +226,9 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                                     </button>
                                 )}
                                 <button
-                                    onClick={() => handleDownload(materialStudioImage, 'MaterialStudio')}
+                                    onClick={() => handleDownload(detailStudioImage, 'DetailStudio')}
                                     className="p-3 bg-white text-black rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center border border-white/20 shadow-2xl scale-100 active:scale-95"
-                                    title="Download Material Focus Sheet"
+                                    title="Download this shot"
                                 >
                                     <Download size={20} />
                                 </button>
@@ -324,25 +236,15 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                         </div>
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center justify-center text-secondary w-full">
-                        {originalImage && mode === 'change' ? (
-                            /* The source, sharp, with the mask tint over it when a
-                               change is pending - the honest picture of what the
-                               next Apply will and will not touch. */
-                            <div className={`${RENDER_CANVAS} group`}>
-                                <img src={getImageUrl(materialMaskPreview || originalImage)} className="w-full h-full object-contain absolute inset-0 transition-opacity duration-300" alt="Source" />
-                                {materialMaskPreview && (
-                                    <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-none bg-emerald-600/90 text-white text-[10px] font-bold uppercase tracking-widest shadow-lg">Green = the only pixels that will change</div>
-                                )}
-                            </div>
-                        ) : originalImage ? (
+                    <div className="flex-1 min-h-0 flex flex-col items-stretch justify-center text-secondary w-full">
+                        {originalImage ? (
                             <div className={`${RENDER_CANVAS} group`}>
                                 <img src={getImageUrl(originalImage)} className="w-full h-full object-contain opacity-30 grayscale transition-all duration-700 group-hover:opacity-50 absolute inset-0" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent"></div>
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                     <div className="glass-panel px-8 py-6 rounded-2xl text-white text-center shadow-[0_0_30px_rgba(0,0,0,0.5)] border border-white/20 backdrop-blur-xl">
                                         <p className="text-xl font-bold mb-2 tracking-tight">Source Analyzed</p>
-                                        <p className="text-sm text-white/80 font-medium">Select exactly 4 focal points to render.</p>
+                                        <p className="text-sm text-white/80 font-medium">{mode === 'shots' ? 'Pick one camera shot to generate.' : 'Select exactly 4 focal points to render.'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -365,7 +267,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                         )}
                     </div>
                 )}
-                
+
                 {historyFooter && (
                     <div className="absolute bottom-6 left-6 right-6 z-20 flex justify-center">
                         <div className="w-full max-w-5xl">
@@ -380,7 +282,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                     spending a call rather than guessing. */}
                 {originalImage && !mode && !isLoading && (
                     <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-6 animate-in fade-in duration-300">
-                        <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-white p-8 md:p-10 space-y-8 relative animate-in zoom-in-95 duration-300">
+                        <div className="w-full max-w-xl bg-white rounded-xl shadow-2xl border border-white p-8 md:p-10 space-y-8 relative animate-in zoom-in-95 duration-300">
                             <button
                                 onClick={onOpenSceneUpload}
                                 aria-label="Choose a different image"
@@ -392,7 +294,7 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                             <div className="space-y-2">
                                 <h3 className="text-2xl font-bold text-accent tracking-tight">What would you like to do?</h3>
                                 <p className="text-slate-600 text-sm">
-                                    Your image is ready. Choose how Material Studio should work with it.
+                                    Your image is ready. Choose how Detail Studio should work with it.
                                 </p>
                             </div>
 
@@ -414,17 +316,17 @@ export const MaterialStudioView: React.FC<MaterialStudioViewProps> = ({
                                 </button>
 
                                 <button
-                                    onClick={() => onChooseMode('change')}
+                                    onClick={() => onChooseMode('shots')}
                                     className="group text-left p-6 rounded-2xl border border-slate-200 hover:border-accent/50 hover:bg-accent/5 transition-all space-y-3"
                                 >
                                     <div className="w-12 h-12 rounded-2xl bg-accent/8 border border-accent/15 flex items-center justify-center text-accent">
-                                        <Layers size={22} />
+                                        <Camera size={22} />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <h4 className="font-bold text-accent">Change Materials</h4>
+                                        <h4 className="font-bold text-accent">Camera shots</h4>
                                         <p className="text-xs text-slate-500 leading-relaxed">
-                                            The AI analyses the building and detects its cladding, roof, glazing,
-                                            doors and ground - then swap any of them.
+                                            The engine suggests close-up shots of your render - through the glazing,
+                                            at a corner, on a detail. Pick one and it takes that photograph.
                                         </p>
                                     </div>
                                 </button>

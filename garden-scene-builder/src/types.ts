@@ -422,9 +422,31 @@ export interface PricingConfig {
   basePrices: Record<string, number>;
 }
 
+/** Output frame shapes a saved camera can be set to; the import is cropped to it. */
+export type CameraRatio = '16:9' | '3:2' | '4:3' | '1:1' | '4:5';
+
+/**
+ * A saved camera (21 Sep 2026): a view you can always go back to, in either
+ * the orbit ('3d') or the walk ('walking') camera, with its lens and the
+ * output frame. Position and target are world metres. Saved with the scene,
+ * so a design keeps its cameras and a scheme can be rendered from the same
+ * three angles every time.
+ */
+export interface SavedCamera {
+  id: string;
+  name: string;
+  mode: '3d' | 'walking';
+  position: [number, number, number];
+  target: [number, number, number];
+  fov: number;
+  ratio: CameraRatio;
+}
+
 export interface SceneState {
   room: Room;
   objects: SceneObject[];
+  /** Saved cameras, see SavedCamera. Absent on designs saved before they existed. */
+  cameras?: SavedCamera[];
   fences: FenceRun[];
   /** The style a newly drawn run takes; runs drawn before this existed
    *  (no kind of their own) also fall back to it. */

@@ -1,11 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useAppEngine, compressImageFile } from '../../hooks/useAppEngine';
+import { useAppEngine } from '../../hooks/useAppEngine';
 import { AppStage, Project } from '../../types';
 import { useCredits } from '../../hooks/useCredits';
 import { Construction, FolderOpen, ChevronDown } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { createProject, listProjects, updateProject } from '../../services/projectService';
-import { setConfigSpec } from '../../services/geminiService';
 import { consumePendingDesign } from '../../services/designHandoff';
 import { setPendingPlanCapture } from '../../services/floorPlanService';
 
@@ -129,52 +128,16 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
         return;
       }
 
-      if (event.data && event.data.type === 'RENDER_3D_SCENE') {
-        // The public configurator has no render button; a message claiming
-        // otherwise is not honoured. Renders are also gated on the server.
+      /**
+       * The configurator no longer hands anything to the engine (Charlie,
+       * 21 Sep 2026): its camera mode CAPTURES a screenshot that downloads,
+       * and the user uploads it to the Render Engine like any other image,
+       * so the analysis reads the picture and nothing else. The only message
+       * left is "take me to the Render Engine", with nothing preloaded.
+       */
+      if (event.data && event.data.type === 'OPEN_RENDER_ENGINE') {
         if (configModeRef.current !== 'business') return;
-        const dataUrl = event.data.image;
-        // Hard-constraint spec for the render prompt — the server turns this
-        // into "exactly N doors, style X, cladding Y" so the render matches
-        // the configured building instead of guessing from the screenshot.
-        setConfigSpec(event.data.roomSpec || null);
-        // The rebuilt engine: the exact edge drawing and the design itself,
-        // from which the inventory shown in the render panel is built.
-        const lineDataUrl: string | null = typeof event.data.lineImage === 'string' ? event.data.lineImage : null;
-        engine.loadConfiguratorScene(lineDataUrl ? lineDataUrl.replace(/^data:[^;]+;base64,/, '') : null, event.data.roomSpec || null);
-
-        // Convert dataUrl to a File object so the engine can process it properly
-        fetch(dataUrl)
-          .then(res => res.blob())
-          .then(async blob => {
-            const file = new File([blob], '3d-design.png', { type: 'image/png' });
-
-            try {
-                // Compress the image to strip the prefix and reduce size before sending to API
-                const base64Data = await compressImageFile(file, 2048);
-
-                // Set it as if they uploaded a SketchUp image
-                engine.setIsSketchUpMode(true);
-
-                // Manually set the original image directly
-                engine.setOriginalImageForStage(AppStage.RENDER_ENGINE, base64Data);
-
-                // Switch to the Render Engine stage
-                engine.setActiveStage(AppStage.RENDER_ENGINE);
-
-                // Identical to a MANUAL SKETCHUP upload from here - which skips
-                // material auto-detect. The configurator already chose every
-                // material, so there is nothing for an image analyser to guess;
-                // running it on the flat-shaded screenshot invented elements
-                // (windows on windowless buildings) that then contradicted the
-                // spec. Materials stay at their defaults, so the CGI render
-                // prompt keeps the model's colour intent, and the spec locks
-                // counts and dimensions.
-                engine.setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
-            } catch (err) {
-                console.error("Failed to process 3D scene image", err);
-            }
-          });
+        engine.setActiveStage(AppStage.RENDER_ENGINE);
       }
     };
 
@@ -242,7 +205,7 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
               {canUseBusinessConfig ? 'Included in your plan' : 'Configurator plan and up'}
             </span>
             <h3 className="text-lg font-bold text-white mb-2">Full</h3>
-            <p className="text-sm text-white/70 leading-relaxed mb-5">Everything: interiors, kitchens, furniture, the walkthrough and lighting plan. Send it to the Render Engine on The Hub.</p>
+            <p className="text-sm text-white/70 leading-relaxed mb-5">Everything: interiors, kitchens, furniture, the walkthrough and lighting plan. Capture any view and render it in the Render Engine on The Hub.</p>
             <span className="text-xs font-bold uppercase tracking-wider text-white">{canUseBusinessConfig ? 'Open →' : 'See the plans →'}</span>
           </button>
         </div>

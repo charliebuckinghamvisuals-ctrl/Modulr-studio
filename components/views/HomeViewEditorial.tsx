@@ -32,7 +32,6 @@ import { WalkthroughShowcase } from '../WalkthroughShowcase';
 
 interface HomeViewProps {
     onOpenEngine: () => void;
-    onOpenMaterialStudio: () => void;
     onNavigate?: (stage: AppStage) => void;
 }
 
@@ -57,7 +56,8 @@ const REASONS = [
 const TOOLS: { label: string; line: string; stage: AppStage; badge?: string }[] = [
     { label: '3D Configurator', line: 'Design to real dimensions', stage: AppStage.DESIGNER },
     { label: 'Render Engine', line: 'Pro-level CGI from the design', stage: AppStage.RENDER_ENGINE },
-    { label: 'Material Studio', line: 'Swap any surface, honestly', stage: AppStage.MATERIAL_STUDIO },
+    { label: 'Detail Studio', line: 'The finish, up close', stage: AppStage.DETAIL_STUDIO },
+    { label: 'Material Editor', line: 'Swap any surface, honestly', stage: AppStage.MATERIAL_EDITOR },
     { label: 'Weather Lab', line: 'Same scheme, any season', stage: AppStage.WEATHER_LAB },
     { label: 'Floor Plan Studio', line: 'Rendered and CAD plans', stage: AppStage.FLOOR_PLAN_STUDIO, badge: 'Coming soon' },
     { label: 'Animation Studio', line: 'A render, brought to life', stage: AppStage.ANIMATION_STUDIO, badge: 'Coming soon' },
@@ -175,7 +175,7 @@ const HeroCopy: React.FC<{ light?: boolean; onOpenEngine: () => void; onDesign?:
             className={`${light ? 'text-white' : 'text-accent'} text-[1.9rem] sm:text-4xl lg:text-[3.1rem] leading-[1.1] mt-4`}
             style={light ? { textShadow: '0 1px 2px rgba(0,0,0,0.35)' } : undefined}
         >
-            Design it in 3D. Walk through it. Render it like a pro.
+            Design in 3D. Render like a pro.
         </h1>
         <p className={`${light ? 'text-white/85' : 'text-secondary'} text-base lg:text-lg font-light leading-relaxed mt-5 max-w-xl`}>
             The design-to-render platform for garden room and annexe providers: one design, carried from the configurator to the client's inbox.
@@ -307,8 +307,8 @@ export const HomeViewEditorial: React.FC<HomeViewProps> = ({ onOpenEngine, onNav
 
                 <Step
                     n="02" name="Render" flip
-                    title="The engine is handed the building you priced, not a screenshot."
-                    body="Send any configurator view, CAD export or line drawing. The geometry is the foundation; the engine lights and finishes it, it does not redraw it. The Modulr Lock System checks every item before the image ships."
+                    title="Upload the view. The engine does the rest."
+                    body="A capture from the configurator, a CAD export or a line drawing. The engine draws its own line drawing from it, lists every item it sees, and lights and finishes the geometry without redrawing it. The Modulr Lock System checks every item before the image ships."
                     action={{ label: 'Launch the Render Engine', onClick: onOpenEngine }}
                 >
                     <div className="overflow-hidden border border-slate-200">
@@ -320,17 +320,17 @@ export const HomeViewEditorial: React.FC<HomeViewProps> = ({ onOpenEngine, onNav
                 <Step
                     n="03" name="Material details"
                     title="Close enough to sell the finish."
-                    body="Material Studio takes a finished render to macro: the cladding grain, the glazing bars, the bench in the sauna. Swap a surface and only that surface changes; the rest of the image is left exactly as it was."
-                    action={{ label: 'Open Material Studio', onClick: go(AppStage.MATERIAL_STUDIO) }}
+                    body="Detail Studio takes a finished render to macro: the cladding grain, the glazing bars, the bench in the sauna. The Material Editor swaps a surface and only that surface changes; the rest of the image is left exactly as it was."
+                    action={{ label: 'Open Detail Studio', onClick: go(AppStage.DETAIL_STUDIO) }}
                 >
                     {/* The sheet is square and narrower than the column; it and
                         its caption share one left-aligned wrapper so the caption
                         starts under the image's edge, not the column's. */}
                     <div className="max-w-[720px]">
                         <div className="aspect-square overflow-hidden bg-[#eef0ec]">
-                            <img src="/sauna-materials.jpg" alt="Material Studio sheet of the garden gym and sauna: bronze glazing bars, the sauna bench, oak cladding grain and a frame corner against lavender" loading="lazy" className="w-full h-full object-cover" />
+                            <img src="/sauna-materials.jpg" alt="Detail Studio sheet of the garden gym and sauna: bronze glazing bars, the sauna bench, oak cladding grain and a frame corner against lavender" loading="lazy" className="w-full h-full object-cover" />
                         </div>
-                        <Caption>Material Studio sheet · the garden gym and sauna at the top of the page</Caption>
+                        <Caption>Detail Studio sheet · the garden gym and sauna at the top of the page</Caption>
                     </div>
                 </Step>
 

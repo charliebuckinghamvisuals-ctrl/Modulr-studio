@@ -2,7 +2,7 @@ import React from 'react';
 import {
     Phone, Mail, ArrowRight, ExternalLink, Box, Layers,
     PenTool, Palette, CloudSun, FolderOpen, ShieldCheck, FileText, Lock,
-    Film, ClipboardCheck,
+    Film, ClipboardCheck, Grid,
 } from 'lucide-react';
 import { Button } from '../Button';
 import { DraftingBackground } from '../DraftingBackground';
@@ -65,7 +65,7 @@ const TOOLS: Tool[] = [
         image: '/gallery-4.jpg',
         tagline: 'Pro-level CGI exteriors from a drawing, a photo or the configurator',
         body:
-            'The core of the platform. Feed it a view from the 3D Configurator, a SketchUp screenshot, a CAD elevation, a line drawing or a site photograph and it returns a finished architectural visual - correct materials, believable light, real context. Built specifically around the language of garden rooms and annexes rather than generic architecture. From the configurator it is handed the full specification - every door, window and cladding face - so the render matches the design you priced.',
+            'The core of the platform. Upload a view - a capture from the 3D Configurator, a screenshot, a CAD elevation, a line drawing or a site photograph - and it returns a finished architectural visual: correct materials, believable light, real context. Built specifically around the language of garden rooms and annexes rather than generic architecture. It draws its own line drawing from your image, lists every item it sees, and checks the render against that list before it ships.',
         points: [
             'Works from SketchUp and CAD exports, line drawings or photographs',
             'Automatic detection of cladding, roof, glazing, doors and ground treatment',
@@ -88,8 +88,22 @@ const TOOLS: Tool[] = [
         ],
     },
     {
+        icon: <Grid size={22} />,
+        name: 'Detail Studio',
+        image: '/sauna-materials.jpg',
+        tagline: 'The finish, up close',
+        body:
+            'Take a finished render to macro. A 2x2 close-up sheet of the cladding grain, the glazing bars and the joinery for the specification page, or a single camera shot of any detail the engine picks out - the same building, the same light, nothing redesigned.',
+        points: [
+            'Four focal points on one 2x2 detail sheet',
+            'Suggested camera shots: through the glazing, at a corner, on a detail',
+            'Photographs the render as it is; nothing is invented',
+            'Sheets and shots save straight to the Project',
+        ],
+    },
+    {
         icon: <Palette size={22} />,
-        name: 'Material Studio',
+        name: 'Material Editor',
         image: '/gallery-8.jpg',
         tagline: 'Change the specification, keep the building',
         body:
