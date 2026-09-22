@@ -16,7 +16,11 @@ import { describeExteriorLights, describeInterior, describePlanItems } from '../
 import { cropToInk } from '../utils/renderInputs';
 import { DOOR_KINDS, LEAF_RANGE, doorKind, clampLeaves, changesForKind } from '../utils/doors';
 import type { DoorKind } from '../types';
-import { MATERIAL_DEF } from '../utils/materials';
+import { MATERIAL_DEF, resolveDeckingKey } from '../utils/materials';
+
+/** The preset colour the decking boards show when no custom colour is set. */
+const deckPresetColour = (room: { deckingMaterial?: string; cladding?: string }): string =>
+  ((MATERIAL_DEF as any)[resolveDeckingKey(room.deckingMaterial, room.cladding)]?.color as string | undefined) ?? '#a3794a';
 import { ObjectTile } from './UI/ObjectTile';
 import { KitchenPanel } from './UI/KitchenPanel';
 import { TemplatesSection } from './UI/TemplatesSection';
@@ -952,28 +956,41 @@ export function Sidebar() {
               <div className="space-y-4 mt-4">
                 <div>
                   <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Base / Decking</label>
+                  {/* Every deck is the same painted-board set (22 Sep 2026); these
+                      are its preset colours. Picking one clears any custom
+                      colour so the preset shows as itself. */}
                   <div className="flex gap-2 flex-wrap">
                     {['concrete', 'timber', 'composite_cedar', 'composite_oak', 'composite_black', 'composite_dark_grey', 'composite_grey', 'composite_brown'].map(col => {
-                      const isActive = col === 'concrete' ? room.baseMaterial === 'concrete' : (room.deckingMaterial || room.cladding || 'timber') === col && room.baseMaterial !== 'concrete';
+                      const isActive = col === 'concrete' ? room.baseMaterial === 'concrete' : (room.deckingMaterial || room.cladding || 'timber') === col && room.baseMaterial !== 'concrete' && !room.deckingTint;
                       return (
-                        <button 
-                          key={col} 
+                        <button
+                          key={col}
                           onClick={() => {
                             if (col === 'concrete') {
                               updateRoom({ baseMaterial: 'concrete' });
                             } else {
-                              updateRoom({ 
+                              updateRoom({
                                 baseMaterial: col === 'timber' ? 'timber_decking' : 'composite_decking',
-                                deckingMaterial: col as any
+                                deckingMaterial: col as any,
+                                deckingTint: undefined,
                               });
                             }
-                          }} 
+                          }}
                           className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg uppercase transition-colors ${isActive ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
-                          {col.replace('composite_', 'comp ').replace('_', ' ')}
+                          {col === 'concrete' ? 'Concrete' : col === 'timber' ? 'Timber' : col.replace('composite_', '').replace('_', ' ')}
                         </button>
                       );
                     })}
                   </div>
+                  {room.baseMaterial !== 'concrete' && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <input type="color" value={room.deckingTint || deckPresetColour(room)} onChange={(e) => updateRoom({ deckingTint: e.target.value })} className="w-7 h-7 rounded-md cursor-pointer border-0 shadow-sm overflow-hidden" title="Board colour" />
+                      <span className="text-[10px] text-gray-500">Board colour{room.deckingTint ? '' : ' (preset)'}</span>
+                      {room.deckingTint && (
+                        <button onClick={() => updateRoom({ deckingTint: undefined })} className="ml-auto text-[10px] font-semibold text-gray-400 hover:text-[#3b4d4a]">Reset</button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </CollapsibleSection>

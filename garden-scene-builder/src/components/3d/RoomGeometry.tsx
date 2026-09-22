@@ -805,7 +805,7 @@ function DoorLabel({ mm, from, onCommit, onRemove, onSwap, swapLabel }: {
   );
 }
 
-function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; room: any; showDims: boolean }) {
+function PartitionUnit({ part, hP, room, showDims, ceilingUnder }: { part: any; hP: number; room: any; showDims: boolean; ceilingUnder: ((u: number) => number) | null }) {
   const isSelected = useStore(s => s.selectedElementId === `part-${part.id}`);
   const [dragging, setDragging] = useState(false);
   const grabRef = useRef<{ dx: number; dz: number } | null>(null);
@@ -904,65 +904,65 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
   };
 
   /**
-   * Internal walls follow the gable instead of stopping short of it.
+   * Internal walls follow the gable instead of stopping short of it
+   * (reinstated 22 Sep 2026, checked in the live scene this time).
    *
    * hP is the wall height, which under a gable roof left a triangular gap
-   * between the top of every partition and the underside of the roof - you
-   * could see straight over the wall into the next room.
+   * between the top of every partition and the ceiling - you could see
+   * straight over the wall into the next room. The wall body stays exactly
+   * as it was; the gap is filled by a CAP on top.
    *
-   * Two cases, and which one applies depends on how the partition lies
-   * relative to the ridge:
+   * The cap is the ceiling's own profile. The parent hands in ceilingUnder(u):
+   * the height of the ceiling's underside at distance u from the ridge, the
+   * same maths the ceiling panels are hung from, flat ceiling included. Along
+   * the wall's own axis that is a known height at every point, so the cap is
+   * just that outline extruded through the wall's thickness: no booleans, no
+   * rotated cutters, nothing to get subtly wrong. A wall along the ridge gets
+   * a flat-topped cap from the same code; under a flat roof there is no cap.
    *
-   *   ACROSS the slope - the roof height changes along the wall's length, so
-   *     the wall needs a pitched top. Built by raising it to the ridge and
-   *     cutting the two roof planes off it.
-   *   ALONG the ridge - the roof height is the same everywhere along the
-   *     wall, so it just needs to be taller. No cutting, no CSG.
-   */
-  const gRoofH = (room.roofHeightMm ?? 200) / 1000;
-  const isGableRoom = room.shape === 'Gable';
-  const sideGable = isGableRoom && room.gableOrientation === 'side';
-  const roomW = room.widthMm / 1000;
-  const roomD = room.depthMm / 1000;
-  // Half-span measured across the slope, and the wall's offset from the ridge.
-  const halfSpan = (sideGable ? roomD : roomW) / 2;
-  const acrossSlope = isGableRoom && (sideGable ? part.rotation === 90 : part.rotation !== 90);
-  // Distance from the ridge line to this wall, for the along-ridge case.
-  const ridgeOffset = sideGable ? pZ : pX;
-  const ridgeY = hP + gRoofH;
-  const roofYAt = (u: number) => hP + gRoofH * (1 - Math.min(1, Math.abs(u) / halfSpan));
-
-  /**
-   * The wall body stays exactly as it was; the gap is filled by a CAP on top.
-   *
-   * The first attempt raised the wall to the ridge and tried to cut the two
-   * roof planes off it with rotated boxes. Getting that transform wrong does
-   * not fail safely - the cut simply misses and the wall stands at full ridge
-   * height, straight through the roof, which is what happened.
-   *
-   * This computes the roof profile directly instead. Along the wall's own x
-   * axis the underside of the roof is a known height at every point, so the
-   * cap is just that outline extruded through the wall's thickness: no
-   * booleans, no rotations, nothing to get subtly wrong. Where the wall runs
-   * along the ridge the profile is flat and the same code yields a plain
-   * rectangle.
+   * Two earlier attempts were backed out - one cut the roof planes off a
+   * ridge-height box with rotated cutters and missed, one was this profile
+   * but shipped with an unrelated black screen. See the git history.
    */
   const boxH = hP;
-
-  /*
-   * NOTE: internal walls do NOT yet follow the gable - they stop at wall
-   * height and leave a triangular gap to the underside of the roof.
-   *
-   * Two attempts at closing it have been backed out. The first raised the
-   * wall to the ridge and cut the roof planes off with rotated boxes: a wrong
-   * transform there does not fail safely, the cut misses and the wall stands
-   * through the roof. The second built the cap as an extruded profile, which
-   * is the right approach, but it went out in the same build as a black
-   * screen and could not be cleared of causing it.
-   *
-   * Backed out on purpose rather than left in unproven. Reinstate the profile
-   * version only alongside someone who can actually see the render.
+  const sideGable = room.shape === 'Gable' && room.gableOrientation === 'side';
+  /** Ridge distance of a point given in the wall group's local frame. */
+  const ridgeDist = (lx: number, lz: number) => {
+    const c = Math.cos(rotAngle), s = Math.sin(rotAngle);
+    const wx = pX + lx * c + lz * s;
+    const wz = pZ - lx * s + lz * c;
+    return sideGable ? wz : wx;
+  };
+  /**
+   * The cap outline in a (s, y) plane, s running along the run's own axis,
+   * extruded through the wall thickness and centred on it. Sampled finely
+   * enough that the ridge crease, wherever it falls along the wall, is
+   * reproduced rather than cut across. Buried 15mm into the ceiling panel
+   * and 5mm into the wall head so neither seam shows daylight.
    */
+  const capGeometry = (len: number, uAt: (s: number) => number): THREE.BufferGeometry | null => {
+    if (!ceilingUnder) return null;
+    const bottom = boxH / 2 - 0.005;
+    const N = 48;
+    const pts: [number, number][] = [];
+    let tallest = 0;
+    for (let i = 0; i <= N; i++) {
+      const s = -len / 2 + (len * i) / N;
+      const top = ceilingUnder(uAt(s)) + 0.015 - boxH / 2;
+      tallest = Math.max(tallest, top - bottom);
+      pts.push([s, Math.max(bottom + 0.002, top)]);
+    }
+    if (tallest < 0.01) return null;
+    const shape = new THREE.Shape();
+    shape.moveTo(-len / 2, bottom);
+    shape.lineTo(len / 2, bottom);
+    for (let i = pts.length - 1; i >= 0; i--) shape.lineTo(pts[i][0], pts[i][1]);
+    shape.closePath();
+    const g = new THREE.ExtrudeGeometry(shape, { depth: pT, bevelEnabled: false });
+    g.translate(0, 0, -pT / 2);
+    g.computeVertexNormals();
+    return g;
+  };
 
   const doorHeight = (dr: any) => Math.min(dr.heightMm / 1000, hP - 0.05);
   const viewMode = useStore(s => s.viewMode);
@@ -999,6 +999,18 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
   const paper = wallpaperProps();
   const mainGeom = useMemo(() => createWorldScaleBoxGeometry(pL, boxH, pT, false, 0, 0, 0), [pL, boxH, pT]);
   const legGeom = useMemo(() => (hasLeg ? createWorldScaleBoxGeometry(pT, boxH, legL, false, 0, 0, 0) : null), [hasLeg, pT, boxH, legL]);
+  // Gable caps. The leg's cap is built along the leg (s = local z from the
+  // corner) and turned into place with the same rotation as the leg itself.
+  const legX = le * (pL / 2 - pT / 2);
+  const legZ0 = ld * (legL / 2 + pT / 2);
+  const mainCap = useMemo(() => capGeometry(pL, (s) => ridgeDist(s, 0)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ceilingUnder, pL, pT, boxH, pX, pZ, rotAngle, sideGable]);
+  const legCap = useMemo(() => (hasLeg ? capGeometry(legL, (s) => ridgeDist(legX, legZ0 + s)) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ceilingUnder, hasLeg, legL, legX, legZ0, pT, boxH, pX, pZ, rotAngle, sideGable]);
+  useEffect(() => () => { mainCap?.dispose(); }, [mainCap]);
+  useEffect(() => () => { legCap?.dispose(); }, [legCap]);
   const wallMat = (
     <meshStandardMaterial
       {...paper}
@@ -1077,6 +1089,21 @@ function PartitionUnit({ part, hP, room, showDims }: { part: any; hP: number; ro
               </Subtraction>
             ))}
           </Geometry>
+          {wallMat}
+        </mesh>
+      )}
+
+      {/* Gable caps: the wall's top follows the ceiling. Not part of the
+          boolean above - doors never reach this high, and keeping the cap a
+          plain mesh means a bad profile can only ever look wrong, never
+          knock the wall out. */}
+      {mainCap && (
+        <mesh geometry={mainCap} castShadow receiveShadow onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onClick={stopEvt}>
+          {wallMat}
+        </mesh>
+      )}
+      {legCap && (
+        <mesh geometry={legCap} position={[legX, 0, legZ0]} rotation={[0, -Math.PI / 2, 0]} castShadow receiveShadow onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onClick={stopEvt}>
           {wallMat}
         </mesh>
       )}
@@ -1666,6 +1693,32 @@ export function RoomGeometry() {
     return panels;
   }, [isGable, gSpan, wallThickness, isSideGable, w, d, roofH, h, gableFascia,
       room.gableFlatCeiling, room.gableCeilingHeightMm]);
+
+  /**
+   * Where the ceiling's UNDERSIDE is, at distance u from the ridge - the
+   * same line the panels above are hung from, so a partition capped to it
+   * meets the ceiling flush. Under a flat ceiling it is the lower of the
+   * flat panel and the slope. Null when there is no gable: partitions under a
+   * flat roof already reach the ceiling.
+   */
+  const gableCeilingUnder = useMemo(() => {
+    if (!isGable || !gableCeiling) return null;
+    const spanHalf = gSpan / 2;
+    const pitch = Math.atan2(roofH, spanHalf);
+    const perp = Math.cos(pitch);
+    const wallTop = h + 0.025;
+    const roofUnder = (u: number) =>
+      wallTop + roofH * (1 - Math.min(1, Math.abs(u) / spanHalf)) - 0.025 - (gableFascia / 2) / perp;
+    const under = (u: number) => roofUnder(u) - GABLE_CEILING_T / perp - 0.006;
+    let flatUnder = Infinity;
+    if (room.gableFlatCeiling) {
+      const asked = (room.gableCeilingHeightMm ?? 2400) / 1000;
+      const soffit0 = roofUnder(0) - (GABLE_CEILING_T / 2) / perp - 0.006;
+      const flatY = Math.max(1.8, Math.min(0.01 + asked + GABLE_CEILING_T / 2, soffit0));
+      flatUnder = flatY - GABLE_CEILING_T / 2;
+    }
+    return (u: number) => Math.min(under(u), flatUnder);
+  }, [isGable, gableCeiling, gSpan, roofH, h, gableFascia, room.gableFlatCeiling, room.gableCeilingHeightMm]);
 
   const lShapeCutOuterGeom = useMemo(() => createWorldScaleBoxGeometry(cutW + 0.2, h + 1, cutD + 0.2, false, 0, 0, 0, isVertical), [cutW, cutD, h, roofH, isGable, isVertical]);
   // Roof plan size is exactly roofW x roofD (wall footprint + user overhangs).
@@ -3214,7 +3267,7 @@ export function RoomGeometry() {
           (click), body-draggable with snapping to the room walls and other
           internal walls, and owns its doors so they travel with it. */}
       {room.partitions?.map(part => (
-        <PartitionUnit key={part.id} part={part} hP={isPitched && !isGable ? (frontH + backH)/2 : h} room={room} showDims={room.showDimensions} />
+        <PartitionUnit key={part.id} part={part} hP={isPitched && !isGable ? (frontH + backH)/2 : h} room={room} showDims={room.showDimensions} ceilingUnder={gableCeilingUnder} />
       ))}
 
       {/* Interior Doors */}

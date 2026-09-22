@@ -39,25 +39,32 @@ export const MATERIAL_DEF = {
   charcoal: { prefix: 'weathered_larch', tileSize: 2.0, roughness: 1.0, color: '#555555' },
   weathered_larch: { prefix: 'weathered_larch', tileSize: 2.0, roughness: 1.0, color: '#ffffff' },
   // ── Decking range ─────────────────────────────────────────────────────────
-  // Colours deliberately mirror the wall cladding range so a scheme reads as
-  // one product family. Painted tones use the colour-neutralised decking map
-  // for the same reason the cladding does: tinting light grey through a brown
-  // timber base produces mud rather than grey.
-  composite_cedar: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.75, color: '#b0764b' },
-  composite_oak: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.75, color: '#c9a173' },
-  composite_light_oak: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.75, color: '#dcc09a' },
-  composite_white: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.72, color: '#e8e6e1', neutral: true },
-  composite_brown: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.8, color: '#8b6b55' },
-  composite_black: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.8, color: '#1f2123', neutral: true },
-  composite_dark_grey: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.78, color: '#4a5057', neutral: true },
-  composite_grey: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.75, color: '#a9aeb2', neutral: true },
-  composite_slate_blue: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.75, color: '#7c93a6', neutral: true },
-  composite_sage: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.76, color: '#7e8c74', neutral: true },
-  composite_clay: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.78, color: '#9a6b58', neutral: true },
+  // ONE surface, many colours (Charlie, 22 Sep 2026: "the decking material
+  // is terrible - make it the painted boards, and you can change colours").
+  // Every deck key is the painted-planks board set - the same texture as the
+  // 'painted_planks' cladding, colour-neutralised so a tint reads true - laid
+  // at 140mm boards (20 boards across the 2.8m tile). The keys stay so saved
+  // designs, the price table and the render spec still resolve; each one is
+  // now just a preset colour. room.deckingTint overrides the preset
+  // (deckTint: true) - see useRealMaterial.
+  composite_cedar: { prefix: 'white_planks', tileSize: 2.8, roughness: 0.72, color: '#b0764b', neutral: true, noAo: true, deckTint: true },
+  composite_oak: { prefix: 'white_planks', tileSize: 2.8, roughness: 0.72, color: '#c9a173', neutral: true, noAo: true, deckTint: true },
+  composite_light_oak: { prefix: 'white_planks', tileSize: 2.8, roughness: 0.72, color: '#dcc09a', neutral: true, noAo: true, deckTint: true },
+  composite_white: { prefix: 'white_planks', tileSize: 2.8, roughness: 0.7, color: '#e8e6e1', neutral: true, noAo: true, deckTint: true },
+  composite_brown: { prefix: 'white_planks', tileSize: 2.8, roughness: 0.74, color: '#8b6b55', neutral: true, noAo: true, deckTint: true },
+  composite_black: { prefix: 'white_planks', tileSize: 2.8, roughness: 0.74, color: '#1f2123', neutral: true, noAo: true, deckTint: true },
+  composite_dark_grey: { prefix: 'white_planks', tileSize: 2.8, roughness: 0.73, color: '#4a5057', neutral: true, noAo: true, deckTint: true },
+  composite_grey: { prefix: 'white_planks', tileSize: 2.8, roughness: 0.72, color: '#a9aeb2', neutral: true, noAo: true, deckTint: true },
+  composite_slate_blue: { prefix: 'white_planks', tileSize: 2.8, roughness: 0.72, color: '#7c93a6', neutral: true, noAo: true, deckTint: true },
+  composite_sage: { prefix: 'white_planks', tileSize: 2.8, roughness: 0.72, color: '#7e8c74', neutral: true, noAo: true, deckTint: true },
+  composite_clay: { prefix: 'white_planks', tileSize: 2.8, roughness: 0.73, color: '#9a6b58', neutral: true, noAo: true, deckTint: true },
   composite_wood: { prefix: 'planks_clean', tileSize: 2.0, roughness: 0.8, color: '#8b6b55' },
   charred_timber: { prefix: 'weathered_larch', tileSize: 2.0, roughness: 1.0, color: '#222222' },
-  timber_decking: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 1.0, color: '#ffffff' },
-  composite_decking: { prefix: 'decking_hardwood', tileSize: 2.0, roughness: 0.8, color: '#aaaaaa' },
+  // 'Timber' is the natural-wood preset on the same boards; the old white
+  // (#ffffff) meant "use the photo's own colour", which the neutral map no
+  // longer has, so it carries a real timber tone now.
+  timber_decking: { prefix: 'white_planks', tileSize: 2.8, roughness: 0.78, color: '#a3794a', neutral: true, noAo: true, deckTint: true },
+  composite_decking: { prefix: 'white_planks', tileSize: 2.8, roughness: 0.74, color: '#a9aeb2', neutral: true, noAo: true, deckTint: true },
   epdm: { prefix: 'slate_roof', tileSize: 1.0, roughness: 0.5, color: '#333333' },
   // ambientCG Rubber004 (75cm tile): a textured rubber roof sheet.
   rubber: { prefix: 'roof_rubber', tileSize: 0.75, roughness: 1.0, color: '#ffffff', noAo: true, sheet: true },
@@ -174,8 +181,10 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
   // Board size for interior floors, as a multiplier on the material's real
   // tile size: 2 lays planks twice as wide, 0.5 half as wide.
   const floorScale = useStore(state => state.scene.room.floorScale) || 1;
-  // The paint colour of a tintable cladding (painted planks).
+  // The paint colour of a tintable cladding (painted planks), and the
+  // colour chosen for the decking boards (any deckTint material).
   const claddingTint = useStore(state => state.scene.room.claddingTint);
+  const deckingTint = useStore(state => state.scene.room.deckingTint);
   // Hardware max, usually 16. Read from the renderer rather than hardcoded so a
   // device that supports less is not asked for something it cannot do.
   const maxAnisotropy = useThree(state => state.gl.capabilities.getMaxAnisotropy());
@@ -314,12 +323,15 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
     // memo dependency lists further up.
     return useMemo(() => ({
         ...cloned,
-        // A tintable cladding takes the room's paint colour over its own.
-        color: ((def as any).tintable && claddingTint) ? claddingTint : def.color,
+        // A tintable cladding takes the room's paint colour over its own; a
+        // decking material takes the decking colour over its preset.
+        color: ((def as any).tintable && claddingTint) ? claddingTint
+            : ((def as any).deckTint && deckingTint) ? deckingTint
+            : def.color,
         roughness: def.roughness,
         // Only when the material says so, so the spread does not override
         // the wall's own default with undefined.
         ...((def as any).metalness !== undefined ? { metalness: (def as any).metalness } : {}),
         normalScale: new THREE.Vector2(0.5, 0.5) // Step 3: start normalScale at 0.5
-    }), [cloned, def, claddingTint]);
+    }), [cloned, def, claddingTint, deckingTint]);
 }

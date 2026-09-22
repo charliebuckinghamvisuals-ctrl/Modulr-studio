@@ -254,6 +254,10 @@ export interface Room {
    *  = the rectangle the three sizes above describe. See utils/deck. */
   deckOutline?: [number, number][];
   deckingMaterial?: DeckingMaterialType;
+  /** Decking board colour - any hex. Unset = the deckingMaterial preset's
+   *  own colour. Every deck surface is the same painted-board set since
+   *  22 Sep 2026; the material key is just which preset was picked. */
+  deckingTint?: string;
   overhangLeftMm?: number;
   overhangRightMm?: number;
   overhangBackMm?: number;

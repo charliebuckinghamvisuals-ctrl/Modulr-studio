@@ -23,7 +23,7 @@ function useSurface(surface: string | undefined) {
   const decked = !!surface && surface !== 'concrete';
   const room = useStore(s => s.scene.room);
   const deck = useDeckMaterial(decked ? surface : undefined);
-  const tone = decked ? deckTone(resolveDeckKey(surface, room)) : CONCRETE;
+  const tone = decked ? deckTone(resolveDeckKey(surface, room), room.deckingTint) : CONCRETE;
   const concrete = useMemo(() => new THREE.MeshStandardMaterial({ color: CONCRETE, roughness: 0.95, metalness: 0 }), []);
   const fascia = useMemo(() => new THREE.MeshStandardMaterial({ color: tone, roughness: 0.9, metalness: 0 }), [tone]);
   return { decked, top: decked ? deck : concrete, side: fascia };

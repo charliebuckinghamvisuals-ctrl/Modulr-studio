@@ -48,8 +48,10 @@ export const deckMaterialMeta = (id: string) => DECK_MATERIALS.find(m => m.id ==
 export const resolveDeckKey = (id: string | undefined, room: { deckingMaterial?: string; cladding?: string }) =>
   id && id !== 'match' ? id : resolveDeckingKey(room.deckingMaterial, room.cladding);
 
-/** A plain colour close to the boards, for fascias and kerbs. */
-export const deckTone = (key: string) => {
+/** A plain colour close to the boards, for fascias and kerbs. The room's
+ *  decking colour wins over the preset, as it does on the boards. */
+export const deckTone = (key: string, tint?: string) => {
+  if (tint) return tint;
   const c = ((MATERIAL_DEF as any)[key]?.color as string | undefined) ?? '#a3794a';
   return c.toLowerCase() === '#ffffff' ? '#a3794a' : c;
 };
@@ -87,7 +89,7 @@ function Deck({ deck, showLabel }: { deck: DeckArea; showLabel: boolean }) {
   const h = Math.max(0.02, deck.heightMm / 1000);
   const top = useDeckMaterial(deck.material);
   const key = resolveDeckKey(deck.material, room);
-  const fascia = useMemo(() => new THREE.MeshStandardMaterial({ color: deckTone(key), roughness: 0.85, metalness: 0 }), [key]);
+  const fascia = useMemo(() => new THREE.MeshStandardMaterial({ color: deckTone(key, room.deckingTint), roughness: 0.85, metalness: 0 }), [key, room.deckingTint]);
   // Same UV origin as the building's base, so boards line through.
   const f = baseFrame(room);
   const geom = useMemo(() => deckSlabGeometry(deck.points, h, f.baseX, f.baseZ), [deck.points, h, f.baseX, f.baseZ]);

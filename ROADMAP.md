@@ -78,7 +78,28 @@ modes.
 - [ ] Lazy-load the tool views (bundle warning: chunks > 500 kB).
 - [ ] Render judge upgrade + model pinning (parked 7 Sep).
 
-## 4. Tools - open threads
+## 4. 3D Configurator - Charlie's list (22 Sep 2026)
+
+- [ ] **L-shaped buildings** - "once we have L shapes that's pretty much
+      the most popular shapes we have". The geometry is NOT gone: `shape:
+      'LShape'` with `lShapeCutoutWidthMm/DepthMm` still builds walls, roof,
+      base, cladding and cutout dimensions in RoomGeometry.tsx; it was only
+      hidden from the shape picker on 28 Jul (4ab526b) because it was rough.
+      To ship it: put it back in the picker, then go round everything that
+      skips `isLShape` today - canopy, per-elevation dimensions in plan and
+      3D, the width drag handle - and check doors/windows on the two inner
+      faces of the cutout, the walk-mode collision, the PDF elevations (six
+      faces, not four), the price (floor and wall area already subtract the
+      cutout) and the render spec text. Gable + L is a second job: two ridges
+      or a hip at the corner. Budget 2-3 days for box L, more for gable L.
+- [x] Internal walls reach the gable (22 Sep): a profile cap on every
+      partition follows the ceiling - vaulted or flat - checked by raycast
+      and by eye in the live scene, main run and L-leg alike.
+- [x] Decking is the painted-boards set in any colour (22 Sep): every deck
+      key is the same white_planks board texture at 140mm boards; presets are
+      colours, plus a colour picker (`room.deckingTint`) and Reset.
+
+## 5. Tools - open threads
 
 - [ ] Floor Plan Studio: CAD plan figures still drift; SVG/DXF export and
       bird's-eye preset parked.
