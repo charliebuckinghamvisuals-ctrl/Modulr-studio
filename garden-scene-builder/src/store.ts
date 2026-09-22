@@ -13,6 +13,11 @@ declare global { interface Window { __modulrStore?: unknown } }
 interface AppState {
   scene: SceneState;
   viewMode: ViewMode;
+  /** True while the walker stands inside the enclosed room. Written only
+   *  when it CHANGES (MainScene's walk loop), so it costs nothing per frame.
+   *  The camera panel uses it to send a capture to the right render engine. */
+  walkInside: boolean;
+  setWalkInside: (v: boolean) => void;
   toolMode: ToolMode;
   selectedObjectId: string | null;
   selectedElementId: string | null;
@@ -461,6 +466,7 @@ export const useStore = create<AppState>((set, get) => ({
   pastScenes: [],
   futureScenes: [],
   viewMode: '3d',
+  walkInside: false,
   toolMode: 'select',
   selectedObjectId: null,
   selectedElementId: null,
@@ -474,7 +480,8 @@ export const useStore = create<AppState>((set, get) => ({
   harmonizedImage: null,
   renderTransform: { x: 0, y: -0.005, z: 0, scale: 1, rotationY: 0 },
 
-  setViewMode: (mode) => set({ viewMode: mode, toolMode: 'select', activePlacementType: null }),
+  setViewMode: (mode) => set({ viewMode: mode, toolMode: 'select', activePlacementType: null, ...(mode === 'walking' ? {} : { walkInside: false }) }),
+  setWalkInside: (v) => { if (useStore.getState().walkInside !== v) set({ walkInside: v }); },
   setToolMode: (mode) => set({ toolMode: mode }),
   addFence: (ax, az, bx, bz) => set((state) => ({
     scene: { ...state.scene, fences: [...(state.scene.fences || []), { id: uuidv4(), ax, az, bx, bz, ...(state.scene.boundaryStyle || {}) }] },

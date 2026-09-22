@@ -105,6 +105,16 @@ modes.
       roughness,ao}.jpg and add a roofTiles def like roof_slate.
 - [ ] **GLB / SketchUp export of a design** - see chat 22 Sep: three.js
       GLTFExporter on the live scene minus helpers; SketchUp imports GLB.
+- [x] **Interior Render Engine** on its own page (22 Sep): /interior-render-engine,
+      its own result slot and history, an interior survey prompt, and
+      view: 'interior' through /render/survey and /render so the server uses
+      the interior inventory, prompt and verifier that had been sitting
+      unreachable since 21 Sep. In walk mode the camera panel's button reads
+      "Interior Render" while the walker is inside the room (store flag
+      walkInside, written only on change) and opens that page.
+- [ ] Interior engine: not yet run end to end with an account - capture ->
+      upload -> survey -> render. Only the page, routing and the walk-mode
+      switch were checked in the browser.
 - [x] Internal walls reach the gable (22 Sep): a profile cap on every
       partition follows the ceiling - vaulted or flat - checked by raycast
       and by eye in the live scene, main run and L-leg alike.

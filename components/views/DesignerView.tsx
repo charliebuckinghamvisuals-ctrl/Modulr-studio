@@ -137,7 +137,10 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
        */
       if (event.data && event.data.type === 'OPEN_RENDER_ENGINE') {
         if (configModeRef.current !== 'business') return;
-        engine.setActiveStage(AppStage.RENDER_ENGINE);
+        // A capture taken from inside the room opens the Interior Render
+        // Engine instead (22 Sep 2026) - it is surveyed and rendered as a
+        // room, not as a building seen from the garden.
+        engine.setActiveStage(event.data.view === 'interior' ? AppStage.INTERIOR_RENDER : AppStage.RENDER_ENGINE);
       }
     };
 

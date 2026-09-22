@@ -163,6 +163,20 @@ export function interiorInventoryFromSpec(spec) {
 }
 
 /**
+ * Surveying an INTERIOR capture into inventory items.
+ *
+ * The exterior SURVEY_PROMPT asks for elevations, decking, boundaries and
+ * roof coverings, none of which exist in a room; pointed at an interior it
+ * invented a building around the view. This asks for what a room actually
+ * holds, in the same groups the bar already renders.
+ */
+export const INTERIOR_SURVEY_PROMPT = [
+    'You are surveying a 3D view taken INSIDE a room of a garden building, for a render engine. List EVERYTHING modelled in the image as separate items, each described precisely enough that a renderer could keep it exactly: what it is, its size relative to the room, where it sits, its material and its colour.',
+    'Required groups, one item each unless there are several: building (the room itself - its shape, ceiling form - flat, vaulted or part-flat - and rough proportions); materials (wall finish and colour, ceiling finish and colour, floor material with board or tile direction and colour, any partition or feature wall); openings (EACH door set and EACH window separately: which wall, type - hinged/French/bi-fold/sliding, leaf count, glazed or SOLID, frame colour inside, and where along the wall; rooflights); interior (EACH piece of furniture, kitchen or bathroom unit, worktop, appliance, tap, rug, and what is fitted where - never a generic "furniture" item); lights (each fitting seen: downlight, pendant, wall light - style, position and count).',
+    'Describe ONLY what is actually in the image. An empty room is an empty room: say so in one item ("No furniture - the room is empty") rather than furnishing it. Do not describe anything seen through the glass beyond a single item naming what the view is (for example "Through the glazing: lawn and planting").',
+].join('\n');
+
+/**
  * The interior render prompt. Same four-part contract as the exterior
  * (render/prompt.js): HARD RULES, INVENTORY, FORBIDDEN, LOOK. The setting
  * exists only through the glass.

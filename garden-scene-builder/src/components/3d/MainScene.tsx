@@ -427,6 +427,19 @@ function WalkingControls({ controlsEnabled }: { controlsEnabled: boolean }) {
     camera.rotation.y = yaw.current;
     camera.rotation.x = pitch.current;
     camera.rotation.z = 0;
+
+    /*
+     * Inside or outside, for the camera panel's "which render engine"
+     * decision (22 Sep 2026). Computed in the room's own frame so a rotated
+     * plot works, and written to the store only on a change - the setter
+     * compares first, so a walk across the room is one write, not 60/second.
+     */
+    const rmNow = useStore.getState().scene.room;
+    const l = toRoomLocal(rmNow, position.current.x, position.current.z);
+    const wt = (rmNow.wallThicknessMm ?? 150) / 1000;
+    const enc = enclosedRange(rmNow);
+    const halfD = rmNow.depthMm / 2000 - wt;
+    useStore.getState().setWalkInside(l.x > enc.x0 && l.x < enc.x1 && l.z > -halfD && l.z < halfD);
   });
 
   return null;

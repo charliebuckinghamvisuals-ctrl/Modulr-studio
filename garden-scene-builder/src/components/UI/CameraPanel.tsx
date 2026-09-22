@@ -22,7 +22,9 @@ import { CAMERA_RATIOS, ratioValue, readCameraPose, applyCamera, captureToFile, 
  * shutter, and downloads the file. The Render Engine gets that file the
  * way it gets any image: uploaded by the user. Nothing about the design
  * travels with it (Charlie: the analysis must read the picture, not the
- * configurator). "Go to Render Engine" just opens the page.
+ * configurator). "Go to Render Engine" just opens the page - the interior
+ * one when the camera is inside the room (walk view), the exterior one
+ * otherwise.
  *
  * Not in the free public configurator, nor in plan, lighting or export views.
  */
@@ -126,13 +128,13 @@ export function CameraPanel() {
   const {
     viewMode, setViewMode, isExporting, configMode, storedCameras, activeCameraId, setActiveCameraId,
     addCamera, updateCamera, removeCamera, cameraMode, setCameraMode, setWalkStart,
-    cameraFov, setCameraFov, walkFov, setWalkFov,
+    cameraFov, setCameraFov, walkFov, setWalkFov, walkInside,
   } = useStore(useShallow(s => ({
     viewMode: s.viewMode, setViewMode: s.setViewMode, isExporting: s.isExporting, configMode: s.configMode,
     storedCameras: s.scene.cameras, activeCameraId: s.activeCameraId, setActiveCameraId: s.setActiveCameraId,
     addCamera: s.addCamera, updateCamera: s.updateCamera, removeCamera: s.removeCamera,
     cameraMode: s.cameraMode, setCameraMode: s.setCameraMode, setWalkStart: s.setWalkStart,
-    cameraFov: s.cameraFov, setCameraFov: s.setCameraFov, walkFov: s.walkFov, setWalkFov: s.setWalkFov,
+    cameraFov: s.cameraFov, setCameraFov: s.setCameraFov, walkFov: s.walkFov, setWalkFov: s.setWalkFov, walkInside: s.walkInside,
   })));
   const cameras = storedCameras || NO_CAMERAS;
   const [ratio, setRatio] = useState<CameraRatio>('16:9');
@@ -155,6 +157,9 @@ export function CameraPanel() {
   const active = cameras.find(c => c.id === activeCameraId) || null;
   const frameRatio = active ? active.ratio : ratio;
   const isWalk = viewMode === 'walking';
+  // Only a capture taken from INSIDE goes to the Interior Render Engine;
+  // walking round the garden still means the exterior one.
+  const isInside = isWalk && walkInside;
   const lens = isWalk ? walkFov : cameraFov;
   const setLens = isWalk ? setWalkFov : setCameraFov;
 
@@ -314,11 +319,11 @@ export function CameraPanel() {
           </button>
           <button
             type="button"
-            onClick={openRenderEngine}
+            onClick={() => openRenderEngine(isInside ? 'interior' : 'exterior')}
             className="px-4 bg-white hover:bg-gray-50 text-[#3b4d4a] border-l border-[#3b4d4a]/15 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
-            title="Open the Render Engine, where you upload the capture"
+            title={isInside ? 'Open the Interior Render Engine, where you upload the capture' : 'Open the Render Engine, where you upload the capture'}
           >
-            Render Engine <ArrowRight size={12} />
+            {isInside ? 'Interior Render' : 'Render Engine'} <ArrowRight size={12} />
           </button>
         </div>
         <p className="px-4 py-1.5 text-[9px] text-[#3b4d4a]/60 leading-snug">

@@ -64,6 +64,14 @@ export const ROUTES: Record<AppStage, RouteMeta> = {
         keywords: COMMON_KEYWORDS,
         indexable: false,
     },
+    [AppStage.INTERIOR_RENDER]: {
+        path: '/interior-render-engine',
+        title: 'Interior Render Engine',
+        description:
+            'Render the inside of a garden room or annexe: walk in, frame the view, and get a pro-level interior CGI with the real floor, kitchen, furniture and light through the glazing - nothing added, nothing moved.',
+        keywords: `garden room interior render, annexe interior CGI, interior visualisation garden room, garden office interior render, room render from 3D model, ${COMMON_KEYWORDS}`,
+        indexable: true,
+    },
     [AppStage.LINE_CONVERT]: {
         path: '/line-converter',
         title: 'Line Converter',

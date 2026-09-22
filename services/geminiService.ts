@@ -256,13 +256,16 @@ export interface SceneSetting {
 export const renderScene = async (o: {
     shaded: string; line?: string | null; spec?: Record<string, unknown> | null; items?: InventoryItem[];
     setting: SceneSetting; seed?: number;
+    /** 'interior' switches the server to the interior prompt, inventory and
+     *  verifier (render/interior.js). Default exterior. */
+    view?: 'interior' | 'exterior';
 }): Promise<{ image: string; items: InventoryItem[]; line?: string; verification: RenderVerification; engine: Record<string, string>; seconds: number }> => {
     const { ratio } = await getImageDimensions(o.shaded);
     const response = await apiFetch(`${API_BASE_URL}/render`, {
         method: 'POST',
         headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
-            shaded: o.shaded, line: o.line || null, spec: o.spec || null, items: o.items?.length ? o.items : undefined, ratio,
+            shaded: o.shaded, line: o.line || null, spec: o.spec || null, items: o.items?.length ? o.items : undefined, ratio, view: o.view || 'exterior',
             scenePreset: o.setting.preset, timePreset: o.setting.time, weatherPreset: o.setting.weather, sceneText: o.setting.text, seed: o.seed,
         }),
     });
@@ -275,12 +278,13 @@ export const renderScene = async (o: {
     return data;
 };
 
-/** An uploaded view surveyed into inventory items (Gemini 3.8 Flash). */
-export const surveyImage = async (image: string): Promise<InventoryItem[]> => {
+/** An uploaded view surveyed into inventory items (Gemini 3.8 Flash).
+ *  'interior' surveys it as a room rather than as a building. */
+export const surveyImage = async (image: string, view: 'interior' | 'exterior' = 'exterior'): Promise<InventoryItem[]> => {
     const response = await apiFetch(`${API_BASE_URL}/render/survey`, {
         method: 'POST',
         headers: await getAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ image }),
+        body: JSON.stringify({ image, view }),
     });
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

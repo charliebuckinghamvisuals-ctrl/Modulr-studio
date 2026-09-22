@@ -126,6 +126,9 @@ export const useAppEngine = () => {
     const [editorImage, setEditorImage] = useState<string | null>(null);
     const [lineEnvironmentImage, setLineEnvironmentImage] = useState<string | null>(null);
     const [finalImage, setFinalImage] = useState<string | null>(null);
+    /** Interior Render Engine result - its own slot so the two engines never
+     *  overwrite each other's work when you switch pages. */
+    const [interiorRenderImage, setInteriorRenderImage] = useState<string | null>(null);
     /** Detail Studio result: the 2x2 sheet or the single camera shot. */
     const [detailStudioImage, setDetailStudioImage] = useState<string | null>(null);
     /** Material Editor result: the source with only the changed surfaces repainted. */
@@ -324,6 +327,7 @@ export const useAppEngine = () => {
      *  mode pickers). Each lands its file on its own tool's stage. */
     const materialInputRef = useRef<HTMLInputElement>(null);
     const materialEditorInputRef = useRef<HTMLInputElement>(null);
+    const interiorInputRef = useRef<HTMLInputElement>(null);
 
     /**
      * Empty the workspace but stay where you are.
@@ -347,6 +351,7 @@ export const useAppEngine = () => {
         setFinalImage(null);
         setDetailStudioImage(null);
         setMaterialEditorImage(null);
+        setInteriorRenderImage(null);
         setDetectedMaterials(null); setMaterialMasks({}); setMaterialPrompt(''); setMaterialMaskPreview(null);
         setBatchImages([]);
         setBatchRenders([]);
@@ -363,6 +368,7 @@ export const useAppEngine = () => {
         if (fileInputRef.current) fileInputRef.current.value = '';
         if (materialInputRef.current) materialInputRef.current.value = '';
         if (materialEditorInputRef.current) materialEditorInputRef.current.value = '';
+        if (interiorInputRef.current) interiorInputRef.current.value = '';
     };
 
     /** Clear everything AND leave the tool - what the header's Start Over does. */
@@ -422,7 +428,7 @@ export const useAppEngine = () => {
         } catch { resolve(false); }
     });
 
-    const handleAnalyzeForRenderEngine = async (image: string) => {
+    const handleAnalyzeForRenderEngine = async (image: string, view: 'interior' | 'exterior' = 'exterior') => {
         setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' }); // Explicit reset
         setRenderLineImage(null);
         if (await looksLikeLineDrawing(image)) {
@@ -431,11 +437,11 @@ export const useAppEngine = () => {
         }
         setRenderSpec(null);
         setInventoryItems([]);
-        setProcessing({ isLoading: true, message: 'Surveying the view: building, openings, decking, lights...' });
+        setProcessing({ isLoading: true, message: view === 'interior' ? 'Surveying the room: walls, floor, openings, furniture, lights...' : 'Surveying the view: building, openings, decking, lights...' });
         setIsAnalyzingMaterials(true);
         setIsSurveying(true);
         try {
-            const items = await surveyImage(image);
+            const items = await surveyImage(image, view);
             setInventoryItems(items);
         } catch (error) {
             console.error(error);
@@ -499,6 +505,7 @@ export const useAppEngine = () => {
                 setRenderedImage(null);
                 setEditorImage(null);
                 setFinalImage(null);
+                setInteriorRenderImage(null);
                 setDetailStudioImage(null);
                 setMaterialEditorImage(null);
                 setDetectedDetails([]);
@@ -518,6 +525,9 @@ export const useAppEngine = () => {
                 } else if (targetStage === AppStage.MATERIAL_EDITOR) {
                     // One job, no mode to choose: find the surfaces straight away.
                     await analyseForMaterialEditor(base64Data);
+                } else if (targetStage === AppStage.INTERIOR_RENDER) {
+                    setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
+                    await handleAnalyzeForRenderEngine(base64Data, 'interior');
                 } else if (targetStage === AppStage.RENDER_ENGINE) {
                     setMaterials({ walls: 'none', roof: 'none', windows: 'none', doors: 'none', decking: 'none' });
                     // Always auto-detect materials - works for photos, B&W line drawings, and SketchUp models
@@ -843,8 +853,11 @@ export const useAppEngine = () => {
     const handleRender = async (opts?: { reuseSeed?: boolean }) => {
         const source = originalImage;
         if (!source) return;
+        const isInterior = activeStage === AppStage.INTERIOR_RENDER;
 
-        const loadingMsg = renderLineImage
+        const loadingMsg = isInterior
+            ? 'Rendering the room: geometry locked, every item checked...'
+            : renderLineImage
             ? 'Rendering from the drawing: geometry locked, every item checked...'
             : 'Drawing the outline, then rendering: geometry locked, every item checked...';
 
@@ -862,18 +875,18 @@ export const useAppEngine = () => {
             if (activeStage === AppStage.STUDIO) {
                 result = await renderBuilding(source, materials, additionalPrompt, isHighQuality, isProMode, selectedAngle, isSketchUpMode, studioBackground, false, seed, cameraEffects);
             } else {
-                const out = await renderScene({ shaded: source, line: renderLineImage, spec: renderSpec, items: inventoryItems, setting: { ...sceneSetting, text: [sceneSetting.text, additionalPrompt].filter(Boolean).join(' ') }, seed });
+                const out = await renderScene({ shaded: source, line: renderLineImage, spec: renderSpec, items: inventoryItems, setting: { ...sceneSetting, text: [sceneSetting.text, additionalPrompt].filter(Boolean).join(' ') }, seed, view: isInterior ? 'interior' : 'exterior' });
                 result = out.image;
                 if (out.items?.length && !inventoryItems.length) setInventoryItems(out.items);
                 if (out.line && !renderLineImage) setRenderLineImage(out.line);
             }
             setRenderVerification(getLastVerification());
-            trackFeatureUsage('render_engine');
-            setRenderedImage(result);
+            trackFeatureUsage(isInterior ? 'interior_render_engine' : 'render_engine');
+            if (isInterior) setInteriorRenderImage(result); else setRenderedImage(result);
 
             setEditorImage(null);
             await saveToHistory({
-                stage: AppStage.RENDER_ENGINE,
+                stage: isInterior ? AppStage.INTERIOR_RENDER : AppStage.RENDER_ENGINE,
                 image: result,
                 originalImage: originalImage,
                 prompt: additionalPrompt,
@@ -1243,7 +1256,7 @@ export const useAppEngine = () => {
     return {
         renderLineImage, setRenderLineImage, renderSpec, inventoryItems, setInventoryItems, updateInventoryItem, updateInventoryFinish, removeInventoryItem, isSurveying, sceneSetting, setSceneSetting, loadConfiguratorScene,
         activeStage, setActiveStage,
-        originalImage, setOriginalImage, setOriginalImageForStage, lineImage, setLineImage, lineSourceImage, setLineSourceImage, renderedImage, setRenderedImage, editorImage, setEditorImage, lineEnvironmentImage, setLineEnvironmentImage, finalImage, setFinalImage, detailStudioImage, setDetailStudioImage, materialEditorImage, setMaterialEditorImage,
+        originalImage, setOriginalImage, setOriginalImageForStage, lineImage, setLineImage, lineSourceImage, setLineSourceImage, renderedImage, setRenderedImage, editorImage, setEditorImage, lineEnvironmentImage, setLineEnvironmentImage, finalImage, setFinalImage, detailStudioImage, setDetailStudioImage, materialEditorImage, setMaterialEditorImage, interiorRenderImage, setInteriorRenderImage,
         batchImages, setBatchImages, batchRenders, setBatchRenders, batchMaterials, setBatchMaterials,
         detectedDetails, setDetectedDetails, selectedDetails, setSelectedDetails, toggleDetailSelection,
         processing,
@@ -1257,7 +1270,7 @@ export const useAppEngine = () => {
         materials, setMaterials,
         isAnalyzingMaterials,
         weather, setWeather,
-        fileInputRef, materialInputRef, materialEditorInputRef,
+        fileInputRef, materialInputRef, materialEditorInputRef, interiorInputRef,
         handleReset, clearWorkspace, handleImageUpload, handleBatchImageUpload, handleDownload,
         handleExport4K, isExporting4K,
         refinementPrompt, setRefinementPrompt,

@@ -115,6 +115,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
   const toolItems: Array<{ id: AppStage; label: string; badge?: string; locked?: boolean; icon?: React.ReactNode }> = [
     { id: AppStage.DESIGNER, label: '3D Config', badge: 'Beta' },
     { id: AppStage.RENDER_ENGINE, label: 'Render Engine' },
+    { id: AppStage.INTERIOR_RENDER, label: 'Interior Render' },
     { id: AppStage.LINE_CONVERT, label: 'Line Converter' },
     { id: AppStage.WEATHER_LAB, label: 'Weather Lab' },
     { id: AppStage.DETAIL_STUDIO, label: 'Detail Studio' },

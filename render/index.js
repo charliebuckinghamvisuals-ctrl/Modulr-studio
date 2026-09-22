@@ -22,7 +22,7 @@ import { buildRenderPrompt, buildMaterialsPassPrompt, LINE_CONVERSION_PROMPT, SU
 import { drawImage, GEOMETRY_MODEL, FINISH_MODEL, safeRatio } from './providers/gemini.js';
 import { verifyRender } from './verify.js';
 import { planInventoryFromSpec, buildPlanPrompt, PLAN_SURVEY_PROMPT } from './plan.js';
-import { isInteriorSpec, interiorInventoryFromSpec, buildInteriorRenderPrompt, buildInteriorMaterialsPassPrompt } from './interior.js';
+import { isInteriorSpec, interiorInventoryFromSpec, buildInteriorRenderPrompt, buildInteriorMaterialsPassPrompt, INTERIOR_SURVEY_PROMPT } from './interior.js';
 
 const stripDataUrl = (s) => (typeof s === 'string' ? s.replace(/^data:[^;]+;base64,/, '') : '');
 
@@ -269,9 +269,12 @@ export function mountRender(app, deps) {
             if (!image) return res.status(400).json({ error: 'No image.' });
             const access = await enforceRenderAccess(req, CREDIT_COSTS.ANALYSIS);
             if (!access.allowed) return res.status(access.status).json(access.body);
+            // A capture from inside the room is surveyed as a room, not as a
+            // building seen from the garden (Interior Render Engine, 22 Sep 2026).
+            const interiorView = req.body.view === 'interior';
             const response = await ai.models.generateContent({
                 model: ANALYSIS_MODEL,
-                contents: { parts: [{ inlineData: { data: image, mimeType: sniffMime(image) } }, { text: SURVEY_PROMPT }] },
+                contents: { parts: [{ inlineData: { data: image, mimeType: sniffMime(image) } }, { text: interiorView ? INTERIOR_SURVEY_PROMPT : SURVEY_PROMPT }] },
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: { type: Type.OBJECT, properties: {
@@ -285,7 +288,7 @@ export function mountRender(app, deps) {
             });
             const json = JSON.parse(response.text || '{}');
             const items = inventoryFromItems((json.items || []).map((x, i) => ({ ...x, id: `${String(x.group || 'item').toLowerCase()}-${i + 1}` })));
-            logRender(req, 'render-survey', ANALYSIS_MODEL, 'n/a', { items: items.length });
+            logRender(req, 'render-survey', ANALYSIS_MODEL, 'n/a', { items: items.length, view: interiorView ? 'interior' : 'exterior' });
             res.json({ items });
         } catch (error) {
             console.error('[RENDER] survey failed:', error);

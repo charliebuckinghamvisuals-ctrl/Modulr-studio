@@ -106,7 +106,14 @@ export async function captureToFile(ratio: CameraRatio, cameraName = 'view'): Pr
   return image;
 }
 
-/** Ask the host app to open the Render Engine page - empty, ready for the upload. */
-export function openRenderEngine(): void {
-  window.parent.postMessage({ type: 'OPEN_RENDER_ENGINE' }, window.location.origin);
+/**
+ * Ask the host app to open a render engine page - empty, ready for the upload.
+ *
+ * A capture taken from INSIDE the room belongs in the Interior Render Engine:
+ * it is surveyed as a room and rendered with the interior contract, and the
+ * exterior engine would try to make a building out of it (Charlie, 22 Sep
+ * 2026). The walk view decides which page the button opens.
+ */
+export function openRenderEngine(view: 'interior' | 'exterior' = 'exterior'): void {
+  window.parent.postMessage({ type: 'OPEN_RENDER_ENGINE', view }, window.location.origin);
 }

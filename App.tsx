@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, Grid, Layers, Sparkles, PenTool, Image as ImageIcon, Settings, History, ChevronDown, Loader2, Upload, CloudSun, Aperture } from 'lucide-react';
+import { Zap, Grid, Layers, Sparkles, PenTool, Image as ImageIcon, Settings, History, ChevronDown, Loader2, Upload, CloudSun, Aperture, Home, Box } from 'lucide-react';
 import { ToggleSwitch } from './components/ToggleSwitch';
 import { MaintenanceView, maintenanceActive } from './components/views/MaintenanceView';
 import { getImageQuality, setImageQuality, type ImageQuality } from './services/geminiService';
@@ -92,12 +92,17 @@ const App: React.FC = () => {
 
         engine.setLineImage(null);
         engine.setRenderedImage(null);
+        engine.setInteriorRenderImage(null);
         engine.setEditorImage(null);
         engine.setFinalImage(null);
         engine.setDetailStudioImage(null);
         engine.setMaterialEditorImage(null);
 
         switch (item.stage) {
+            case AppStage.INTERIOR_RENDER:
+                engine.setInteriorRenderImage(item.image);
+                engine.setAdditionalPrompt(item.prompt);
+                break;
             case AppStage.RENDER_ENGINE:
                 engine.setRenderedImage(item.image);
                 engine.setMaterials(item.settings);
@@ -831,6 +836,32 @@ const App: React.FC = () => {
         </div>
     );
 
+    /** The interior page's own empty state: one way in, and it says where the
+     *  view comes from - walk inside in the configurator and capture there. */
+    const interiorEngineEmptyState = (
+        <div className="flex flex-col items-center justify-center w-full h-full p-8 relative canvas-grid">
+            <div className="absolute inset-0 bg-accent/10 backdrop-blur-3xl pointer-events-none"></div>
+            <div
+                onClick={() => engine.interiorInputRef.current?.click()}
+                className="max-w-md w-full h-72 glass-panel border border-accent/20 hover:border-accent/50 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer group transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_40px_rgba(64,90,86,0.2)] relative overflow-hidden text-center p-6 bg-white"
+            >
+                <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center group-hover:bg-accent group-hover:scale-110 transition-all duration-300 shadow-xl relative z-10">
+                    <Home className="text-accent group-hover:text-white transition-colors" size={24} />
+                </div>
+                <div className="relative z-10">
+                    <h3 className="text-accent font-bold text-lg mb-2">Upload a view from inside</h3>
+                    <p className="text-secondary text-sm leading-relaxed">Walk inside in the 3D Configurator, frame the shot and capture it - then drop that file here. The engine surveys the room, lists everything in it, and checks the render against it.</p>
+                </div>
+            </div>
+            <button
+                onClick={() => engine.setActiveStage(AppStage.DESIGNER)}
+                className="mt-6 z-10 inline-flex items-center gap-2 px-5 py-2.5 rounded-none bg-white border border-accent/30 text-accent text-sm font-bold shadow-lg hover:bg-accent hover:text-white transition-colors"
+            >
+                <Box size={14} /> Open the 3D Configurator
+            </button>
+        </div>
+    );
+
     const renderAppContent = () => (
         <AppShell
             activeStage={engine.activeStage}
@@ -964,6 +995,38 @@ const App: React.FC = () => {
                 />
             )}
 
+            {/* The Interior Render Engine: the same engine, the same controls,
+                pointed at a view from INSIDE the room. Its own page rather than
+                a mode on the exterior one (Charlie, 22 Sep 2026: "a separate
+                page to keep it less confusing"), and its own result slot, so
+                switching between the two never loses a render. */}
+            {engine.activeStage === AppStage.INTERIOR_RENDER && (
+                <WorkspaceView
+                    title="Interior Render Engine"
+                    subtitle="Walk in, frame the view, render the room: the real floor, units and furniture, lit through your own glazing."
+                    controls={renderEngineControls}
+                    primaryImg={engine.getRenderUrl(engine.interiorRenderImage)}
+                    secondaryImg={engine.getRenderUrl(engine.originalImage)}
+                    placeholder="Ready to Render"
+                    onDownload={engine.handleDownload}
+                    onSaveToProject={(img) => setProjectSave({ image: img, kind: 'interior_render', name: 'interior-render' })}
+                    onExport4K={engine.handleExport4K}
+                    isExporting4K={engine.isExporting4K}
+                    verification={engine.renderVerification}
+                    inventoryCount={engine.inventoryItems.length}
+                    onRerender={(sameLook) => engine.handleRender({ reuseSeed: sameLook })}
+                    onFormatChange={engine.setDownloadFormat}
+                    downloadFormat={engine.downloadFormat}
+                    onInputClick={() => engine.interiorInputRef.current?.click()}
+                    onReset={engine.clearWorkspace}
+                    isLoading={engine.activeStage === AppStage.INTERIOR_RENDER && engine.processing.isLoading}
+                    loadingMessage={engine.processing.message}
+                    customEmptyState={!engine.originalImage ? interiorEngineEmptyState : undefined}
+                    userPlan={engine.userPlan}
+                    historyFooter={<HistoryFooter currentStage={AppStage.INTERIOR_RENDER} onLoadHistoryItem={handleLoadHistory} />}
+                />
+            )}
+
             {engine.activeStage === AppStage.RENDER_ENGINE && (
                 <WorkspaceView
                     title="Render Engine"
@@ -1078,6 +1141,13 @@ const App: React.FC = () => {
             />
             <input
                 type="file"
+                ref={engine.interiorInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={(e) => engine.handleImageUpload(e, AppStage.INTERIOR_RENDER)}
+            />
+            <input
+                type="file"
                 ref={engine.materialEditorInputRef}
                 className="hidden"
                 accept="image/*"
@@ -1114,6 +1184,7 @@ const App: React.FC = () => {
      */
     const GATED_STAGES = new Set<AppStage>([
         AppStage.RENDER_ENGINE,
+        AppStage.INTERIOR_RENDER,
         AppStage.LINE_CONVERT,
         AppStage.WEATHER_LAB,
         AppStage.DETAIL_STUDIO,
@@ -1140,6 +1211,7 @@ const App: React.FC = () => {
      */
     const AI_TOOL_STAGES = new Set<AppStage>([
         AppStage.RENDER_ENGINE,
+        AppStage.INTERIOR_RENDER,
         AppStage.LINE_CONVERT,
         AppStage.WEATHER_LAB,
         AppStage.DETAIL_STUDIO,

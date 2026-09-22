@@ -3,6 +3,9 @@ export enum AppStage {
   UPLOAD = 'upload', // Legacy upload, maps to Render Engine Entry
   LINE_CONVERT = 'line_convert',
   RENDER_ENGINE = 'render_engine',
+  /** Interior Render Engine: the same engine pointed at a view from INSIDE
+   *  the room. Its own page so the two never share a workspace (22 Sep 2026). */
+  INTERIOR_RENDER = 'interior_render',
   STUDIO = 'studio',
   EDITOR = 'editor',
   WEATHER_LAB = 'weather_lab',
