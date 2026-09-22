@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useAppEngine } from '../../hooks/useAppEngine';
 import { AppStage, Project } from '../../types';
 import { useCredits } from '../../hooks/useCredits';
+import { useAuth } from '../../hooks/useAuth';
 import { Construction, FolderOpen, ChevronDown } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { createProject, listProjects, updateProject } from '../../services/projectService';
@@ -157,7 +158,8 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
     };
   }, [engine]);
 
-  const { plan, loading, canUseFullConfigurator } = useCredits();
+  const { user, loading: authLoading } = useAuth();
+  const { loading, canUseFullConfigurator } = useCredits();
 
   /**
    * Which configurator to open.
@@ -170,20 +172,38 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
    * its URL and again by message, and it defaults to public on its own.
    */
   const [configMode, setConfigMode] = useState<'public' | 'business' | null>(null);
-  configModeRef.current = configMode;
   // Every paid plan and the trial get the full configurator (20 Sep 2026);
   // the public one is for signed-out visitors. Server-decided.
   const canUseBusinessConfig = canUseFullConfigurator === true;
+  /**
+   * A paid account opens straight into the full one (22 Sep 2026). The chooser
+   * was asking a subscriber the same question on every visit and there was
+   * only ever one answer, so it is now for accounts that are NOT entitled:
+   * the free tile and the plans behind the locked one.
+   *
+   * Derived rather than set from an effect, so the chooser cannot flash up for
+   * a frame before the auto-open lands.
+   */
+  const effectiveMode: 'public' | 'business' | null =
+    configMode ?? (canUseBusinessConfig ? 'business' : null);
+  configModeRef.current = effectiveMode;
 
-  if (loading) {
+  // Signed in but the plan has not come back yet. Holding here rather than
+  // rendering the chooser is the whole point: a subscriber must never be shown
+  // the upsell tile, and a paid account must never be asked to click through.
+  // `loading` always resolves, including on a failed fetch, so this cannot
+  // spin forever - a failure falls through to the chooser.
+  if (authLoading || (!!user && loading)) {
     return (
-        <div className="w-full h-[100dvh] flex flex-col bg-[#0F1110] items-center justify-center">
-            <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin"></div>
-        </div>
+      <div className="w-full h-[calc(100dvh-6rem)] flex flex-col items-center justify-center gap-4 render-grid px-6">
+        <div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-semibold text-[#3b4d4a]">Checking your plan…</p>
+        <p className="text-xs text-slate-400">Opening your configurator</p>
+      </div>
     );
   }
 
-  if (!configMode) {
+  if (!effectiveMode) {
     return (
       <div className="w-full h-[calc(100dvh-6rem)] flex flex-col items-center justify-center render-grid px-6">
         {/* The site's drafting-paper surface, not a black void - the chooser
@@ -295,11 +315,11 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
       )}
       <iframe
         ref={iframeRef}
-        src={`/3d-config/index.html?mode=${configMode}`}
+        src={`/3d-config/index.html?mode=${effectiveMode}`}
         onLoad={() => {
           setConfigLoaded(true);
           // Belt and braces with the URL: tell the configurator which one it is.
-          iframeRef.current?.contentWindow?.postMessage({ type: 'SET_CONFIG_MODE', mode: configMode }, window.location.origin);
+          iframeRef.current?.contentWindow?.postMessage({ type: 'SET_CONFIG_MODE', mode: effectiveMode }, window.location.origin);
           // A design opened from the Projects page is waiting to be shown.
           // The iframe's app needs a beat to mount its message listener, and
           // LOAD_3D_DESIGN is idempotent, so post it a few times.

@@ -244,10 +244,21 @@ export function useCredits() {
         }
     }, [user]);
 
+    /**
+     * True until the server has answered for THIS account.
+     *
+     * Between auth resolving and the effect above running, the shared state is
+     * still the signed-out EMPTY - loading false, plan null - so a screen
+     * gating on `loading` would show its signed-out answer for a frame before
+     * the real plan landed. A signed-in user the shared state has not picked
+     * up yet is still loading.
+     */
+    const loading = snapshot.loading || (!!user && currentUser?.uid !== user.uid);
+
     return {
         credits: snapshot.credits,
         plan: snapshot.plan,
-        loading: snapshot.loading,
+        loading,
         refreshCredits: fetchCredits,
         rendersLeft: snapshot.rendersLeft,
         rendersPerDay: snapshot.rendersPerDay,
