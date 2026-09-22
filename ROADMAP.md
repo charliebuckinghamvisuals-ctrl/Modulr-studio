@@ -94,9 +94,11 @@ modes.
       material group, so their textured top never showed - rubber and
       aluminium had been plain colour on every gable since they were added.
 - [x] Cladding (22 Sep): corrugated black / dark grey, box metal black /
-      anthracite (Poly Haven box profile), Japanese cedar plank (no colour
-      options), timber lap siding in any colour (horizontal only - Vertical
-      is locked while it is on a wall). Laminate floor added.
+      anthracite (Poly Haven box profile). Laminate floor added. Timber lap
+      siding and Japanese cedar plank were added and pulled the same day
+      ("terrible") - keys still resolve for saved designs, textures gone.
+- [x] Decking edges are a flat skirting in the deck colour; boards on top
+      only (22 Sep).
 - [ ] Poliigon "Aged Wooden Shingle Roof" (free, but behind a Poliigon
       login, so not fetched): download the 1K JPG set, drop it in
       garden-scene-builder/public/textures as roof_shingle_{color,normal,

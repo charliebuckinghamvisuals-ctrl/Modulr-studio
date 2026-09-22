@@ -126,14 +126,10 @@ export const MATERIAL_DEF = {
   // Width slider leaves it alone.
   corrugated_black: { prefix: 'corrugated_light', tileSize: 1.2, roughness: 0.5, color: '#1f2123', neutral: true, noAo: true, fixedScale: true, metalness: 0.7 },
   corrugated_dark_grey: { prefix: 'corrugated_light', tileSize: 1.2, roughness: 0.5, color: '#4a5057', neutral: true, noAo: true, fixedScale: true, metalness: 0.7 },
-  // ambientCG WoodSiding009, rotated so its laps run like the other boards'
-  // grooves (vertical in the map) and read horizontal on the wall in the
-  // default orientation. Five boards across the map; tintable like the
-  // painted planks, so it takes the same colour picker. Horizontal only -
-  // the Sidebar disables Vertical while it is in use.
-  // Eight laps across the 512px map (measured on the normal map's edges,
-  // 64px each) - it was set to five, which drew every board at 5/8 width.
-  wood_siding: { prefix: 'wood_siding', tileSize: 2.0, roughness: 0.75, color: '#e8e6e1', neutral: true, noAo: true, boards: 8, tintable: true, horizontalOnly: true },
+  // Timber lap siding (ambientCG WoodSiding009) was offered for a few hours
+  // on 22 Sep 2026 and pulled ("nope, terrible"); the key resolves to the
+  // painted boards so a design saved with it still loads.
+  wood_siding: { prefix: 'white_planks', tileSize: 1.8, roughness: 0.7, color: '#e8e6e1', neutral: true, noAo: true, boards: 20, tintable: true },
   // Poly Haven box_profile_metal_sheet (2m tile), colour-neutralised: "call
   // it box metal cladding and only have it in black or dark grey metal
   // (anthracite)" - Charlie, 22 Sep 2026. A profile, so fixedScale.
@@ -141,9 +137,9 @@ export const MATERIAL_DEF = {
   box_metal_anthracite: { prefix: 'box_metal', tileSize: 2.0, roughness: 0.45, color: '#2d3032', neutral: true, noAo: true, fixedScale: true, metalness: 0.75 },
   // Poly Haven japanese_cedar_planks (1.13m tile, seven boards across), shown
   // as photographed - no colour options, the wood is the point.
-  // Real size (fixedScale): 1.13m across seven boards, about 160mm each. The
-  // Board Width slider drove it to 100mm boards with a seam every 700mm.
-  cedar_plank: { prefix: 'cedar_plank', tileSize: 1.13, roughness: 0.7, color: '#ffffff', fixedScale: true },
+  // Japanese cedar plank (Poly Haven) came and went the same day as the
+  // siding; resolves to the cedar composite.
+  cedar_plank: { prefix: 'synthetic_wood', tileSize: 2.0, roughness: 0.65, color: '#b0764b' },
   // Legacy keys from old saved scenes. Their original PNG textures no longer
   // exist in public/textures — pointing at the missing files faulted useTexture
   // and blanked the whole scene, so they resolve to the composite equivalents.

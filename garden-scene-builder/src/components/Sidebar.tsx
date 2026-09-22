@@ -695,9 +695,7 @@ export function Sidebar() {
                             { id: 'corrugated_dark_grey', name: 'Corrugated Dark Grey' },
                             { id: 'box_metal_black', name: 'Box Metal Black' },
                             { id: 'box_metal_anthracite', name: 'Box Metal Anthracite' },
-                            { id: 'cedar_plank', name: 'Japanese Cedar Plank' },
                             { id: 'painted_planks', name: 'Painted Boards (any colour)' },
-                            { id: 'wood_siding', name: 'Timber Siding (horizontal, any colour)' },
                           ].map((cladding) => {
                             const isActive = field.key === 'cladding'
                                ? room.cladding === cladding.id

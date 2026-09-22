@@ -24,6 +24,7 @@ import { InteriorDoorModel } from './InteriorDoorModel';
 import { DoorHandle } from './DoorHandleModel';
 import { baseFrame, useDeckTexture } from '../../utils/deck';
 import { DeckSlab } from './DeckSlab';
+import { deckTone } from './Decks';
 
 /** Apex liner thickness: enough to sit clear of the gable face without
  *  z-fighting, thin enough to read as paint rather than a second wall. */
@@ -1788,6 +1789,22 @@ export function RoomGeometry() {
     };
 
     /**
+     * Boards on TOP only. The sides of the base and the deck are a flat
+     * skirting in the deck's colour - "the front of decking needs to be a
+     * flat material, basically a skirting, not cladding" (Charlie, 22 Sep
+     * 2026). One material over the whole box had wrapped the boards round
+     * every edge. Box faces: 0 +x, 1 -x, 2 top, 3 bottom, 4 +z, 5 -z.
+     */
+    const skirtHex = deckTone(resolveDeckingKey(room.deckingMaterial, room.cladding), room.deckingTint);
+    const skirtProps = { color: skirtHex, roughness: 0.85, metalness: 0 };
+    const boxMats = (key: string) => isDeckingMaterial
+      ? [0, 1, 2, 3, 4, 5].map(i => (i === 2
+          ? <meshStandardMaterial key={`${key}-${i}`} attach={`material-${i}`} {...materialProps} />
+          : <meshStandardMaterial key={`${key}-${i}`} attach={`material-${i}`} {...skirtProps} />))
+      : <meshStandardMaterial key={key} attach="material" {...materialProps} />;
+    const boxKey = `${room.deckingMaterial || room.cladding || 'default'}-${room.baseMaterial}-${isDeckingMaterial}-${skirtHex}`;
+
+    /**
      * The plinth IS the floor you stand on, so it carries isFloor.
      *
      * The floor-finish mesh sits at y=0.005 inside a plinth that runs from 0
@@ -1818,12 +1835,12 @@ export function RoomGeometry() {
       return (
         <group {...pointerEvents}>
           <mesh position={[leftX, baseH/2, leftZ]} receiveShadow>
-            <primitive object={createWorldScaleBoxGeometry(leftW, baseH, leftD, false, leftX, 0, leftZ)} attach="geometry" />
-            <meshStandardMaterial key={`${room.deckingMaterial || room.cladding || 'default'}-${room.baseMaterial}-${isDeckingMaterial}`} attach="material" {...materialProps} />
+            <primitive object={createWorldScaleBoxGeometry(leftW, baseH, leftD, isDeckingMaterial, leftX, 0, leftZ)} attach="geometry" />
+            {boxMats(boxKey)}
           </mesh>
           <mesh position={[rightX, baseH/2, rightZ]} receiveShadow>
-            <primitive object={createWorldScaleBoxGeometry(rightW, baseH, rightD, false, rightX, 0, rightZ)} attach="geometry" />
-            <meshStandardMaterial key={`${room.deckingMaterial || room.cladding || 'default'}-${room.baseMaterial}-${isDeckingMaterial}`} attach="material" {...materialProps} />
+            <primitive object={createWorldScaleBoxGeometry(rightW, baseH, rightD, isDeckingMaterial, rightX, 0, rightZ)} attach="geometry" />
+            {boxMats(boxKey)}
           </mesh>
         </group>
       );
@@ -1843,12 +1860,12 @@ export function RoomGeometry() {
       return (
         <group {...pointerEvents}>
           <mesh position={[frontX, baseH/2, frontZ]} receiveShadow>
-            <primitive object={createWorldScaleBoxGeometry(frontW, baseH, frontD, false, frontX, 0, frontZ)} attach="geometry" />
-            <meshStandardMaterial key={`${room.deckingMaterial || room.cladding || 'default'}-${room.baseMaterial}-${isDeckingMaterial}`} attach="material" {...materialProps} />
+            <primitive object={createWorldScaleBoxGeometry(frontW, baseH, frontD, isDeckingMaterial, frontX, 0, frontZ)} attach="geometry" />
+            {boxMats(boxKey)}
           </mesh>
           <mesh position={[backX, baseH/2, backZ]} receiveShadow>
-            <primitive object={createWorldScaleBoxGeometry(backW, baseH, backD, false, backX, 0, backZ)} attach="geometry" />
-            <meshStandardMaterial key={`${room.deckingMaterial || room.cladding || 'default'}-${room.baseMaterial}-${isDeckingMaterial}`} attach="material" {...materialProps} />
+            <primitive object={createWorldScaleBoxGeometry(backW, baseH, backD, isDeckingMaterial, backX, 0, backZ)} attach="geometry" />
+            {boxMats(boxKey)}
           </mesh>
         </group>
       );
@@ -1870,9 +1887,9 @@ export function RoomGeometry() {
         <group>
           <mesh position={[pf.plinthX, plinthH / 2, pf.plinthZ]} receiveShadow {...pointerEvents}>
             <primitive object={createWorldScaleBoxGeometry(pf.plinthW, plinthH, pf.plinthD, false, pf.plinthX - baseX, 0, pf.plinthZ - baseZ)} attach="geometry" />
-            <meshStandardMaterial key={matKey} attach="material" {...materialProps} />
+            <meshStandardMaterial key={`${matKey}-skirt`} attach="material" {...skirtProps} />
           </mesh>
-          <DeckSlab room={room} materialProps={materialProps as Record<string, unknown>} materialKey={matKey} />
+          <DeckSlab room={room} materialProps={materialProps as Record<string, unknown>} materialKey={boxKey} sideProps={skirtProps} />
         </group>
       );
     }
@@ -1885,8 +1902,8 @@ export function RoomGeometry() {
         receiveShadow
         {...pointerEvents}
       >
-        <primitive object={createWorldScaleBoxGeometry(baseW, baseH, baseD, false, 0, 0, 0)} attach="geometry" />
-        <meshStandardMaterial key={`${room.deckingMaterial || room.cladding || 'default'}-${room.baseMaterial}-${isDeckingMaterial}`} attach="material" {...materialProps} />
+        <primitive object={createWorldScaleBoxGeometry(baseW, baseH, baseD, isDeckingMaterial, 0, 0, 0)} attach="geometry" />
+        {boxMats(boxKey)}
       </mesh>
     );
   };

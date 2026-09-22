@@ -54,10 +54,8 @@ const CLADDING_LOOKS = {
     corrugated_black: 'BLACK powder-coated CORRUGATED STEEL sheet, vertical profile',
     corrugated_dark_grey: 'DARK GREY powder-coated CORRUGATED STEEL sheet, vertical profile',
     painted_planks: 'PAINTED vertical timber boards',
-    wood_siding: 'PAINTED horizontal timber LAP SIDING (overlapping weatherboards)',
     box_metal_black: 'BLACK BOX-PROFILE METAL SHEET cladding, crisp square vertical ribs',
     box_metal_anthracite: 'ANTHRACITE (dark grey) BOX-PROFILE METAL SHEET cladding, crisp square vertical ribs',
-    cedar_plank: 'natural JAPANESE CEDAR planks, warm honey-orange timber with visible grain, vertical boards',
 };
 
 /** The building's deck, as the configurator resolves it (utils/materials.ts
@@ -123,7 +121,6 @@ export function inventoryFromSpec(spec) {
         const look = (id) => {
             if (typeof id !== 'string') return null;
             if (id === 'painted_planks' && tint) return `PAINTED vertical timber boards, paint colour ${tint}`;
-            if (id === 'wood_siding' && tint) return `PAINTED horizontal timber LAP SIDING (overlapping weatherboards), paint colour ${tint}`;
             if (CLADDING_LOOKS[id]) return CLADDING_LOOKS[id];
             return id.trim() ? clean(id.replace(/_/g, ' '), 40) : null;
         };

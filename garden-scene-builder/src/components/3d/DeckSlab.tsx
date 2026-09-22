@@ -19,7 +19,7 @@ import { baseFrame, deckOutline, deckSlabGeometry } from '../../utils/deck';
 
 const SNAP = 0.05;
 
-export function DeckSlab({ room, materialProps, materialKey }: { room: Room; materialProps: Record<string, unknown>; materialKey: string }) {
+export function DeckSlab({ room, materialProps, materialKey, sideProps }: { room: Room; materialProps: Record<string, unknown>; materialKey: string; sideProps?: Record<string, unknown> }) {
   const f = baseFrame(room);
   const pts = deckOutline(room);
   const selected = useStore(s => s.selectedElementId === 'deck');
@@ -107,7 +107,17 @@ export function DeckSlab({ room, materialProps, materialKey }: { room: Room; mat
         onPointerOver={(e) => { e.stopPropagation(); useStore.getState().setHoveredElementId('room'); }}
         onPointerOut={() => useStore.getState().setHoveredElementId(null)}
       >
-        <meshStandardMaterial key={materialKey} attach="material" {...materialProps} />
+        {/* ExtrudeGeometry groups: 0 = the caps (boards), 1 = the sides.
+            The sides take the flat skirting when given one, as the freeform
+            decks always have. */}
+        {sideProps ? (
+          <>
+            <meshStandardMaterial key={`${materialKey}-top`} attach="material-0" {...materialProps} />
+            <meshStandardMaterial key={`${materialKey}-side`} attach="material-1" {...sideProps} />
+          </>
+        ) : (
+          <meshStandardMaterial key={materialKey} attach="material" {...materialProps} />
+        )}
       </mesh>
       {selected && (
         // The click that ends a knob drag lands on the knob, off the slab's

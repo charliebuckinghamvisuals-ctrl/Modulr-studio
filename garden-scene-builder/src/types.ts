@@ -9,13 +9,13 @@ export type CladdingType =
   // Poly Haven sets added 8 Sep 2026: a corrugated steel sheet, and painted
   // vertical boards whose colour is the room's claddingTint.
   | 'corrugated_iron' | 'painted_planks'
-  // ambientCG sets added 22 Sep 2026: the light corrugated sheet in black or
-  // dark grey (also a roof covering), and horizontal timber lap siding whose
-  // colour is the room's claddingTint, like the painted boards.
-  | 'corrugated_black' | 'corrugated_dark_grey' | 'wood_siding'
-  // Poly Haven sets added 22 Sep 2026: box-profile metal sheet in black or
-  // anthracite, and Japanese cedar planks as they come (no colour options).
-  | 'box_metal_black' | 'box_metal_anthracite' | 'cedar_plank'
+  // ambientCG light corrugated sheet in black or dark grey (also a roof
+  // covering) and the Poly Haven box-profile sheet in black or anthracite,
+  // 22 Sep 2026.
+  | 'corrugated_black' | 'corrugated_dark_grey'
+  | 'box_metal_black' | 'box_metal_anthracite'
+  // Offered briefly on 22 Sep and withdrawn; kept so saved designs resolve.
+  | 'wood_siding' | 'cedar_plank'
   // Legacy values retained so previously saved scenes still resolve.
   | 'timber' | 'composite_wood' | 'composite_black' | 'composite_grey'
   | 'composite_brown' | 'oak' | 'cedar' | 'charred_wood' | 'render_white'

@@ -392,9 +392,7 @@ const initialState: SceneState = {
       painted_planks: 175,
       corrugated_black: 160,
       corrugated_dark_grey: 160,
-      wood_siding: 190,
       box_metal_anthracite: 165,
-      cedar_plank: 210,
     },
     roofPrices: {
       epdm: 80,
