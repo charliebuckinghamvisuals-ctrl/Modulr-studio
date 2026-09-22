@@ -51,7 +51,13 @@ const CLADDING_LOOKS = {
     corrugated_metal: 'corrugated metal sheet',
     fire_board_grey: 'grey fibre-cement board',
     corrugated_iron: 'galvanised CORRUGATED STEEL sheet, vertical profile (dull grey metal)',
+    corrugated_black: 'BLACK powder-coated CORRUGATED STEEL sheet, vertical profile',
+    corrugated_dark_grey: 'DARK GREY powder-coated CORRUGATED STEEL sheet, vertical profile',
     painted_planks: 'PAINTED vertical timber boards',
+    wood_siding: 'PAINTED horizontal timber LAP SIDING (overlapping weatherboards)',
+    box_metal_black: 'BLACK BOX-PROFILE METAL SHEET cladding, crisp square vertical ribs',
+    box_metal_anthracite: 'ANTHRACITE (dark grey) BOX-PROFILE METAL SHEET cladding, crisp square vertical ribs',
+    cedar_plank: 'natural JAPANESE CEDAR planks, warm honey-orange timber with visible grain, vertical boards',
 };
 
 /** The building's deck, as the configurator resolves it (utils/materials.ts
@@ -82,7 +88,12 @@ const deckLook = (spec) => {
 };
 const FASCIA_LOOKS = { black: 'BLACK (#141414)', anthracite: 'ANTHRACITE dark grey (#2f3236)', white: 'WHITE', grey: 'mid GREY' };
 
-const ROOF_NAMES = { epdm: 'EPDM rubber membrane', sedum: 'sedum green roof', upvc: 'uPVC roof sheet', metal: 'standing-seam metal roof', rubber: 'textured black rubber roof sheeting', aluminium: 'black powder-coated aluminium roof sheet' };
+const ROOF_NAMES = {
+    epdm: 'EPDM rubber membrane', sedum: 'sedum green roof', upvc: 'uPVC roof sheet', metal: 'standing-seam metal roof', rubber: 'textured black rubber roof sheeting', aluminium: 'black powder-coated aluminium roof sheet',
+    // Pitched coverings added to the configurator 22 Sep 2026.
+    roof_clay_tiles: 'dark CLAY PANTILES in courses', roof_slate_round: 'grey ROUND-EDGE (fish-scale) SLATES in courses', roof_slate: 'grey natural SLATE in courses',
+    roof_corrugated_dark: 'dark weathered CORRUGATED STEEL sheet, ridges running down the slope', roof_corrugated_black: 'BLACK CORRUGATED STEEL sheet, ridges running down the slope', roof_corrugated_dark_grey: 'DARK GREY CORRUGATED STEEL sheet, ridges running down the slope',
+};
 const FRAME_NAMES = { upvc: 'uPVC', aluminium: 'aluminium', timber: 'painted timber' };
 
 /** An item: id (stable, for QA), group (for the bar), label (short), text (prompt). */
@@ -99,14 +110,20 @@ export function inventoryFromSpec(spec) {
         // ---- building --------------------------------------------------
         const wStr = mm(spec.widthMm), dStr = mm(spec.depthMm);
         const roof = spec.shape === 'Gable' ? 'gable (dual pitched) roof' : 'flat roof';
-        items.push(item('building', 'building', `Building ${wStr && dStr ? `${wStr} x ${dStr}` : ''}, ${roof}`.trim(),
-            `The building: single storey, ${wStr && dStr ? `${wStr} wide x ${dStr} deep, ` : ''}${roof}, exactly the footprint, height and proportions the line drawing shows.`));
+        // L-shaped footprint (back in the configurator 22 Sep 2026): named,
+        // or the engine tidies the notch into a plain box.
+        const lCut = spec.shape === 'LShape' && spec.lShapeCutoutWidthMm && spec.lShapeCutoutDepthMm
+            ? `L-shaped footprint: a ${mm(spec.lShapeCutoutWidthMm)} x ${mm(spec.lShapeCutoutDepthMm)} corner is cut out of the front-right, the roof and cladding following the notch, `
+            : '';
+        items.push(item('building', 'building', `Building ${wStr && dStr ? `${wStr} x ${dStr}` : ''}, ${lCut ? 'L-shaped, ' : ''}${roof}`.trim(),
+            `The building: single storey, ${wStr && dStr ? `${wStr} wide x ${dStr} deep, ` : ''}${lCut}${roof}, exactly the footprint, height and proportions the line drawing shows.`));
 
         // ---- cladding, per elevation ----------------------------------
         const tint = hex(spec.claddingTint);
         const look = (id) => {
             if (typeof id !== 'string') return null;
             if (id === 'painted_planks' && tint) return `PAINTED vertical timber boards, paint colour ${tint}`;
+            if (id === 'wood_siding' && tint) return `PAINTED horizontal timber LAP SIDING (overlapping weatherboards), paint colour ${tint}`;
             if (CLADDING_LOOKS[id]) return CLADDING_LOOKS[id];
             return id.trim() ? clean(id.replace(/_/g, ' '), 40) : null;
         };

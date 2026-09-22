@@ -9,15 +9,27 @@ export type CladdingType =
   // Poly Haven sets added 8 Sep 2026: a corrugated steel sheet, and painted
   // vertical boards whose colour is the room's claddingTint.
   | 'corrugated_iron' | 'painted_planks'
+  // ambientCG sets added 22 Sep 2026: the light corrugated sheet in black or
+  // dark grey (also a roof covering), and horizontal timber lap siding whose
+  // colour is the room's claddingTint, like the painted boards.
+  | 'corrugated_black' | 'corrugated_dark_grey' | 'wood_siding'
+  // Poly Haven sets added 22 Sep 2026: box-profile metal sheet in black or
+  // anthracite, and Japanese cedar planks as they come (no colour options).
+  | 'box_metal_black' | 'box_metal_anthracite' | 'cedar_plank'
   // Legacy values retained so previously saved scenes still resolve.
   | 'timber' | 'composite_wood' | 'composite_black' | 'composite_grey'
   | 'composite_brown' | 'oak' | 'cedar' | 'charred_wood' | 'render_white'
-  | 'box_metal_grey' | 'box_metal_black' | 'corrugated_metal' | 'fire_board_grey';
+  | 'box_metal_grey' | 'corrugated_metal' | 'fire_board_grey';
 export type BaseMaterialType = 'concrete' | 'timber_decking' | 'composite_decking';
 export type DeckingMaterialType = 'timber' | 'composite_grey' | 'composite_oak' | 'composite_cedar' | 'composite_brown' | 'composite_black';
 /** 'upvc' and 'metal' are kept so older saved designs still load; the
  *  pickers offer EPDM, rubber, aluminium and sedum. */
-export type RoofMaterialType = 'epdm' | 'sedum' | 'rubber' | 'aluminium' | 'upvc' | 'metal';
+export type RoofMaterialType = 'epdm' | 'sedum' | 'rubber' | 'aluminium' | 'upvc' | 'metal'
+  // Pitched-roof coverings (22 Sep 2026): clay pantiles, round-edge and
+  // square slates - gable only in the picker - and corrugated steel sheet in
+  // dark, black or dark grey, offered on both roof shapes.
+  | 'roof_clay_tiles' | 'roof_slate_round' | 'roof_slate'
+  | 'roof_corrugated_dark' | 'roof_corrugated_black' | 'roof_corrugated_dark_grey';
 /** What the door and window frames are made of. Colour is separate. */
 export type FrameMaterialType = 'upvc' | 'aluminium' | 'timber';
 export type FrameColorType = 'anthracite' | 'black' | 'white' | 'silver';
@@ -76,7 +88,7 @@ export interface Door {
   stack?: 'left' | 'right' | 'split';
 }
 
-export type InteriorFloorType = 'oak_plank' | 'light_oak' | 'rustic_pine' | 'smoked_oak' | 'oak_herringbone' | 'walnut_parquet';
+export type InteriorFloorType = 'oak_plank' | 'light_oak' | 'rustic_pine' | 'smoked_oak' | 'oak_herringbone' | 'walnut_parquet' | 'laminate';
 
 export interface WindowData {
   id: string;

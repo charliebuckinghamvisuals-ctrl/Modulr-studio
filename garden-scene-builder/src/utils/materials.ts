@@ -35,6 +35,8 @@ export const MATERIAL_DEF = {
   smoked_oak: { prefix: 'smoked_oak', tileSize: 2.0, roughness: 0.55, color: '#ffffff', isFloor: true, noAo: true },
   oak_herringbone: { prefix: 'oak_herringbone', tileSize: 1.8, roughness: 0.5, color: '#ffffff', isFloor: true },
   walnut_parquet: { prefix: 'walnut_parquet', tileSize: 2.0, roughness: 0.45, color: '#ffffff', isFloor: true },
+  // Poly Haven laminate_floor_02 (1.7m tile): a clean, even laminate.
+  laminate: { prefix: 'laminate', tileSize: 1.7, roughness: 0.4, color: '#ffffff', isFloor: true },
 
   charcoal: { prefix: 'weathered_larch', tileSize: 2.0, roughness: 1.0, color: '#555555' },
   weathered_larch: { prefix: 'weathered_larch', tileSize: 2.0, roughness: 1.0, color: '#ffffff' },
@@ -74,6 +76,19 @@ export const MATERIAL_DEF = {
   // ambientCG Grass002 (1.4m tile): the garden the building stands in.
   grass: { prefix: 'grass', tileSize: 1.4, roughness: 1.0, color: '#ffffff' },
   sedum: { prefix: 'sedum', tileSize: 2.0, roughness: 1.0, color: '#ffffff' },
+  // ── Pitched-roof coverings (ambientCG, 22 Sep 2026) ────────────────────────
+  // 'sheet' so the flat roof's 0..1 box lays them by real size; the gable
+  // slabs have world-scale UVs and take them through useDeckTexture at
+  // 1/tileSize instead. tileSize is the real-world size of one texture
+  // repeat: 2.9m for the pantiles (ambientCG's stated size), ~3m for the
+  // slates (about 200mm courses), and the corrugation pitch x the ridges
+  // counted across the map for the steel.
+  roof_clay_tiles: { prefix: 'roof_clay_tiles', tileSize: 2.9, roughness: 0.9, color: '#ffffff', sheet: true, roofTiles: true },
+  roof_slate_round: { prefix: 'roof_slate_round', tileSize: 3.0, roughness: 0.9, color: '#ffffff', noAo: true, sheet: true, roofTiles: true },
+  roof_slate: { prefix: 'roof_slate', tileSize: 3.0, roughness: 0.9, color: '#ffffff', noAo: true, sheet: true, roofTiles: true },
+  roof_corrugated_dark: { prefix: 'corrugated_dark', tileSize: 1.8, roughness: 0.5, color: '#ffffff', sheet: true, roofSteel: true, metalness: 0.7 },
+  roof_corrugated_black: { prefix: 'corrugated_light', tileSize: 1.2, roughness: 0.5, color: '#1f2123', neutral: true, sheet: true, roofSteel: true, metalness: 0.7 },
+  roof_corrugated_dark_grey: { prefix: 'corrugated_light', tileSize: 1.2, roughness: 0.5, color: '#4a5057', neutral: true, sheet: true, roofSteel: true, metalness: 0.7 },
   metal: { prefix: 'slate_roof', tileSize: 2.0, roughness: 0.4, color: '#777777' },
   slate: { prefix: 'slate_roof', tileSize: 1.0, roughness: 0.9, color: '#ffffff' },
   concrete: { prefix: 'sedum', tileSize: 4.0, roughness: 1.0, color: '#aaaaaa' },
@@ -105,6 +120,26 @@ export const MATERIAL_DEF = {
   // map is neutralised to near-white so the room's claddingTint multiplies
   // through as the paint colour - any colour, not a fixed range.
   painted_planks: { prefix: 'white_planks', tileSize: 1.8, roughness: 0.7, color: '#e8e6e1', neutral: true, noAo: true, boards: 20, tintable: true },
+  // ambientCG CorrugatedSteel007A, colour-neutralised and tinted: the same
+  // sheet as the roof_corrugated_black/dark_grey coverings, as wall cladding.
+  // fixedScale like corrugated_iron - a profile, not boards, so the Board
+  // Width slider leaves it alone.
+  corrugated_black: { prefix: 'corrugated_light', tileSize: 1.2, roughness: 0.5, color: '#1f2123', neutral: true, noAo: true, fixedScale: true, metalness: 0.7 },
+  corrugated_dark_grey: { prefix: 'corrugated_light', tileSize: 1.2, roughness: 0.5, color: '#4a5057', neutral: true, noAo: true, fixedScale: true, metalness: 0.7 },
+  // ambientCG WoodSiding009, rotated so its laps run like the other boards'
+  // grooves (vertical in the map) and read horizontal on the wall in the
+  // default orientation. Five boards across the map; tintable like the
+  // painted planks, so it takes the same colour picker. Horizontal only -
+  // the Sidebar disables Vertical while it is in use.
+  wood_siding: { prefix: 'wood_siding', tileSize: 2.0, roughness: 0.75, color: '#e8e6e1', neutral: true, noAo: true, boards: 5, tintable: true, horizontalOnly: true },
+  // Poly Haven box_profile_metal_sheet (2m tile), colour-neutralised: "call
+  // it box metal cladding and only have it in black or dark grey metal
+  // (anthracite)" - Charlie, 22 Sep 2026. A profile, so fixedScale.
+  box_metal_black: { prefix: 'box_metal', tileSize: 2.0, roughness: 0.45, color: '#1f2123', neutral: true, noAo: true, fixedScale: true, metalness: 0.75 },
+  box_metal_anthracite: { prefix: 'box_metal', tileSize: 2.0, roughness: 0.45, color: '#2d3032', neutral: true, noAo: true, fixedScale: true, metalness: 0.75 },
+  // Poly Haven japanese_cedar_planks (1.13m tile, seven boards across), shown
+  // as photographed - no colour options, the wood is the point.
+  cedar_plank: { prefix: 'cedar_plank', tileSize: 1.13, roughness: 0.7, color: '#ffffff', boards: 7 },
   // Legacy keys from old saved scenes. Their original PNG textures no longer
   // exist in public/textures — pointing at the missing files faulted useTexture
   // and blanked the whole scene, so they resolve to the composite equivalents.
@@ -136,6 +171,12 @@ export const CLADDING_TO_DECKING: Record<string, string> = {
   clay_composite: 'composite_clay',
   corrugated_iron: 'composite_grey',
   painted_planks: 'composite_white',
+  corrugated_black: 'composite_black',
+  corrugated_dark_grey: 'composite_dark_grey',
+  wood_siding: 'composite_white',
+  box_metal_black: 'composite_black',
+  box_metal_anthracite: 'composite_dark_grey',
+  cedar_plank: 'composite_cedar',
 };
 
 /** Resolve the decking material, following the cladding when none is set. */

@@ -11,7 +11,7 @@ import { Geometry, Base, Subtraction, Addition } from './SafeCsg';
 import * as THREE from 'three';
 import { frameColourHex } from '../../utils/frameColours';
 import { Text, Line, Html, Edges, Billboard, useTexture } from '@react-three/drei';
-import { useRealMaterial, resolveDeckingKey, resolveFloorKey } from '../../utils/materials';
+import { useRealMaterial, resolveDeckingKey, resolveFloorKey, MATERIAL_DEF } from '../../utils/materials';
 import { Suspense } from 'react';
 import { createWorldScaleBoxGeometry, createWorldScaleGableGeometry } from '../../utils/geometry';
 import { createCladdingGeometry, createDeckingGeometry } from '../../utils/geometryUtils';
@@ -1534,7 +1534,37 @@ export function RoomGeometry() {
   const roofColorHex = (room as any).roofColor || roofMaterialColors[room.roofMaterial as string] || '#222222';
   // Coverings with a real surface map get it on the roof's top face; EPDM
   // and the old ids stay a flat colour (sedum lays its own mat on top).
-  const texturedRoof = room.roofMaterial === 'rubber' || room.roofMaterial === 'aluminium';
+  const texturedRoof = room.roofMaterial === 'rubber' || room.roofMaterial === 'aluminium' || String(room.roofMaterial || '').startsWith('roof_');
+  // The gable slabs and the flat slab carry world-scale UVs (metres), not
+  // the 0..1 of the top sheet, so their covering is laid at 1/tileSize - the
+  // same trick the freeform decks use - instead of the sheet's size/tile,
+  // which had the rubber and aluminium repeating several times per metre
+  // on a gable.
+  const texRoofSlabRaw = useDeckTexture(room.roofMaterial || 'epdm');
+  // A slab's top face maps image-u along the slope and image-v along the
+  // ridge, so a texture's rows (slate courses) ran up the slope and its
+  // ridges (corrugations) along the ridge. A quarter turn puts courses across
+  // the slope and corrugations down it, which is how a roof is laid.
+  const texRoofSlab = useMemo(() => {
+    for (const k of ['map', 'normalMap', 'roughnessMap', 'aoMap'] as const) {
+      const m = (texRoofSlabRaw as any)[k] as THREE.Texture | undefined;
+      if (m) { m.center.set(0.5, 0.5); m.rotation = Math.PI / 2; m.needsUpdate = true; }
+    }
+    return texRoofSlabRaw;
+  }, [texRoofSlabRaw]);
+  /**
+   * The covering on a roof's top face. One place for every roof shape, so
+   * the tiles, slates and corrugated sheets added 22 Sep 2026 look the same
+   * on a gable slab as on the flat top sheet.
+   */
+  const roofTopMaterial = (tex: any, extra: Record<string, unknown> = {}) => {
+    const key = String(room.roofMaterial || '');
+    const rdef: any = (MATERIAL_DEF as any)[key] || {};
+    if (key === 'aluminium') return <meshStandardMaterial {...extra} color="#ffffff" map={tex.map} normalMap={tex.normalMap} roughnessMap={tex.roughnessMap} roughness={0.32} metalness={0.9} envMapIntensity={1.2} />;
+    if (rdef.roofSteel) return <meshStandardMaterial {...extra} color={tex.color || rdef.color} map={tex.map} normalMap={tex.normalMap} normalScale={new THREE.Vector2(1, 1)} roughnessMap={tex.roughnessMap} roughness={0.5} metalness={0.7} envMapIntensity={1.1} />;
+    if (rdef.roofTiles) return <meshStandardMaterial {...extra} color="#ffffff" map={tex.map} normalMap={tex.normalMap} normalScale={new THREE.Vector2(1, 1)} roughnessMap={tex.roughnessMap} aoMap={tex.aoMap} roughness={0.95} metalness={0} />;
+    return <meshStandardMaterial {...extra} color="#ffffff" map={tex.map} normalMap={tex.normalMap} normalScale={new THREE.Vector2(0.9, 0.9)} roughnessMap={tex.roughnessMap} roughness={1} metalness={0} />;
+  };
   const frameColorHex = frameColourHex(room.frameColor);
   // Inside face of every frame member. Falls back to the outside colour, so a
   // design saved before the split renders exactly as it did.
@@ -1735,8 +1765,8 @@ export function RoomGeometry() {
   // slabs run 50mm past both gable ends and 50mm past the eaves, like a real
   // roof line, instead of finishing dead flush with the cladding.
   const ROOF_LIP = 0.05;
-  const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((gSpan/2 + gOhLow1) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, gRunLen + ROOF_LIP * 2, false, 0, 0, 0), [gSpan, gOhLow1, gablePitch, gRunLen, gableFascia]);
-  const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((gSpan/2 + gOhLow2) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, gRunLen + ROOF_LIP * 2, false, 0, 0, 0), [gSpan, gOhLow2, gablePitch, gRunLen, gableFascia]);
+  const roofGableLeftGeom = useMemo(() => createWorldScaleBoxGeometry((gSpan/2 + gOhLow1) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, gRunLen + ROOF_LIP * 2, true, 0, 0, 0), [gSpan, gOhLow1, gablePitch, gRunLen, gableFascia]);
+  const roofGableRightGeom = useMemo(() => createWorldScaleBoxGeometry((gSpan/2 + gOhLow2) / Math.cos(gablePitch) + ROOF_LIP, gableFascia, gRunLen + ROOF_LIP * 2, true, 0, 0, 0), [gSpan, gOhLow2, gablePitch, gRunLen, gableFascia]);
 
 
   const renderBaseMeshes = () => {
@@ -2439,9 +2469,7 @@ export function RoomGeometry() {
                   // The top face shows the covering itself when it has one - the
                   // rubber sheet, the aluminium - rather than a flat colour.
                   texturedRoof
-                    ? (room.roofMaterial === 'aluminium'
-                        ? <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} roughnessMap={texRoof.roughnessMap} roughness={0.32} metalness={0.9} envMapIntensity={1.2} />
-                        : <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} normalScale={new THREE.Vector2(0.9, 0.9)} roughnessMap={texRoof.roughnessMap} roughness={1} metalness={0} />)
+                    ? roofTopMaterial(texRoofSlab, { key: 'mat-2', attach: 'material-2' })
                     : <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
                   <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
                   React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }), // Front fascia
@@ -2480,9 +2508,7 @@ export function RoomGeometry() {
                   // The top face shows the covering itself when it has one - the
                   // rubber sheet, the aluminium - rather than a flat colour.
                   texturedRoof
-                    ? (room.roofMaterial === 'aluminium'
-                        ? <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} roughnessMap={texRoof.roughnessMap} roughness={0.32} metalness={0.9} envMapIntensity={1.2} />
-                        : <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} normalScale={new THREE.Vector2(0.9, 0.9)} roughnessMap={texRoof.roughnessMap} roughness={1} metalness={0} />)
+                    ? roofTopMaterial(texRoofSlab, { key: 'mat-2', attach: 'material-2' })
                     : <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
                   <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
                   React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }), // Front fascia
@@ -2586,9 +2612,7 @@ export function RoomGeometry() {
                   // The top face shows the covering itself when it has one - the
                   // rubber sheet, the aluminium - rather than a flat colour.
                   texturedRoof
-                    ? (room.roofMaterial === 'aluminium'
-                        ? <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} roughnessMap={texRoof.roughnessMap} roughness={0.32} metalness={0.9} envMapIntensity={1.2} />
-                        : <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} normalScale={new THREE.Vector2(0.9, 0.9)} roughnessMap={texRoof.roughnessMap} roughness={1} metalness={0} />)
+                    ? roofTopMaterial(texRoofSlab, { key: 'mat-2', attach: 'material-2' })
                     : <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
                   <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
                   React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }),
@@ -2640,11 +2664,9 @@ export function RoomGeometry() {
               powder-coated aluminium, or a matt EPDM membrane. Sedum lays
               its own mat over the top. */}
           <mesh position={[0, roofH/2 + 0.01, 0]}>
-            {room.roofMaterial === 'aluminium'
-              ? <meshStandardMaterial color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} roughnessMap={texRoof.roughnessMap} roughness={0.32} metalness={0.9} envMapIntensity={1.2} />
-              : room.roofMaterial === 'rubber'
-                ? <meshStandardMaterial color="#ffffff" map={texRoof.map} normalMap={texRoof.normalMap} normalScale={new THREE.Vector2(0.9, 0.9)} roughnessMap={texRoof.roughnessMap} roughness={1} metalness={0} />
-                : room.roofMaterial === 'epdm'
+            {texturedRoof
+              ? roofTopMaterial(texRoof)
+              : room.roofMaterial === 'epdm'
                   ? <meshStandardMaterial color="#262626" roughness={0.85} metalness={0.05} />
                   : <meshStandardMaterial color="#444" metalness={0.8} roughness={0.2} />}
             <Geometry>

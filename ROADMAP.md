@@ -80,18 +80,29 @@ modes.
 
 ## 4. 3D Configurator - Charlie's list (22 Sep 2026)
 
-- [ ] **L-shaped buildings** - "once we have L shapes that's pretty much
-      the most popular shapes we have". The geometry is NOT gone: `shape:
-      'LShape'` with `lShapeCutoutWidthMm/DepthMm` still builds walls, roof,
-      base, cladding and cutout dimensions in RoomGeometry.tsx; it was only
-      hidden from the shape picker on 28 Jul (4ab526b) because it was rough.
-      To ship it: put it back in the picker, then go round everything that
-      skips `isLShape` today - canopy, per-elevation dimensions in plan and
-      3D, the width drag handle - and check doors/windows on the two inner
-      faces of the cutout, the walk-mode collision, the PDF elevations (six
-      faces, not four), the price (floor and wall area already subtract the
-      cutout) and the render spec text. Gable + L is a second job: two ridges
-      or a hip at the corner. Budget 2-3 days for box L, more for gable L.
+- [x] **L-shaped buildings** back in the picker (22 Sep): Footprint row
+      (Rectangle / L-Shape) under Roof Shape, cut-out width/depth inputs,
+      price subtracts the notch, render inventory names the L. Flat roof only.
+- [ ] L-shape follow-ups: doors and windows on the two INNER faces of the
+      cut-out (openings still only take front/back/left/right); canopy and
+      the per-elevation dimension labels skip L today; PDF elevations show
+      four faces not six; walk-mode collision round the notch unchecked.
+- [ ] **Gable over an L** - two ridges or a hip at the corner. Separate job.
+- [x] Roof coverings (22 Sep, ambientCG CC0): clay pantiles, round slate,
+      slate (gable only), corrugated steel dark / black / dark grey (both
+      roof shapes). Found and fixed on the way: the gable slabs had ONE
+      material group, so their textured top never showed - rubber and
+      aluminium had been plain colour on every gable since they were added.
+- [x] Cladding (22 Sep): corrugated black / dark grey, box metal black /
+      anthracite (Poly Haven box profile), Japanese cedar plank (no colour
+      options), timber lap siding in any colour (horizontal only - Vertical
+      is locked while it is on a wall). Laminate floor added.
+- [ ] Poliigon "Aged Wooden Shingle Roof" (free, but behind a Poliigon
+      login, so not fetched): download the 1K JPG set, drop it in
+      garden-scene-builder/public/textures as roof_shingle_{color,normal,
+      roughness,ao}.jpg and add a roofTiles def like roof_slate.
+- [ ] **GLB / SketchUp export of a design** - see chat 22 Sep: three.js
+      GLTFExporter on the live scene minus helpers; SketchUp imports GLB.
 - [x] Internal walls reach the gable (22 Sep): a profile cap on every
       partition follows the ceiling - vaulted or flat - checked by raycast
       and by eye in the live scene, main run and L-leg alike.

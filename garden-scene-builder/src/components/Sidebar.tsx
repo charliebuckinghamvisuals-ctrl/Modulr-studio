@@ -342,7 +342,10 @@ export function Sidebar() {
               <div className="grid grid-cols-2 gap-2">
                 {(['Box', 'Gable'] as const).map((shape) => (
                   <div key={shape} onClick={() => {
-                    if (room.shape === shape) return;
+                    // An L-shaped footprint is a flat roof too: "Flat Roof"
+                    // is already active for it, and picking it must not
+                    // throw the footprint away.
+                    if (room.shape === shape || (shape === 'Box' && room.shape === 'LShape')) return;
                     const baseH = room.baseHeightMm ?? 100;
                     const roofH = room.roofHeightMm ?? 200;
                     if (shape === 'Gable') {
@@ -361,10 +364,56 @@ export function Sidebar() {
                       const eavesTotal = (room.heightMm ?? 2350) - roofH;
                       updateRoom({ shape: 'Box', heightMm: Math.max(10, eavesTotal - baseH - 200), roofHeightMm: 200 });
                     }
-                  }} className={`p-3 rounded-xl text-center cursor-pointer transition-all ${room.shape === shape ? 'bg-[#3b4d4a] text-white shadow-md' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
+                  }} className={`p-3 rounded-xl text-center cursor-pointer transition-all ${room.shape === shape || (shape === 'Box' && room.shape === 'LShape') ? 'bg-[#3b4d4a] text-white shadow-md' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
                     <span className="text-[11px] font-semibold tracking-wide">{shape === 'Box' ? 'Flat Roof' : 'Gable Roof'}</span>
                   </div>
                 ))}
+              </div>
+
+              {/* Footprint. Back in the picker 22 Sep 2026 (hidden since
+                  4ab526b): "once we have L shapes that's pretty much the most
+                  popular shapes we have". Flat roof only for now - a gable
+                  over an L needs two ridges or a hip, which is its own job,
+                  so the button is shown but disabled under a gable. The
+                  cutout is taken out of the front-right corner. */}
+              <div className="mt-3">
+                <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Footprint</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([['rect', 'Rectangle'], ['l', 'L-Shape']] as const).map(([id, label]) => {
+                    const active = id === 'l' ? room.shape === 'LShape' : room.shape !== 'LShape';
+                    const disabled = id === 'l' && room.shape === 'Gable';
+                    return (
+                      <div key={id}
+                        title={disabled ? 'L-shape is flat roof only for now' : undefined}
+                        onClick={() => {
+                          if (disabled || active) return;
+                          if (id === 'l') updateRoom({ shape: 'LShape', lShapeCutoutWidthMm: room.lShapeCutoutWidthMm ?? 2000, lShapeCutoutDepthMm: room.lShapeCutoutDepthMm ?? 1500 });
+                          else updateRoom({ shape: 'Box' });
+                        }}
+                        className={`p-3 rounded-xl text-center transition-all ${disabled ? 'bg-gray-50 text-gray-300 border border-black/5 cursor-not-allowed' : active ? 'bg-[#3b4d4a] text-white shadow-md cursor-pointer' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50 cursor-pointer'}`}>
+                        <span className="text-[11px] font-semibold tracking-wide">{label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {room.shape === 'Gable' && (
+                  <p className="text-[10px] text-gray-400 mt-1.5">L-shape is flat roof only for now.</p>
+                )}
+                {room.shape === 'LShape' && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-gray-600 w-28">Cut-out width</span>
+                      <DeferredInput type="number" step={100} value={room.lShapeCutoutWidthMm ?? 2000} onChange={(e) => updateRoom({ lShapeCutoutWidthMm: Math.max(100, Math.min(room.widthMm - 400, parseInt(e.target.value) || 0)) })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
+                      <span className="text-[10px] text-gray-400">mm</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-gray-600 w-28">Cut-out depth</span>
+                      <DeferredInput type="number" step={100} value={room.lShapeCutoutDepthMm ?? 1500} onChange={(e) => updateRoom({ lShapeCutoutDepthMm: Math.max(100, Math.min(room.depthMm - 400, parseInt(e.target.value) || 0)) })} className="flex-1 bg-white border border-black/5 shadow-sm rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-[#3b4d4a] outline-none" />
+                      <span className="text-[10px] text-gray-400">mm</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400">Taken out of the front-right corner. Drag the cut-out's own handles in Plan View.</p>
+                  </div>
+                )}
               </div>
               {room.shape === 'Gable' && (
                 <div className="mt-3">
@@ -591,9 +640,20 @@ export function Sidebar() {
                      <div onClick={() => updateRoom({ claddingOrientation: 'horizontal' })} className={`p-2 rounded-xl text-center cursor-pointer transition-colors ${room.claddingOrientation !== 'vertical' ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
                       <span className="text-[10px] font-semibold uppercase">Horizontal</span>
                     </div>
-                    <div onClick={() => updateRoom({ claddingOrientation: 'vertical' })} className={`p-2 rounded-xl text-center cursor-pointer transition-colors ${room.claddingOrientation === 'vertical' ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50'}`}>
-                      <span className="text-[10px] font-semibold uppercase">Vertical</span>
-                    </div>
+                    {/* Lap siding only comes horizontal: Vertical is locked
+                        while any elevation wears it (22 Sep 2026). */}
+                    {(() => {
+                      const sidingOn = ['cladding', 'claddingFront', 'claddingBack', 'claddingLeft', 'claddingRight', 'claddingGable']
+                        .some(k => (MATERIAL_DEF as any)[(room as any)[k]]?.horizontalOnly);
+                      return (
+                        <div
+                          title={sidingOn ? 'Timber siding is horizontal only' : undefined}
+                          onClick={() => { if (!sidingOn) updateRoom({ claddingOrientation: 'vertical' }); }}
+                          className={`p-2 rounded-xl text-center transition-colors ${sidingOn ? 'bg-gray-50 text-gray-300 border border-black/5 cursor-not-allowed' : room.claddingOrientation === 'vertical' ? 'bg-[#3b4d4a] text-white shadow-sm cursor-pointer' : 'bg-white border border-black/5 text-gray-600 hover:bg-gray-50 cursor-pointer'}`}>
+                          <span className="text-[10px] font-semibold uppercase">Vertical</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="mb-6">
 <DimensionSlider label="Board Width" min={50} max={300} step={5} value={room.claddingWidthMm ?? 100} onChange={(v) => updateRoom({ claddingWidthMm: v })} />
@@ -631,7 +691,13 @@ export function Sidebar() {
                             { id: 'sage_composite', name: 'Sage Green' },
                             { id: 'clay_composite', name: 'Clay' },
                             { id: 'corrugated_iron', name: 'Corrugated Steel' },
+                            { id: 'corrugated_black', name: 'Corrugated Black' },
+                            { id: 'corrugated_dark_grey', name: 'Corrugated Dark Grey' },
+                            { id: 'box_metal_black', name: 'Box Metal Black' },
+                            { id: 'box_metal_anthracite', name: 'Box Metal Anthracite' },
+                            { id: 'cedar_plank', name: 'Japanese Cedar Plank' },
                             { id: 'painted_planks', name: 'Painted Boards (any colour)' },
+                            { id: 'wood_siding', name: 'Timber Siding (horizontal, any colour)' },
                           ].map((cladding) => {
                             const isActive = field.key === 'cladding'
                                ? room.cladding === cladding.id
@@ -943,8 +1009,14 @@ export function Sidebar() {
               <div>
                 <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Roof Material</label>
                 <div className="flex gap-2 flex-wrap">
-                  {([['epdm', 'EPDM'], ['rubber', 'Rubber'], ['aluminium', 'Aluminium'], ['sedum', 'Sedum']] as const).map(([col, name]) => (
-                    <button key={col} onClick={() => updateRoom({ roofMaterial: col })} className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg transition-colors ${room.roofMaterial === col ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
+                  {/* Tiles and slates are pitched-roof coverings, so they only
+                      appear under a gable; the corrugated sheets suit either. */}
+                  {([
+                    ['epdm', 'EPDM'], ['rubber', 'Rubber'], ['aluminium', 'Aluminium'], ['sedum', 'Sedum'],
+                    ...(room.shape === 'Gable' ? [['roof_clay_tiles', 'Clay Tiles'], ['roof_slate_round', 'Round Slate'], ['roof_slate', 'Slate']] as const : []),
+                    ['roof_corrugated_dark', 'Corrugated'], ['roof_corrugated_black', 'Corrugated Black'], ['roof_corrugated_dark_grey', 'Corrugated Grey'],
+                  ] as ReadonlyArray<readonly [string, string]>).map(([col, name]) => (
+                    <button key={col} onClick={() => updateRoom({ roofMaterial: col as any })} className={`px-2 py-1.5 text-[10px] font-semibold rounded-lg transition-colors ${room.roofMaterial === col ? 'bg-[#3b4d4a] text-white shadow-sm' : 'bg-white text-gray-600 border border-black/5 hover:bg-gray-50'}`}>
                       {name}
                     </button>
                   ))}
@@ -1634,6 +1706,7 @@ export function Sidebar() {
                       { id: 'smoked_oak', name: 'Smoked Oak', img: 'textures/smoked_oak_color.jpg' },
                       { id: 'oak_herringbone', name: 'Oak Herringbone', img: 'textures/oak_herringbone_color.jpg' },
                       { id: 'walnut_parquet', name: 'Walnut Parquet', img: 'textures/walnut_parquet_color.jpg' },
+                      { id: 'laminate', name: 'Laminate', img: 'textures/laminate_color.jpg' },
                     ] as { id: string; name: string; img?: string; tint?: string }[]).map(floor => {
                       const active = room.interiorFloorType === floor.id;
                       return (
