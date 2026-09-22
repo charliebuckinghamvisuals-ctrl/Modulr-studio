@@ -320,7 +320,7 @@ export const HomeViewEditorial: React.FC<HomeViewProps> = ({ onOpenEngine, onNav
                 <Step
                     n="03" name="Material details"
                     title="Close enough to sell the finish."
-                    body="Detail Studio takes a finished render to macro: the cladding grain, the glazing bars, the bench in the sauna. The Material Editor swaps a surface and only that surface changes; the rest of the image is left exactly as it was."
+                    body="Detail Studio takes a finished render to macro: a 2x2 sheet of the cladding grain, the glazing bars, the bench in the sauna - or a single camera shot it picks and takes itself. The Material Editor swaps a surface and only that surface changes; the rest of the image is left exactly as it was."
                     action={{ label: 'Open Detail Studio', onClick: go(AppStage.DETAIL_STUDIO) }}
                 >
                     {/* The sheet is square and narrower than the column; it and
@@ -331,6 +331,22 @@ export const HomeViewEditorial: React.FC<HomeViewProps> = ({ onOpenEngine, onNav
                             <img src="/sauna-materials.jpg" alt="Detail Studio sheet of the garden gym and sauna: bronze glazing bars, the sauna bench, oak cladding grain and a frame corner against lavender" loading="lazy" className="w-full h-full object-cover" />
                         </div>
                         <Caption>Detail Studio sheet · the garden gym and sauna at the top of the page</Caption>
+
+                        {/* Three camera shots under the sheet (Charlie, 22 Sep 2026):
+                            single close-ups the engine framed and took of a
+                            finished render. Same left edge as the sheet. */}
+                        <div className="grid grid-cols-3 gap-3 mt-8">
+                            {[
+                                { src: '/detail-shot-2.jpg', alt: 'Detail Studio camera shot: cedar corner, fascia and door reveal' },
+                                { src: '/detail-shot-5.jpg', alt: 'Detail Studio camera shot: games room at sunset, pool table through the sliding glazing' },
+                                { src: '/detail-shot-8.jpg', alt: 'Detail Studio camera shot: black composite boards and a window reveal at sunset' },
+                            ].map(shot => (
+                                <div key={shot.src} className="aspect-square overflow-hidden bg-[#eef0ec]">
+                                    <img src={shot.src} alt={shot.alt} loading="lazy" className="w-full h-full object-cover" />
+                                </div>
+                            ))}
+                        </div>
+                        <Caption>Camera shots · Detail Studio picks the frame, then takes it</Caption>
                     </div>
                 </Step>
 
