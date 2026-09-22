@@ -43,6 +43,25 @@ export const GalleryView: React.FC = () => {
         '/MaterialStudio-1775819212919.jpg',
     ].map((image, i) => ({ id: `material-${i + 1}`, image }));
 
+    /**
+     * Detail Studio camera shots (21 Sep 2026).
+     *
+     * Single close-ups the engine suggested and then took of a finished
+     * render: through the glazing, at a corner, on a detail. Square like the
+     * sheets, so they share the tile; their own section because they are one
+     * photograph each, not a 2x2 grid.
+     */
+    const shotItems = [
+        { image: '/detail-shot-1.jpg', caption: 'Through the Crittall doors to the office chair' },
+        { image: '/detail-shot-2.jpg', caption: 'Cedar corner, fascia and door reveal' },
+        { image: '/detail-shot-3.jpg', caption: 'Deck edge and open door, leaves on the boards' },
+        { image: '/detail-shot-4.jpg', caption: 'Cedar elevation with wall lights, from the lawn' },
+        { image: '/detail-shot-5.jpg', caption: 'Games room at sunset, pool table through the sliders' },
+        { image: '/detail-shot-6.jpg', caption: 'Black-clad games room, glazing catching the sky' },
+        { image: '/detail-shot-7.jpg', caption: 'Sofa through the glazing, sunset on the deck' },
+        { image: '/detail-shot-8.jpg', caption: 'Black composite boards and window reveal, sunset' },
+    ].map((item, i) => ({ id: `shot-${i + 1}`, ...item }));
+
     const sliderItems = [12, 13, 14, 15, 16, 17].map((id) => ({
         id,
         type: 'slider' as const,
@@ -216,6 +235,50 @@ export const GalleryView: React.FC = () => {
                                             <div className="space-y-1">
                                                 <span className="text-white text-[10px] uppercase font-bold tracking-[0.3em] block">Detail Studio</span>
                                                 <span className="text-white/80 text-xs font-medium">2x2 Macro Detail Sheet</span>
+                                            </div>
+                                            <div className="p-3 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white">
+                                                <Sparkles size={16} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+
+                    {/* Section 4: Camera shots */}
+                    <section className="space-y-12">
+                        <div className="flex flex-col items-center text-center space-y-4">
+                            <h2 className="text-2xl md:text-4xl font-bold text-accent tracking-tight">Camera Shots</h2>
+                            <p className="text-secondary text-sm max-w-xl">
+                                Single close-ups taken in Detail Studio: the engine suggests the shots
+                                worth taking of a finished render and then takes them. Same building,
+                                same light, nothing redesigned.
+                            </p>
+                            <div className="h-px w-24 bg-accent/20"></div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 py-8">
+                            {shotItems.map((item, idx) => (
+                                <div
+                                    key={item.id}
+                                    className="group relative glass-panel rounded-xl border border-border bg-white shadow-2xl overflow-hidden aspect-square transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.15)] hover:-translate-y-4 animate-in fade-in slide-in-from-bottom-12"
+                                    style={{ animationDelay: `${idx * 80}ms` }}
+                                >
+                                    <div className="absolute inset-0 bg-slate-100 flex items-center justify-center text-slate-300">
+                                        <ImageIcon size={48} />
+                                    </div>
+                                    <img
+                                        src={item.image}
+                                        alt={`Detail Studio camera shot: ${item.caption}`}
+                                        loading="lazy"
+                                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 z-10"
+                                    />
+                                    <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 z-20 transform translate-y-4 group-hover:translate-y-0">
+                                        <div className="flex items-center justify-between">
+                                            <div className="space-y-1">
+                                                <span className="text-white text-[10px] uppercase font-bold tracking-[0.3em] block">Detail Studio</span>
+                                                <span className="text-white/80 text-xs font-medium">{item.caption}</span>
                                             </div>
                                             <div className="p-3 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white">
                                                 <Sparkles size={16} />
