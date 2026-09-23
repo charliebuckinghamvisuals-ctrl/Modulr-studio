@@ -1,5 +1,6 @@
 import type { Room, Door, WindowData, PartitionData } from '../types';
 import { bayRange, openingRemovedByBay, bayFloorTop } from './bay';
+import { lShapeNotch } from './lshape';
 
 /**
  * Wall collision for the walkthrough.
@@ -72,20 +73,50 @@ export function buildWalkSolids(room: Room, openIds: string[], allOpen: boolean)
     const inner = bay.side === 'left' ? bay.x1 : bay.x0;
     frontGaps.push(through ? { a: Math.min(outer, inner), b: Math.max(outer, inner) } : { a: bay.x0, b: bay.x1 });
   }
-  rects.push(...splitX({ x0: -w / 2, x1: w / 2, z0: d / 2 - wt, z1: d / 2 }, frontGaps));
+  // An L's notch shortens the front-or-back wall and the end wall it sits
+  // against, and brings two walls of its own. Before this the walkthrough
+  // did not know the L existed: the rectangle's walls stood across the
+  // notch as invisible walls you could not walk into.
+  const notch = lShapeNotch(room, w, d);
+  // The run of a front/back wall along x, and of an end wall along z, with
+  // the notch's stretch taken off whichever end it sits at.
+  const runX = (cut: boolean): [number, number] =>
+    !cut || !notch ? [-w / 2, w / 2] : notch.sx > 0 ? [-w / 2, notch.lineX] : [notch.lineX, w / 2];
+  const runZ = (cut: boolean): [number, number] =>
+    !cut || !notch ? [-d / 2, d / 2] : notch.sz > 0 ? [-d / 2, notch.lineZ] : [notch.lineZ, d / 2];
+
+  const [fx0, fx1] = runX(notch?.sz === 1);
+  rects.push(...splitX({ x0: fx0, x1: fx1, z0: d / 2 - wt, z1: d / 2 }, frontGaps));
 
   // Back wall: gone over a full-depth bay whose back is open. Slats still
   // stand in the way.
   const backGaps = gapsFor('back');
   if (bay && bay.full && room.bay?.backWall === 'open') backGaps.push({ a: bay.x0, b: bay.x1 });
-  rects.push(...splitX({ x0: -w / 2, x1: w / 2, z0: -d / 2, z1: -d / 2 + wt }, backGaps));
+  const [bx0, bx1] = runX(notch?.sz === -1);
+  rects.push(...splitX({ x0: bx0, x1: bx1, z0: -d / 2, z1: -d / 2 + wt }, backGaps));
 
   // End walls: the bay's end is gone along the bay when it is open.
   for (const side of ['left', 'right'] as const) {
     const gaps = gapsFor(side);
     if (bay && bay.side === side && room.bay?.screen === 'open') gaps.push({ a: bay.z0, b: d / 2 + 0.1 });
     const x0 = side === 'left' ? -w / 2 : w / 2 - wt;
-    rects.push(...splitZ({ x0, x1: x0 + wt, z0: -d / 2, z1: d / 2 }, gaps));
+    const [ez0, ez1] = runZ(notch?.sx === (side === 'left' ? -1 : 1));
+    rects.push(...splitZ({ x0, x1: x0 + wt, z0: ez0, z1: ez1 }, gaps));
+  }
+
+  // The notch's own two walls, on the building side of its lines - where
+  // RoomGeometry leaves them - each run a wall thickness past the inner
+  // corner so the two close it. Their doors are the doors of the walls they
+  // face the same way as (see outerFaceAt in utils/lshape), so the same gap
+  // lists cut them; a gap from the main face falls outside and is dropped.
+  if (notch) {
+    const { sx, sz, lineX, lineZ } = notch;
+    const acrossZ0 = sz > 0 ? lineZ - wt : lineZ;
+    rects.push(...splitX({ x0: Math.min(lineX - sx * wt, sx * w / 2), x1: Math.max(lineX - sx * wt, sx * w / 2), z0: acrossZ0, z1: acrossZ0 + wt },
+      sz > 0 ? frontGaps : backGaps));
+    const alongX0 = sx > 0 ? lineX - wt : lineX;
+    rects.push(...splitZ({ x0: alongX0, x1: alongX0 + wt, z0: Math.min(lineZ - sz * wt, sz * d / 2), z1: Math.max(lineZ - sz * wt, sz * d / 2) },
+      gapsFor(sx > 0 ? 'right' : 'left')));
   }
 
   if (bay) {
@@ -158,6 +189,12 @@ export function walkFloorY(room: Room, x: number, z: number): number {
   const base = (room.baseHeightMm ?? 100) / 1000;
   const bay = bayRange(room);
   if (bay && x > bay.x0 && x < bay.x1 && z > bay.z0 && z < d / 2) return base + bayFloorTop(room);
+  // An L's notch is outside: ground, or the deck where the deck runs into
+  // the recess (its default outline is the whole base rectangle).
+  const notch = lShapeNotch(room, w, d);
+  if (notch && x > notch.x0 && x < notch.x1 && z > notch.z0 && z < notch.z1) {
+    return (room.hasDecking || room.hasPictureFrame) ? base : 0;
+  }
   if (Math.abs(x) <= w / 2 && Math.abs(z) <= d / 2) return base;
   const deck = (room.hasDecking || room.hasPictureFrame) ? (room.deckingSizeMm ?? 1500) / 1000 : 0;
   if (deck > 0 && Math.abs(x) <= w / 2 && z > d / 2 && z <= d / 2 + deck) return base;

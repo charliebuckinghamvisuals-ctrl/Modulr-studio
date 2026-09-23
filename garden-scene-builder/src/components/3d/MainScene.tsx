@@ -10,6 +10,12 @@ import { CameraControls, Environment, Lightformer, ContactShadows, Plane, Text, 
 useEnvironment.preload({ files: 'textures/garden_nook.hdr' });
 useEnvironment.preload({ files: 'textures/night.hdr' });
 import { sunState, MOON_DIR } from '../../utils/sun';
+import { SKIES, skyForSun, skyRotation } from '../../utils/skies';
+// The default sky, fetched with the rest of the first load. Evening and
+// night load when first chosen, with the generated sky and the garden HDR
+// standing in meanwhile (see the Suspense below), so a first visit does not
+// pay for all three.
+useEnvironment.preload({ files: SKIES.day.file });
 import { isLightFitting } from '../../modelRegistry';
 import { FenceRuns, FenceTool } from './FenceRuns';
 import { Paths, PathTool } from './Paths';
@@ -24,7 +30,7 @@ import { PlacementGhost } from './PlacementGhost';
 import { ObjectType } from '../../types';
 import { buildWalkSolids, walkBlocked, walkFloorY, toRoomLocal, toWorld } from '../../utils/walkCollide';
 import { enclosedRange } from '../../utils/bay';
-import { captureRenderInputs } from '../../utils/renderInputs';
+import { captureRenderInputs, captureDrawing, type DrawingOptions } from '../../utils/renderInputs';
 
 
 /**
@@ -462,6 +468,11 @@ function ScreenshotHelper() {
     // drawing of the same frame. The Sidebar's "Send to Render Engine"
     // calls this; see utils/renderInputs.ts for why both are needed.
     (window as any).__modulrCaptureRenderInputs = () => captureRenderInputs(gl, scene, camera);
+    // The PDF's drawings: a shaded and an edge render of the scene from a
+    // camera the caller builds (a true orthographic elevation, framed to a
+    // known scale), at the size it asks for. See src/pdf/capture.ts.
+    (window as any).__modulrCaptureDrawing = (cam: THREE.Camera, width: number, height: number, opts?: DrawingOptions) =>
+      captureDrawing(gl, scene, cam, width, height, opts);
   }, [gl, scene, camera, advance]);
 
   useEffect(() => {
@@ -688,6 +699,11 @@ export function MainScene() {
   // the sun is down; the moon takes over as the key light.
   const timeOfDay = useStore(s => s.timeOfDay);
   const sun = useMemo(() => sunState(timeOfDay), [timeOfDay]);
+  // The photographed sky for this time of day, turned so its sun (or moon)
+  // is where the light comes from - see utils/skies.
+  const skyKey = skyForSun(sun);
+  const sky = SKIES[skyKey];
+  const skyRot = skyRotation(skyKey, sun);
   const hasFittings = useStore(s => s.scene.objects.some(o => isLightFitting(o.type)));
   const grassTex: any = useTexture({ map: './textures/grass_color.jpg', normalMap: './textures/grass_normal.jpg', roughnessMap: './textures/grass_roughness.jpg' });
   const grass = useMemo(() => {
@@ -723,6 +739,48 @@ export function MainScene() {
     const c = lerp3(p(night), lit, sun.daylight);
     return '#' + c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
   };
+  // Stars as crisp points and a moon disc, where the night's key light comes
+  // from. Points stay sharp at any zoom, which the 2K night photo's own
+  // stars could not (utils/skies): small and many, faintly coloured.
+  const nightStars = (
+    <>
+      <Stars radius={220} depth={60} count={5200} factor={3.2} saturation={0.25} fade speed={0.4} />
+      <mesh position={[MOON_DIR[0] * 380, MOON_DIR[1] * 380, MOON_DIR[2] * 380]}>
+        <sphereGeometry args={[7, 24, 24]} />
+        <meshBasicMaterial color="#eef1f8" toneMapped={false} />
+      </mesh>
+    </>
+  );
+  // After cloudMix, which it calls - a const read before its line is a
+  // temporal-dead-zone throw on the first render.
+  // The generated sky: the atmosphere shader with the real sun position,
+  // stars and a moon after dark, and a few clouds. The fallback while a
+  // photographed sky loads.
+  const generatedSky = (
+    <>
+      <Sky
+        distance={450000}
+        sunPosition={[sun.dir[0] * 100, sun.dir[1] * 100, sun.dir[2] * 100]}
+        turbidity={sun.turbidity}
+        rayleigh={sun.rayleigh}
+        mieCoefficient={sun.mie}
+        mieDirectionalG={0.8}
+      />
+      {/* After sunset: stars, and a moon where the night's key light
+          comes from. The atmosphere shader goes dark on its own once
+          the sun is below the horizon. */}
+      {sun.elevation < 0 && nightStars}
+      {/* limit is the instanced buffer drei allocates and walks every
+          frame. The three clouds below use 62 segments between them, so
+          200 was reserving and iterating more than three times what is
+          drawn. 64 covers them with room to spare. */}
+      <Clouds material={THREE.MeshLambertMaterial} limit={64}>
+        <Cloud seed={1} segments={26} bounds={[26, 3, 12]} volume={9} color={cloudMix('#ffffff', '#2a3040')} opacity={0.5} position={[-14, 22, -22]} />
+        <Cloud seed={2} segments={20} bounds={[20, 3, 10]} volume={7} color={cloudMix('#f3f6fa', '#262c3a')} opacity={0.42} position={[20, 26, -30]} />
+        <Cloud seed={3} segments={16} bounds={[16, 2, 8]} volume={5} color={cloudMix('#ffffff', '#2a3040')} opacity={0.32} position={[4, 30, -40]} />
+      </Clouds>
+    </>
+  );
 
 
   useFrame((_, delta) => {
@@ -841,46 +899,27 @@ export function MainScene() {
 
       <group name="environment-background" visible={viewMode !== 'render'}>
         {/*
-          Generated sky rather than a photographic HDR backdrop. Sky is a
-          procedural atmospheric model with a real sun position, so it gives a
-          clean gradient and a sun without baking a specific location's
-          buildings and trees into the background.
-
-          The HDR is still loaded for lighting only (no `background` prop) -
-          removing it entirely would flatten reflections and ambient bounce.
+          The backdrop is the photographed sky (utils/skies) since 23 Sep
+          2026 - open, horizon-cleared skies, so there are still no
+          buildings or trees baked in, which is why a generated sky was used
+          before. That generated sky (generatedSky, above) now shows only
+          while a sky file loads, so switching never flashes an empty
+          background. Not in the render view or an export, which want no
+          sky; the Environment puts the old background back when it
+          unmounts.
         */}
-        {!isExporting && (
-          <>
-            <Sky
-              distance={450000}
-              sunPosition={[sun.dir[0] * 100, sun.dir[1] * 100, sun.dir[2] * 100]}
-              turbidity={sun.turbidity}
-              rayleigh={sun.rayleigh}
-              mieCoefficient={sun.mie}
-              mieDirectionalG={0.8}
-            />
-            {/* After sunset: stars, and a moon where the night's key light
-                comes from. The atmosphere shader goes dark on its own once
-                the sun is below the horizon. */}
-            {sun.elevation < 0 && (
-              <>
-                <Stars radius={220} depth={60} count={2600} factor={4.5} saturation={0} fade speed={0.4} />
-                <mesh position={[MOON_DIR[0] * 380, MOON_DIR[1] * 380, MOON_DIR[2] * 380]}>
-                  <sphereGeometry args={[7, 24, 24]} />
-                  <meshBasicMaterial color="#eef1f8" toneMapped={false} />
-                </mesh>
-              </>
-            )}
-            {/* limit is the instanced buffer drei allocates and walks every
-                frame. The three clouds below use 62 segments between them, so
-                200 was reserving and iterating more than three times what is
-                drawn. 64 covers them with room to spare. */}
-            <Clouds material={THREE.MeshLambertMaterial} limit={64}>
-              <Cloud seed={1} segments={26} bounds={[26, 3, 12]} volume={9} color={cloudMix('#ffffff', '#2a3040')} opacity={0.5} position={[-14, 22, -22]} />
-              <Cloud seed={2} segments={20} bounds={[20, 3, 10]} volume={7} color={cloudMix('#f3f6fa', '#262c3a')} opacity={0.42} position={[20, 26, -30]} />
-              <Cloud seed={3} segments={16} bounds={[16, 2, 8]} volume={5} color={cloudMix('#ffffff', '#2a3040')} opacity={0.32} position={[4, 30, -40]} />
-            </Clouds>
-          </>
+        {!isExporting && viewMode !== 'render' && (
+          <Suspense fallback={generatedSky}>
+            {/* backgroundBlurriness set explicitly, 0 unless the sky asks:
+                any blur at all draws the backdrop from the pre-blurred
+                lighting copy of the sky, a quarter the resolution - "looks
+                so blurry" (Charlie, 23 Sep 2026). Set here because every
+                Environment writes the same scene field, and this one must
+                win. Night blurs on purpose: its photo is only the sky's
+                colour and glow, and the stars are drawn over it. */}
+            <Environment files={sky.file} background="only" backgroundBlurriness={sky.bgBlur ?? 0} backgroundIntensity={sky.bgScale} backgroundRotation={[0, skyRot, 0]} />
+            {sky.pointStars && nightStars}
+          </Suspense>
         )}
 
         {viewMode === 'walking' && !isExporting ? (
@@ -925,15 +964,34 @@ export function MainScene() {
             ))}
           </Environment>
         ) : (
-          <Environment
-            files={isNight ? "textures/night.hdr" : "textures/garden_nook.hdr"}
-            blur={0.05}
-            // Muted during export. An HDR is directional by nature - it is a
-            // photograph of a real sky with a bright side - so leaving it at full
-            // strength would reintroduce exactly the uneven face-to-face lighting
-            // the flat ambient above is there to remove.
-            environmentIntensity={isExporting ? 0.08 : (isNight ? 0.3 : 0.3 + 0.7 * sun.daylight)}
-          />
+          /*
+            The 3D view is lit by the sky you can see (utils/skies), turned
+            like the backdrop so its sun is on the light's side, and scaled
+            (envScale) to the overall level of the HDR it replaced so the
+            tuned time-of-day brightness carries over. While a sky file loads
+            the old HDR stands in: an environment map is there throughout, so
+            switching sky does not recompile every material or flash black.
+            Muted during export either way. An HDR is directional by nature -
+            it is a photograph of a real sky with a bright side - so leaving
+            it at full strength would reintroduce exactly the uneven
+            face-to-face lighting the flat ambient above is there to remove.
+          */
+          <Suspense fallback={
+            <Environment
+              files={isNight ? "textures/night.hdr" : "textures/garden_nook.hdr"}
+              blur={0.05}
+              environmentIntensity={isExporting ? 0.08 : (isNight ? 0.3 : 0.3 + 0.7 * sun.daylight)}
+            />
+          }>
+            {/* No `blur` here: in drei it is the BACKGROUND's blurriness, not
+                the lighting's, and with the photo as the backdrop 0.05 was
+                enough to halve its sharpness. */}
+            <Environment
+              files={sky.file}
+              environmentRotation={[0, skyRot, 0]}
+              environmentIntensity={(isExporting ? 0.08 : (isNight ? 0.3 : 0.3 + 0.7 * sun.daylight)) * sky.envScale}
+            />
+          </Suspense>
         )}
 
         {/* Ground Plane - real grass (ambientCG Grass002, 1.4m tile) rather
@@ -971,19 +1029,27 @@ export function MainScene() {
         rotation={[0, viewMode === 'render' ? renderTransform.rotationY : 0, 0]}
         scale={viewMode === 'render' ? renderTransform.scale : 1}
       >
-        {/* The Garden Room */}
-        <Suspense fallback={null}>
-          <RoomGeometry />
-        </Suspense>
+        {/* The Garden Room. The three named groups let a drawing capture
+            (the PDF's elevations) keep the building and hide the garden -
+            see utils/renderInputs captureDrawing. */}
+        <group name="pdf-building">
+          <Suspense fallback={null}>
+            <RoomGeometry />
+          </Suspense>
+        </group>
 
         {/* Garden Objects */}
-        <SceneObjects />
-        <FenceRuns />
-        <FenceTool />
-        <Paths />
-        <PathTool />
-        <Decks />
-        <DeckTool />
+        <group name="pdf-objects">
+          <SceneObjects />
+        </group>
+        <group name="pdf-garden">
+          <FenceRuns />
+          <FenceTool />
+          <Paths />
+          <PathTool />
+          <Decks />
+          <DeckTool />
+        </group>
         <LightingPlan />
       </group>
 

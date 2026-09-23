@@ -2,7 +2,7 @@ import React from 'react';
 import { useMemo, useState, useRef, useEffect, useDeferredValue } from 'react';
 import { Room, Door, FrameMaterialType } from '../../types';
 import { doorKind } from '../../utils/doors';
-import { clampCutoutWidthMm, clampCutoutDepthMm } from '../../utils/lshape';
+import { clampCutoutWidthMm, clampCutoutDepthMm, lShapeNotch, outerFaceAt } from '../../utils/lshape';
 import { bayRange, enclosedRange, wallSpanMm, openingRemovedByBay } from '../../utils/bay';
 import { BayParts } from './BayParts';
 import { useFrame } from '@react-three/fiber';
@@ -346,7 +346,13 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
     const out: Partial<Record<Door['wall'], { lo: number; hi: number }>> = {};
     (['front', 'back', 'left', 'right', 'bay'] as const).forEach(wl => { const s = wallSpanMm(room, wl); if (s) out[wl] = s; });
     return out;
-  }, [room.bay, room.widthMm, room.depthMm, room.wallThicknessMm]);
+  }, [room.bay, room.widthMm, room.depthMm, room.wallThicknessMm, room.shape, room.lShapeCutoutWidthMm, room.lShapeCutoutDepthMm, room.lShapeCutoutCorner]);
+  // An L's notch: its two faces take openings like any wall - "I still need
+  // to add windows/doors onto those cut out walls" (Charlie, 23 Sep 2026).
+  // They keep the names of the walls they face the same way as (see
+  // outerFaceAt), so only the picking and the + buttons know about them.
+  const notch = useMemo(() => lShapeNotch(room, room.widthMm / 1000, room.depthMm / 1000),
+    [room.shape, room.widthMm, room.depthMm, room.lShapeCutoutWidthMm, room.lShapeCutoutDepthMm, room.lShapeCutoutCorner]);
 
   useEffect(() => {
     const onWallClick = (e: any) => {
@@ -362,7 +368,15 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
       if (y < baseH + 0.15 || y > baseH + h + 0.1) { setHit(null); return; }
       let wall: Door['wall'] | null = null;
       let offsetMm = 0;
-      if (Math.abs(Math.abs(lz) - d / 2) < band && Math.abs(lx) < w / 2 - 0.05) {
+      // The notch's faces first: a click near its outer corner is also
+      // within the band of the end wall's line.
+      if (notch && Math.abs(lz - notch.lineZ) < band && lx > notch.x0 + 0.05 && lx < notch.x1 - 0.05) {
+        wall = notch.sz > 0 ? 'front' : 'back';
+        offsetMm = Math.round(lx * 1000);
+      } else if (notch && Math.abs(lx - notch.lineX) < band && lz > notch.z0 + 0.05 && lz < notch.z1 - 0.05) {
+        wall = notch.sx > 0 ? 'right' : 'left';
+        offsetMm = Math.round(lz * 1000);
+      } else if (Math.abs(Math.abs(lz) - d / 2) < band && Math.abs(lx) < w / 2 - 0.05) {
         wall = lz > 0 ? 'front' : 'back';
         offsetMm = Math.round(lx * 1000);
       } else if (Math.abs(Math.abs(lx) - w / 2) < band && Math.abs(lz) < d / 2 - 0.05) {
@@ -375,7 +389,9 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
         offsetMm = Math.round((lz - (bay.z0 + d / 2) / 2) * 1000);
       }
       // Wall the bay has taken away - nothing to put an opening in.
-      const span = wall ? spans[wall] : undefined;
+      // The face the click is on - the main one or, on a stepped wall, the
+      // notch's recessed one.
+      const span = wall ? (wallSpanMm(room, wall, offsetMm) ?? undefined) : undefined;
       if (!wall || !span || offsetMm < span.lo + 50 || offsetMm > span.hi - 50) { setHit(null); return; }
       setHit({ wall, offsetMm, pos: [lx, Math.min(Math.max(y, baseH + 0.8), baseH + h - 0.2), lz] });
     };
@@ -383,7 +399,7 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
     window.addEventListener('wall-clicked', onWallClick);
     window.addEventListener('keydown', onKey);
     return () => { window.removeEventListener('wall-clicked', onWallClick); window.removeEventListener('keydown', onKey); };
-  }, [room.x, room.z, room.rot, room.widthMm, room.depthMm, room.wallThicknessMm, h, baseH, bay, spans]);
+  }, [room.x, room.z, room.rot, room.widthMm, room.depthMm, room.wallThicknessMm, h, baseH, bay, spans, notch]);
 
   const viewMode = useStore(s => s.viewMode);
   const isExporting = useStore(s => s.isExporting);
@@ -412,12 +428,21 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
   const wt = (room.wallThicknessMm ?? 150) / 1000;
   const midY = baseH + h * 0.55;
   const mid = (wl: Door['wall']) => { const s = spans[wl]; return s ? Math.round((s.lo + s.hi) / 2 / 50) * 50 : null; };
-  const wallButtons: { wall: Door['wall']; offsetMm: number; pos: [number, number, number] }[] = [];
+  const wallButtons: { wall: Door['wall']; offsetMm: number; pos: [number, number, number]; recess?: boolean }[] = [];
   const fm = mid('front'), bm = mid('back'), lm = mid('left'), rm = mid('right'), dm = mid('bay');
   if (fm !== null) wallButtons.push({ wall: 'front', offsetMm: fm, pos: [fm / 1000, midY, d / 2 + 0.12] });
   if (bm !== null) wallButtons.push({ wall: 'back', offsetMm: bm, pos: [bm / 1000, midY, -d / 2 - 0.12] });
   if (lm !== null) wallButtons.push({ wall: 'left', offsetMm: lm, pos: [-w / 2 - 0.12, midY, lm / 1000] });
   if (rm !== null) wallButtons.push({ wall: 'right', offsetMm: rm, pos: [w / 2 + 0.12, midY, rm / 1000] });
+  if (notch) {
+    // One on each of the notch's faces, in the middle of the stretch an
+    // opening can use, just proud of the face.
+    const across = notch.sz > 0 ? 'front' : 'back', along = notch.sx > 0 ? 'right' : 'left';
+    const sa = wallSpanMm(room, across, Math.round((notch.x0 + notch.x1) * 500));
+    const sb = wallSpanMm(room, along, Math.round((notch.z0 + notch.z1) * 500));
+    if (sa) { const m = Math.round((sa.lo + sa.hi) / 2 / 50) * 50; wallButtons.push({ wall: across, offsetMm: m, pos: [m / 1000, midY, notch.lineZ + notch.sz * 0.12], recess: true }); }
+    if (sb) { const m = Math.round((sb.lo + sb.hi) / 2 / 50) * 50; wallButtons.push({ wall: along, offsetMm: m, pos: [notch.lineX + notch.sx * 0.12, midY, m / 1000], recess: true }); }
+  }
   if (dm !== null && bay) {
     const faceX = bay.dividerX + (bay.side === 'left' ? -(wt / 2 + 0.12) : wt / 2 + 0.12);
     wallButtons.push({ wall: 'bay', offsetMm: dm, pos: [faceX, midY, (bay.z0 + d / 2) / 2 + dm / 1000] });
@@ -426,9 +451,9 @@ function WallAddChip({ room, h, baseH }: { room: Room, h: number, baseH: number 
   return (
     <>
       {showAdders && wallButtons.map(b => (
-        <Html key={`wall-add-${b.wall}`} position={b.pos} center zIndexRange={[125, 0]}>
+        <Html key={`wall-add-${b.wall}${b.recess ? '-recess' : ''}`} position={b.pos} center zIndexRange={[125, 0]}>
           <button
-            title={`Add a window or door to the ${b.wall === 'bay' ? 'divider' : b.wall} wall`}
+            title={`Add a window or door to the ${b.recess ? 'cut-out' : b.wall === 'bay' ? 'divider' : b.wall} wall`}
             style={{ pointerEvents: 'auto' }}
             onPointerDown={(e) => e.stopPropagation()}
             // Moving onto the button leaves the 3D mesh, which would hide the
@@ -1346,8 +1371,11 @@ export function RoomGeometry() {
 
   // LShape dimensions
   const isLShape = room.shape === 'LShape';
-  const cutW = isLShape ? Math.min(((room.lShapeCutoutWidthMm ?? 2000) / 1000), w - 0.35) : 0;
-  const cutD = isLShape ? Math.min(((room.lShapeCutoutDepthMm ?? 1500) / 1000), d - 0.35) : 0;
+  // One definition of the notch, shared with the walkthrough's collision
+  // (utils/lshape) so the two can never disagree about where it is.
+  const notch = lShapeNotch(room, w, d);
+  const cutW = notch?.cutW ?? 0;
+  const cutD = notch?.cutD ?? 0;
   /**
    * Which corner the cut-out comes out of (22 Sep 2026). It was welded to
    * the front-right, which is the wrong one for half of all plots - "make it
@@ -1355,16 +1383,23 @@ export function RoomGeometry() {
    * written for the front-right and mirrored by these two signs, so there is
    * one piece of geometry rather than four.
    */
-  const cutCorner = room.lShapeCutoutCorner ?? 'front-right';
   /** +1 = the cut is on the right (+x), -1 = on the left. */
-  const cutSX = cutCorner.endsWith('left') ? -1 : 1;
+  const cutSX = notch?.sx ?? 1;
   /** +1 = the cut is at the front (+z), -1 = at the back. */
-  const cutSZ = cutCorner.startsWith('back') ? -1 : 1;
+  const cutSZ = notch?.sz ?? 1;
   const clampCutW = (val: number) => clampCutoutWidthMm(room, val);
   const clampCutD = (val: number) => clampCutoutDepthMm(room, val);
   /** The notch's inner corner, on the building's own wall lines. */
   const cutLineX = cutSX * (w / 2 - cutW);
   const cutLineZ = cutSZ * (d / 2 - cutD);
+  /** The outer face an opening at this point sits in: the notch steps two
+   *  elevations back, and an opening on the recessed face keeps its wall's
+   *  name and only moves plane. See outerFaceAt (utils/lshape). */
+  const faceAt = (wall: string, offsetM: number) => outerFaceAt(notch, w, d, wall, offsetM);
+  /** The same, as a distance from the centre, for code that places a frame
+   *  at +/-frameZ or +/-frameX: whole walls give exactly what they always did. */
+  const faceZ = (wall: string, offsetM: number) => (wall === 'front' || wall === 'back') ? Math.abs(faceAt(wall, offsetM)) : d / 2;
+  const faceX = (wall: string, offsetM: number) => (wall === 'left' || wall === 'right') ? Math.abs(faceAt(wall, offsetM)) : w / 2;
   /**
    * How far each elevation runs in plan once the notch has eaten its end.
    * The notch shortens exactly two walls - a front-right cut takes the end
@@ -1477,7 +1512,7 @@ export function RoomGeometry() {
   const texBayWall = useRealMaterial(room.bay?.wallFinish === 'cladding' && room.bay.wallCladding ? room.bay.wallCladding : (room.claddingBack || room.cladding || 'timber'), w, h, 0);
   const bayWallBrushMat = room.bay?.wallFinish === 'render'
     ? <meshStandardMaterial color={room.bay.wallColour ?? '#e8e4dc'} roughness={0.85} metalness={0} />
-    : <meshStandardMaterial color="#ffffff" metalness={0.1} {...texBayWall} bumpScale={0.1} />;
+    : <meshPhysicalMaterial color="#ffffff" metalness={0.1} {...texBayWall} bumpScale={0.1} />;
 
   /**
    * One floor tongue per door and per floor-level window: the reveal between
@@ -1500,13 +1535,13 @@ export function RoomGeometry() {
     return openings.map(o => {
       // The piece's centre: half a reveal inside the inner wall face.
       let x = 0, z = 0, gw = o.width, gd = reveal;
-      if (o.wall === 'front') { x = o.offset; z = d/2 - wallThickness + reveal/2; }
-      else if (o.wall === 'back') { x = o.offset; z = -(d/2 - wallThickness + reveal/2); }
-      else if (o.wall === 'left') { x = -(w/2 - wallThickness + reveal/2); z = o.offset; gw = reveal; gd = o.width; }
-      else { x = w/2 - wallThickness + reveal/2; z = o.offset; gw = reveal; gd = o.width; }
+      if (o.wall === 'front') { x = o.offset; z = faceZ('front', o.offset) - wallThickness + reveal/2; }
+      else if (o.wall === 'back') { x = o.offset; z = -(faceZ('back', o.offset) - wallThickness + reveal/2); }
+      else if (o.wall === 'left') { x = -(faceX('left', o.offset) - wallThickness + reveal/2); z = o.offset; gw = reveal; gd = o.width; }
+      else { x = faceX('right', o.offset) - wallThickness + reveal/2; z = o.offset; gw = reveal; gd = o.width; }
       return { key: o.key, x, z, geom: floorTongueGeometry(gw, gd, x - encCx, z, sw, sd) };
     });
-  }, [room.doors, room.windows, w, d, wallThickness, frameDepth, encW, encCx, bayKey]);
+  }, [room.doors, room.windows, w, d, wallThickness, frameDepth, encW, encCx, bayKey, isLShape, cutW, cutD, cutSX, cutSZ]);
 
   const isVert = room.claddingOrientation !== 'vertical';
   const geomFrontWall = useMemo(() => createCladdingGeometry(w, frontH, isVert), [w, frontH, isVert]);
@@ -1596,6 +1631,25 @@ export function RoomGeometry() {
    * the tiles, slates and corrugated sheets added 22 Sep 2026 look the same
    * on a gable slab as on the flat top sheet.
    */
+  /**
+   * A roof slab's TOP face records itself in the shadow map (23 Sep 2026).
+   *
+   * three records a solid's far side by default, which for a roof slab is
+   * its underside, a centimetre or two above the ceiling. With the shadow
+   * map's safety offset and 4cm texels, the top few centimetres of every
+   * wall facing the moon (or sun) then read as lit - a bright saw-toothed
+   * band under the ceiling, "light bleeding in from outside" (Charlie).
+   * Recording the top face puts the occluder a slab's thickness higher, so
+   * nothing just under the roof can read as lit. Only the top face: the
+   * underside and fascia keep the default, and the shadow map keeps the
+   * nearest, so the top wins.
+   *
+   * Measured: the band's excess brightness 20.5 -> 0.7. No striping from
+   * self-shadowing on the roof or fascia from outside, flat or gable, at
+   * night, midday or evening. Bias and shadow-map resolution were tried
+   * first: neither helped, and a tighter map made it worse.
+   */
+  const ROOF_TOP_SHADOW = { shadowSide: THREE.FrontSide } as const;
   const roofTopMaterial = (tex: any, extra: Record<string, unknown> = {}) => {
     const key = String(room.roofMaterial || '');
     const rdef: any = (MATERIAL_DEF as any)[key] || {};
@@ -2111,27 +2165,27 @@ export function RoomGeometry() {
             {/* Main block */}
             <Base position={[0, (h + 0.05)/2, 0]}>
               <primitive object={claddingBoxGeom} attach="geometry" />
-              <meshStandardMaterial key="mat-0" attach="material-0" color="#ffffff" metalness={0.1} {...texRight}  bumpScale={0.1} />
-              <meshStandardMaterial key="mat-1" attach="material-1" color="#ffffff" metalness={0.1} {...texLeft}  bumpScale={0.1} />
-              <meshStandardMaterial key="mat-2" attach="material-2" color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
-              <meshStandardMaterial key="mat-3" attach="material-3" color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
-              <meshStandardMaterial attach="material-4" color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
-              <meshStandardMaterial attach="material-5" color="#ffffff" metalness={0.1} {...texBack}  bumpScale={0.1} />
+              <meshPhysicalMaterial key="mat-0" attach="material-0" color="#ffffff" metalness={0.1} {...texRight}  bumpScale={0.1} />
+              <meshPhysicalMaterial key="mat-1" attach="material-1" color="#ffffff" metalness={0.1} {...texLeft}  bumpScale={0.1} />
+              <meshPhysicalMaterial key="mat-2" attach="material-2" color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
+              <meshPhysicalMaterial key="mat-3" attach="material-3" color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
+              <meshPhysicalMaterial attach="material-4" color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
+              <meshPhysicalMaterial attach="material-5" color="#ffffff" metalness={0.1} {...texBack}  bumpScale={0.1} />
             </Base>
 
             {room.hasPictureFrame && (
               <>
                 <Addition position={[-w/2 + wallThickness/2, isGable ? (h+roofH)/2 : (h+0.05)/2, d/2 + ohFront/2 - 0.005]}>
                   <primitive object={pfLeftGeom} attach="geometry" />
-                  <meshStandardMaterial color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
+                  <meshPhysicalMaterial color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
                 </Addition>
                 <Addition position={[w/2 - wallThickness/2, isGable ? (h+roofH)/2 : (h+0.05)/2, d/2 + ohFront/2 - 0.005]}>
                   <primitive object={pfRightGeom} attach="geometry" />
-                  <meshStandardMaterial color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
+                  <meshPhysicalMaterial color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
                 </Addition>
                 <Addition position={[0, pfHeight - 0.15, d/2 + ohFront/2 - 0.005]}>
                   <primitive object={pfTopGeom} attach="geometry" />
-                  <meshStandardMaterial color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
+                  <meshPhysicalMaterial color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
                 </Addition>
               </>
             )}
@@ -2140,7 +2194,7 @@ export function RoomGeometry() {
             {isLShape && (
               <Subtraction position={[cutSX * (w/2 - cutW/2 + 0.1), h/2, cutSZ * (d/2 - cutD/2 + 0.1)]}>
                 <primitive object={lShapeCutOuterGeom} attach="geometry" />
-                <meshStandardMaterial
+                <meshPhysicalMaterial
                   color="#ffffff"
                   {...texFront}
                   metalness={0.1}
@@ -2175,11 +2229,11 @@ export function RoomGeometry() {
                     <>
                     <Addition position={[w/2 - wallThickness/2, h + 0.025, 0]} rotation={[0, Math.PI/2, 0]}>
                       <primitive object={gableTriangleGeom} attach="geometry" />
-                      <meshStandardMaterial color="#ffffff" metalness={0.1} {...texRight}  bumpScale={0.1} />
+                      <meshPhysicalMaterial color="#ffffff" metalness={0.1} {...texRight}  bumpScale={0.1} />
                     </Addition>
                     <Addition position={[-w/2 + wallThickness/2, h + 0.025, 0]} rotation={[0, Math.PI/2, 0]}>
                       <primitive object={gableTriangleGeom} attach="geometry" />
-                      <meshStandardMaterial color="#ffffff" metalness={0.1} {...texLeft}  bumpScale={0.1} />
+                      <meshPhysicalMaterial color="#ffffff" metalness={0.1} {...texLeft}  bumpScale={0.1} />
                     </Addition>
                     </>
                     )}
@@ -2189,12 +2243,12 @@ export function RoomGeometry() {
                     {!room.hasApexGlazing && (
                     <Addition position={[0, h + 0.025, d/2 - wallThickness/2]}>
                       <primitive object={gableTriangleGeom} attach="geometry" />
-                      <meshStandardMaterial color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
+                      <meshPhysicalMaterial color="#ffffff" metalness={0.1} {...texFront}  bumpScale={0.1} />
                     </Addition>
                     )}
                     <Addition position={[0, h + 0.025, -d/2 + wallThickness/2]}>
                       <primitive object={gableTriangleGeom} attach="geometry" />
-                      <meshStandardMaterial color="#ffffff" metalness={0.1} {...texBack}  bumpScale={0.1} />
+                      <meshPhysicalMaterial color="#ffffff" metalness={0.1} {...texBack}  bumpScale={0.1} />
                     </Addition>
                   </>
                 )}
@@ -2224,9 +2278,19 @@ export function RoomGeometry() {
                   <primitive object={interiorCut(w - cutW - wallThickness*2, h + 1, d - wallThickness*2)} attach="geometry" />
                   <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
                 </Subtraction>
-                {/* The short leg: beside the notch, stopping at its wall. */}
-                <Subtraction position={[cutSX * (w/2 - cutW/2 - wallThickness), h/2, -cutSZ * cutD/2]}>
-                  <primitive object={interiorCut(cutW + wallThickness*2, h + 1, d - cutD - wallThickness*2)} attach="geometry" />
+                {/* The short leg: beside the notch, stopping at its wall.
+                    In x it runs from a wall thickness INTO the long leg's
+                    space (overlapping empty room, so no cut face lands
+                    exactly on the long leg's and leaves a coplanar skin) to
+                    the INNER face of the end wall. It used to be a wall
+                    thickness wider on both sides, which put its far face on
+                    the building's outer line: the short leg's end wall was
+                    cut to a paper skin, and the floor and ceiling - which
+                    stop at the inner face - left a 150mm slot at the top and
+                    bottom where the roof and the deck showed through
+                    (Charlie, 23 Sep 2026). */}
+                <Subtraction position={[cutSX * (w/2 - cutW/2 - wallThickness * 1.5), h/2, -cutSZ * cutD/2]}>
+                  <primitive object={interiorCut(cutW + wallThickness, h + 1, d - cutD - wallThickness*2)} attach="geometry" />
                   <meshStandardMaterial {...paper} color={room.interiorColor || '#ffffff'} />
                 </Subtraction>
               </>
@@ -2258,14 +2322,14 @@ export function RoomGeometry() {
               let size: [number, number, number] = [doorW, doorH + 0.1, wallThickness * 3];
 
               if (door.wall === 'front') {
-                pos = [offset, doorH/2 - 0.05, d/2];
+                pos = [offset, doorH/2 - 0.05, faceAt('front', offset)];
               } else if (door.wall === 'back') {
-                pos = [offset, doorH/2 - 0.05, -d/2];
+                pos = [offset, doorH/2 - 0.05, faceAt('back', offset)];
               } else if (door.wall === 'left') {
-                pos = [-w/2, doorH/2 - 0.05, offset];
+                pos = [faceAt('left', offset), doorH/2 - 0.05, offset];
                 size = [wallThickness * 3, doorH + 0.1, doorW];
               } else { // right
-                pos = [w/2, doorH/2 - 0.05, offset];
+                pos = [faceAt('right', offset), doorH/2 - 0.05, offset];
                 size = [wallThickness * 3, doorH + 0.1, doorW];
               }
 
@@ -2299,7 +2363,7 @@ export function RoomGeometry() {
               return (
                 <Subtraction position={[(lo + hi) / 2, h/2, d/2]}>
                   <primitive object={interiorCut(hi - lo, h + 1, wallThickness * 3)} attach="geometry" />
-                  <meshStandardMaterial color="#ffffff" metalness={0.1} {...texFront} bumpScale={0.1} />
+                  <meshPhysicalMaterial color="#ffffff" metalness={0.1} {...texFront} bumpScale={0.1} />
                 </Subtraction>
               );
             })()}
@@ -2355,16 +2419,16 @@ export function RoomGeometry() {
 
               // Windows mapping
               if (win.wall === 'front') {
-                pos = [offset, cutY, d/2];
+                pos = [offset, cutY, faceAt('front', offset)];
                 size = [winW, cutH, wallThickness * 3];
               } else if (win.wall === 'back') {
-                pos = [offset, cutY, -d/2];
+                pos = [offset, cutY, faceAt('back', offset)];
                 size = [winW, cutH, wallThickness * 3];
               } else if (win.wall === 'left') {
-                pos = [-w/2, cutY, offset];
+                pos = [faceAt('left', offset), cutY, offset];
                 size = [wallThickness * 3, cutH, winW];
               } else { // right
-                pos = [w/2, cutY, offset];
+                pos = [faceAt('right', offset), cutY, offset];
                 size = [wallThickness * 3, cutH, winW];
               }
 
@@ -2385,7 +2449,10 @@ export function RoomGeometry() {
           room.hasPictureFrame, room.interiorColor, room.hasApexGlazing, isSideGable,
           w, d, h, wallThickness, roofH, pfHeight, ohFront,
           isLShape, isTShape, isCornerCut, isGable, isPitched,
-          cutW, cutD, frontH, backH, roofPitch,
+          // The corner as well as the size: without these, switching corner
+          // moved the roof, floor and plinth but left the walls cut at the
+          // old corner until something else rebuilt them (23 Sep 2026).
+          cutW, cutD, cutSX, cutSZ, frontH, backH, roofPitch,
           deferredDoors, deferredWindows,
           bayKey, bayCx, bayW, texBayWall.map, texBayWall.color, room.bay?.wallFinish, room.bay?.wallColour,
         ])}
@@ -2549,8 +2616,8 @@ export function RoomGeometry() {
                   // The top face shows the covering itself when it has one - the
                   // rubber sheet, the aluminium - rather than a flat colour.
                   texturedRoof
-                    ? roofTopMaterial(texRoofSlab, { key: 'mat-2', attach: 'material-2' })
-                    : <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
+                    ? roofTopMaterial(texRoofSlab, { key: 'mat-2', attach: 'material-2', ...ROOF_TOP_SHADOW })
+                    : <meshStandardMaterial key="mat-2" attach="material-2" {...ROOF_TOP_SHADOW} color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
                   <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
                   React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }), // Front fascia
                   React.cloneElement(getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }), // Back fascia
@@ -2588,8 +2655,8 @@ export function RoomGeometry() {
                   // The top face shows the covering itself when it has one - the
                   // rubber sheet, the aluminium - rather than a flat colour.
                   texturedRoof
-                    ? roofTopMaterial(texRoofSlab, { key: 'mat-2', attach: 'material-2' })
-                    : <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
+                    ? roofTopMaterial(texRoofSlab, { key: 'mat-2', attach: 'material-2', ...ROOF_TOP_SHADOW })
+                    : <meshStandardMaterial key="mat-2" attach="material-2" {...ROOF_TOP_SHADOW} color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
                   <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
                   React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }), // Front fascia
                   React.cloneElement(getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }), // Back fascia
@@ -2692,8 +2759,8 @@ export function RoomGeometry() {
                   // The top face shows the covering itself when it has one - the
                   // rubber sheet, the aluminium - rather than a flat colour.
                   texturedRoof
-                    ? roofTopMaterial(texRoofSlab, { key: 'mat-2', attach: 'material-2' })
-                    : <meshStandardMaterial key="mat-2" attach="material-2" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
+                    ? roofTopMaterial(texRoofSlab, { key: 'mat-2', attach: 'material-2', ...ROOF_TOP_SHADOW })
+                    : <meshStandardMaterial key="mat-2" attach="material-2" {...ROOF_TOP_SHADOW} color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Top
                   <meshStandardMaterial key="mat-3" attach="material-3" color={roofColorHex} metalness={0.3} roughness={0.6}  bumpScale={0.1} />, // Bottom
                   React.cloneElement(getFasciaMat('front'), { key: 'mat-4', attach: 'material-4' }),
                   React.cloneElement(getFasciaMat('back'), { key: 'mat-5', attach: 'material-5' }),
@@ -3012,8 +3079,8 @@ export function RoomGeometry() {
         // Crittall doors default to the slim steel profile; standard doors keep the room's frame style
         const doorFrameT = door.style === 'crittall' ? Math.min(frameThickness, 0.025) : frameThickness;
         const doorSashT = door.style === 'crittall' ? Math.min(sashThickness, 0.025) : sashThickness;
-        const frameZ = d/2 - frameDepth/2; 
-        const frameX = w/2 - frameDepth/2;
+        const frameZ = faceZ(door.wall, offset) - frameDepth/2; 
+        const frameX = faceX(door.wall, offset) - frameDepth/2;
         let pos: [number, number, number] = [offset, doorH/2, frameZ];
         let rot: [number, number, number] = [0, 0, 0];
         const isDraggingThis = selectedElementId === door.id && !controlsEnabled;
@@ -3175,8 +3242,8 @@ export function RoomGeometry() {
         const isDraggingThis = selectedElementId === win.id && !controlsEnabled;
         const dragZOffset = isDraggingThis ? 0.015 : 0;
         // Calculate offset to be flush with the wall surface
-        const frameZ = d/2 - frameDepth/2; 
-        const frameX = w/2 - frameDepth/2;
+        const frameZ = faceZ(win.wall, offset) - frameDepth/2; 
+        const frameX = faceX(win.wall, offset) - frameDepth/2;
 
         if (win.wall === 'front') { pos = [offset, sill + winH/2, frameZ + dragZOffset]; } 
         else if (win.wall === 'back') { pos = [offset, sill + winH/2, -frameZ - dragZOffset]; rot = [0, Math.PI, 0]; } 
@@ -3437,8 +3504,8 @@ export function RoomGeometry() {
             const offset = (win.offsetMm ?? 0) / 1000;
             let pos: [number, number, number] = [0, 0, 0];
             let rot: [number, number, number] = [0, 0, 0];
-            const frameZ = d/2 - frameDepth/2; 
-            const frameX = w/2 - frameDepth/2;
+            const frameZ = faceZ(win.wall, offset) - frameDepth/2; 
+            const frameX = faceX(win.wall, offset) - frameDepth/2;
             
             if (win.wall === 'front') { pos = [offset, 0, frameZ]; } 
             else if (win.wall === 'back') { pos = [offset, 0, -frameZ]; rot = [0, Math.PI, 0]; } 
@@ -3464,8 +3531,8 @@ export function RoomGeometry() {
           })}
           {(room.doors || []).map(door => {
             const offset = door.offsetMm / 1000;
-            const frameZ = d/2 - frameDepth/2; 
-            const frameX = w/2 - frameDepth/2;
+            const frameZ = faceZ(door.wall, offset) - frameDepth/2; 
+            const frameX = faceX(door.wall, offset) - frameDepth/2;
             let pos: [number, number, number] = [offset, 0, frameZ];
             let rot: [number, number, number] = [0, 0, 0];
             
@@ -4147,6 +4214,12 @@ export function RoomGeometry() {
               } else if (wall === (cutSX > 0 ? 'right' : 'left')) {
                 if (cutSZ > 0) endEdge = d/2 - cutD; else startEdge = -d/2 + cutD;
               }
+              // An opening on the notch's recessed face belongs to that face,
+              // not this run; measuring it here would chain across the recess.
+              for (let i = elements.length - 1; i >= 0; i--) {
+                if (elements[i].offset <= startEdge || elements[i].offset >= endEdge) elements.splice(i, 1);
+              }
+              if (elements.length === 0) return null;
             }
 
             // Generate segments

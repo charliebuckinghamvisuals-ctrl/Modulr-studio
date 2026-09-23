@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { MainScene } from './3d/MainScene';
 import { useStore } from '../store';
 import { ViewModeToggle } from './UI/ViewModeToggle';
+import { SkyToggle } from './UI/SkyToggle';
 import { LightingPanel } from './UI/LightingPanel';
 import { PricePill } from './UI/PricePill';
 import { ObjectEditorPanel } from './UI/ObjectEditorPanel';
@@ -52,8 +53,10 @@ function LoadingScreen() {
   /**
    * Going away is a ONE-WAY decision.
    *
-   * 18 models are warmed in the background after startup, one at a time, and
-   * each one flips useProgress back to active. The old effect called
+   * Anything loaded after startup - a model placed, a texture swapped -
+   * flips useProgress back to active. (The background model warm-up used to,
+   * eighteen times; it is a plain fetch now and starts only once this screen
+   * has gone - see SceneObjects.) The old effect called
    * setShow(true) on every one of those flips and cleared the pending fade,
    * so the loader was thrown back over the scene again and again - the screen
    * flashing ten times. Nothing was actually wrong; it was the same loader
@@ -68,6 +71,10 @@ function LoadingScreen() {
   useEffect(() => {
     if (dismissed.current || !isComplete) return;
     dismissed.current = true;
+    // The go-ahead for the background model download (see SceneObjects),
+    // which must never compete with - or hold open - this screen.
+    (window as any).__modulrSceneReady = true;
+    window.dispatchEvent(new Event('modulr:scene-ready'));
     setFading(true);
     const timeout = setTimeout(() => setShow(false), 800);
     return () => clearTimeout(timeout);
@@ -182,6 +189,7 @@ export function CanvasArea() {
       {!cameraMode && (
         <>
           <ViewModeToggle />
+          <SkyToggle />
           <LightingPanel />
           <CameraWidget />
           <HistoryButtons />

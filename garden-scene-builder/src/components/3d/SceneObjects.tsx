@@ -92,29 +92,63 @@ function GlbModel({ url, type, color, worktop, finish, seed, veneer, metal }: { 
 }
 
 /**
- * Warm the model cache in the BACKGROUND, once the app is already usable.
+ * Warm the model cache in the BACKGROUND, once the scene is on screen.
  *
- * These preloads used to run at module load, which put all 18 models -
- * 12.7MB - in front of the loading screen: nothing could be done with the
- * configurator until every sofa and shower had arrived, which on a normal
- * connection is a very long wait for models most designs never use. They are
- * now fetched one at a time after first paint, and any model placed before
- * its turn simply loads on demand through Suspense.
+ * History, because each version was reasonable and each one bit:
+ *  - preloads at module load put every model in front of the loading screen;
+ *  - then useGLTF.preload one every 500ms "after first paint" - except it was
+ *    scheduled on the first idle moment of PAGE LOAD, long before the scene
+ *    was up, and every preload goes through the loading manager the loading
+ *    screen watches. The screen waits for that manager to go quiet, so it
+ *    waited for the whole queue. At 18 models / 12.7MB that was tolerable; by
+ *    23 Sep 2026 it was ~80MB (one armchair alone is 17.6MB), each GLB parsed
+ *    on the main thread, and a first visit sat on "Loading Studio" at a few
+ *    percent, running at about one frame a second (Charlie: "stalls on here
+ *    every time").
+ *
+ * Now it only starts once the loading screen has gone (modulr:scene-ready),
+ * and it only DOWNLOADS - a plain fetch into the HTTP cache, one file at a
+ * time. Nothing is parsed and the loading manager never hears about it, so
+ * it can neither hold the loader open nor stall the scene while someone is
+ * working. Placing a model later hits the cache (a 304 on the live server)
+ * and parses then, behind ModelFallback. Big files and a total budget are
+ * skipped: a customer should not pay 80MB of mobile data for furniture they
+ * never place - those load on demand like any model placed before its turn.
  */
+const WARM_MAX_FILE_BYTES = 4 * 1024 * 1024;
+const WARM_BUDGET_BYTES = 25 * 1024 * 1024;
+
+async function warmModelCache() {
+  if ((navigator as any).connection?.saveData) return;
+  const urls = [...new Set(Object.values(MODEL_URLS).filter(Boolean) as string[])];
+  let spent = 0;
+  for (const url of urls) {
+    if (spent >= WARM_BUDGET_BYTES) return;
+    try {
+      // The size comes from a HEAD, which moves no body. Aborting a GET once
+      // its headers arrive does not work as a skip: by then the body is
+      // already on its way, and measured on localhost the "skipped" files had
+      // come down in full, putting the budget 1.8MB over.
+      const head = await fetch(url, { method: 'HEAD' });
+      // Unknown size is skipped too - it could be anything.
+      const size = Number(head.headers.get('content-length')) || 0;
+      if (head.ok && size && size <= WARM_MAX_FILE_BYTES && spent + size <= WARM_BUDGET_BYTES) {
+        const res = await fetch(url);
+        if (res.ok) { await res.arrayBuffer(); spent += size; }
+      }
+    } catch { /* offline, or a bad url - it must not stop the rest */ }
+    await new Promise(r => setTimeout(r, 250));
+  }
+}
+
 if (typeof window !== 'undefined') {
-  const warmCache = () => {
-    const urls = Object.values(MODEL_URLS).filter(Boolean) as string[];
-    let i = 0;
-    const next = () => {
-      if (i >= urls.length) return;
-      try { useGLTF.preload(urls[i++]); } catch { /* a bad url must not stop the rest */ }
-      setTimeout(next, 500);
-    };
-    next();
+  const start = () => {
+    const idle = (window as any).requestIdleCallback;
+    if (idle) idle(() => { void warmModelCache(); }, { timeout: 5000 });
+    else setTimeout(() => { void warmModelCache(); }, 1000);
   };
-  const idle = (window as any).requestIdleCallback;
-  if (idle) idle(warmCache, { timeout: 10000 });
-  else setTimeout(warmCache, 6000);
+  if ((window as any).__modulrSceneReady) start();
+  else window.addEventListener('modulr:scene-ready', start, { once: true });
 }
 
 /** Simple stand-in shown while a model streams in. */

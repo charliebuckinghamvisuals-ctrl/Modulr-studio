@@ -1,4 +1,5 @@
 import type { Room, ObjectType } from '../types';
+import { steppedWallMm } from './lshape';
 
 /**
  * The outdoor section: one end of the building left open under the same
@@ -160,7 +161,19 @@ export function clampInZone(room: Room, lx: number, lz: number, margin: number, 
  * (openingInBay). This is the same rule from the other side: where an
  * opening CAN go. Null: nothing of this wall is left.
  */
-export function wallSpanMm(room: Room, wall: string): { lo: number; hi: number } | null {
+export function wallSpanMm(room: Room, wall: string, nearMm?: number): { lo: number; hi: number } | null {
+  const span = wholeWallSpanMm(room, wall);
+  // An L's notch steps two walls back: the stretch returned is the main face,
+  // or the recessed one when nearMm - an opening's centre - lies on it.
+  const step = steppedWallMm(room, wall);
+  if (!span || !step) return span;
+  const onRecess = nearMm !== undefined && (step.recessHigh ? nearMm > step.line : nearMm < step.line);
+  const lo = onRecess === step.recessHigh ? Math.max(span.lo, step.line) : span.lo;
+  const hi = onRecess === step.recessHigh ? span.hi : Math.min(span.hi, step.line);
+  return hi > lo ? { lo, hi } : null;
+}
+
+function wholeWallSpanMm(room: Room, wall: string): { lo: number; hi: number } | null {
   const wtMm = room.wallThicknessMm ?? 150;
   const bay = bayRange(room);
   if (wall === 'bay') {

@@ -284,7 +284,9 @@ function clampOpening<T extends { wall: string; widthMm: number; offsetMm: numbe
   // hidden and looks lost). A wall the bay has removed entirely keeps the
   // full span: the opening stays hidden and comes back with the wall.
   const wallLen = (el.wall === 'front' || el.wall === 'back') ? room.widthMm : room.depthMm;
-  const span = wallSpanMm(room, el.wall) ?? { lo: -wallLen / 2, hi: wallLen / 2 };
+  // On an L the stretch is the face the opening is on - the main one, or the
+  // notch's recessed one - so it is kept off the corner between them.
+  const span = wallSpanMm(room, el.wall, Number.isFinite(el.offsetMm) ? el.offsetMm : undefined) ?? { lo: -wallLen / 2, hi: wallLen / 2 };
   const maxWidth = Math.max(300, span.hi - span.lo - MIN_PIER_MM * 2);
   // A width or offset that is not a number (an emptied input, a field an old
   // save never had) must not come out of here as NaN: Math.max(300, NaN) is

@@ -119,7 +119,18 @@ export const MATERIAL_DEF = {
   // White Planks Clean: 20 painted boards across 1.8m (90mm each). The colour
   // map is neutralised to near-white so the room's claddingTint multiplies
   // through as the paint colour - any colour, not a fixed range.
-  painted_planks: { prefix: 'white_planks', tileSize: 1.8, roughness: 0.7, color: '#e8e6e1', neutral: true, noAo: true, boards: 20, tintable: true },
+  // clearcoat: the paint film - "a bit more sheen, more realism" (Charlie,
+  // 23 Sep 2026). Measured in the scene before settling on this:
+  //  - lower roughness alone barely registers; the map already puts the
+  //    board faces near 0.37;
+  //  - a coat over a FLAT normal does nothing useful either: it mirrors
+  //    one even sheet of whatever the wall faces, which here is the
+  //    garden, so the wall only goes a shade murkier;
+  //  - a coat that follows the BOARD profile (clearcoatNormalScale) is what
+  //    reads: each board edge catches the light on its own. +35% board-to-
+  //    board contrast at midday and at evening, the wall 2-3% darker.
+  // It is subtle by nature - it is reflecting a garden, not a studio.
+  painted_planks: { prefix: 'white_planks', tileSize: 1.8, roughness: 0.7, color: '#e8e6e1', neutral: true, noAo: true, boards: 20, tintable: true, clearcoat: 0.6, clearcoatRoughness: 0.3, clearcoatNormalScale: 1.5 },
   // ambientCG CorrugatedSteel007A, colour-neutralised and tinted: the same
   // sheet as the roof_corrugated_black/dark_grey coverings, as wall cladding.
   // fixedScale like corrugated_iron - a profile, not boards, so the Board
@@ -129,7 +140,7 @@ export const MATERIAL_DEF = {
   // Timber lap siding (ambientCG WoodSiding009) was offered for a few hours
   // on 22 Sep 2026 and pulled ("nope, terrible"); the key resolves to the
   // painted boards so a design saved with it still loads.
-  wood_siding: { prefix: 'white_planks', tileSize: 1.8, roughness: 0.7, color: '#e8e6e1', neutral: true, noAo: true, boards: 20, tintable: true },
+  wood_siding: { prefix: 'white_planks', tileSize: 1.8, roughness: 0.7, color: '#e8e6e1', neutral: true, noAo: true, boards: 20, tintable: true, clearcoat: 0.6, clearcoatRoughness: 0.3, clearcoatNormalScale: 1.5 },
   // Poly Haven box_profile_metal_sheet (2m tile), colour-neutralised: "call
   // it box metal cladding and only have it in black or dark grey metal
   // (anthracite)" - Charlie, 22 Sep 2026. A profile, so fixedScale.
@@ -370,6 +381,16 @@ export function useRealMaterial(materialKey: string, widthMeters: number, height
             : ((def as any).deckTint && deckingTint) ? deckingTint
             : def.color,
         roughness: def.roughness,
+        // Always sent, 0 when the material has none: switching from a
+        // painted board to anything else must take the sheen off, not leave
+        // the last value on a material React reuses. The wall materials are
+        // physical so this reaches them; anything standard ignores it.
+        clearcoat: (def as any).clearcoat ?? 0,
+        clearcoatRoughness: (def as any).clearcoatRoughness ?? 0,
+        // The coat follows the boards' own profile; without this it is a
+        // flat sheet over the whole wall (see painted_planks).
+        clearcoatNormalMap: (def as any).clearcoat ? (cloned as any).normalMap ?? null : null,
+        clearcoatNormalScale: new THREE.Vector2((def as any).clearcoatNormalScale ?? 1, (def as any).clearcoatNormalScale ?? 1),
         // Only when the material says so, so the spread does not override
         // the wall's own default with undefined.
         ...((def as any).metalness !== undefined ? { metalness: (def as any).metalness } : {}),

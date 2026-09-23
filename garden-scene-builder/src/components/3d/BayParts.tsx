@@ -132,7 +132,7 @@ export function BayParts({ room, bay, w, d, h, wallThickness, frameColorHex, roo
   const deckGeom = useMemo(() => createDeckingGeometry(floorW, floorL), [floorW, floorL]);
 
   const claddingMat = (tex: Tex, key: string, attach?: string) => (
-    <meshStandardMaterial key={key} attach={attach} color="#ffffff" metalness={0.1} {...tex} bumpScale={0.1} />
+    <meshPhysicalMaterial key={key} attach={attach} color="#ffffff" metalness={0.1} {...tex} bumpScale={0.1} />
   );
   const paperMat = (key: string, attach?: string) => (
     <meshStandardMaterial key={key} attach={attach} {...paper} color={room.interiorColor || '#ffffff'} />

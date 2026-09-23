@@ -1,6 +1,7 @@
 import type { ObjectType, Room, SceneObject } from '../types';
 import { UNIT_FAMILY, NATIVE_WIDTH_MM, END_PANELS, END_PANEL_T, END_PANEL_GAP, isEndPanel, GLB_OBJECT_LABELS } from '../modelRegistry';
 import { zoneX, clampInZone, bayRange, openingRemovedByBay } from './bay';
+import { lShapeNotch } from './lshape';
 
 /**
  * Settle an object against the room's inner wall faces by its FACES.
@@ -344,6 +345,23 @@ export function snapToOutsideWall(room: Room, x: number, z: number): { x: number
   faces.push({ axis: 'z', at: -d / 2, lo: -w / 2, hi: w / 2, out: -1, wall: 'back' });
   faces.push({ axis: 'x', at: -w / 2, lo: -d / 2, hi: d / 2, out: -1, wall: 'left' });
   faces.push({ axis: 'x', at: w / 2, lo: -d / 2, hi: d / 2, out: 1, wall: 'right' });
+
+  // An L-shape: the two walls the notch steps back stop at it, and its own
+  // two faces are walls too. Without them a light moved into the notch
+  // snapped to where the front (or end) wall would have been and faced its
+  // way - "it flips back to the default front orientation" (Charlie, 23 Sep
+  // 2026). The notch faces keep the names of the walls they face the same
+  // way as (see utils/lshape), so the magnets find their doors and windows.
+  const notch = lShapeNotch(room, w, d);
+  if (notch) {
+    const across = notch.sz > 0 ? 'front' : 'back', along = notch.sx > 0 ? 'right' : 'left';
+    for (const f of faces) {
+      if (f.wall === across && f.axis === 'z') { if (notch.sx > 0) f.hi = Math.min(f.hi, notch.lineX); else f.lo = Math.max(f.lo, notch.lineX); }
+      if (f.wall === along && f.axis === 'x') { if (notch.sz > 0) f.hi = Math.min(f.hi, notch.lineZ); else f.lo = Math.max(f.lo, notch.lineZ); }
+    }
+    faces.push({ axis: 'z', at: notch.lineZ, lo: notch.x0, hi: notch.x1, out: notch.sz as 1 | -1, wall: across });
+    faces.push({ axis: 'x', at: notch.lineX, lo: notch.z0, hi: notch.z1, out: notch.sx as 1 | -1, wall: along });
+  }
 
   /**
    * Magnets along a face: the centre of every door and window in it, and
