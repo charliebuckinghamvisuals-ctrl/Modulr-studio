@@ -3,7 +3,7 @@ import type { ObjectType } from '../types';
 import {
   TINT_MATERIAL, MATERIAL_TWEAKS, METAL_MATERIALS, METAL_FINISHES, DEFAULT_FINISH, FORCE_DIELECTRIC,
   EMISSIVE_MATERIAL, LIGHT_COLOURS, UNMIRROR_NORMALS, finishSpec,
-  FABRIC_MATERIAL, FABRIC_REPEAT, WORKTOP_MATERIAL, worktopById, TIMBER_MATERIAL,
+  fabricRepeatFor, WORKTOP_MATERIAL, worktopById, TIMBER_MATERIAL,
   veneerById, isVeneerFinish, UNIT_FAMILY, metalUsesColour, HORIZONTAL_VENEER, DOUBLE_SIDED_METAL, FACE_SPLITS, PLINTH_MATERIAL, METAL_TEXTURE,
 } from '../modelRegistry';
 import type { WorktopDef } from '../modelRegistry';
@@ -841,8 +841,8 @@ export function applyModelMaterials(type: ObjectType, root: THREE.Object3D, colo
         }
       }
 
-      const fabricRepeat = FABRIC_REPEAT[type];
-      if (fabricRepeat !== undefined && m.name === FABRIC_MATERIAL) {
+      const fabricRepeat = fabricRepeatFor(type, m.name);
+      if (fabricRepeat !== undefined) {
         const fab = fabricMaterial(fabricRepeat, color);
         fab.name = m.name;
         bodyMats.push(fab as unknown as THREE.MeshPhysicalMaterial);

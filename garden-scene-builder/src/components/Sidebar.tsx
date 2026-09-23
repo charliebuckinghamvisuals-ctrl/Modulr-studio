@@ -1851,7 +1851,7 @@ export function Sidebar() {
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Seating</label>
               <div className="grid grid-cols-2 gap-2.5">
-                {(['sofa', 'sofa_l', 'sofa_3', 'sofa_4', 'armchair', 'armchair_2', 'armchair_3', 'footstool', 'office_chair', 'bar_stool', 'bar_stool_tall'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['sofa', 'sofa_l', 'sofa_4', 'sofa_5', 'sofa_6', 'armchair', 'armchair_2', 'armchair_3', 'footstool', 'office_chair', 'bar_stool', 'bar_stool_tall'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
@@ -1911,6 +1911,18 @@ export function Sidebar() {
               {!room.bay && <p className="text-[10px] text-gray-400 mb-2 leading-snug">Add an Outdoor Section on the Extras step first - these go in it.</p>}
               <div className="grid grid-cols-2 gap-2.5">
                 <ObjectTile type="hot_tub" label="Hot Tub" />
+              </div>
+            </section>
+
+            {/* Garden furniture: anywhere outside - the decking, a garden
+                deck, the lawn - standing on whatever is underneath. */}
+            <section>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-1 block">Garden Furniture</label>
+              <p className="text-[10px] text-gray-400 mb-2 leading-snug">Place on the decking or in the garden. Add as many chairs as you like.</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                {(['outdoor_sofa', 'outdoor_chair', 'outdoor_table', 'bbq'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
+                ))}
               </div>
             </section>
 

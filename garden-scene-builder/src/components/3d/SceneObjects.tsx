@@ -2,12 +2,13 @@ import { useStore } from '../../store';
 import { useShallow } from 'zustand/react/shallow';
 import { SceneObject, Room } from '../../types';
 import * as THREE from 'three';
-import { useRef, useState, useEffect, useMemo, Suspense } from 'react';
+import { useRef, useState, useEffect, useMemo, Suspense, Component, type ReactNode } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
 import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, objectMountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel, metalUsesColour, isCornerUnit, CORNER_UNIT, UNIT_FAMILY, isWallLight } from '../../modelRegistry';
 import { applyModelMaterials, retintModel, resurfaceWorktop, refinishUnits, refinishMetal } from '../../utils/materialFixes';
+import { isGardenFurniture, groundTopAt } from '../../utils/groundTop';
 import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, canopySoffitAt, clampToCanopy, FOOTPRINT_RADIUS, snapEndPanel, snapTap, isKitchenTap, settleAgainstWalls, snapToOutsideWall } from '../../utils/placement';
 import { wallpaperProps } from '../../utils/wallpaper';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
@@ -229,7 +230,7 @@ export function SceneObjects() {
         if (isExporting && ['tree', 'conifer', 'hedge', 'shrub', 'flowerbed', 'planter', 'bench', 'slab', 'patio'].includes(obj.type)) {
           return null;
         }
-        return <ObjectMesh key={obj.id} obj={obj} />;
+        return <ObjectBoundary key={obj.id + obj.type} type={obj.type}><ObjectMesh obj={obj} /></ObjectBoundary>;
       })}
       <FittingLights objects={objects} emit={lightsEmit} />
       {/* One slab per run of cabinets, laid over the hidden per-unit tops. */}
@@ -383,6 +384,19 @@ function FittingLights({ objects, emit }: { objects: SceneObject[]; emit: boolea
   );
 }
 
+/**
+ * One object that cannot load - a model file missing from the server, a
+ * failed download - is left out rather than taking the whole configurator
+ * down with it. Without this a single 404 unmounted the canvas and the
+ * customer was left with a blank page (23 Sep 2026).
+ */
+class ObjectBoundary extends Component<{ type: string; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(error: unknown) { console.warn(`Could not show ${this.props.type}; left out of the scene.`, error); }
+  render() { return this.state.failed ? null : this.props.children; }
+}
+
 function ObjectMesh({ obj }: { obj: SceneObject }) {
   const { selectedObjectId, setSelectedObjectId, updateObject, viewMode, room } = useStore(useShallow(s => ({
     selectedObjectId: s.selectedObjectId,
@@ -391,6 +405,7 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
     viewMode: s.viewMode,
     room: s.scene.room
   })));
+  const decks = useStore(s => s.scene.decks);
   const isSelected = selectedObjectId === obj.id;
   const isLightingView = viewMode === 'lighting';
   /** Pool cast on the 750mm working plane, from the real drop and beam angle
@@ -465,7 +480,9 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   // Outdoor things stand on the bay's deck, which sits proud of the floor
   // finish - a tub on the floor level was sunk 20mm into the boards.
   // A canopy spot is outside, but hangs from the roof, which sits on the base.
-  const baseH = isInterior ? ((room.baseHeightMm ?? 100) / 1000) + (isOutdoorType(obj.type) && room.bay ? bayFloorTop(room) : 0.01) : obj.type === 'canopy_spot' ? (room.baseHeightMm ?? 100) / 1000 : 0;
+  const baseH = isInterior ? ((room.baseHeightMm ?? 100) / 1000) + (isOutdoorType(obj.type) && room.bay ? bayFloorTop(room) : 0.01) : obj.type === 'canopy_spot' ? (room.baseHeightMm ?? 100) / 1000
+    // Garden furniture stands on the deck, the plinth or the lawn under it.
+    : isGardenFurniture(obj.type) ? groundTopAt(room, decks, obj.x, obj.z) : 0;
   // Worktop-mounted objects (taps) sit on the 900mm sink unit rather than on
   // the floor, so they are lifted by their mount height as well.
   // A ceiling fitting hangs from the ceiling, which moves with the wall

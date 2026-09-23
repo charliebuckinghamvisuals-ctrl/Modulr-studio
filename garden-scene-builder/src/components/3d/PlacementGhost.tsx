@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 import { MODEL_URLS, MODEL_SCALES, mountHeight, CEILING_MOUNTED, isCeilingMounted, isWallLight } from '../../modelRegistry';
 import { isInteriorType, clampToRoomInterior, interiorCeilingHeight, snapEndPanel, snapTap, isKitchenTap, settleAgainstWalls, snapToOutsideWall } from '../../utils/placement';
 import { isEndPanel } from '../../modelRegistry';
+import { isGardenFurniture, groundTopAt } from '../../utils/groundTop';
 
 /** Semi-transparent clone of a GLB model, used as the placement preview. */
 function GhostGlb({ url }: { url: string }) {
@@ -37,6 +38,7 @@ function GhostGlb({ url }: { url: string }) {
 export function PlacementGhost() {
   const type = useStore(s => s.activePlacementType);
   const room = useStore(s => s.scene.room);
+  const decks = useStore(s => s.scene.decks);
   const baseH = (room.baseHeightMm ?? 100) / 1000;
   const groupRef = useRef<THREE.Group>(null);
   const [rot, setRot] = useState(0);
@@ -74,7 +76,8 @@ export function PlacementGhost() {
     if (isWallLight(type)) { const s = snapToOutsideWall(room, x, z); x = s.x; z = s.z; if (s.rot !== rot) setRot(s.rot); }
     posRef.current = { x, z };
     if (groupRef.current) {
-      groupRef.current.position.set(x, y, z);
+      // Garden furniture previews on the deck or lawn under the cursor.
+      groupRef.current.position.set(x, isGardenFurniture(type) ? groundTopAt(room, decks, x, z) + mountHeight(type) : y, z);
       groupRef.current.visible = true;
     }
   };

@@ -28,6 +28,14 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   sofa_4: 'models/sofa_4.glb',
   armchair_2: 'models/armchair_2.glb',
   armchair_3: 'models/armchair_3.glb',
+  // 23 Sep 2026: two sofas from one export, and the garden furniture and
+  // BBQ - each cut out of Charlie's file and turned to face the front.
+  sofa_5: 'models/sofa_5.glb',
+  sofa_6: 'models/sofa_6.glb',
+  outdoor_sofa: 'models/outdoor_sofa.glb',
+  outdoor_chair: 'models/outdoor_chair.glb',
+  outdoor_table: 'models/outdoor_table.glb',
+  bbq: 'models/bbq_grill.glb',
   rug: 'models/rug.glb',
   rug_2: 'models/rug_2.glb',
   footstool: 'models/footstool.glb',
@@ -774,7 +782,7 @@ export const DOUBLE_SIDED_METAL: Partial<Record<ObjectType, true>> = {
  */
 export const metalUsesColour = (type: ObjectType) =>
   METAL_MATERIALS[type] !== undefined && TINT_MATERIAL[type] === undefined
-  && FABRIC_REPEAT[type] === undefined && EMISSIVE_MATERIAL[type] === undefined;
+  && !hasFabric(type) && EMISSIVE_MATERIAL[type] === undefined;
 
 /**
  * Types whose imported materials should be forced DIELECTRIC (metalness 0).
@@ -807,6 +815,9 @@ export const UNMIRROR_NORMALS: Partial<Record<ObjectType, true>> = {
   // panels shaded dark, which read as "four different claddings" even in
   // one flat colour (10 Sep).
   hot_tub: true,
+  // The seat and base are the mirrored half of a pair - the seat came up
+  // dark and blotchy once it wore the woven fabric (23 Sep).
+  sofa_3: true,
 };
 
 export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
@@ -837,6 +848,16 @@ export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
   arcade_machine: true,
   // Plastic bezel and glass; the screen gloss is a tweak below.
   wall_tv: true,
+  // The newer seating: timber frames, scatter cushions and bases were all
+  // at the exporter's half-metal (the low armchair at full metal).
+  sofa_3: true,
+  sofa_4: true,
+  armchair_2: true,
+  armchair_3: true,
+  // Rope weave, powder-coated frames and a painted table top.
+  outdoor_sofa: true,
+  outdoor_chair: true,
+  outdoor_table: true,
 };
 
 /**
@@ -857,9 +878,35 @@ export const FABRIC_REPEAT: Partial<Record<ObjectType, number>> = {
   sofa_l: 1.23,
   armchair: 1.21,
   footstool: 1.24,
+  sofa_5: 1.083,
+  sofa_6: 1.25,
 };
 
-export const hasFabric = (type: ObjectType) => FABRIC_REPEAT[type] !== undefined;
+/**
+ * Upholstery that is NOT the exporter's 'Material~1': material name to its
+ * measured repeat (same method as above). The newer seating came in with
+ * its own photographic leather and velvet at the exporter's half-metal,
+ * which read as satin and foil next to the woven sofas - "make the
+ * materials same as the others" (Charlie, 23 Sep 2026). Cushions, frames
+ * and legs keep their own materials; FORCE_DIELECTRIC takes the metal out.
+ */
+export const FABRIC_MATERIALS: Partial<Record<ObjectType, Record<string, number>>> = {
+  // The exporter wrote these UVs in texture pixels, hence the tiny repeats.
+  sofa_3: { 'Material~9': 0.002146 },
+  sofa_4: { 'Material~1': 0.002936 },
+  armchair_2: { Armchair_modern_arm_chair_01_pillow: 7.194 },
+  // One material for the whole tub chair: it is all upholstery.
+  armchair_3: { model: 6.198 },
+  // Garden cushions, in the same cloth and colours.
+  outdoor_sofa: { santander_fabric1: 1.595 },
+  outdoor_chair: { santander_fabric1: 1.584 },
+};
+
+/** The weave repeat for this material of this model, or undefined if it is not upholstery. */
+export const fabricRepeatFor = (type: ObjectType, material: string): number | undefined =>
+  FABRIC_MATERIALS[type]?.[material] ?? (material === FABRIC_MATERIAL ? FABRIC_REPEAT[type] : undefined);
+
+export const hasFabric = (type: ObjectType) => FABRIC_REPEAT[type] !== undefined || FABRIC_MATERIALS[type] !== undefined;
 
 /**
  * Upholstery colours.
@@ -1045,6 +1092,12 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   armchair: 'Armchair',
   armchair_2: 'Armchair (Modern)',
   armchair_3: 'Armchair (Low)',
+  sofa_5: 'Sofa (3-Seat)',
+  sofa_6: 'Loveseat',
+  outdoor_sofa: 'Garden Sofa',
+  outdoor_chair: 'Garden Armchair',
+  outdoor_table: 'Garden Coffee Table',
+  bbq: 'BBQ',
   rug: 'Rug (Patterned)',
   rug_2: 'Rug (Sand)',
   footstool: 'Footstool',
