@@ -29,6 +29,13 @@ service firebase.storage {
        * `projectsEnabled` is server-written only — see the users/{uid} rules in
        * firestore.rules for why the client cannot set it.
        */
+      // firestore.get() here is a CROSS-SERVICE call: the Firebase Storage service
+      // agent (service-<project number>@gcp-sa-firebasestorage.iam.gserviceaccount.com)
+      // must hold the "Firebase Rules Firestore Service Agent" IAM role, or the
+      // get errors and EVERY upload is refused with storage/unauthorized - which
+      // is what every upload hit when found on 23 Sep 2026. `firebase deploy --only storage`
+      // offers to grant it; so does Google Cloud Console > IAM.
+      //
       // A single get(), not exists() + get(): Storage rules may touch at most two
       // Firestore documents per evaluation, and there is no reason to spend both
       // on the same one. An account with no document yet makes this error, which

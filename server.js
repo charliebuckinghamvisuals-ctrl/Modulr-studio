@@ -2204,6 +2204,100 @@ app.get('/api/share/:token', shareLimiter, async (req, res) => {
     }
 });
 
+/**
+ * Project file upload, through the server.
+ *
+ * The browser normally uploads straight to Firebase Storage, and storage.rules
+ * decide. Those rules read the account's projectsEnabled flag with a
+ * cross-service firestore.get(), which only works once the Storage service
+ * agent holds the "Firebase Rules Firestore Service Agent" IAM role - without
+ * it EVERY upload is refused (storage/unauthorized, 23 Sep 2026). The client
+ * falls back to this route when that happens, so saving never depends on a
+ * console setting.
+ *
+ * It applies the same controls the rules do - signed in, projects enabled,
+ * the project is theirs, image or PDF, under 25 MB - and checks the bytes
+ * really are what the declared type says. Same path layout and download-URL
+ * form as a direct upload, so the rest of the app cannot tell the difference.
+ */
+const PROJECT_ASSET_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'application/pdf']);
+const PROJECT_ASSET_KINDS = new Set(['proposal', 'exterior_render', 'interior_render', 'line_drawing', 'floor_plan', 'document', 'other']);
+const PROJECT_ASSET_MAX = 25 * 1024 * 1024;
+const assetLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    keyGenerator: (req) => ipKeyGenerator(req.ip) || 'unknown',
+    message: { error: 'Too many uploads. Please try again shortly.' },
+    validate: { ip: false, xForwardedForHeader: false }
+});
+const looksLike = (buf, type) => {
+    if (type === 'application/pdf') return buf.slice(0, 5).toString('latin1') === '%PDF-';
+    if (type === 'image/png') return buf.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    if (type === 'image/jpeg') return buf[0] === 0xff && buf[1] === 0xd8;
+    if (type === 'image/webp') return buf.slice(0, 4).toString('latin1') === 'RIFF' && buf.slice(8, 12).toString('latin1') === 'WEBP';
+    return false;
+};
+
+app.post('/api/projects/:projectId/assets', assetLimiter, verifyFirebaseToken,
+    express.raw({ type: () => true, limit: PROJECT_ASSET_MAX }), async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Storage is not available right now.' });
+        const uid = req.user.uid;
+        const projectId = String(req.params.projectId || '');
+        if (!/^[A-Za-z0-9_-]{1,64}$/.test(projectId)) return res.status(400).json({ error: 'Unknown project.' });
+
+        const contentType = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+        const body = Buffer.isBuffer(req.body) ? req.body : null;
+        if (!PROJECT_ASSET_TYPES.has(contentType)) return res.status(415).json({ error: 'Only PNG, JPEG, WebP and PDF files can be attached.' });
+        if (!body || body.length === 0) return res.status(400).json({ error: 'The file was empty.' });
+        if (body.length >= PROJECT_ASSET_MAX) return res.status(413).json({ error: 'That file is over the 25 MB limit.' });
+        if (!looksLike(body, contentType)) return res.status(415).json({ error: 'That file is not the type it says it is.' });
+
+        const kind = PROJECT_ASSET_KINDS.has(String(req.query.kind)) ? String(req.query.kind) : 'other';
+        const name = String(req.query.name || 'file').replace(/[\u0000-\u001f]/g, '').slice(0, 120) || 'file';
+
+        // The same two checks the rules make: entitled, and the owner.
+        const account = await db.collection('users').doc(uid).get();
+        if (!account.exists || account.data().projectsEnabled !== true) {
+            return res.status(403).json({ error: 'Projects is not included on your plan.' });
+        }
+        const projectRef = db.collection('projects').doc(projectId);
+        const project = await projectRef.get();
+        if (!project.exists || project.data().ownerUid !== uid) return res.status(404).json({ error: 'Unknown project.' });
+
+        const { randomUUID } = await import('crypto');
+        const assetId = randomUUID();
+        const safeName = name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+        const storagePath = `projects/${uid}/${projectId}/${assetId}-${safeName}`;
+        const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'modulr-studio.firebasestorage.app';
+        const token = randomUUID();
+        await admin.storage().bucket(bucketName).file(storagePath).save(body, {
+            resumable: false,
+            contentType,
+            metadata: { contentType, metadata: { firebaseStorageDownloadTokens: token } },
+        });
+        const asset = {
+            id: assetId,
+            storagePath,
+            downloadUrl: `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`,
+            name,
+            contentType,
+            sizeBytes: body.length,
+            kind,
+            createdAt: Date.now(),
+        };
+        await projectRef.update({
+            assets: admin.firestore.FieldValue.arrayUnion(asset),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        res.json({ asset });
+    } catch (e) {
+        console.error('project asset upload error:', e);
+        res.status(500).json({ error: 'The file could not be saved. Please try again in a moment.' });
+    }
+});
+
+
 // Protect all API routes and enforce master lock
 /**
  * The prices on sale, for the pricing page: key, Stripe price ID, label,

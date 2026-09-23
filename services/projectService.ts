@@ -104,6 +104,31 @@ const toProject = (id: string, data: any): Project => {
     };
 };
 
+/**
+ * The fields a status change touches, keeping the two dates the dashboard
+ * counts by honest. Stamped rather than inferred at read time because the
+ * user can correct them afterwards - once a date is on the record it is
+ * theirs, so nothing re-stamps a field that already has a value.
+ */
+export const statusChanges = (
+    project: Pick<Project, 'quotedAt' | 'wonAt'>,
+    status: ProjectStatus,
+    now = Date.now()
+): Partial<ProjectDraft> => {
+    const changes: Partial<ProjectDraft> = { status };
+    // Leaving Lead implies a price went out - Quoted, Won and Lost all
+    // presuppose a quote.
+    if (status !== 'lead' && project.quotedAt === null) changes.quotedAt = now;
+    if (status === 'won' || status === 'complete') {
+        if (project.wonAt === null) changes.wonAt = now;
+    } else if (project.wonAt !== null) {
+        // Moved back out of Won. Leaving the acceptance date behind would keep
+        // the job in won totals for a month it is no longer won in.
+        changes.wonAt = null;
+    }
+    return changes;
+};
+
 export const listProjects = async (): Promise<Project[]> => {
     const uid = requireUid();
     // Filtered by ownerUid here AND enforced in Firestore rules. The query is a
@@ -188,7 +213,16 @@ export const uploadAsset = async (
     const path = assetPath(uid, projectId, assetId, file.name);
     const objectRef = storageRef(storage, path);
 
-    await uploadBytes(objectRef, file, { contentType: file.type });
+    try {
+        await uploadBytes(objectRef, file, { contentType: file.type });
+    } catch (e: any) {
+        // storage/unauthorized for an entitled account means the Storage rules
+        // could not read the account record (the cross-service Firestore
+        // permission, see storage.rules). The server makes the same checks
+        // and saves to the same place, so the file goes that way instead.
+        if (e?.code === 'storage/unauthorized') return uploadViaServer(projectId, file, kind);
+        throw e;
+    }
     const downloadUrl = await getDownloadURL(objectRef);
 
     const asset: ProjectAsset = {
@@ -210,6 +244,22 @@ export const uploadAsset = async (
     });
 
     return asset;
+};
+
+/** The same upload, made by the server - see uploadAsset. It files the
+ *  asset on the project itself. */
+const uploadViaServer = async (projectId: string, file: File, kind: ProjectAssetKind): Promise<ProjectAsset> => {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error('You must be signed in to manage projects.');
+    const qs = new URLSearchParams({ kind, name: file.name });
+    const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/assets?${qs}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': file.type },
+        body: file,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.asset) throw new Error(data.error || 'The file could not be saved. Please try again in a moment.');
+    return data.asset as ProjectAsset;
 };
 
 /** Attach a render the app produced. Renders live in memory as base64, so they
