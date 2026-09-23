@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppEngine } from '../../hooks/useAppEngine';
-import { AppStage, Project } from '../../types';
+import { AppStage, Project, ProjectDraft } from '../../types';
 import { useCredits } from '../../hooks/useCredits';
 import { useAuth } from '../../hooks/useAuth';
 import { Construction, FolderOpen, ChevronDown } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { createProject, listProjects, updateProject } from '../../services/projectService';
+import { createProject, listProjects, updateProject, statusChanges } from '../../services/projectService';
+import { SaveToProjectDialog } from '../SaveToProjectDialog';
 import { consumePendingDesign } from '../../services/designHandoff';
 import { setPendingPlanCapture } from '../../services/floorPlanService';
+import { useBranding } from '../../hooks/useBranding';
 
 export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
 
@@ -23,8 +25,17 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
   const [saveName, setSaveName] = useState('');
   // '__new__' or an existing project id to attach the design to.
   const [saveTarget, setSaveTarget] = useState('__new__');
+  // A PDF proposal from the configurator's export, waiting for a project.
+  const [pendingPdf, setPendingPdf] = useState<{
+    file: File; name: string; client: string; address: string; price: number | null; scene3d: string | null;
+  } | null>(null);
   // Read by the message handler, which is bound once per engine.
   const configModeRef = useRef<'public' | 'business' | null>(null);
+  // The PDF export dialog edits branding inside the iframe, which has no
+  // Firebase client; it hands the fields up to be saved against the account.
+  const { setBranding } = useBranding();
+  const setBrandingRef = useRef(setBranding);
+  setBrandingRef.current = setBranding;
 
   const confirmSave = async () => {
     if (!pendingSave) return;
@@ -107,6 +118,39 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
           scene: { v: 2, room, objects: scene?.objects || [], fences: scene?.fences || [], paths: scene?.paths || [], garden: scene?.garden },
           price: typeof price === 'number' ? Math.round(price) : null,
         });
+        return;
+      }
+
+      // Save to project in the PDF export: the finished proposal comes up
+      // here to be filed, as the design does - the iframe has no Firebase.
+      if (event.data && event.data.type === 'SAVE_PDF_TO_PROJECT' && event.data.pdf instanceof Blob) {
+        const d = event.data;
+        const str = (v: unknown, n: number) => (typeof v === 'string' ? v.slice(0, n) : '');
+        const scene = d.scene && typeof d.scene === 'object' ? d.scene : null;
+        setPendingPdf({
+          file: new File([d.pdf], str(d.fileName, 120) || 'design-proposal.pdf', { type: 'application/pdf' }),
+          name: str(d.project?.name, 120),
+          client: str(d.project?.client, 120),
+          address: str(d.project?.address, 200),
+          price: typeof d.price === 'number' && d.price > 0 ? Math.round(d.price) : null,
+          scene3d: scene ? JSON.stringify({ v: 2, room: scene.room || {}, objects: scene.objects || [], fences: scene.fences || [], paths: scene.paths || [], garden: scene.garden }) : null,
+        });
+        return;
+      }
+
+      // Branding edited in the configurator's PDF export: save it to the
+      // account. Only the known fields, and a logo only as an image data URL.
+      if (event.data && event.data.type === 'SAVE_BRANDING' && event.data.branding) {
+        const b = event.data.branding;
+        const hex = (v: unknown) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : undefined);
+        const patch: Record<string, unknown> = {};
+        if (b.logo === null || (typeof b.logo === 'string' && b.logo.startsWith('data:image/'))) patch.logo = b.logo;
+        if (hex(b.primaryColor)) patch.primaryColor = b.primaryColor;
+        if (hex(b.secondaryColor)) patch.secondaryColor = b.secondaryColor;
+        if (typeof b.companyName === 'string') patch.companyName = b.companyName.slice(0, 120);
+        if (typeof b.pdfFont === 'string' && /^[a-z]{2,24}$/.test(b.pdfFont)) patch.pdfFont = b.pdfFont;
+        if (typeof b.contactInfo === 'string') patch.contactInfo = b.contactInfo.slice(0, 600);
+        setBrandingRef.current(patch as any).catch(() => { /* kept locally; saved next time */ });
         return;
       }
 
@@ -275,6 +319,41 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
           <p className="text-sm font-semibold text-accent">Loading 3D Configurator…</p>
           <p className="text-xs text-slate-400">First load can take a few seconds</p>
         </div>
+      )}
+      {pendingPdf && (
+        <SaveToProjectDialog
+          file={pendingPdf.file}
+          assetKind="proposal"
+          defaultName="design-proposal"
+          title="Save proposal to a project"
+          newProject={{
+            name: pendingPdf.name || 'Garden room',
+            clientName: pendingPdf.client,
+            address: pendingPdf.address,
+            estimateValue: pendingPdf.price,
+            // A proposal made is a quote given.
+            status: 'quoted',
+            quotedAt: Date.now(),
+            scene3d: pendingPdf.scene3d,
+            notes: 'Created from a PDF proposal.',
+          }}
+          afterSave={p => {
+            // File the proposal and bring the job up to date with it, never
+            // overwriting what is already on the project.
+            const c: Partial<ProjectDraft> = {};
+            if (p.status === 'lead') Object.assign(c, statusChanges(p, 'quoted'));
+            if (p.estimateValue === null && pendingPdf.price) c.estimateValue = pendingPdf.price;
+            if (!p.clientName && pendingPdf.client) c.clientName = pendingPdf.client;
+            if (!p.address && pendingPdf.address) c.address = pendingPdf.address;
+            if (!p.scene3d && pendingPdf.scene3d) c.scene3d = pendingPdf.scene3d;
+            return c;
+          }}
+          onSaved={projectName => {
+            iframeRef.current?.contentWindow?.postMessage({ type: 'PDF_SAVED_TO_PROJECT', projectName }, window.location.origin);
+            refreshDesigns();
+          }}
+          onClose={() => setPendingPdf(null)}
+        />
       )}
       {pendingSave && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40">

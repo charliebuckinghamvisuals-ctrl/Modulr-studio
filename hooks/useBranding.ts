@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../services/firebase';
@@ -11,6 +11,13 @@ export interface BrandingData {
     contactInfo: string;
     /** PDF export design - read by the 3D Configurator via the localStorage mirror. */
     pdfTemplate: PdfTemplate;
+    /** The proposal's second colour (rules, accents) and the name set in its
+     *  title blocks. Edited in the configurator's PDF export dialog, which
+     *  hands them up here to save (SAVE_BRANDING, see DesignerView). */
+    secondaryColor?: string;
+    companyName?: string;
+    /** The PDF proposal's typeface, an id from the configurator's PDF_FONTS. */
+    pdfFont?: string;
 }
 
 const DEFAULT_BRANDING: BrandingData = {
@@ -48,8 +55,13 @@ const clearCache = () => {
 };
 
 export function useBranding() {
-    const [branding, setBrandingState] = useState<BrandingData>(DEFAULT_BRANDING);
+    const [branding, setBrandingValue] = useState<BrandingData>(DEFAULT_BRANDING);
     const [isLoaded, setIsLoaded] = useState(false);
+    // The latest value, so two saves in quick succession (company name, then
+    // contact details) build on each other instead of the second restoring
+    // what the first replaced.
+    const latest = useRef<BrandingData>(DEFAULT_BRANDING);
+    const setBrandingState = (b: BrandingData) => { latest.current = b; setBrandingValue(b); };
 
     useEffect(() => {
         // Branding is per USER, not per browser. It previously lived only in
@@ -86,7 +98,7 @@ export function useBranding() {
     }, []);
 
     const setBranding = async (newBranding: Partial<BrandingData>) => {
-        const updated = { ...branding, ...newBranding };
+        const updated = { ...latest.current, ...newBranding };
         setBrandingState(updated);
         writeCache(updated);
 

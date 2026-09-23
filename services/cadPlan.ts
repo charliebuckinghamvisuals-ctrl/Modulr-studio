@@ -34,6 +34,30 @@ export interface CadPlanSpec {
     deckOutline?: [number, number][];
     bay?: { side?: 'left' | 'right' | 'none'; widthMm?: number; depthMm?: number };
     planItems?: PlanItem[];
+    /** An L-shape's cut-out (shape 'LShape'), as the configurator stores it. */
+    lShapeCutoutWidthMm?: number; lShapeCutoutDepthMm?: number;
+    lShapeCutoutCorner?: 'front-left' | 'front-right' | 'back-left' | 'back-right';
+}
+
+/**
+ * The L-shape's notch, in plan millimetres, or null.
+ *
+ * The same arithmetic as lShapeNotch in the configurator
+ * (garden-scene-builder/src/utils/lshape.ts), which this package cannot
+ * import - keep the two in step: the cut is clamped to leave 350mm of
+ * building, sx/sz are +1 for a right/front corner, and lineX/lineZ are the
+ * notch's inner corner on the outer wall lines.
+ */
+function planNotch(spec: CadPlanSpec, W: number, D: number) {
+    if (spec.shape !== 'LShape') return null;
+    const cutW = Math.min(Number(spec.lShapeCutoutWidthMm) || 2000, W - 350);
+    const cutD = Math.min(Number(spec.lShapeCutoutDepthMm) || 1500, D - 350);
+    const corner = spec.lShapeCutoutCorner || 'front-right';
+    const sx = corner.endsWith('left') ? -1 : 1, sz = corner.startsWith('back') ? -1 : 1;
+    const lineX = sx * (W / 2 - cutW), lineZ = sz * (D / 2 - cutD);
+    return { cutW, cutD, sx, sz, lineX, lineZ,
+        x0: Math.min(lineX, sx * W / 2), x1: Math.max(lineX, sx * W / 2),
+        z0: Math.min(lineZ, sz * D / 2), z1: Math.max(lineZ, sz * D / 2) };
 }
 
 const r0 = (v: number) => Math.round(v);
@@ -56,9 +80,16 @@ function dimChain(points: number[], axis: 'x' | 'y', at: number, extFrom: number
         const [tx1, ty1] = P(p - 60, at + 60), [tx2, ty2] = P(p + 60, at - 60);
         line(tx1, ty1, tx2, ty2);
     }
+    const lens = uniq.slice(1).map((b, i) => b - uniq[i]);
     for (let i = 0; i < uniq.length - 1; i++) {
         const a = uniq[i], b = uniq[i + 1], mid = (a + b) / 2, len = b - a;
         if (len < 1) continue;
+        // A figure is about 350mm wide at this size. A short run keeps its
+        // figure only when both neighbours are long enough for it to spill
+        // into; two short runs side by side printed on top of each other
+        // ("250150" at an L's notch corner).
+        const roomy = (n: number | undefined) => n === undefined || n >= 700;
+        if (len < 350 && !(roomy(lens[i - 1]) && roomy(lens[i + 1]))) continue;
         const [tx, ty] = P(mid, at + side * 60);
         const rot = axis === 'y' ? ` transform="rotate(-90 ${tx} ${ty})"` : '';
         out.push(`<text class="fig" x="${tx}" y="${ty}" text-anchor="middle"${rot}>${r0(len)}</text>`);
@@ -67,11 +98,18 @@ function dimChain(points: number[], axis: 'x' | 'y', at: number, extFrom: number
 }
 
 /** Build the plan as an SVG string. Returns the SVG and its size in mm. */
-export function buildCadPlanSvg(spec: CadPlanSpec, opts: { title?: string; notes?: string } = {}): { svg: string; widthMm: number; heightMm: number } {
+export function buildCadPlanSvg(spec: CadPlanSpec, opts: {
+    title?: string; notes?: string; bare?: boolean;
+    /** Line drawings of the furniture (the configurator's PDF): an image laid
+     *  in plan millimetres, drawn under the walls. With it, the items keep
+     *  their labels but lose their boxes. */
+    furniture?: { href: string; x0: number; z0: number; w: number; d: number };
+} = {}): { svg: string; widthMm: number; heightMm: number } {
     const W = Math.max(1000, Number(spec.widthMm) || 6000), D = Math.max(1000, Number(spec.depthMm) || 4000);
     const T = Math.max(50, Number(spec.wallThicknessMm) || 150);
     const hw = W / 2, hd = D / 2;
     const out: string[] = [];
+    const notch = planNotch(spec, W, D);
 
     // ---- deck (behind everything) ----------------------------------------
     let deckFront = 0, deckLeft = 0, deckRight = 0;
@@ -92,10 +130,30 @@ export function buildCadPlanSvg(spec: CadPlanSpec, opts: { title?: string; notes
         for (let x = Math.ceil(x0 / 150) * 150; x < x1; x += 150) out.push(`<line class="board" x1="${x}" y1="${z0}" x2="${x}" y2="${z1}"/>`);
         // Deck depth, on the left of the deck.
         dimChain([hd, hd + deckFront], 'y', x0 - 500, x0, -1, out);
+        // An L's deck runs on into the recess, as the configurator's does.
+        if (notch) {
+            out.push(`<rect class="deck" x="${notch.x0}" y="${notch.z0}" width="${notch.x1 - notch.x0}" height="${notch.z1 - notch.z0}"/>`);
+            for (let x = Math.ceil(notch.x0 / 150) * 150; x < notch.x1; x += 150) out.push(`<line class="board" x1="${x}" y1="${notch.z0}" x2="${x}" y2="${notch.z1}"/>`);
+        }
+    }
+
+    if (opts.furniture) {
+        const f = opts.furniture;
+        out.push(`<image href="${f.href}" x="${r0(f.x0)}" y="${r0(f.z0)}" width="${r0(f.w)}" height="${r0(f.d)}" preserveAspectRatio="none"/>`);
     }
 
     // ---- walls: outer rectangle minus inner, even-odd -----------------------
-    out.push(`<path class="wall" fill-rule="evenodd" d="M${-hw} ${-hd} H${hw} V${hd} H${-hw} Z M${-hw + T} ${-hd + T} H${hw - T} V${hd - T} H${-hw + T} Z"/>`);
+    if (notch) {
+        // An L: drawn for a front-right notch and mirrored by the corner's
+        // signs - the outer outline, and the same outline inset by the wall.
+        const cx = hw - notch.cutW, cz = hd - notch.cutD;
+        const ring = (pts: [number, number][]) => 'M' + pts.map(([x, z]) => `${r0(notch.sx * x)} ${r0(notch.sz * z)}`).join(' L') + ' Z';
+        const outer: [number, number][] = [[-hw, -hd], [hw, -hd], [hw, cz], [cx, cz], [cx, hd], [-hw, hd]];
+        const inner: [number, number][] = [[-hw + T, -hd + T], [hw - T, -hd + T], [hw - T, cz - T], [cx - T, cz - T], [cx - T, hd - T], [-hw + T, hd - T]];
+        out.push(`<path class="wall" fill-rule="evenodd" d="${ring(outer)} ${ring(inner)}"/>`);
+    } else {
+        out.push(`<path class="wall" fill-rule="evenodd" d="M${-hw} ${-hd} H${hw} V${hd} H${-hw} Z M${-hw + T} ${-hd + T} H${hw - T} V${hd - T} H${-hw + T} Z"/>`);
+    }
 
     // The covered outdoor section: its front is open, a dividing wall closes it off from the room.
     const bay = spec.bay && (spec.bay.side === 'left' || spec.bay.side === 'right') && Number(spec.bay.widthMm) > 0 ? spec.bay : null;
@@ -113,28 +171,45 @@ export function buildCadPlanSvg(spec: CadPlanSpec, opts: { title?: string; notes
     }
 
     // ---- openings in the outer walls ---------------------------------------
-    const wallGeom = (w: Wall) => {
-        if (w === 'front') return { axis: 'x' as const, at: hd, inward: -1 };
-        if (w === 'back') return { axis: 'x' as const, at: -hd, inward: 1 };
-        if (w === 'left') return { axis: 'y' as const, at: -hw, inward: 1 };
-        return { axis: 'y' as const, at: hw, inward: -1 };
+    /**
+     * The face an opening sits in: its axis, the OUTER face's coordinate and
+     * which way is in. An L's notch steps two walls back, and an opening on
+     * the recessed face keeps its wall's name (as in the configurator) - its
+     * centre, not its name, says which face it is on.
+     */
+    const wallGeom = (w: Wall, centre = 0) => {
+        const onX = !!notch && centre > notch.x0 && centre < notch.x1;
+        const onZ = !!notch && centre > notch.z0 && centre < notch.z1;
+        if (w === 'front') return { axis: 'x' as const, at: notch && notch.sz > 0 && onX ? notch.lineZ : hd, inward: -1 };
+        if (w === 'back') return { axis: 'x' as const, at: notch && notch.sz < 0 && onX ? notch.lineZ : -hd, inward: 1 };
+        if (w === 'left') return { axis: 'y' as const, at: notch && notch.sx < 0 && onZ ? notch.lineX : -hw, inward: 1 };
+        return { axis: 'y' as const, at: notch && notch.sx > 0 && onZ ? notch.lineX : hw, inward: -1 };
     };
     const cutWall = (w: Wall, centre: number, width: number) => {
-        const g = wallGeom(w);
+        const g = wallGeom(w, centre);
         const a = centre - width / 2;
         // A white rectangle through the full wall thickness, a touch over on both faces.
-        if (g.axis === 'x') out.push(`<rect class="cut" x="${a}" y="${w === 'front' ? hd - T - 5 : -hd - 5}" width="${width}" height="${T + 10}"/>`);
-        else out.push(`<rect class="cut" x="${w === 'left' ? -hw - 5 : hw - T - 5}" y="${a}" width="${T + 10}" height="${width}"/>`);
+        const start = g.inward < 0 ? g.at - T - 5 : g.at - 5;
+        if (g.axis === 'x') out.push(`<rect class="cut" x="${a}" y="${start}" width="${width}" height="${T + 10}"/>`);
+        else out.push(`<rect class="cut" x="${start}" y="${a}" width="${T + 10}" height="${width}"/>`);
     };
     const chains: Record<'front' | 'back' | 'left' | 'right', number[]> = { front: [-hw, -hw + T, hw - T, hw], back: [-hw, -hw + T, hw - T, hw], left: [-hd, -hd + T, hd - T, hd], right: [-hd, -hd + T, hd - T, hd] };
+    // A stepped wall's chain also carries the notch corner - the main face's
+    // end and the inner face of the notch's side wall - so it reads the
+    // cut-out's width (front/back) or depth (sides) as well.
+    if (notch) {
+        const across = notch.sz > 0 ? 'front' : 'back', along = notch.sx > 0 ? 'right' : 'left';
+        chains[across].push(notch.lineX, notch.lineX - notch.sx * T);
+        chains[along].push(notch.lineZ, notch.lineZ - notch.sz * T);
+    }
 
     for (const wn of spec.windows || []) {
         if (wn.wall === 'bay') continue;
         const c = Number(wn.offsetMm) || 0, wd = Number(wn.widthMm) || 1000;
         cutWall(wn.wall, c, wd);
-        const g = wallGeom(wn.wall);
+        const g = wallGeom(wn.wall, c);
         // Glass line through the middle of the wall, with the frame either side.
-        const mid = wn.wall === 'front' ? hd - T / 2 : wn.wall === 'back' ? -hd + T / 2 : wn.wall === 'left' ? -hw + T / 2 : hw - T / 2;
+        const mid = g.at + g.inward * T / 2;
         if (g.axis === 'x') { out.push(`<line class="glass" x1="${c - wd / 2}" y1="${mid}" x2="${c + wd / 2}" y2="${mid}"/>`); out.push(`<line class="thin" x1="${c - wd / 2}" y1="${mid - T / 2}" x2="${c + wd / 2}" y2="${mid - T / 2}"/><line class="thin" x1="${c - wd / 2}" y1="${mid + T / 2}" x2="${c + wd / 2}" y2="${mid + T / 2}"/>`); }
         else { out.push(`<line class="glass" x1="${mid}" y1="${c - wd / 2}" x2="${mid}" y2="${c + wd / 2}"/>`); out.push(`<line class="thin" x1="${mid - T / 2}" y1="${c - wd / 2}" x2="${mid - T / 2}" y2="${c + wd / 2}"/><line class="thin" x1="${mid + T / 2}" y1="${c - wd / 2}" x2="${mid + T / 2}" y2="${c + wd / 2}"/>`); }
         chains[wn.wall].push(c - wd / 2, c + wd / 2);
@@ -157,10 +232,10 @@ export function buildCadPlanSvg(spec: CadPlanSpec, opts: { title?: string; notes
         chains[dr.wall].push(c - wd / 2, c + wd / 2);
         const leaves = Math.max(1, parseInt(String(dr.leaves)) || 1);
         const kind = ['hinged', 'french', 'bifold', 'sliding'].includes(String(dr.kind)) ? String(dr.kind) : leaves <= 1 ? 'hinged' : leaves === 2 ? 'french' : 'bifold';
-        const g = wallGeom(dr.wall);
+        const g = wallGeom(dr.wall, c);
         // Wall centre line position and the inward direction.
-        const wallMid = dr.wall === 'front' ? hd - T / 2 : dr.wall === 'back' ? -hd + T / 2 : dr.wall === 'left' ? -hw + T / 2 : hw - T / 2;
-        const inner = dr.wall === 'front' ? hd - T : dr.wall === 'back' ? -hd + T : dr.wall === 'left' ? -hw + T : hw - T;
+        const wallMid = g.at + g.inward * T / 2;
+        const inner = g.at + g.inward * T;
         const a = c - wd / 2, b = c + wd / 2;
         // Along-wall unit u, inward unit v, in plan coordinates.
         const U = g.axis === 'x' ? [1, 0] : [0, 1];
@@ -266,10 +341,25 @@ export function buildCadPlanSvg(spec: CadPlanSpec, opts: { title?: string; notes
     }
 
     // ---- furniture and fittings, as symbols with a label ----------------------
+    const placedLabels: { x0: number; x1: number; y0: number; y1: number }[] = [];
     for (const it of spec.planItems || []) {
         const w = Number(it.widthMm) || 600, dpt = Number(it.depthMm) || Math.min(w, 600);
         const x = Number(it.xMm) || 0, z = Number(it.zMm) || 0, rot = Number(it.rotDeg) || 0;
         const label = esc(String(it.label || '').toUpperCase());
+        if (opts.furniture) {
+            // The drawing shows the item; the label sits on it in a white halo
+            // so it reads over the line work (hung below, it ran into the next
+            // item). A rug is always under something, and a label that would
+            // land on one already placed is left off - a coffee table on a rug
+            // printed both names on top of each other.
+            if (/\bRUG\b/.test(label)) continue;
+            const ly = z + 40, lw = label.length * 78;
+            const box = { x0: x - lw / 2 - 40, x1: x + lw / 2 + 40, y0: ly - 120, y1: ly + 50 };
+            if (placedLabels.some(b => b.x0 < box.x1 && box.x0 < b.x1 && b.y0 < box.y1 && box.y0 < b.y1)) continue;
+            placedLabels.push(box);
+            out.push(`<text class="tiny halo" x="${r0(x)}" y="${r0(ly)}" text-anchor="middle">${label}</text>`);
+            continue;
+        }
         out.push(`<g transform="translate(${r0(x)} ${r0(z)}) rotate(${r0(-rot)})"><rect class="item" x="${r0(-w / 2)}" y="${r0(-dpt / 2)}" width="${r0(w)}" height="${r0(dpt)}"/>` +
             (/sofa|armchair|bed/i.test(label) ? `<line class="thin" x1="${r0(-w / 2)}" y1="${r0(-dpt / 2 + Math.min(180, dpt * 0.3))}" x2="${r0(w / 2)}" y2="${r0(-dpt / 2 + Math.min(180, dpt * 0.3))}"/>` : '') +
             (/sink/i.test(label) ? `<rect class="thin" x="${r0(-w * 0.3)}" y="${r0(-dpt * 0.25)}" width="${r0(w * 0.6)}" height="${r0(dpt * 0.5)}" rx="40"/>` : '') +
@@ -294,11 +384,14 @@ export function buildCadPlanSvg(spec: CadPlanSpec, opts: { title?: string; notes
     const notes = opts.notes ? esc(opts.notes) : '';
 
     // ---- frame ---------------------------------------------------------------
-    const margin = 1500;
-    const x0 = left - margin, y0 = -hd - margin, x1 = right + margin, y1 = deckBottom + margin + 500;
+    // bare: the drawing alone, for a sheet whose title block carries the
+    // title and notes (the configurator's PDF proposal).
+    const margin = opts.bare ? 1100 : 1500;
+    const x0 = left - margin, y0 = -hd - margin, x1 = right + margin, y1 = deckBottom + margin + (opts.bare ? 0 : 500);
     const widthMm = x1 - x0, heightMm = y1 - y0;
-    out.push(`<text class="title" x="${x0 + 200}" y="${y1 - 260}">${title}</text>`);
-    out.push(`<text class="tiny" x="${x0 + 200}" y="${y1 - 80}">Drawn from the design data · all dimensions in mm · ${r0(W)} x ${r0(D)} overall, walls ${r0(T)}${notes ? ' · ' + notes : ''}</text>`);
+    if (!opts.bare) out.push(`<text class="title" x="${x0 + 200}" y="${y1 - 260}">${title}</text>`);
+    const lNote = notch ? ` · L-shape, ${r0(notch.cutW)} x ${r0(notch.cutD)} cut-out at the ${(spec.lShapeCutoutCorner || 'front-right').replace('-', ' ')}` : '';
+    if (!opts.bare) out.push(`<text class="tiny" x="${x0 + 200}" y="${y1 - 80}">Drawn from the design data · all dimensions in mm · ${r0(W)} x ${r0(D)} overall, walls ${r0(T)}${lNote}${notes ? ' · ' + notes : ''}</text>`);
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${y0} ${widthMm} ${heightMm}" width="${widthMm}" height="${heightMm}">
 <style>
@@ -316,6 +409,7 @@ export function buildCadPlanSvg(spec: CadPlanSpec, opts: { title?: string; notes
   .ext { stroke: #1f1f1f; stroke-width: 6; fill: none; }
   .fig { font: 150px 'Montserrat', Arial, Helvetica, sans-serif; fill: #1f1f1f; }
   .tiny { font: 110px 'Montserrat', Arial, Helvetica, sans-serif; fill: #1f1f1f; letter-spacing: 6px; }
+  .halo { stroke: #ffffff; stroke-width: 44px; stroke-linejoin: round; paint-order: stroke; }
   .label { font: 170px 'Montserrat', Arial, Helvetica, sans-serif; fill: #1f1f1f; letter-spacing: 14px; }
   .title { font: bold 260px 'Montserrat', Arial, Helvetica, sans-serif; fill: #1f1f1f; letter-spacing: 30px; }
 </style>

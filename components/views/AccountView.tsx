@@ -10,7 +10,7 @@ import { auth } from '../../services/firebase';
 import { signOut, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { useAuth } from '../../hooks/useAuth';
 import { useCredits } from '../../hooks/useCredits';
-import { useBranding } from '../../hooks/useBranding';
+import { BrandingSettings } from '../BrandingSettings';
 import { AppStage } from '../../types';
 
 interface AccountViewProps {
@@ -20,7 +20,6 @@ interface AccountViewProps {
 export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
     const { user } = useAuth();
     const { credits, plan, rendersLeft, rendersPerDay, trialDaysLeft, refreshCredits } = useCredits();
-    const { branding, setBranding } = useBranding();
 
     // Editable display name
     const [editableName, setEditableName] = React.useState(user?.displayName || '');
@@ -370,147 +369,9 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                     </div>
                 </div>
 
-                {/* Company Branding Section */}
+                {/* Company Branding - set once, used on every PDF proposal */}
                 <div className="pt-12 animate-in fade-in slide-in-from-bottom-16 duration-1000 delay-600">
-                    <div className="space-y-8">
-                        <div className="flex items-baseline gap-4">
-                            <h2 className="text-2xl font-bold text-accent tracking-tight">Company Branding</h2>
-                            <div className="flex-1 h-px bg-border"></div>
-                        </div>
-                        <p className="text-sm text-secondary font-medium">Customize the branding for your PDF Presentation exports.</p>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                            {/* Logo & Color */}
-                            <div className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/40 pl-1">Company Logo</label>
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-24 h-24 rounded-2xl bg-slate-50 border border-dashed border-border flex items-center justify-center overflow-hidden">
-                                            {branding.logo ? (
-                                                <img src={branding.logo} alt="Company Logo" className="w-full h-full object-contain p-2" />
-                                            ) : (
-                                                <Grid size={24} className="text-slate-300" />
-                                            )}
-                                        </div>
-                                        <label className="px-4 py-2 rounded-xl bg-accent/5 text-accent text-xs font-bold uppercase tracking-widest hover:bg-accent/10 transition-all cursor-pointer">
-                                            Upload Logo
-                                            <input 
-                                                type="file" 
-                                                accept="image/*" 
-                                                className="hidden" 
-                                                onChange={(e) => {
-                                                    const file = e.target.files?.[0];
-                                                    if (file) {
-                                                        const reader = new FileReader();
-                                                        reader.onload = (ev) => {
-                                                            if (ev.target?.result) {
-                                                                setBranding({ logo: ev.target.result as string });
-                                                            }
-                                                        };
-                                                        reader.readAsDataURL(file);
-                                                    }
-                                                }} 
-                                            />
-                                        </label>
-                                        {branding.logo && (
-                                            <button 
-                                                onClick={() => setBranding({ logo: null })}
-                                                className="px-4 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-bold uppercase tracking-widest hover:bg-red-100 transition-all"
-                                            >
-                                                Remove
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                                
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/40 pl-1">Primary Color</label>
-                                    <div className="flex items-center gap-4">
-                                        <input 
-                                            type="color" 
-                                            value={branding.primaryColor}
-                                            onChange={(e) => setBranding({ primaryColor: e.target.value })}
-                                            className="w-12 h-12 rounded-xl border-none cursor-pointer bg-transparent"
-                                        />
-                                        <input 
-                                            type="text" 
-                                            value={branding.primaryColor}
-                                            onChange={(e) => setBranding({ primaryColor: e.target.value })}
-                                            className="px-4 py-2 rounded-xl bg-slate-50 border border-border outline-none focus:ring-2 focus:ring-accent/30 text-sm font-bold uppercase"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* PDF design template */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/40 pl-1">PDF Design</label>
-                                <p className="text-xs text-secondary pl-1">How your exported design proposals look.</p>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    {([
-                                        { id: 'classic', name: 'Classic', desc: 'Colour header band on every page with your logo. The original look.' },
-                                        { id: 'minimal', name: 'Minimal', desc: 'Clean white pages, hairline rules. Your colour used sparingly as an accent.' },
-                                        { id: 'bold', name: 'Bold', desc: 'Deep colour masthead on the cover with the project title inside it.' },
-                                    ] as const).map(t => {
-                                        const selected = (branding.pdfTemplate || 'classic') === t.id;
-                                        return (
-                                            <button
-                                                key={t.id}
-                                                onClick={() => setBranding({ pdfTemplate: t.id })}
-                                                className={`text-left p-4 rounded-2xl border-2 transition-all ${selected ? 'border-accent bg-accent/5 shadow-sm' : 'border-border bg-slate-50 hover:border-accent/40'}`}
-                                            >
-                                                {/* Tiny page preview drawn with divs, tinted by the user's colour */}
-                                                <div className="w-full h-16 rounded-lg bg-white border border-border overflow-hidden mb-3">
-                                                    {t.id === 'classic' && (
-                                                        <>
-                                                            <div className="h-3 w-full" style={{ background: branding.primaryColor }} />
-                                                            <div className="p-1.5 space-y-1">
-                                                                <div className="h-1.5 w-1/2 rounded bg-slate-300" />
-                                                                <div className="h-6 w-full rounded bg-slate-100" />
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                    {t.id === 'minimal' && (
-                                                        <div className="p-1.5 space-y-1">
-                                                            <div className="flex justify-between items-center">
-                                                                <div className="h-1.5 w-1/4 rounded" style={{ background: branding.primaryColor }} />
-                                                                <div className="h-1 w-1/5 rounded bg-slate-200" />
-                                                            </div>
-                                                            <div className="h-px w-full bg-slate-200" />
-                                                            <div className="h-6 w-full rounded bg-slate-100" />
-                                                        </div>
-                                                    )}
-                                                    {t.id === 'bold' && (
-                                                        <>
-                                                            <div className="h-8 w-full p-1.5 flex flex-col justify-end" style={{ background: branding.primaryColor }}>
-                                                                <div className="h-1.5 w-1/2 rounded bg-white/80" />
-                                                            </div>
-                                                            <div className="p-1.5">
-                                                                <div className="h-4 w-full rounded bg-slate-100" />
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </div>
-                                                <span className={`block text-xs font-bold ${selected ? 'text-accent' : 'text-primary'}`}>{t.name}</span>
-                                                <span className="block text-[10px] text-secondary mt-0.5 leading-snug">{t.desc}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Contact Info */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/40 pl-1">Contact Information (Header)</label>
-                                <textarea
-                                    value={branding.contactInfo}
-                                    onChange={(e) => setBranding({ contactInfo: e.target.value })}
-                                    placeholder="e.g. Website: www.yourcompany.com | Phone: 01234 567 890 | Email: hello@yourcompany.com"
-                                    className="w-full h-32 p-4 rounded-2xl bg-slate-50 border border-border outline-none focus:ring-2 focus:ring-accent/30 transition-all text-sm text-accent shadow-inner resize-none"
-                                />
-                            </div>
-                        </div>
-                    </div>
+                    <BrandingSettings />
                 </div>
 
                 {/* Footer */}

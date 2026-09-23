@@ -1,57 +1,72 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { FolderOpen, Plus, Loader2, X, Lock } from 'lucide-react';
-import { Project, ProjectAssetKind } from '../types';
-import { listProjects, createProject, uploadAsset } from '../services/projectService';
+import { Project, ProjectAssetKind, ProjectDraft } from '../types';
+import { listProjects, createProject, uploadAsset, updateProject } from '../services/projectService';
 import { getCurrentProject } from '../services/currentProject';
 import { useCredits } from '../hooks/useCredits';
 
 /**
- * "Save to Project" picker, shared by every tool that produces an image.
+ * "Save to Project" picker, shared by every tool that produces a file.
  *
- * The tools hand over a finished image; the user picks an existing project or
- * names a new one, and the image lands in that project's assets. Kept as one
- * dialog so Render Engine, Weather Lab, Detail Studio, Material Editor et al. all save the
- * same way - the alternative was five subtly different save flows.
+ * The tools hand over a finished image (or, from the PDF export, a finished
+ * file); the user picks an existing project or names a new one, and it lands
+ * in that project's files. Kept as one dialog so Render Engine, Weather Lab,
+ * Detail Studio, Material Editor, the PDF proposal et al. all save the same
+ * way - the alternative was several subtly different save flows.
  */
 interface SaveToProjectDialogProps {
-    /** Data URL (or fetchable URL) of the image to save. Null hides the dialog. */
-    image: string | null;
+    /** Data URL (or fetchable URL) of the image to save. */
+    image?: string | null;
+    /** A ready-made file instead of an image - the PDF proposal. */
+    file?: File | null;
     assetKind: ProjectAssetKind;
-    /** Base filename, e.g. "render-engine". */
+    /** Base filename, e.g. "render-engine". Ignored for a `file`. */
     defaultName: string;
     onClose: () => void;
+    title?: string;
+    /** Fields for a project created here, e.g. the client from the proposal. */
+    newProject?: Partial<ProjectDraft>;
+    /** Changes to make to an existing project once the file is in it. */
+    afterSave?: (project: Project) => Partial<ProjectDraft> | null;
+    /** Told where it went, e.g. so the configurator can say "Saved". */
+    onSaved?: (projectName: string) => void;
 }
 
-export const SaveToProjectDialog: React.FC<SaveToProjectDialogProps> = ({ image, assetKind, defaultName, onClose }) => {
+export const SaveToProjectDialog: React.FC<SaveToProjectDialogProps> = ({
+    image, file, assetKind, defaultName, onClose, title = 'Save to Project', newProject, afterSave, onSaved,
+}) => {
     const { canUseProjects } = useCredits();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [savingTo, setSavingTo] = useState<string | null>(null);
     const [newName, setNewName] = useState('');
+    const open = !!(image || file);
 
     useEffect(() => {
-        if (!image || !canUseProjects) return;
+        if (!open || !canUseProjects) return;
         setLoading(true);
-        setNewName('');
+        setNewName(newProject?.name || '');
         listProjects()
             .then(list => {
                 // The project the user last had open goes first - it is almost
-                // always the job this render belongs to.
+                // always the job this file belongs to.
                 const cur = getCurrentProject();
                 if (cur) list = [...list.filter(p => p.id === cur.id), ...list.filter(p => p.id !== cur.id)];
                 setProjects(list);
             })
             .catch(() => setProjects([]))
             .finally(() => setLoading(false));
-    }, [image, canUseProjects]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, canUseProjects]);
 
-    if (!image) return null;
+    if (!open) return null;
 
     const toFile = async (): Promise<File> => {
+        if (file) return file;
         // Tools hand over data URLs, http URLs or raw base64 - normalise first.
-        const src = image.startsWith('data:') || image.startsWith('http') || image.startsWith('blob:')
-            ? image
+        const src = image!.startsWith('data:') || image!.startsWith('http') || image!.startsWith('blob:')
+            ? image!
             : `data:image/jpeg;base64,${image}`;
         const blob = await (await fetch(src)).blob();
         const ext = blob.type === 'image/png' ? 'png' : 'jpg';
@@ -62,7 +77,12 @@ export const SaveToProjectDialog: React.FC<SaveToProjectDialogProps> = ({ image,
         setSavingTo(project.id);
         try {
             await uploadAsset(project.id, await toFile(), assetKind);
-            toast.success(`Saved to "${project.name}"`);
+            const changes = afterSave?.(project);
+            if (changes && Object.keys(changes).length) await updateProject(project.id, changes);
+            toast.success(changes?.status === 'quoted' && project.status === 'lead'
+                ? `Saved to "${project.name}" - moved to Quoted`
+                : `Saved to "${project.name}"`);
+            onSaved?.(project.name);
             onClose();
         } catch (e: any) {
             toast.error(e?.message || 'Could not save to that project.');
@@ -79,9 +99,10 @@ export const SaveToProjectDialog: React.FC<SaveToProjectDialogProps> = ({ image,
         }
         setSavingTo('__new__');
         try {
-            const created = await createProject({ name });
+            const created = await createProject({ ...newProject, name });
             await uploadAsset(created.id, await toFile(), assetKind);
             toast.success(`Saved to new project "${name}"`);
+            onSaved?.(name);
             onClose();
         } catch (e: any) {
             toast.error(e?.message || 'Could not create the project.');
@@ -97,7 +118,7 @@ export const SaveToProjectDialog: React.FC<SaveToProjectDialogProps> = ({ image,
                 onClick={e => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-sm font-bold text-[#3b4d4a]">Save to Project</h3>
+                    <h3 className="text-sm font-bold text-[#3b4d4a]">{title}</h3>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
                         <X size={16} />
                     </button>
@@ -106,7 +127,7 @@ export const SaveToProjectDialog: React.FC<SaveToProjectDialogProps> = ({ image,
                 {!canUseProjects ? (
                     <p className="text-xs text-slate-500 mt-3 flex items-start gap-2">
                         <Lock size={14} className="shrink-0 mt-0.5" />
-                        Projects is included on Configurator and The Hub. Subscribe to keep your renders filed against the client they belong to.
+                        Projects is included on Configurator and The Hub. Subscribe to keep your work filed against the client it belongs to.
                     </p>
                 ) : (
                     <>

@@ -106,6 +106,8 @@ export type ProjectAssetKind =
   | 'interior_render'
   | 'line_drawing'
   | 'floor_plan'
+  /** A PDF design proposal saved from the configurator's export. */
+  | 'proposal'
   | 'document'
   | 'other';
 

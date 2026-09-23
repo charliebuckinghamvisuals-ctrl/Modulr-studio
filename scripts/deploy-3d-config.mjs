@@ -43,17 +43,20 @@ for (const f of fs.readdirSync(destAssets)) {
 //    straight into public/3d-config/models, so nothing there is pruned.
 //    (17 Sep 2026: the door handle shipped in the source tree but never
 //    reached here, so the app loaded a 404 and drew no handles.)
-const distModels = path.join(DIST, 'models');
-const destModels = path.join(DEST, 'models');
-let modelsCopied = 0;
-if (fs.existsSync(distModels)) {
-    fs.mkdirSync(destModels, { recursive: true });
-    for (const f of fs.readdirSync(distModels)) {
-        const src = path.join(distModels, f), dst = path.join(destModels, f);
-        if (!fs.existsSync(dst) || fs.statSync(src).mtimeMs > fs.statSync(dst).mtimeMs) { fs.copyFileSync(src, dst); modelsCopied++; }
+//    The PDF fonts go the same way (23 Sep 2026: they were never copied, and
+//    the dev server answered the font URLs with index.html).
+for (const dir of ['models', 'fonts']) {
+    const from = path.join(DIST, dir), to = path.join(DEST, dir);
+    let copied = 0;
+    if (fs.existsSync(from)) {
+        fs.mkdirSync(to, { recursive: true });
+        for (const f of fs.readdirSync(from)) {
+            const src = path.join(from, f), dst = path.join(to, f);
+            if (!fs.existsSync(dst) || fs.statSync(src).mtimeMs > fs.statSync(dst).mtimeMs) { fs.copyFileSync(src, dst); copied++; }
+        }
     }
+    console.log(`${dir}: ${copied} copied`);
 }
-console.log(`models: ${modelsCopied} copied`);
 
 const html = fs.readFileSync(path.join(DEST, 'index.html'), 'utf8');
 const refs = html.match(/assets\/[A-Za-z0-9._-]+\.(?:js|css)/g) || [];

@@ -1,987 +1,492 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../../store';
-import { jsPDF } from 'jspdf';
-import { Download, X, Loader2 } from 'lucide-react';
-import { DOOR_KIND_NAME, doorKind } from '../../utils/doors';
+import { X, Loader2, Upload, Star, ArrowUp, ArrowDown, Trash2, FileText, Download, Eye, ImagePlus, FolderInput, ExternalLink, Check } from 'lucide-react';
+import { captureProposalDrawings, type CaptureResult } from '../../pdf/capture';
+import { buildProposalPdf, type ProposalVisual } from '../../pdf/proposal';
+import { readBrand, saveBrand, type PdfBrand } from '../../pdf/brand';
+import { PDF_FONTS, fontById, loadFontSample } from '../../pdf/fonts';
 
-interface ShotResult {
-  dataUrl: string;
-  width: number;
-  height: number;
+// Debug handle, as __modulrScene: lets a headless check take the drawings.
+(window as any).__modulrPdfCapture = captureProposalDrawings;
+
+/**
+ * The design proposal export - "proper proper premium... it needs to feel
+ * architectural" (Charlie, 23 Sep 2026).
+ *
+ * The PDF is a set of A3 or A4 drawing sheets (src/pdf/proposal.ts): a cover,
+ * the company's own renders, true-scale elevations and the CAD floor plan
+ * with dimensions, 3D views, the specification and schedule, and planning
+ * guidance, all in the company's branding. The renders are ATTACHED here -
+ * whatever the company has produced - rather than generated.
+ *
+ * Kept for the session (module scope), so closing the dialog to change the
+ * design does not throw away the attached images or what was typed.
+ */
+type Sections = { cover: boolean; visuals: boolean; elevations: boolean; perspectives: boolean; plan: boolean; spec: boolean; planning: boolean };
+interface FormState {
+  projectName: string; client: string; address: string; reference: string; notes: string;
+  priceMode: 'estimate' | 'actual' | 'none'; actualPrice: string;
+  sections: Sections;
+  paper: 'A3' | 'A4';
+}
+// The paper is a company's habit rather than a project's, so it is remembered.
+const PAPER_KEY = 'modulr_pdf_paper';
+const savedPaper = (): 'A3' | 'A4' => { try { return localStorage.getItem(PAPER_KEY) === 'A4' ? 'A4' : 'A3'; } catch { return 'A3'; } };
+let sessionForm: FormState = {
+  projectName: 'Garden Room', client: '', address: '', reference: '', notes: '',
+  priceMode: 'estimate', actualPrice: '',
+  sections: { cover: true, visuals: true, elevations: true, perspectives: true, plan: true, spec: true, planning: true },
+  paper: savedPaper(),
+};
+let sessionVisuals: ProposalVisual[] = [];
+let sessionCover: number | null = null;
+let sessionPlan: ProposalVisual | null = null;
+
+const SECTION_LABELS: [keyof Sections, string, string][] = [
+  ['cover', 'Cover', 'Hero image, logo and project'],
+  ['visuals', 'Visuals', 'Your attached renders and photos'],
+  ['elevations', 'Elevations', 'Front, rear and sides, to scale'],
+  ['plan', 'Floor plan', 'CAD plan with dimensions, to scale'],
+  ['perspectives', '3D views', 'Two perspectives of the design'],
+  ['spec', 'Specification', 'Building, finishes, openings, price'],
+  ['planning', 'Planning guidance', 'Permitted development check'],
+];
+
+/** Read an image file, shrinking anything huge so the PDF stays a sensible size. */
+function readVisual(file: File): Promise<ProposalVisual> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = () => reject(fr.error);
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Not an image we can read: ' + file.name));
+      img.onload = () => {
+        const MAX = 3200;
+        const k = Math.min(1, MAX / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+        resolve({ dataUrl: c.toDataURL('image/jpeg', 0.9), caption: file.name.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' '), width: c.width, height: c.height, page: 0 });
+      };
+      img.src = String(fr.result);
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+function readLogo(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = () => reject(fr.error);
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Not an image we can read'));
+      img.onload = () => {
+        // PNG keeps a transparent logo transparent; 1200px is plenty for print.
+        const k = Math.min(1, 1200 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/png'));
+      };
+      img.src = String(fr.result);
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+/** Inside the app the configurator is an iframe, and the account holds the
+ *  branding and the projects. On its own (the standalone configurator) there
+ *  is neither, and the dialog edits branding itself. */
+const embedded = (() => { try { return window.parent !== window; } catch { return true; } })();
+
+const inputCls = 'w-full bg-white border border-black/10 rounded-lg px-3 py-2 text-xs text-[#1c1f21] focus:outline-none focus:ring-2 focus:ring-[#3b4d4a]/40';
+const labelCls = 'block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5';
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="py-5 border-b border-black/5 last:border-0">
+      <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#3b4d4a] mb-3">{title}</h3>
+      {children}
+    </section>
+  );
 }
 
 export function ExportPDFModal({ onClose }: { onClose: () => void }) {
-  const { scene } = useStore();
-  const [loading, setLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle');
-  const [formData, setFormData] = useState({
-    name: '',
-    address: '',
-    projectName: 'Garden Room Project',
-    notes: '',
-    /**
-     * What the PDF says about money. 'estimate' shows the configurator's
-     * calculated figure; 'actual' shows the price the company typed (they
-     * know their real quote better than our calculator); 'none' omits the
-     * price section entirely - some firms never put numbers on a proposal.
-     */
-    priceMode: 'estimate' as 'estimate' | 'actual' | 'none',
-    actualPrice: '',
-  });
+  const [form, setForm] = useState<FormState>(sessionForm);
+  const [visuals, setVisuals] = useState<ProposalVisual[]>(sessionVisuals);
+  const [cover, setCover] = useState<number | null>(sessionCover);
+  const [ownPlan, setOwnPlan] = useState<ProposalVisual | null>(sessionPlan);
+  const planRef = useRef<HTMLInputElement>(null);
+  const [brand, setBrand] = useState<PdfBrand>(() => readBrand());
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ url: string; blob: Blob; key: string } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const logoRef = useRef<HTMLInputElement>(null);
+  const estimate = Math.round(useStore.getState().calculatePrice());
+  const [savedTo, setSavedTo] = useState<string | null>(null);
 
-  // Escape closes the dialog, as every other dialog here does. Not while a
-  // PDF is being generated - closing mid-render would drop a half-built file.
+  // Branding comes from the account: when it is changed in Account settings
+  // (another tab, via the "Edit" link) the mirror updates and so does this.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); };
+    const onStorage = (e: StorageEvent) => { if (e.key === 'modulr_branding') setBrand(readBrand()); };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+  // The app says where the proposal was filed.
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type === 'PDF_SAVED_TO_PROJECT') setSavedTo(String(e.data.projectName || 'your project'));
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  // Keep for the session.
+  useEffect(() => { sessionForm = form; try { localStorage.setItem(PAPER_KEY, form.paper); } catch { /* private mode */ } }, [form]);
+  // The chosen font, loaded into the page for the sample line.
+  useEffect(() => { loadFontSample(fontById(brand.font)); }, [brand.font]);
+  useEffect(() => { sessionVisuals = visuals; }, [visuals]);
+  useEffect(() => { sessionCover = cover; }, [cover]);
+  useEffect(() => { sessionPlan = ownPlan; }, [ownPlan]);
+  // Free the preview's blob URL when it is replaced or the dialog closes.
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [loading, onClose]);
+  }, [busy, onClose]);
 
-  const autoCrop = (base64: string): Promise<ShotResult> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0);
-        
-        try {
-          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imgData.data;
-          let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
-          let hasPixels = false;
-          
-          for (let y = 0; y < canvas.height; y++) {
-            for (let x = 0; x < canvas.width; x++) {
-              const alpha = data[(y * canvas.width + x) * 4 + 3];
-              if (alpha > 5) {
-                hasPixels = true;
-                if (x < minX) minX = x;
-                if (x > maxX) maxX = x;
-                if (y < minY) minY = y;
-                if (y > maxY) maxY = y;
-              }
-            }
-          }
-          
-          if (!hasPixels) {
-            resolve({ dataUrl: base64, width: img.width, height: img.height });
-            return;
-          }
-          
-          const padding = 20;
-          minX = Math.max(0, minX - padding);
-          minY = Math.max(0, minY - padding);
-          maxX = Math.min(canvas.width, maxX + padding);
-          maxY = Math.min(canvas.height, maxY + padding);
-          
-          const cropW = maxX - minX;
-          const cropH = maxY - minY;
-          
-          const cropCanvas = document.createElement('canvas');
-          cropCanvas.width = cropW;
-          cropCanvas.height = cropH;
-          const cropCtx = cropCanvas.getContext('2d')!;
-          cropCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
-          resolve({ dataUrl: cropCanvas.toDataURL('image/png'), width: cropW, height: cropH });
-        } catch(e) {
-          console.error('Crop failed', e);
-          resolve({ dataUrl: base64, width: img.width, height: img.height });
-        }
-      };
-      img.onerror = () => resolve({ dataUrl: base64, width: 800, height: 600 });
-      img.src = base64;
-    });
-  };
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm(f => ({ ...f, [k]: v }));
+  const setBrandField = <K extends keyof PdfBrand>(k: K, v: PdfBrand[K]) => setBrand(b => { const n = { ...b, [k]: v }; saveBrand(n); return n; });
 
-  const takeScreenshot = async (view: string, mode: '3d' | 'plan' = '3d', showDims: boolean = true): Promise<ShotResult> => {
-    return new Promise((resolve) => {
-      // Switch view mode
-      useStore.getState().setViewMode(mode);
-      useStore.getState().setIsExporting(showDims);
-      
-      setTimeout(() => {
-        const handleScreenshot = async (e: any) => {
-          window.removeEventListener('screenshot-taken', handleScreenshot);
-          const cropped = await autoCrop(e.detail);
-          resolve(cropped);
-        };
-        window.addEventListener('screenshot-taken', handleScreenshot);
-        window.dispatchEvent(new CustomEvent('camera-set-view', { detail: { view, snap: true } }));
-        
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('take-screenshot'));
-        }, 500);
-      }, 500); // Give React time to render the viewMode change
-    });
-  };
-
-  const handleExport = async () => {
-    setLoading(true);
-    useStore.getState().setHoveredElementId(null);
-    
-    setTimeout(async () => {
+  const addFiles = async (files: FileList | File[]) => {
+    const list = Array.from(files).filter(f => /^image\//.test(f.type));
+    if (!list.length) return;
+    setError(null);
     try {
-      // 1. Gather all screenshots
-      const topImg = await takeScreenshot('top', 'plan', true);
-      const frontImg = await takeScreenshot('front', '3d', true);
-      const leftImg = await takeScreenshot('left', '3d', true);
-      const rightImg = await takeScreenshot('right', '3d', true);
-      const backImg = await takeScreenshot('back', '3d', true);
-      const perspectiveImg = await takeScreenshot('perspective', '3d', false);
-
-      // Fetch Planning Advice from API. The server computes the traffic-light
-      // verdict from the totals sent here, so the numbers must be the REAL
-      // ground-to-top figures for the roof shape.
-      let planningAdvice = '';
-      let planning: any = null;
-      try {
-        // For Gable, heightMm is already the total height — adding base+roof
-        // again overstated the building by ~450mm in the planning advice.
-        const isGablePdf = scene.room.shape === 'Gable';
-        const heightExtra = isGablePdf ? 0 : (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
-        const totalFrontHeight = scene.room.heightMm + heightExtra;
-        const totalBackHeight = isGablePdf ? totalFrontHeight : (scene.room.backHeightMm ?? scene.room.heightMm) + heightExtra;
-
-        const augmentedRoomDetails = {
-           ...scene.room,
-           overallTotalFrontHeightMm: totalFrontHeight,
-           overallTotalBackHeightMm: totalBackHeight,
-           overallTotalHeightMm: Math.max(totalFrontHeight, totalBackHeight),
-           eavesHeightMm: isGablePdf ? scene.room.heightMm - (scene.room.roofHeightMm || 200) : Math.max(totalFrontHeight, totalBackHeight),
-           heightMm: totalFrontHeight,
-           backHeightMm: totalBackHeight,
-           /*
-            * What is INSIDE the building, which decides the incidental-use
-            * test and until now was never sent. Class E only covers a building
-            * incidental to the enjoyment of the house; put a bed in it and it
-            * is sleeping accommodation, which is not incidental at any height.
-            * The checklist could only ever show "?" against that line because
-            * the server was being handed the shell and none of the contents.
-            *
-            * Types only - positions are irrelevant to the test and there is no
-            * reason to send the furniture layout off the machine.
-            */
-           contents: Array.from(new Set((scene.objects || []).map(o => o.type))),
-        };
-
-        const response = await fetch('/api/planning-advice', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ roomDetails: augmentedRoomDetails })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          planningAdvice = data.advice;
-          if (data.verdict) planning = data;
-        }
-      } catch (e) {
-        console.error("Failed to fetch planning advice", e);
-      }
-
-      // 2. Generate PDF
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      // ── Branding ──────────────────────────────────────────────────────────
-      // Read from the host app. The configurator runs in a same-origin iframe,
-      // so it can read the branding the user saved in Account Management. Until
-      // now the PDF ignored this entirely and hardcoded Modulr's own colour,
-      // which is why no customer logo or colour ever appeared.
-      const brand = (() => {
-        const fallback = { logo: null as string | null, primaryColor: '#3b4d4a', contactInfo: '', pdfTemplate: 'classic' };
-        try {
-          const raw = localStorage.getItem('modulr_branding');
-          return raw ? { ...fallback, ...JSON.parse(raw) } : fallback;
-        } catch { return fallback; }
-      })();
-
-      const hexToRgb = (hex: string): [number, number, number] => {
-        const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex.trim());
-        return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [59, 77, 74];
-      };
-      const BRAND = hexToRgb(brand.primaryColor);
-      // PDF design, chosen in Account > Company Branding. 'classic' is the
-      // original look; unknown values fall back to it so old caches never break.
-      const template: 'classic' | 'minimal' | 'bold' =
-        brand.pdfTemplate === 'minimal' ? 'minimal' : brand.pdfTemplate === 'bold' ? 'bold' : 'classic';
-      const INK: [number, number, number] = [38, 42, 45];
-      const MUTED: [number, number, number] = [122, 130, 134];
-      const HAIRLINE: [number, number, number] = [222, 226, 228];
-
-      // Single source of truth for the page grid, so every page lines up.
-      const M = 18;                       // page margin
-      const CONTENT_W = pageWidth - M * 2;
-      const HEADER_H = 26;
-      const FOOTER_Y = pageHeight - 12;
-
-      // Measure the logo once so it can be placed at its true aspect ratio.
-      let logoMeta: { data: string; fmt: string; ratio: number } | null = null;
-      if (brand.logo) {
-        try {
-          const dims = await new Promise<{ w: number; h: number }>((res, rej) => {
-            const im = new Image();
-            im.onload = () => res({ w: im.naturalWidth, h: im.naturalHeight });
-            im.onerror = rej;
-            im.src = brand.logo as string;
-          });
-          const fmt = /^data:image\/jpe?g/i.test(brand.logo) ? 'JPEG' : 'PNG';
-          logoMeta = { data: brand.logo, fmt, ratio: dims.w / Math.max(1, dims.h) };
-        } catch { logoMeta = null; }
-      }
-
-      const drawHeader = (title: string) => {
-        if (template === 'minimal') {
-          // No band: logo (or wordmark) on white, hairline underneath. Brand
-          // colour appears only in the wordmark and section rules.
-          if (logoMeta) {
-            const h = 11;
-            const w = Math.min(44, h * logoMeta.ratio);
-            try { pdf.addImage(logoMeta.data, logoMeta.fmt, M, (HEADER_H - h) / 2, w, h); } catch { /* skip bad logo */ }
-          } else {
-            pdf.setTextColor(...BRAND);
-            pdf.setFont('helvetica', 'bold');
-            pdf.setFontSize(11);
-            pdf.text('MODULR STUDIO', M, HEADER_H / 2 + 1.5);
-          }
-          pdf.setTextColor(...MUTED);
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(8.5);
-          pdf.text(title.toUpperCase(), pageWidth - M, HEADER_H / 2 + 1, { align: 'right' });
-          pdf.setDrawColor(...HAIRLINE);
-          pdf.setLineWidth(0.2);
-          pdf.line(M, HEADER_H - 2, pageWidth - M, HEADER_H - 2);
-          return;
-        }
-
-        pdf.setFillColor(...BRAND);
-        pdf.rect(0, 0, pageWidth, HEADER_H, 'F');
-
-        if (logoMeta) {
-          const h = 12;
-          const w = Math.min(48, h * logoMeta.ratio);
-          try { pdf.addImage(logoMeta.data, logoMeta.fmt, M, (HEADER_H - h) / 2, w, h); } catch { /* skip bad logo */ }
-        } else {
-          pdf.setTextColor(255, 255, 255);
-          pdf.setFont('helvetica', 'bold');
-          pdf.setFontSize(12);
-          pdf.text('MODULR STUDIO', M, HEADER_H / 2 + 1.5);
-        }
-
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(9);
-        pdf.text(title.toUpperCase(), pageWidth - M, HEADER_H / 2 + 1, { align: 'right' });
-      };
-
-      const drawFooter = (page: number) => {
-        pdf.setDrawColor(...HAIRLINE);
-        pdf.setLineWidth(0.2);
-        pdf.line(M, FOOTER_Y - 4, pageWidth - M, FOOTER_Y - 4);
-        pdf.setFontSize(7.5);
-        pdf.setTextColor(...MUTED);
-        pdf.setFont('helvetica', 'normal');
-        const left = brand.contactInfo || 'Generated with Modulr Studio';
-        pdf.text(left.slice(0, 90), M, FOOTER_Y);
-        pdf.text(String(page), pageWidth - M, FOOTER_Y, { align: 'right' });
-      };
-
-      /**
-       * Section heading with a rule under it. `x` defaults to the left margin;
-       * a heading over a right-hand column MUST pass its own x - drawing every
-       * title at M is what printed "Openings & Fixtures" on top of "Finishes".
-       */
-      const sectionTitle = (label: string, y: number, x: number = M) => {
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(11);
-        pdf.setTextColor(...BRAND);
-        pdf.text(label.toUpperCase(), x, y);
-        pdf.setDrawColor(...BRAND);
-        pdf.setLineWidth(0.5);
-        pdf.line(x, y + 1.8, x + 14, y + 1.8);
-        return y + 9;
-      };
-
-      /** Key/value row with a hairline separator - reads as a spec table. */
-      const specRow = (label: string, value: string, x: number, y: number, w: number) => {
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(8.5);
-        pdf.setTextColor(...MUTED);
-        pdf.text(label, x, y);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(...INK);
-        pdf.text(value, x + w, y, { align: 'right' });
-        pdf.setDrawColor(...HAIRLINE);
-        pdf.setLineWidth(0.15);
-        pdf.line(x, y + 2.2, x + w, y + 2.2);
-        return y + 7;
-      };
-
-      const drawImageFit = (shot: ShotResult, x: number, y: number, maxW: number, maxH: number) => {
-        const ratio = Math.min(maxW / shot.width, maxH / shot.height);
-        const w = shot.width * ratio;
-        const h = shot.height * ratio;
-        const cx = x + (maxW - w) / 2;
-        const cy = y + (maxH - h) / 2;
-        pdf.addImage(shot.dataUrl, 'PNG', cx, cy, w, h);
-      };
-
-      // Same Gable rule as the planning-advice block above: heightMm is total.
-      const pdfHeightExtra = scene.room.shape === 'Gable' ? 0 : (scene.room.baseHeightMm || 100) + (scene.room.roofHeightMm || 200);
-      const totalHeightFront = scene.room.heightMm + pdfHeightExtra;
-      const totalHeightBack = (scene.room.backHeightMm ?? scene.room.heightMm) + pdfHeightExtra;
-      const totalPrice = useStore.getState().calculatePrice();
-      /**
-       * The figure the PDF shows. null = no price section at all. In 'actual'
-       * mode an empty/invalid entry omits the price rather than silently
-       * falling back to the estimate the user chose not to show.
-       */
-      const parsedActual = parseFloat(formData.actualPrice.replace(/[£,\s]/g, ''));
-      const pdfPrice: number | null =
-        formData.priceMode === 'none' ? null
-        : formData.priceMode === 'actual' ? (isFinite(parsedActual) && parsedActual > 0 ? Math.round(parsedActual) : null)
-        : Math.round(totalPrice);
-      const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-
-      // ── Page 1: Cover ─────────────────────────────────────────────────────
-      const meta = [
-        formData.name ? `Prepared for ${formData.name}` : null,
-        formData.address || null,
-        new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
-      ].filter(Boolean).join('   ·   ');
-
-      let y: number;
-      if (template === 'bold') {
-        // Deep brand-colour masthead with the title inside it - the whole
-        // cover leads with the company's colour rather than a slim band.
-        const MAST_H = 58;
-        pdf.setFillColor(...BRAND);
-        pdf.rect(0, 0, pageWidth, MAST_H, 'F');
-        if (logoMeta) {
-          const h = 12;
-          const w = Math.min(48, h * logoMeta.ratio);
-          try { pdf.addImage(logoMeta.data, logoMeta.fmt, M, 10, w, h); } catch { /* skip bad logo */ }
-        } else {
-          pdf.setTextColor(255, 255, 255);
-          pdf.setFont('helvetica', 'bold');
-          pdf.setFontSize(12);
-          pdf.text('MODULR STUDIO', M, 17);
-        }
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(9);
-        pdf.text('DESIGN PROPOSAL', pageWidth - M, 17, { align: 'right' });
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(24);
-        pdf.text(formData.projectName || 'Garden Room', M, MAST_H - 18);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(9.5);
-        pdf.text(meta, M, MAST_H - 9);
-        y = MAST_H + 10;
-      } else {
-        drawHeader('Design Proposal');
-        y = HEADER_H + 18;
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(22);
-        pdf.setTextColor(...INK);
-        pdf.text(formData.projectName || 'Garden Room', M, y);
-        y += 9;
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(9.5);
-        pdf.setTextColor(...MUTED);
-        pdf.text(meta, M, y);
-        y += 8;
-      }
-
-      // Hero image
-      const heroH = 92;
-      drawImageFit(perspectiveImg, M, y, CONTENT_W, heroH);
-      y += heroH + 12;
-
-      // Two columns: specification and estimate
-      const colGap = 10;
-      const colW = (CONTENT_W - colGap) / 2;
-
-      let leftY = sectionTitle('Specification', y);
-      const isGableSpec = scene.room.shape === 'Gable';
-      leftY = specRow('Roof', isGableSpec ? 'Gable' : 'Flat', M, leftY, colW);
-      leftY = specRow('Width', `${scene.room.widthMm} mm`, M, leftY, colW);
-      leftY = specRow('Depth', `${scene.room.depthMm} mm`, M, leftY, colW);
-      if (isGableSpec) {
-        // A gable has ONE height story: eaves and ridge. Front/back height is
-        // flat-roof vocabulary, and printing the stored backHeightMm here
-        // produced nonsense like "3500mm front, 2010mm back" from a stale
-        // pre-switch value.
-        leftY = specRow('Eaves height', `${scene.room.heightMm - (scene.room.roofHeightMm || 200)} mm`, M, leftY, colW);
-        leftY = specRow('Ridge height', `${scene.room.heightMm} mm`, M, leftY, colW);
-        leftY = specRow('Fascia depth', `${scene.room.gableFasciaMm ?? 100} mm`, M, leftY, colW);
-      } else {
-        leftY = specRow('Height (front)', `${totalHeightFront} mm`, M, leftY, colW);
-        if (totalHeightBack !== totalHeightFront) {
-          leftY = specRow('Height (back)', `${totalHeightBack} mm`, M, leftY, colW);
-        }
-      }
-      if (scene.room.lShapeCutoutWidthMm && !['Box', 'Quba', 'Gable'].includes(scene.room.shape as string)) {
-        leftY = specRow('Cutout width', `${scene.room.lShapeCutoutWidthMm} mm`, M, leftY, colW);
-        leftY = specRow('Cutout depth', `${scene.room.lShapeCutoutDepthMm ?? 1500} mm`, M, leftY, colW);
-        // Which corner it comes out of is half the drawing - a builder
-        // reading "2500 x 2000 cut-out" has no idea which end it is at.
-        leftY = specRow('Cutout corner', (scene.room.lShapeCutoutCorner ?? 'front-right').replace('-', ' '), M, leftY, colW);
-      }
-
-      const rightX = M + colW + colGap;
-      let rightY = y;
-      if (pdfPrice !== null) {
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(11);
-        pdf.setTextColor(...BRAND);
-        pdf.text(formData.priceMode === 'actual' ? 'PRICE' : 'ESTIMATE', rightX, y);
-        pdf.setDrawColor(...BRAND);
-        pdf.setLineWidth(0.5);
-        pdf.line(rightX, y + 1.8, rightX + 14, y + 1.8);
-
-        rightY = y + 12;
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(21);
-        pdf.setTextColor(...INK);
-        pdf.text(`£${pdfPrice.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`, rightX, rightY);
-
-        rightY += 7;
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(8);
-        pdf.setTextColor(...MUTED);
-        const priceNote = formData.priceMode === 'actual'
-          ? 'Price for the design as specified. Any variations will be quoted separately.'
-          : 'Indicative only, based on the design, size and materials selected. Not a formal quotation.';
-        pdf.text(pdf.splitTextToSize(priceNote, colW), rightX, rightY);
-      }
-
-      if (formData.notes) {
-        const notesY = Math.max(leftY, rightY + 14) + 6;
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(8.5);
-        pdf.setTextColor(...MUTED);
-        pdf.text('NOTES', M, notesY);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(...INK);
-        pdf.text(pdf.splitTextToSize(formData.notes, CONTENT_W), M, notesY + 5);
-      }
-
-      drawFooter(1);
-
-      // ── Page 2: Plan & Schedule ───────────────────────────────────────────
-      pdf.addPage();
-      drawHeader('Plan & Schedule');
-
-      let p2y = sectionTitle('Plan View', HEADER_H + 16);
-      const planH = 88;
-      drawImageFit(topImg, M, p2y, CONTENT_W, planH);
-      p2y += planH + 14;
-
-      // Finishes and openings side by side rather than one long stacked list.
-      let finY = sectionTitle('Finishes', p2y);
-      finY = specRow('Cladding', titleCase(String(scene.room.cladding)), M, finY, colW);
-      finY = specRow('Base', titleCase(String(scene.room.baseMaterial)), M, finY, colW);
-      finY = specRow('Roof', titleCase(String(scene.room.roofMaterial)), M, finY, colW);
-      finY = specRow('Interior', titleCase(String(scene.room.interiorColor || 'White')), M, finY, colW);
-      finY = specRow('Frames', titleCase(String(scene.room.frameColor)) + (scene.room.frameColorInner && scene.room.frameColorInner !== scene.room.frameColor ? ' / ' + titleCase(String(scene.room.frameColorInner)) + ' inside' : ''), M, finY, colW);
-      finY = specRow('Floor', titleCase(String(scene.room.interiorFloorType || 'Oak')), M, finY, colW);
-
-      let openY = sectionTitle('Openings & Fixtures', p2y, rightX);
-      // The schedule lists the building's actual openings — doors, windows,
-      // skylights. It previously grouped scene.objects, which put the garden
-      // furniture (trees, sofas) under "Openings" and omitted every real door
-      // and window from the client's document.
-      const openings: { key: string; size: string }[] = [
-        ...(scene.room.doors || []).map(dr => ({
-          key: `${titleCase(String(dr.style || 'standard'))} ${DOOR_KIND_NAME[doorKind(dr)]} (${dr.leaves} leaf)`,
-          size: `${dr.widthMm} x ${dr.heightMm} mm`,
-        })),
-        ...(scene.room.windows || []).map(wn => ({
-          key: `${titleCase(String(wn.style || 'standard'))} Window`,
-          size: `${wn.widthMm} x ${wn.heightMm} mm`,
-        })),
-        ...(scene.room.skylights || []).map(sk => ({
-          key: `${titleCase(String(sk.type))} Skylight`,
-          size: `${sk.widthMm} x ${sk.lengthMm} mm`,
-        })),
-      ];
-      // Group identical items so a schedule reads "3 x Window" rather than
-      // three near-identical lines.
-      const grouped = openings.reduce((acc: Record<string, { count: number; size: string }>, o) => {
-        const key = `${o.key}|${o.size}`;
-        if (!acc[key]) acc[key] = { count: 0, size: o.size };
-        acc[key].count += 1;
-        return acc;
-      }, {});
-      const entries = Object.entries(grouped).map(([k, info]) => [k.split('|')[0], info] as [string, { count: number; size: string }]);
-      if (entries.length === 0) {
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(8.5);
-        pdf.setTextColor(...MUTED);
-        pdf.text('None specified.', rightX, openY);
-      } else {
-        entries.slice(0, 14).forEach(([name, info]) => {
-          openY = specRow(
-            info.count > 1 ? `${name} (x${info.count})` : name,
-            info.size || '-',
-            rightX, openY, colW
-          );
-        });
-      }
-
-      drawFooter(2);
-
-      // ── Page 3: Elevations ────────────────────────────────────────────────
-      pdf.addPage();
-      drawHeader('Elevations');
-
-      const elTop = sectionTitle('Elevations', HEADER_H + 16);
-
-      // Every caption previously repeated the full front AND back height, on all
-      // four panels. That is the same two numbers printed eight times, which is
-      // what made the sheet look cluttered. Each elevation now states only the
-      // dimension it actually shows, and the shared heights are given once in a
-      // single note underneath.
-      const elW = (CONTENT_W - 12) / 2;
-      const elH = elW * 0.62;
-      const rowGap = 16;
-
-      const elevation = (
-        img: ShotResult, label: string, dim: string, x: number, yTop: number
-      ) => {
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(9);
-        pdf.setTextColor(...INK);
-        pdf.text(label, x, yTop);
-
-        // Light frame so each drawing reads as a discrete panel.
-        pdf.setDrawColor(...HAIRLINE);
-        pdf.setLineWidth(0.2);
-        pdf.rect(x, yTop + 3, elW, elH);
-        drawImageFit(img, x, yTop + 3, elW, elH);
-
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(7.5);
-        pdf.setTextColor(...MUTED);
-        pdf.text(dim, x, yTop + elH + 8);
-      };
-
-      elevation(frontImg, 'Front Elevation', `Width ${scene.room.widthMm} mm`, M, elTop);
-      elevation(backImg, 'Rear Elevation', `Width ${scene.room.widthMm} mm`, M + elW + 12, elTop);
-
-      const row2 = elTop + elH + rowGap + 6;
-      elevation(leftImg, 'Left Elevation', `Depth ${scene.room.depthMm} mm`, M, row2);
-      elevation(rightImg, 'Right Elevation', `Depth ${scene.room.depthMm} mm`, M + elW + 12, row2);
-
-      // Shared heights, stated once.
-      const noteY = row2 + elH + 18;
-      pdf.setDrawColor(...HAIRLINE);
-      pdf.setLineWidth(0.2);
-      pdf.line(M, noteY - 6, pageWidth - M, noteY - 6);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(8);
-      pdf.setTextColor(...MUTED);
-      const heightNote = scene.room.shape === 'Gable'
-        ? `Eaves height ${scene.room.heightMm - (scene.room.roofHeightMm || 200)} mm, ridge height ${scene.room.heightMm} mm. All dimensions in millimetres.`
-        : totalHeightBack !== totalHeightFront
-        ? `Overall height ${totalHeightFront} mm at the front, ${totalHeightBack} mm at the rear. All dimensions in millimetres.`
-        : `Overall height ${totalHeightFront} mm. All dimensions in millimetres.`;
-      pdf.text(heightNote, M, noteY);
-
-      drawFooter(3);
-
-      // ── Page 4: Planning Guidance ─────────────────────────────────────────
-      let pageNo = 3;
-      if (planningAdvice) {
-        pdf.addPage();
-        pageNo += 1;
-        drawHeader('Planning Guidance');
-
-        let pgY = sectionTitle('Planning Guidance', HEADER_H + 16);
-
-        /**
-         * TRAFFIC LIGHT verdict banner. The colour comes from the server's
-         * CODE-computed Class E check (never from AI), so the light can be
-         * trusted: green = PD anywhere on the plot, amber = PD only when
-         * sited 2m+ from boundaries, red = outside the PD envelope.
-         */
-        if (planning?.verdict) {
-          const LIGHT: Record<string, { rgb: [number, number, number]; label: string }> = {
-            green: { rgb: [22, 130, 70], label: 'LIKELY PERMITTED DEVELOPMENT' },
-            amber: { rgb: [200, 130, 20], label: 'PD WITH CONDITIONS - GET ADVICE' },
-            red:   { rgb: [190, 50, 45], label: 'PLANNING PERMISSION LIKELY REQUIRED' },
-          };
-          const L = LIGHT[planning.verdict] || LIGHT.amber;
-          pdf.setFillColor(...L.rgb);
-          pdf.rect(M, pgY - 4, CONTENT_W, 16, 'F');
-          // The three dots make the traffic light legible even in greyscale print.
-          const dotY = pgY + 4;
-          (['green', 'amber', 'red'] as const).forEach((k, i) => {
-            const active = k === planning.verdict;
-            pdf.setFillColor(255, 255, 255);
-            if (active) pdf.circle(M + 6 + i * 7, dotY, 2.4, 'F');
-            else { pdf.setDrawColor(255, 255, 255); pdf.setLineWidth(0.4); pdf.circle(M + 6 + i * 7, dotY, 1.6, 'S'); }
-          });
-          pdf.setTextColor(255, 255, 255);
-          pdf.setFont('helvetica', 'bold');
-          pdf.setFontSize(11);
-          pdf.text(L.label, M + 28, pgY + 3);
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(8);
-          pdf.text(`Overall ${planning.totalHeightMm} mm · eaves ${planning.eavesHeightMm} mm`, M + 28, pgY + 8);
-          pgY += 18;
-
-          pdf.setFont('helvetica', 'bold');
-          pdf.setFontSize(9.5);
-          pdf.setTextColor(...INK);
-          const head = pdf.splitTextToSize(planning.headline || '', CONTENT_W);
-          pdf.text(head, M, pgY + 2);
-          pgY += head.length * 4.6 + 6;
-
-          /**
-           * THE CHECKLIST: every Class E criterion as a drawn tick / cross /
-           * query (glyphs are drawn with lines because the built-in PDF fonts
-           * have no checkmark character). Statuses come from the server's
-           * code-computed checks, never from AI.
-           */
-          if (Array.isArray(planning.checks) && planning.checks.length) {
-            const GREEN: [number, number, number] = [22, 130, 70];
-            const RED: [number, number, number] = [190, 50, 45];
-            const AMBERC: [number, number, number] = [200, 130, 20];
-            const drawStatusIcon = (status: string, cx: number, cy: number) => {
-              const r = 2.4;
-              const col = status === 'pass' ? GREEN : status === 'fail' ? RED : AMBERC;
-              pdf.setFillColor(...col);
-              pdf.circle(cx, cy, r, 'F');
-              pdf.setDrawColor(255, 255, 255);
-              pdf.setLineWidth(0.55);
-              if (status === 'pass') {
-                pdf.line(cx - 1.1, cy + 0.1, cx - 0.3, cy + 1.0);
-                pdf.line(cx - 0.3, cy + 1.0, cx + 1.2, cy - 0.9);
-              } else if (status === 'fail') {
-                pdf.line(cx - 0.9, cy - 0.9, cx + 0.9, cy + 0.9);
-                pdf.line(cx - 0.9, cy + 0.9, cx + 0.9, cy - 0.9);
-              } else {
-                pdf.setTextColor(255, 255, 255);
-                pdf.setFont('helvetica', 'bold');
-                pdf.setFontSize(8);
-                pdf.text('?', cx, cy + 1.4, { align: 'center' });
-              }
-            };
-
-            pdf.setFont('helvetica', 'bold');
-            pdf.setFontSize(8);
-            pdf.setTextColor(...MUTED);
-            pdf.text('PERMITTED DEVELOPMENT CHECKLIST', M, pgY + 2);
-            pgY += 7;
-            for (const chk of planning.checks) {
-              drawStatusIcon(chk.status, M + 3, pgY);
-              pdf.setFont('helvetica', 'bold');
-              pdf.setFontSize(8.5);
-              pdf.setTextColor(...INK);
-              pdf.text(String(chk.label), M + 9, pgY + 1);
-              pdf.setFont('helvetica', 'normal');
-              pdf.setFontSize(7.5);
-              pdf.setTextColor(...MUTED);
-              pdf.text(String(chk.detail || ''), M + 9, pgY + 5);
-              pgY += 10;
-            }
-            pgY += 2;
-
-            // Indicative likelihood score with a bar the length of the page.
-            if (typeof planning.score === 'number') {
-              const barW = CONTENT_W - 58;
-              const col = planning.verdict === 'green' ? GREEN : planning.verdict === 'amber' ? AMBERC : RED;
-              pdf.setFont('helvetica', 'bold');
-              pdf.setFontSize(9);
-              pdf.setTextColor(...INK);
-              pdf.text(`PD likelihood: ${planning.score}%`, M, pgY + 3);
-              pdf.setFillColor(238, 238, 235);
-              pdf.roundedRect(M + 42, pgY, barW, 4, 2, 2, 'F');
-              pdf.setFillColor(...col);
-              pdf.roundedRect(M + 42, pgY, Math.max(6, barW * planning.score / 100), 4, 2, 2, 'F');
-              pgY += 8;
-              pdf.setFont('helvetica', 'normal');
-              pdf.setFontSize(7);
-              pdf.setTextColor(...MUTED);
-              pdf.text('Indicative only, based on the measurable design. Items marked "?" depend on siting, land status and use - assumed typical.', M, pgY + 1);
-              pgY += 7;
-            }
-          }
-        }
-
-        // Disclaimer, boxed so it cannot be mistaken for the advice itself.
-        // Previously this claimed the statement was "accurate", which is not a
-        // claim to make about automatically generated planning guidance.
-        pdf.setFillColor(248, 249, 250);
-        pdf.setDrawColor(...HAIRLINE);
-        pdf.setLineWidth(0.2);
-        // Confident but honest: the old wording ("should not be relied upon")
-        // read as "ignore this page". This assessment IS built on the real
-        // Class E rules and the design's exact measurements - what it cannot
-        // see is the site, so NAPC is framed as the confirmation step, not a
-        // health warning. No invented accuracy percentages: on planning
-        // guidance a number we cannot prove is a liability, not reassurance.
-        const discl = pdf.splitTextToSize(
-          'This assessment is based on the current national Permitted Development rules (Class E) and the exact measurements of this design. Final confirmation depends on your specific site and local authority - please contact NAPC (www.napc.uk) before proceeding and they will confirm it formally.',
-          CONTENT_W - 8
-        );
-        const disclH = discl.length * 4 + 7;
-        pdf.rect(M, pgY - 4, CONTENT_W, disclH, 'FD');
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(7.5);
-        pdf.setTextColor(...MUTED);
-        pdf.text(discl, M + 4, pgY + 1);
-        pgY += disclH + 6;
-
-        pdf.setFontSize(9);
-        pdf.setTextColor(...INK);
-        // Structured verdict: banner carries the headline, so the body is the
-        // reasons/caveats/NAPC only. Legacy string keeps working as fallback.
-        // The checklist above IS the "why", so the body carries only what the
-        // ticks cannot: caveats, Building Regs and the NAPC route.
-        const bodyText = planning?.verdict
-          ? [
-              'WORTH KNOWING:',
-              ...planning.caveats.map((c: string, i: number) => `${i + 1}. ${c}`),
-              '',
-              'BUILDING REGULATIONS: ' + planning.buildingRegs,
-              '',
-              planning.napcNote,
-            ].join('\n')
-          : planningAdvice;
-        const splitText = pdf.splitTextToSize(bodyText, CONTENT_W);
-        for (let i = 0; i < splitText.length; i++) {
-          if (pgY > FOOTER_Y - 12) {
-            drawFooter(pageNo);
-            pdf.addPage();
-            pageNo += 1;
-            drawHeader('Planning Guidance');
-            pgY = HEADER_H + 16;
-            pdf.setFont('helvetica', 'normal');
-            pdf.setFontSize(9);
-            pdf.setTextColor(...INK);
-          }
-          pdf.text(splitText[i], M, pgY);
-          pgY += 4.6;
-        }
-        drawFooter(pageNo);
-      }
-
-      // Save PDF
-      const safeName = (formData.projectName || 'modulr-design')
-        .replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
-      pdf.save(`${safeName || 'modulr-design'}.pdf`);
-      
-      // Reset Camera
-      window.dispatchEvent(new CustomEvent('camera-set-view', { detail: { view: 'perspective', snap: false } }));
-      
-      setIsSuccess(true);
-    } catch (err: any) {
-      console.error(err);
-      alert('Error generating PDF: ' + err.message);
-    } finally {
-      useStore.getState().setIsExporting(false);
-      useStore.getState().setViewMode("3d");
-      setLoading(false);
-    }
-    }, 100);
+      const read = await Promise.all(list.map(readVisual));
+      // Each new image starts on a page of its own; group them by choosing
+      // the same page number.
+      setVisuals(v => {
+        let next = Math.max(0, ...v.map(x => x.page)) + 1;
+        return [...v, ...read.map(r => ({ ...r, page: next++ }))];
+      });
+    } catch (e: any) { setError(e?.message || 'Could not read that image.'); }
   };
 
-  
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center">
-        <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 shadow-2xl flex flex-col items-center text-center">
-          <div className="w-16 h-16 rounded-full border-4 border-[#3b4d4a]/20 border-t-[#3b4d4a] animate-spin mb-6"></div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Generating PDF...</h2>
-          <p className="text-gray-500 text-sm">Please wait while we render your beautiful garden room. This may take a moment.</p>
-        </div>
-      </div>
-    );
-  }
+  const move = (i: number, d: -1 | 1) => setVisuals(v => {
+    const j = i + d; if (j < 0 || j >= v.length) return v;
+    const n = [...v]; [n[i], n[j]] = [n[j], n[i]];
+    setCover(c => (c === i ? j : c === j ? i : c));
+    return n;
+  });
+  const remove = (i: number) => {
+    setVisuals(v => v.filter((_, k) => k !== i));
+    setCover(c => (c === i ? null : c !== null && c > i ? c - 1 : c));
+  };
 
-  if (isSuccess) {
-    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl p-8 flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
-            <Download size={32} />
-          </div>
-          <h2 className="text-2xl font-bold text-[#3b4d4a] mb-2">Design Downloaded!</h2>
-          <p className="text-gray-600 mb-8">Your 3D design and guidance PDF has been generated successfully.</p>
-          <div className="flex flex-col gap-3 w-full">
-            {/*
-              Saves the design to the host app so it can be attached to a
-              Project. The configurator runs in an iframe with no storage of its
-              own, so it hands the scene to the parent window.
+  /** Everything the PDF depends on - a download reuses the preview if nothing changed. */
+  const inputsKey = () => JSON.stringify({ form, brand, cover, v: visuals.map(x => [x.page, x.dataUrl.length]), plan: ownPlan?.dataUrl.length ?? 0, room: useStore.getState().scene.room, objects: useStore.getState().scene.objects.map(o => [o.id, o.x, o.z, o.rot]) });
 
-              This button previously only called alert('Design saved
-              successfully!') and wrote nothing anywhere, so a design the user
-              believed was saved was silently lost.
-            */}
-            <button
-              onClick={() => {
-                try {
-                  {
-                    // The project record keeps a company-entered price over the
-                    // calculator's; "no price on the PDF" still saves the
-                    // estimate internally - hiding it from a client document is
-                    // not the same as not wanting it in the CRM.
-                    const est = useStore.getState().calculatePrice();
-                    const typed = parseFloat(formData.actualPrice.replace(/[£,\s]/g, ''));
-                    const price = formData.priceMode === 'actual' && isFinite(typed) && typed > 0 ? Math.round(typed) : est;
-                    window.parent.postMessage({
-                      type: 'SAVE_3D_DESIGN',
-                      scene: useStore.getState().scene,
-                      price,
-                      savedAt: Date.now(),
-                    }, window.location.origin);
-                  }
-                  setSaveState('saved');
-                } catch (e) {
-                  console.error('Could not hand the design to the host app', e);
-                  setSaveState('error');
-                }
-              }}
-              disabled={saveState === 'saved'}
-              className="w-full py-3 bg-[#3b4d4a] text-white rounded-lg font-semibold shadow-sm hover:bg-[#2d3a38] disabled:opacity-60 transition-colors"
-            >
-              {saveState === 'saved' ? 'Saved to your projects' : saveState === 'error' ? 'Could not save - try again' : 'Save Design'}
-            </button>
-            <button 
-              onClick={onClose}
-              className="w-full py-3 bg-gray-100 text-[#3b4d4a] rounded-lg font-semibold hover:bg-gray-200 transition-colors"
-            >
-              Make Changes
-            </button>
-            <button 
-              onClick={() => {
-                window.location.reload();
-              }}
-              className="w-full py-3 text-red-600 rounded-lg font-semibold hover:bg-red-50 transition-colors"
-            >
-              Start Over
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const priceValue = () => {
+    const parsed = parseFloat(form.actualPrice.replace(/[£,\s]/g, ''));
+    return form.priceMode === 'none' ? null : form.priceMode === 'actual' ? (isFinite(parsed) && parsed > 0 ? parsed : null) : estimate;
+  };
+  const fileName = () => `${(form.projectName || 'design-proposal').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'design-proposal'}.pdf`;
+
+  const build = async (): Promise<{ blob: Blob; key: string }> => {
+    const key = inputsKey();
+    const S = form.sections;
+    const needDrawings = S.elevations || S.perspectives || (S.plan && !ownPlan) || (S.cover && visuals.length === 0);
+    let drawings: CaptureResult = { elevations: [], perspectives: [] };
+    if (needDrawings) drawings = await captureProposalDrawings(setBusy);
+
+    // Planning guidance, from the server's Class E check.
+    let planning: any = null, planningText = '';
+    if (S.planning) {
+      setBusy('Checking the planning position');
+      try {
+        const room = useStore.getState().scene.room;
+        const isGable = room.shape === 'Gable';
+        const extra = isGable ? 0 : (room.baseHeightMm || 100) + (room.roofHeightMm || 200);
+        const front = room.heightMm + extra;
+        const back = isGable ? front : (room.backHeightMm ?? room.heightMm) + extra;
+        const res = await fetch('/api/planning-advice', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomDetails: {
+            ...room,
+            overallTotalFrontHeightMm: front, overallTotalBackHeightMm: back, overallTotalHeightMm: Math.max(front, back),
+            eavesHeightMm: isGable ? room.heightMm - (room.roofHeightMm || 200) : Math.max(front, back),
+            heightMm: front, backHeightMm: back,
+            contents: Array.from(new Set((useStore.getState().scene.objects || []).map(o => o.type))),
+          } }),
+        });
+        if (res.ok) { const data = await res.json(); planningText = data.advice || ''; if (data.verdict) planning = data; }
+      } catch (e) { console.warn('Planning guidance unavailable', e); }
+    }
+
+    const value = priceValue();
+    const { room, objects } = useStore.getState().scene;
+    const pdf = await buildProposalPdf({
+      brand,
+      project: { name: form.projectName, client: form.client, address: form.address, notes: form.notes, date: new Date(), reference: form.reference },
+      price: { mode: form.priceMode, value },
+      room, objects, drawings, visuals, coverIndex: cover,
+      sections: S, planning, planningText, planImage: ownPlan, paper: form.paper,
+    }, setBusy);
+    return { blob: pdf.output('blob'), key };
+  };
+
+  const run = async (then: 'preview' | 'download' | 'save') => {
+    setError(null);
+    setSavedTo(null);
+    try {
+      let result = preview && preview.key === inputsKey() ? { blob: preview.blob, key: preview.key } : null;
+      if (!result) {
+        setBusy('Starting');
+        result = await build();
+        const url = URL.createObjectURL(result.blob);
+        setPreview({ url, blob: result.blob, key: result.key });
+      }
+      if (then === 'download') {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(result.blob);
+        a.download = fileName();
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      }
+      if (then === 'save') {
+        // Up to the app, which asks which project and files it there - with
+        // the design itself, so the job can be reopened in 3D.
+        window.parent.postMessage({
+          type: 'SAVE_PDF_TO_PROJECT',
+          pdf: result.blob,
+          fileName: fileName(),
+          project: { name: form.projectName, client: form.client, address: form.address, reference: form.reference },
+          price: priceValue(),
+          scene: useStore.getState().scene,
+        }, window.location.origin);
+      }
+    } catch (e: any) {
+      console.error(e);
+      setError(e?.message || 'The PDF could not be built.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const stale = !!preview && preview.key !== inputsKey();
+  const contactLines = brand.contactInfo.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-[#3b4d4a]">Export Design PDF</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full transition-colors text-gray-500">
-            <X size={20} />
-          </button>
-        </div>
-        
-        <div className="p-5 overflow-y-auto flex-1 space-y-4">
-          <p className="text-sm text-gray-600 mb-4">
-            Fill out the details below to generate a comprehensive design and estimate document.
-          </p>
-          
-          <div className="space-y-1">
-             <label className="text-xs font-semibold text-gray-600">Project Name</label>
-             <input 
-               type="text" 
-               value={formData.projectName}
-               onChange={(e) => setFormData({...formData, projectName: e.target.value})}
-               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3b4d4a] focus:border-transparent" 
-               placeholder="e.g., Garden Studio 2026"
-             />
-          </div>
-          
-          <div className="space-y-1">
-             <label className="text-xs font-semibold text-gray-600">Client Name</label>
-             <input 
-               type="text" 
-               value={formData.name}
-               onChange={(e) => setFormData({...formData, name: e.target.value})}
-               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3b4d4a] focus:border-transparent" 
-               placeholder="John Doe"
-             />
-          </div>
-          
-          <div className="space-y-1">
-             <label className="text-xs font-semibold text-gray-600">Site Address</label>
-             <textarea 
-               value={formData.address}
-               onChange={(e) => setFormData({...formData, address: e.target.value})}
-               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3b4d4a] focus:border-transparent resize-none h-20" 
-               placeholder="123 Example Street, City, Postcode"
-             ></textarea>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+      <div className="bg-[#fafaf9] rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex overflow-hidden">
+        {/* ---- the form ---- */}
+        <div className="w-[400px] shrink-0 flex flex-col border-r border-black/5 bg-white">
+          <div className="px-6 pt-6 pb-4 flex items-start justify-between border-b border-black/5">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Export</div>
+              <h2 className="text-lg font-bold text-[#1c1f21] mt-0.5">Design proposal</h2>
+              <p className="text-[11px] text-gray-500 mt-1">A drawing set in your branding: elevations and plan to scale, your renders, specification.</p>
+            </div>
+            <button onClick={onClose} disabled={!!busy} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-40" aria-label="Close"><X size={18} /></button>
           </div>
 
-          <div className="space-y-1">
-             <label className="text-xs font-semibold text-gray-600">Pricing on the PDF</label>
-             <div className="grid grid-cols-3 gap-2">
-               {([
-                 { id: 'estimate', label: 'Estimate' },
-                 { id: 'actual', label: 'My price' },
-                 { id: 'none', label: 'No price' },
-               ] as const).map(opt => (
-                 <button
-                   key={opt.id}
-                   type="button"
-                   onClick={() => setFormData({ ...formData, priceMode: opt.id })}
-                   className={`py-2 rounded-lg text-xs font-semibold border transition-colors ${formData.priceMode === opt.id ? 'bg-[#3b4d4a] text-white border-[#3b4d4a]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#3b4d4a]/40'}`}
-                 >
-                   {opt.label}
-                 </button>
-               ))}
-             </div>
-             {formData.priceMode === 'estimate' && (
-               <p className="text-[11px] text-gray-400">Shows the configurator&rsquo;s calculated estimate.</p>
-             )}
-             {formData.priceMode === 'actual' && (
-               <input
-                 value={formData.actualPrice}
-                 onChange={(e) => setFormData({ ...formData, actualPrice: e.target.value })}
-                 inputMode="decimal"
-                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3b4d4a] focus:border-transparent"
-                 placeholder="Your confirmed price, e.g. 24500"
-               />
-             )}
-             {formData.priceMode === 'none' && (
-               <p className="text-[11px] text-gray-400">The PDF will not mention price at all.</p>
-             )}
+          <div className="flex-1 overflow-y-auto px-6">
+            <Section title="Project">
+              <div className="space-y-3">
+                <div><label className={labelCls}>Project name</label><input className={inputCls} value={form.projectName} onChange={e => set('projectName', e.target.value)} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className={labelCls}>Client</label><input className={inputCls} value={form.client} placeholder="Mr & Mrs Smith" onChange={e => set('client', e.target.value)} /></div>
+                  <div><label className={labelCls}>Reference</label><input className={inputCls} value={form.reference} placeholder="Q-2041" onChange={e => set('reference', e.target.value)} /></div>
+                </div>
+                <div><label className={labelCls}>Site address</label><input className={inputCls} value={form.address} onChange={e => set('address', e.target.value)} /></div>
+                <div><label className={labelCls}>Notes</label><textarea rows={3} className={inputCls} value={form.notes} placeholder="Shown on the specification sheet" onChange={e => set('notes', e.target.value)} /></div>
+              </div>
+            </Section>
+
+            <Section title="Price">
+              <div className="grid grid-cols-3 gap-2">
+                {([['estimate', 'Estimate'], ['actual', 'Your price'], ['none', 'No price']] as const).map(([k, l]) => (
+                  <button key={k} onClick={() => set('priceMode', k)} className={`py-2 rounded-lg text-[11px] font-semibold transition-colors ${form.priceMode === k ? 'bg-[#3b4d4a] text-white' : 'bg-white border border-black/10 text-gray-600 hover:bg-gray-50'}`}>{l}</button>
+                ))}
+              </div>
+              {form.priceMode === 'estimate' && <p className="text-[11px] text-gray-500 mt-2">£{estimate.toLocaleString('en-GB')}, from the configurator's pricing.</p>}
+              {form.priceMode === 'actual' && <input className={inputCls + ' mt-2'} placeholder="£" value={form.actualPrice} onChange={e => set('actualPrice', e.target.value)} />}
+            </Section>
+
+            <Section title="Visuals">
+              <p className="text-[11px] text-gray-500 mb-3">Attach your renders and photos, and choose the page each goes on - pick the same page for up to four to share it. Star one for the cover.</p>
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); }}
+                onClick={() => fileRef.current?.click()}
+                className={`cursor-pointer rounded-xl border-2 border-dashed px-4 py-5 text-center transition-colors ${dragOver ? 'border-[#3b4d4a] bg-[#3b4d4a]/5' : 'border-black/10 hover:border-[#3b4d4a]/40 bg-white'}`}
+              >
+                <ImagePlus size={20} className="mx-auto text-[#3b4d4a]/70" />
+                <div className="text-[11px] font-semibold text-[#3b4d4a] mt-1.5">Drop images here, or click to choose</div>
+                <div className="text-[10px] text-gray-400 mt-0.5">JPG or PNG</div>
+                <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }} />
+              </div>
+              {visuals.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {visuals.map((v, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-white border border-black/5 rounded-xl p-2">
+                      <img src={v.dataUrl} alt="" className="w-14 h-10 object-cover rounded-md shrink-0" />
+                      <select
+                        value={v.page}
+                        onChange={e => { const p = parseInt(e.target.value) || 0; setVisuals(list => list.map((x, k) => (k === i ? { ...x, page: p } : x))); }}
+                        className="flex-1 min-w-0 text-[11px] font-semibold text-[#1c1f21] bg-transparent border border-black/10 rounded-md px-1.5 py-1 focus:outline-none"
+                      >
+                        {Array.from({ length: Math.max(visuals.length, Math.max(0, ...visuals.map(x => x.page))) + 1 }, (_, k) => k + 1).map(p => (
+                          <option key={p} value={p}>Visuals page {p}</option>
+                        ))}
+                        <option value={0}>Leave out</option>
+                      </select>
+                      <button title="Use as the cover" onClick={() => setCover(c => (c === i ? null : i))} className={`p-1 rounded ${cover === i ? 'text-amber-500' : 'text-gray-300 hover:text-gray-500'}`}><Star size={14} fill={cover === i ? 'currentColor' : 'none'} /></button>
+                      <button title="Move up" onClick={() => move(i, -1)} className="p-1 rounded text-gray-300 hover:text-gray-600"><ArrowUp size={13} /></button>
+                      <button title="Move down" onClick={() => move(i, 1)} className="p-1 rounded text-gray-300 hover:text-gray-600"><ArrowDown size={13} /></button>
+                      <button title="Remove" onClick={() => remove(i)} className="p-1 rounded text-gray-300 hover:text-red-500"><Trash2 size={13} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Section>
+
+            <Section title="Sheets">
+              <label className={labelCls}>Paper</label>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {([['A3', 'A3 landscape', '420 x 297 mm, the drawing size'], ['A4', 'A4 landscape', '297 x 210 mm, for the office printer']] as const).map(([k, l, hint]) => (
+                  <button key={k} onClick={() => set('paper', k)} className={`px-3 py-2 rounded-lg text-left transition-colors ${form.paper === k ? 'bg-[#3b4d4a] text-white' : 'bg-white border border-black/10 text-gray-600 hover:bg-gray-50'}`}>
+                    <div className="text-[11px] font-semibold">{l}</div>
+                    <div className={`text-[10px] ${form.paper === k ? 'text-white/70' : 'text-gray-400'}`}>{hint}</div>
+                  </button>
+                ))}
+              </div>
+              <div className="space-y-1.5">
+                {SECTION_LABELS.map(([k, label, hint]) => (
+                  <label key={k} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white border border-black/5 cursor-pointer hover:border-black/15">
+                    <input type="checkbox" className="accent-[#3b4d4a]" checked={form.sections[k]} onChange={e => set('sections', { ...form.sections, [k]: e.target.checked })} />
+                    <span className="text-xs font-semibold text-[#1c1f21] w-28">{label}</span>
+                    <span className="text-[10px] text-gray-400 truncate">{hint}</span>
+                  </label>
+                ))}
+              </div>
+              {/* The company's own plan, in place of the drawn one. */}
+              <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-black/5">
+                {ownPlan ? <img src={ownPlan.dataUrl} alt="" className="w-12 h-9 object-contain bg-gray-50 rounded shrink-0" /> : <FileText size={16} className="text-gray-300 shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] font-semibold text-[#1c1f21]">{ownPlan ? 'Using your own floor plan' : 'Floor plan: drawn from the design'}</div>
+                  <div className="text-[10px] text-gray-400">{ownPlan ? 'Replaces the drawn plan' : 'Or use your own plan image instead'}</div>
+                </div>
+                {ownPlan
+                  ? <button onClick={() => setOwnPlan(null)} className="text-[11px] text-gray-400 hover:text-red-500">Remove</button>
+                  : <button onClick={() => planRef.current?.click()} className="text-[11px] font-semibold text-[#3b4d4a] hover:underline">Upload</button>}
+                <input ref={planRef} type="file" accept="image/*" className="hidden" onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { setOwnPlan(await readVisual(f)); } catch (err: any) { setError(err?.message || 'Could not read that plan.'); } }} />
+              </div>
+            </Section>
+
+            <Section title="Branding">
+              {embedded ? (
+                <>
+                  <p className="text-[11px] text-gray-500 mb-3">From your account settings - used on every proposal.</p>
+                  <div className="rounded-xl bg-white border border-black/10 overflow-hidden">
+                    <div className="flex items-center gap-3 p-3">
+                      <div className="w-24 h-14 rounded-lg bg-gray-50 border border-black/5 flex items-center justify-center overflow-hidden shrink-0">
+                        {brand.logo ? <img src={brand.logo} alt="Logo" className="max-w-full max-h-full object-contain p-1.5" /> : <span className="text-[10px] text-gray-400">No logo</span>}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-[#1c1f21] truncate">{brand.companyName || 'No company name'}</div>
+                        {contactLines.slice(0, 2).map((l, i) => <div key={i} className="text-[10px] text-gray-400 truncate">{l}</div>)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 px-3 py-2 border-t border-black/5 bg-gray-50/60">
+                      <span className="flex items-center gap-1.5 text-[10px] text-gray-500"><span className="w-3.5 h-3.5 rounded-full border border-black/10" style={{ background: brand.primary }} /> Brand</span>
+                      <span className="flex items-center gap-1.5 text-[10px] text-gray-500"><span className="w-3.5 h-3.5 rounded-full border border-black/10" style={{ background: brand.secondary }} /> Accent</span>
+                      <span className="text-[10px] text-gray-500 truncate" style={{ fontFamily: fontById(brand.font).css }}>{fontById(brand.font).label}</span>
+                    </div>
+                  </div>
+                  <a href="/account#branding" target="_blank" rel="noopener" className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#3b4d4a] hover:underline">
+                    <ExternalLink size={12} /> Change in Account settings
+                  </a>
+                </>
+              ) : (<>
+              <p className="text-[11px] text-gray-500 mb-3">Used on every proposal from this browser.</p>
+              <div className="flex items-center gap-3">
+                <div className="w-28 h-16 rounded-lg border border-black/10 bg-white flex items-center justify-center overflow-hidden">
+                  {brand.logo ? <img src={brand.logo} alt="Logo" className="max-w-full max-h-full object-contain p-1.5" /> : <span className="text-[10px] text-gray-400">No logo</span>}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <button onClick={() => logoRef.current?.click()} className="flex items-center gap-1.5 text-[11px] font-semibold text-[#3b4d4a] hover:underline"><Upload size={12} /> {brand.logo ? 'Replace logo' : 'Upload logo'}</button>
+                  {brand.logo && <button onClick={() => setBrandField('logo', null)} className="text-[11px] text-gray-400 hover:text-red-500 text-left">Remove</button>}
+                  <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { setBrandField('logo', await readLogo(f)); } catch (err: any) { setError(err?.message || 'Could not read the logo.'); } }} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                {([['primary', 'Brand colour'], ['secondary', 'Accent colour']] as const).map(([k, l]) => (
+                  <div key={k}>
+                    <label className={labelCls}>{l}</label>
+                    <div className="flex items-center gap-2 bg-white border border-black/10 rounded-lg px-2 py-1.5">
+                      <input type="color" value={brand[k]} onChange={e => setBrandField(k, e.target.value)} className="w-7 h-7 rounded cursor-pointer border-0 p-0 bg-transparent" />
+                      <input className="flex-1 min-w-0 text-[11px] font-mono focus:outline-none" value={brand[k]} onChange={e => { const v = e.target.value; if (/^#[0-9a-f]{6}$/i.test(v)) setBrandField(k, v); }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3"><label className={labelCls}>Company name</label><input className={inputCls} value={brand.companyName} onChange={e => setBrandField('companyName', e.target.value)} /></div>
+              <div className="mt-3">
+                <label className={labelCls}>Font</label>
+                <select className={inputCls} value={fontById(brand.font).id} onChange={e => setBrandField('font', e.target.value)}>
+                  {PDF_FONTS.map(f => <option key={f.id} value={f.id}>{f.label} - {f.note}</option>)}
+                </select>
+                <div className="mt-2 px-3 py-2.5 rounded-lg bg-white border border-black/5" style={{ fontFamily: fontById(brand.font).css }}>
+                  <div className="text-[15px] font-bold text-[#1c1f21] leading-tight">{form.projectName || 'Garden Room'}</div>
+                  <div className="text-[10px] tracking-[0.2em] uppercase text-gray-500 mt-1">Front elevation · 1:50 · 4,300 mm</div>
+                </div>
+              </div>
+              <div className="mt-3"><label className={labelCls}>Contact details</label><textarea rows={4} className={inputCls} value={brand.contactInfo} placeholder={'Unit 4, Mill Lane, Kent\n01622 000000\nhello@company.co.uk\nwww.company.co.uk'} onChange={e => setBrandField('contactInfo', e.target.value)} /></div>
+              </>)}
+            </Section>
           </div>
 
-          <div className="space-y-1">
-             <label className="text-xs font-semibold text-gray-600">Additional Notes</label>
-             <textarea
-               value={formData.notes}
-               onChange={(e) => setFormData({...formData, notes: e.target.value})}
-               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3b4d4a] focus:border-transparent resize-none h-20" 
-               placeholder="Any specific design requirements..."
-             ></textarea>
+          <div className="px-6 py-4 border-t border-black/5 bg-white space-y-2">
+            {savedTo && <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700"><Check size={13} /> Saved to "{savedTo}" in Projects</div>}
+            <div className="flex gap-2">
+              <button disabled={!!busy} onClick={() => run('preview')} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[11px] font-bold uppercase tracking-wider border border-[#3b4d4a]/30 text-[#3b4d4a] hover:bg-gray-50 disabled:opacity-50"><Eye size={14} /> {preview ? 'Update' : 'Preview'}</button>
+              {embedded && <button disabled={!!busy} onClick={() => run('save')} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[11px] font-bold uppercase tracking-wider border border-[#3b4d4a]/30 text-[#3b4d4a] hover:bg-gray-50 disabled:opacity-50" title="File this proposal in one of your projects"><FolderInput size={14} /> Save to project</button>}
+              <button disabled={!!busy} onClick={() => run('download')} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-[#3b4d4a] text-white hover:opacity-90 disabled:opacity-50"><Download size={14} /> Download</button>
+            </div>
           </div>
         </div>
-        
-        <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-          <button 
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            Cancel
-          </button>
-          <button 
-            onClick={handleExport}
-            disabled={loading}
-            className="px-6 py-2 bg-[#3b4d4a] text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-[#2d3a38] transition-colors flex items-center gap-2 disabled:opacity-70"
-          >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            {loading ? 'Generating...' : 'Download PDF'}
-          </button>
+
+        {/* ---- the preview ---- */}
+        <div className="flex-1 relative flex flex-col bg-[#e9e9e6]">
+          {preview ? (
+            <>
+              {stale && !busy && <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-white/95 border border-black/10 shadow rounded-full px-4 py-1.5 text-[11px] text-gray-600">Changed since this preview - press Update preview</div>}
+              <iframe title="Proposal preview" src={preview.url + '#view=FitH'} className="flex-1 w-full border-0" />
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-10">
+              <FileText size={36} className="text-[#3b4d4a]/40" />
+              <div className="text-sm font-semibold text-[#3b4d4a] mt-3">Preview your proposal</div>
+              <p className="text-xs text-gray-500 mt-1.5 max-w-sm">Fill in the project, attach your visuals and press Preview. The 3D view is used to draw the elevations, so it will move while the drawings are taken.</p>
+            </div>
+          )}
+          {error && <div className="absolute bottom-4 left-4 right-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-3">{error}</div>}
+          {busy && (
+            <div className="absolute inset-0 bg-[#fafaf9]/85 backdrop-blur-sm flex flex-col items-center justify-center">
+              <Loader2 size={28} className="animate-spin text-[#3b4d4a]" />
+              <div className="text-sm font-semibold text-[#3b4d4a] mt-3">{busy}</div>
+              <div className="text-[11px] text-gray-500 mt-1">Building your proposal</div>
+            </div>
+          )}
         </div>
       </div>
     </div>
