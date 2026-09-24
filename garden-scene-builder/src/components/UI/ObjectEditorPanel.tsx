@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Trash2, RotateCw, Copy, ChevronDown, ChevronUp } from 'lucide-react';
 import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS, hasTimber, VENEERS, isVeneerFinish, metalUsesColour, isTintableTimber, COMPOSITE_COLOURS, TIMBER_MATERIAL, isWallLight, MOUNT_HEIGHT_MM, DECOR_TYPES, SURFACE_DECOR } from '../../modelRegistry';
 import { DimensionSlider } from '../DimensionSlider';
+import { ACOUSTIC_NATIVE, ACOUSTIC_WIDTH_RANGE, ACOUSTIC_HEIGHT_RANGE, SLAT_PITCH_MM, slatCount, widthForSlats, snapAcousticWidth } from '../../utils/acousticPanel';
 import { DECK_MATERIALS } from '../3d/Decks';
 import { useSavedColours, addSavedColour, removeSavedColour } from '../../utils/savedColours';
 import { resumeWalking } from '../../utils/walk';
@@ -509,7 +510,20 @@ export function ObjectEditorPanel() {
 
         {/* Width, for kitchen units. Stretches the carcass along its length
             only, so depth and worktop height stay correct. */}
-        {!finishesOnly && isWidthAdjustable(obj.type) && (() => {
+        {/* The acoustic panel: its width is a whole number of slats, so the
+            slider steps one slat at a time; the height is free. */}
+        {!finishesOnly && obj.type === 'acoustic_panel' && (() => {
+          const n = slatCount(obj.widthMm ?? ACOUSTIC_NATIVE.widthMm);
+          const [hMin, hMax] = ACOUSTIC_HEIGHT_RANGE;
+          return (
+            <>
+              <DimensionSlider label={`Width · ${n} slats`} min={ACOUSTIC_WIDTH_RANGE[0]} max={ACOUSTIC_WIDTH_RANGE[1]} step={SLAT_PITCH_MM} value={widthForSlats(n)} onChange={(v) => updateObject(obj.id, { widthMm: snapAcousticWidth(v) })} />
+              <DimensionSlider label="Height" min={hMin} max={hMax} step={10} value={obj.heightMm ?? ACOUSTIC_NATIVE.heightMm} onChange={(v) => updateObject(obj.id, { heightMm: Math.max(hMin, Math.min(hMax, Math.round(v))) })} />
+            </>
+          );
+        })()}
+
+        {!finishesOnly && isWidthAdjustable(obj.type) && obj.type !== 'acoustic_panel' && (() => {
           const native = NATIVE_WIDTH_MM[obj.type]!;
           const [min, max] = WIDTH_RANGE_MM[obj.type] ?? [native * 0.7, native * 1.5];
           const value = Math.round(obj.widthMm ?? native);
@@ -605,6 +619,9 @@ export function ObjectEditorPanel() {
           );
         })()}
 
+        {/* Not on the acoustic panel: it is sized by its own width and
+            height, and scaling it would fatten the slats. */}
+        {obj.type !== 'acoustic_panel' && (
         <div className="flex items-center gap-3">
           <span className="text-xs font-semibold text-gray-700 shrink-0">Scale</span>
           <input
@@ -615,6 +632,7 @@ export function ObjectEditorPanel() {
           />
           <span className="text-xs font-mono text-gray-500 shrink-0">{obj.scale.toFixed(1)}x</span>
         </div>
+        )}
 
         {(obj.type === 'interior_wall' || obj.type === 'interior_door') && (
           <>

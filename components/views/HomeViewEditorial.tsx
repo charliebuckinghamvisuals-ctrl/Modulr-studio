@@ -72,10 +72,10 @@ const TOOLS: { label: string; line: string; stage?: AppStage; anchor?: string; b
 const WEBSITE_POINTS = [
     { title: 'Only your range', body: 'Your set designs and the options you actually offer, in your finishes. Nothing you do not sell.' },
     { title: 'Your prices, live', body: 'Priced from your own price book as they design, so the number they see is the number you quote.' },
-    { title: 'Straight into your pipeline', body: 'Every design arrives in Jobs & Quotes as a lead, with the design attached, ready to quote.' },
+    { title: 'Straight to you', body: 'Every design arrives as a lead with the specification and the price - by email, and in Jobs & Quotes if you are on a Modulr plan.' },
 ];
 
-const WEBSITE_ENQUIRY = `mailto:info@napc.uk?subject=${encodeURIComponent('Website Configurator enquiry')}&body=${encodeURIComponent('Hi Modulr,\n\nI would like to talk about a Website Configurator for my site.\n\nCompany:\nWebsite:\nHow many set designs:\nDo you have a Modulr plan already:\n')}`;
+const WEBSITE_ENQUIRY = `mailto:info@napc.uk?subject=${encodeURIComponent('Website Configurator enquiry')}&body=${encodeURIComponent('Hi Modulr,\n\nI would like to talk about a Website Configurator for my site.\n\nCompany:\nWebsite:\nHow many set designs:\nModulr account email (if you have one):\n')}`;
 
 const SHOWCASE = ['/gallery-6.jpg', '/gallery-5.jpg', '/gallery-9.jpg', '/gallery-12.jpg'];
 
@@ -526,7 +526,7 @@ export const HomeViewEditorial: React.FC<HomeViewProps> = ({ onOpenEngine, onNav
                             We build a configurator for your website with your set designs, your finishes and your prices, in your branding. Homeowners design their garden room, see what it costs and send it to you.
                         </p>
                         <p className="text-secondary text-sm font-light leading-relaxed mt-4 max-w-md">
-                            Built and quoted for each company. Keep your Modulr plan for designing, rendering and quoting, or take it on its own.
+                            Built for each company, and no Modulr plan needed: four set designs for £995 + VAT.
                         </p>
                         <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-4">
                             <a href={WEBSITE_ENQUIRY}>

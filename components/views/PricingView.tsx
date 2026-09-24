@@ -98,8 +98,6 @@ const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: s
     { label: '4K enhancement',               trial: false, standard: false, business: '50 a month' },
     { label: 'Animation Studio',             trial: false, standard: false, business: '3 clips a month, then pay as you go (coming soon)' },
     { label: 'Planning Checker',             trial: 'Free to all', standard: 'Free to all', business: 'Free to all' },
-    { label: 'Commercial rights',            trial: false, standard: true,  business: true },
-    { label: 'Priority queue',               trial: false, standard: false, business: true },
 ];
 
 const FeatureList: React.FC<{ plan: PlanKey }> = ({ plan }) => (
@@ -132,16 +130,11 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
     const [billingCycle, setBillingCycle] = React.useState<'monthly' | 'yearly'>('monthly');
     const [loadingPlan, setLoadingPlan] = React.useState<string | null>(null);
     /**
-     * Opens on arrival, not just when a plan is clicked.
-     *
-     * The numbers on this page are not settled, and a price someone has already
-     * read is very hard to move afterwards. Saying so up front is the honest
-     * version - letting them study the cards first and only admitting it at the
-     * checkout button wastes their time and reads as a bait and switch.
-     *
-     * Dismissible, because the page behind it is still worth browsing.
+     * The prices are confirmed (Charlie, 24 Sep 2026), so nothing opens on
+     * arrival any more. Until BILLING_ENABLED is switched on the checkout
+     * itself is not open, and this note only appears when a plan is clicked.
      */
-    const [showBillingClosed, setShowBillingClosed] = React.useState(true);
+    const [showBillingClosed, setShowBillingClosed] = React.useState(false);
     const [billing, setBilling] = React.useState<BillingInfo | null>(null);
     React.useEffect(() => {
         fetch('/api/public/billing-prices').then(r => r.json()).then((b: BillingInfo) => {
@@ -247,16 +240,15 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                             <Sparkles size={26} />
                         </div>
                         <div className="space-y-2">
-                            <h3 className="text-2xl font-black text-slate-800 tracking-tight">Subscriptions are locked for now</h3>
+                            <h3 className="text-2xl font-black text-slate-800 tracking-tight">We're not accepting payments at the moment</h3>
                             <p className="text-sm text-slate-600 leading-relaxed">
-                                Our main subscriptions are still in progress and are not open yet.
-                                The plans below are a work in progress - treat them as an
-                                indication rather than a quote, because the numbers may still
-                                change before launch.
+                                Online payment isn't open yet, so plans and animation packs
+                                can't be bought today. Email info@modulrstudio.co.uk and we'll
+                                let you know as soon as it opens.
                             </p>
                             <p className="text-sm text-slate-600 leading-relaxed">
-                                In the meantime the studio is free to try: create an account,
-                                confirm your email, and you have 40 renders over 7 days.
+                                Or try the studio free first: create an account, confirm your
+                                email, and you have 40 renders to use within 7 days.
                             </p>
                         </div>
                         <div className="flex flex-col gap-3 pt-1">
@@ -270,7 +262,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                 onClick={() => setShowBillingClosed(false)}
                                 className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-accent font-bold text-sm transition-colors"
                             >
-                                Browse the plans anyway
+                                Back to the plans
                             </button>
                         </div>
                     </div>
@@ -333,6 +325,16 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                     </div>
                 </div>
 
+                {/* Payments closed (Charlie, 24 Sep 2026): Stripe is not set up
+                    yet, so the page says so before anyone picks a plan. Gone
+                    the moment BILLING_ENABLED is switched on. */}
+                {billing && !billing.billingEnabled && (
+                    <div className="w-full max-w-3xl mx-auto -mt-6 mb-12 border border-accent/25 bg-accent/5 px-5 py-4 text-center">
+                        <p className="text-sm font-bold text-accent">We're not accepting payments at the moment.</p>
+                        <p className="text-xs text-secondary mt-1">Online payment opens soon. Until then, the studio is free to try for 7 days.</p>
+                    </div>
+                )}
+
                 {/* Pricing Cards */}
                 {/* Three across from lg only (QA 21 Sep 2026): at tablet width
                     the cards were 217px wide and the plan names overflowed. */}
@@ -375,7 +377,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                 {billingCycle === 'monthly' ? pounds(penceOf('standard_monthly')) : pounds(Math.round(penceOf('standard_yearly') / 12))}
                                 <span className="text-lg font-bold text-secondary"> / month</span>
                             </div>
-                            <span className="text-secondary font-medium">{billingCycle === 'monthly' ? 'inc VAT, cancel any time' : `${pounds(penceOf('standard_yearly'))} a year inc VAT, 2 months free`}</span>
+                            <span className="text-secondary font-medium">{billingCycle === 'monthly' ? '+ VAT, cancel any time' : `${pounds(penceOf('standard_yearly'))} a year + VAT, 2 months free`}</span>
                         </div>
 
                         <Button
@@ -414,10 +416,10 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                 {billingCycle === 'monthly' ? pounds(penceOf('business_monthly')) : pounds(Math.round(penceOf('business_yearly') / 12))}
                                 <span className="text-lg font-bold text-secondary"> / month</span>
                             </div>
-                            <span className="text-secondary font-medium">{billingCycle === 'monthly' ? 'inc VAT, cancel any time' : `${pounds(penceOf('business_yearly'))} a year inc VAT, 2 months free`}</span>
+                            <span className="text-secondary font-medium">{billingCycle === 'monthly' ? '+ VAT, cancel any time' : `${pounds(penceOf('business_yearly'))} a year + VAT, 2 months free`}</span>
                             {billing?.founding && billingCycle === 'monthly' && (
                                 <span className="mt-2 inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-none bg-amber-100 text-amber-800 text-[11px] font-bold">
-                                    Founding price {pounds(penceOf('business_monthly') - FOUNDING_DISCOUNT_PENCE)} a month for your first year, first 5 companies
+                                    Founding price {pounds(penceOf('business_monthly') - FOUNDING_DISCOUNT_PENCE)} + VAT a month for your first year, first 5 companies
                                 </span>
                             )}
                         </div>
@@ -447,7 +449,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                 A studio animation of a garden room is made by hand: a 3D artist models it, lights it, plots the camera and renders every frame. It is accurate to the millimetre, and it costs £600 to £1,500 for ten seconds and £1,500 to £5,000 for thirty, with one to three weeks' turnaround and a fresh invoice for every change.
                             </p>
                             <p className="text-sm text-secondary leading-relaxed mb-4">
-                                Animation Studio uses Seedance and Kling, the world's leading video models, to turn the design you built in the configurator into a moving visual in about two minutes. It is the next best thing to a hand-made animation, and it costs {pounds(animationPence)} an animation: 30 for £100.
+                                Animation Studio uses Seedance and Kling, the world's leading video models, to turn the design you built in the configurator into a moving visual in about two minutes. It is the next best thing to a hand-made animation, and it costs {pounds(animationPence)} an animation: 30 for £100 + VAT.
                             </p>
                             <p className="text-sm text-secondary leading-relaxed">
                                 <span className="font-bold text-primary">For a small business:</span> a ten second clip of the client's actual building on every quote, a thirty second walkthrough for the website, a new clip every time the design changes, for less than the price of a coffee.
@@ -481,7 +483,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                         >
                                             <div className="text-2xl font-bold text-primary">{Math.floor(penceOf(key) / animationPence)}</div>
                                             <div className="text-[11px] font-semibold text-secondary uppercase tracking-wider">animations</div>
-                                            <div className="text-sm font-bold text-accent mt-1">{pounds(penceOf(key))}</div>
+                                            <div className="text-sm font-bold text-accent mt-1">{pounds(penceOf(key))} <span className="text-[10px] font-semibold text-secondary">+ VAT</span></div>
                                         </button>
                                     ))}
                                 </div>
@@ -494,90 +496,50 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                 </div>
 
                 {/*
-                  * Managed Service: priced per design, not per month (Charlie,
-                  * 20 Sep 2026). The old £100-a-month add-on priced a person's
-                  * time at a few pounds an hour and sat under a table saying an
-                  * agency render costs £400 to £800. A design is two to three
-                  * hours of real work, so it is "from £200" and quoted, which is
-                  * why the button is a request rather than a Stripe checkout: a
-                  * quoted price cannot be a fixed price ID. The managed_service
-                  * subscription price stays in PRICE_CATALOG so the server keeps
-                  * honouring anyone who already holds it.
-                  *
-                  * Two routes to the same work, no subscription required. A Hub
-                  * member pays £200 and gets the design in their projects to
-                  * edit; anyone else pays £300 and gets files plus a share link,
-                  * with the design held on our account. The £100 gap is smaller
-                  * than a month of The Hub, so a firm doing two designs a month
-                  * works out the subscription for itself.
+                  * Modulr Managed Service (Charlie, 24 Sep 2026): one offer, no
+                  * plan needed. Send us the brief and we build it, £149.99 +
+                  * VAT a project. Replaces the 20 Sep two routes (a Design
+                  * Package from £300, or from £200 for Hub members), which
+                  * meant paying for a subscription as well. Still a request,
+                  * not a checkout: each project is invoiced. The
+                  * managed_service subscription price stays in PRICE_CATALOG
+                  * so the server keeps honouring anyone who already holds it.
                   */}
                 <div className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-xl shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
-                    <div className="max-w-3xl mb-10">
-                        <h4 className="text-2xl font-bold text-accent mb-3">Modulr Managed Service</h4>
-                        <p className="text-sm text-secondary leading-relaxed mb-4">
-                            Short on time, or don't want the software at all? Send us the client's brief, drawings or sketch and a Modulr designer builds the scheme in the 3D Configurator for you: the building, the interior, the garden and the finishes.
-                        </p>
-                        <p className="text-sm text-secondary leading-relaxed mb-5">
-                            Every design comes with a set of renders, a material specification and a client PDF. One round of changes is included. Two working days from brief to delivery. No subscription needed.
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
-                            {[
-                                'Full 3D Configurator build, interior included',
-                                'Walk inside and walk outside',
-                                'Render set: several angles, day and dusk',
-                                'Material specification sheet',
-                                'Project PDF for the client',
-                                'One round of changes',
-                            ].map(item => (
-                                <div key={item} className="flex items-start gap-2.5">
-                                    <Check size={16} className="text-accent shrink-0 mt-0.5" strokeWidth={3} />
-                                    <span className="text-sm leading-tight text-primary/85">{item}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-                        {/* Route 1: no subscription, files plus a share link. */}
-                        <div className="rounded-2xl border border-border bg-surface/40 p-6 flex flex-col">
-                            <div className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em] mb-2">Design Package</div>
-                            <div className="text-4xl font-bold text-primary drop-shadow-md mb-1">from £300 <span className="text-xs font-bold text-secondary uppercase">inc VAT</span></div>
-                            <p className="text-sm text-secondary leading-relaxed mb-4">No subscription. We do it all and you get the renders, PDF and spec as files, plus a link your client can open on their phone and walk through.</p>
-                            <div className="overflow-hidden rounded-xl border border-border mb-5">
-                                <table className="w-full text-sm">
-                                    <tbody className="text-primary/85">
-                                        <tr><td className="p-2.5 text-secondary">One design, everything above</td><td className="p-2.5 font-bold text-right">from £300</td></tr>
-                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Five designs, paid up front</td><td className="p-2.5 font-bold text-right">£1,350</td></tr>
-                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Extra round of changes</td><td className="p-2.5 font-bold text-right">£75</td></tr>
-                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Extra render angle after delivery</td><td className="p-2.5 font-bold text-right">£20</td></tr>
-                                    </tbody>
-                                </table>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+                        <div>
+                            <h4 className="text-2xl font-bold text-accent mb-3">Modulr Managed Service</h4>
+                            <p className="text-sm text-secondary leading-relaxed mb-4">
+                                Short on time, or don't want the software at all? Send us the client's brief, drawings or sketch and a Modulr designer builds the scheme in the 3D Configurator for you: the building, the interior, the garden and the finishes.
+                            </p>
+                            <p className="text-sm text-secondary leading-relaxed mb-5">
+                                Every project comes with a set of renders, a material specification and a client PDF. One round of changes is included. Two working days from brief to delivery. No subscription needed.
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
+                                {[
+                                    'Full 3D Configurator build, interior included',
+                                    'Walk inside and walk outside',
+                                    'Render set: several angles, day and dusk',
+                                    'Material specification sheet',
+                                    'Project PDF for the client',
+                                    'One round of changes',
+                                ].map(item => (
+                                    <div key={item} className="flex items-start gap-2.5">
+                                        <Check size={16} className="text-accent shrink-0 mt-0.5" strokeWidth={3} />
+                                        <span className="text-sm leading-tight text-primary/85">{item}</span>
+                                    </div>
+                                ))}
                             </div>
-                            <a className="mt-auto" href={`mailto:info@napc.uk?subject=${encodeURIComponent('Design Package request')}&body=${encodeURIComponent('Hi Modulr,\n\nI would like a Design Package (no subscription).\n\nCompany:\nClient / project name:\nBuilding size and type:\nBrief, drawings or sketch attached:\nDeadline:\n')}`}>
-                                <Button className="px-10 py-4 text-xs font-bold uppercase tracking-wider w-full">Request a Design Package</Button>
-                            </a>
-                            <p className="text-[11px] text-secondary mt-3">Paid up front. Larger or unusual schemes are quoted before any work starts.</p>
                         </div>
 
-                        {/* Route 2: Hub members, the design lands in their projects. */}
                         <div className="rounded-2xl border border-accent/30 bg-gradient-to-b from-surface/80 to-accent/5 p-6 flex flex-col">
-                            <div className="text-[10px] font-bold text-accent uppercase tracking-[0.2em] mb-2">Managed design, The Hub members</div>
-                            <div className="text-4xl font-bold text-primary drop-shadow-md mb-1">from £200 <span className="text-xs font-bold text-secondary uppercase">inc VAT</span></div>
-                            <p className="text-sm text-secondary leading-relaxed mb-4">The design lands in your own projects, so you can walk through it, change it yourself and send it on with your own branding. Cheaper than the package after two designs a month.</p>
-                            <div className="overflow-hidden rounded-xl border border-border mb-5">
-                                <table className="w-full text-sm">
-                                    <tbody className="text-primary/85">
-                                        <tr><td className="p-2.5 text-secondary">One design, everything above</td><td className="p-2.5 font-bold text-right">from £200</td></tr>
-                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Five designs, paid up front</td><td className="p-2.5 font-bold text-right">£900</td></tr>
-                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Extra round of changes</td><td className="p-2.5 font-bold text-right">£50</td></tr>
-                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Extra render angle after delivery</td><td className="p-2.5 font-bold text-right">£20</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <a className="mt-auto" href={`mailto:info@napc.uk?subject=${encodeURIComponent('Managed design request')}&body=${encodeURIComponent('Hi Modulr,\n\nI would like a managed design on my Hub account.\n\nMy Modulr account email:\nClient / project name:\nBuilding size and type:\nBrief, drawings or sketch attached:\nDeadline:\n')}`}>
-                                <Button className="px-10 py-4 text-xs font-bold uppercase tracking-wider w-full">Request a design</Button>
+                            <div className="text-[10px] font-bold text-accent uppercase tracking-[0.2em] mb-2">Per project, no subscription</div>
+                            <div className="text-4xl font-bold text-primary drop-shadow-md mb-1">£149.99 <span className="text-xs font-bold text-secondary uppercase">+ VAT</span></div>
+                            <p className="text-sm text-secondary leading-relaxed mb-5">You send the brief, we do the rest. The renders, PDF and spec come to you as files, plus a link your client can open on their phone and walk through.</p>
+                            <a className="mt-auto" href={`mailto:info@napc.uk?subject=${encodeURIComponent('Managed Service project')}&body=${encodeURIComponent('Hi Modulr,\n\nI would like a Managed Service project.\n\nCompany:\nClient / project name:\nBuilding size and type:\nBrief, drawings or sketch attached:\nDeadline:\n')}`}>
+                                <Button className="px-10 py-4 text-xs font-bold uppercase tracking-wider w-full">Talk to us</Button>
                             </a>
-                            <p className="text-[11px] text-secondary mt-3">Invoiced on delivery. Larger or unusual schemes are quoted before any work starts.</p>
+                            <p className="text-[11px] text-secondary mt-3">Invoiced per project. Larger or unusual schemes are quoted before any work starts.</p>
                         </div>
                     </div>
                 </div>
@@ -585,85 +547,59 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                 {/*
                   * Website Configurator (Charlie, 24 Sep 2026): a configurator
                   * on the PROVIDER'S own website, for their customers - only
-                  * their set designs, finishes and prices. Built per company,
-                  * so the setup is quoted ("talk to us"), then a monthly fee:
-                  * it is hosted, served and kept up to date for as long as it
-                  * is live, and it earns them leads every month. The provider
-                  * still has their own plan for designing, quoting and
-                  * rendering - or takes the website one on its own.
-                  *
-                  * FIGURES ARE PLACEHOLDERS until Charlie sets them: setup from
-                  * £995 (up to 4 designs), £200 a further design, £99 a month
-                  * on a plan, £149 a month on its own.
+                  * their set designs, finishes and prices. Fixed prices, all
+                  * + VAT: £995 setup with four set designs, £200 for each set
+                  * design beyond that, £99 a month to host it and £50 for each
+                  * later update, support request or fix. Anyone can buy it -
+                  * no Modulr plan needed. Leads arrive by email, and in Jobs &
+                  * Quotes as well for a company that is on a plan.
                   */}
                 <div id="website-configurator" className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-xl shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
-                    <div className="max-w-3xl mb-10">
-                        <div className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-accent border border-accent/25 px-2 py-1 mb-4">New · built for you</div>
-                        <h4 className="text-2xl font-bold text-accent mb-3">Website Configurator</h4>
-                        <p className="text-sm text-secondary leading-relaxed mb-4">
-                            A 3D configurator on your own website, for your customers. Only your set designs, your finishes and your prices: a homeowner picks a design, changes it within the options you offer, sees what it costs and sends it straight to you.
-                        </p>
-                        <p className="text-sm text-secondary leading-relaxed mb-5">
-                            We build it from your range, in your branding, and you add it to your site with one line of code. Keep your own Modulr plan for designing, quoting and rendering, or take the website configurator on its own.
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
-                            {[
-                                'Your set designs and options only',
-                                'Your prices, live as they design',
-                                'Your logo and colours, on your site',
-                                'Every design arrives as a lead',
-                                'Works on phones and tablets',
-                                'Hosting, updates and support included',
-                            ].map(item => (
-                                <div key={item} className="flex items-start gap-2.5">
-                                    <Check size={16} className="text-accent shrink-0 mt-0.5" strokeWidth={3} />
-                                    <span className="text-sm leading-tight text-primary/85">{item}</span>
-                                </div>
-                            ))}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+                        <div>
+                            <div className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-accent border border-accent/25 px-2 py-1 mb-4">New · built for you</div>
+                            <h4 className="text-2xl font-bold text-accent mb-3">Website Configurator</h4>
+                            <p className="text-sm text-secondary leading-relaxed mb-4">
+                                A 3D configurator on your own website, for your customers. Only your set designs, your finishes and your prices: a homeowner picks a design, changes it within the options you offer, sees what it costs and sends it straight to you.
+                            </p>
+                            <p className="text-sm text-secondary leading-relaxed mb-5">
+                                We build it from your range, in your branding, and you add it to your site with one line of code. You don't need a Modulr plan: every design a homeowner sends reaches you by email with the specification and the price, and on a Modulr plan it lands in your Jobs & Quotes too.
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
+                                {[
+                                    'Your set designs and options only',
+                                    'Your prices, live as they design',
+                                    'Your logo and colours, on your site',
+                                    'Every design arrives as a lead',
+                                    'Works on phones and tablets',
+                                    'Hosted and kept running for you',
+                                ].map(item => (
+                                    <div key={item} className="flex items-start gap-2.5">
+                                        <Check size={16} className="text-accent shrink-0 mt-0.5" strokeWidth={3} />
+                                        <span className="text-sm leading-tight text-primary/85">{item}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-                        {/* Route 1: on top of a plan - leads into Jobs & Quotes. */}
                         <div className="rounded-2xl border border-accent/30 bg-gradient-to-b from-surface/80 to-accent/5 p-6 flex flex-col">
-                            <div className="text-[10px] font-bold text-accent uppercase tracking-[0.2em] mb-2">With your Modulr plan</div>
-                            <div className="text-4xl font-bold text-primary drop-shadow-md mb-1">from £995 <span className="text-xs font-bold text-secondary uppercase">setup, inc VAT</span></div>
-                            <p className="text-sm text-secondary leading-relaxed mb-4">On a Configurator or Hub plan. Leads land in your Jobs & Quotes with the design attached, priced from your own price book, ready to quote.</p>
+                            <div className="text-[10px] font-bold text-accent uppercase tracking-[0.2em] mb-2">Four set designs, no plan needed</div>
+                            <div className="text-4xl font-bold text-primary drop-shadow-md mb-1">£995 <span className="text-xs font-bold text-secondary uppercase">setup + VAT</span></div>
+                            <p className="text-sm text-secondary leading-relaxed mb-4">Your configurator built with four of your set designs. Need more? Each extra set design is £200.</p>
                             <div className="overflow-hidden rounded-xl border border-border mb-5">
                                 <table className="w-full text-sm">
                                     <tbody className="text-primary/85">
-                                        <tr><td className="p-2.5 text-secondary">Setup, up to four designs</td><td className="p-2.5 font-bold text-right">from £995</td></tr>
-                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Each further design</td><td className="p-2.5 font-bold text-right">£200</td></tr>
-                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Monthly, on top of your plan</td><td className="p-2.5 font-bold text-right">£99</td></tr>
-                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Price changes</td><td className="p-2.5 font-bold text-right">You, from your price book</td></tr>
+                                        <tr><td className="p-2.5 text-secondary">Setup with four set designs</td><td className="p-2.5 font-bold text-right">£995</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Each extra set design</td><td className="p-2.5 font-bold text-right">£200</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Hosting, monthly</td><td className="p-2.5 font-bold text-right">£99</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Further updates, support and fixes</td><td className="p-2.5 font-bold text-right">£50 each</td></tr>
                                     </tbody>
                                 </table>
                             </div>
-                            <a className="mt-auto" href={`mailto:info@napc.uk?subject=${encodeURIComponent('Website Configurator enquiry')}&body=${encodeURIComponent('Hi Modulr,\n\nI would like a Website Configurator for my site, alongside my Modulr plan.\n\nCompany:\nWebsite:\nMy Modulr account email:\nHow many set designs:\nAnything else we should know:\n')}`}>
+                            <a className="mt-auto" href={`mailto:info@napc.uk?subject=${encodeURIComponent('Website Configurator enquiry')}&body=${encodeURIComponent('Hi Modulr,\n\nI would like a Website Configurator for my site.\n\nCompany:\nWebsite:\nModulr account email (if you have one):\nHow many set designs:\nAnything else we should know:\n')}`}>
                                 <Button className="px-10 py-4 text-xs font-bold uppercase tracking-wider w-full">Talk to us</Button>
                             </a>
-                            <p className="text-[11px] text-secondary mt-3">Every build is quoted before any work starts.</p>
-                        </div>
-
-                        {/* Route 2: the website configurator alone - leads by email. */}
-                        <div className="rounded-2xl border border-border bg-surface/40 p-6 flex flex-col">
-                            <div className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em] mb-2">On its own</div>
-                            <div className="text-4xl font-bold text-primary drop-shadow-md mb-1">from £995 <span className="text-xs font-bold text-secondary uppercase">setup, inc VAT</span></div>
-                            <p className="text-sm text-secondary leading-relaxed mb-4">Just the configurator for your customers, no Modulr plan. Each design they send reaches you by email, with the specification and the price.</p>
-                            <div className="overflow-hidden rounded-xl border border-border mb-5">
-                                <table className="w-full text-sm">
-                                    <tbody className="text-primary/85">
-                                        <tr><td className="p-2.5 text-secondary">Setup, up to four designs</td><td className="p-2.5 font-bold text-right">from £995</td></tr>
-                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Each further design</td><td className="p-2.5 font-bold text-right">£200</td></tr>
-                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Monthly</td><td className="p-2.5 font-bold text-right">£149</td></tr>
-                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Price changes</td><td className="p-2.5 font-bold text-right">Sent to us, done in 2 days</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <a className="mt-auto" href={`mailto:info@napc.uk?subject=${encodeURIComponent('Website Configurator enquiry')}&body=${encodeURIComponent('Hi Modulr,\n\nI would like a Website Configurator for my site, on its own.\n\nCompany:\nWebsite:\nHow many set designs:\nAnything else we should know:\n')}`}>
-                                <Button variant="outline" className="px-10 py-4 text-xs font-bold uppercase tracking-wider w-full">Talk to us</Button>
-                            </a>
-                            <p className="text-[11px] text-secondary mt-3">Every build is quoted before any work starts.</p>
+                            <p className="text-[11px] text-secondary mt-3">All prices + VAT.</p>
                         </div>
                     </div>
                 </div>

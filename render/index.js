@@ -24,6 +24,33 @@ import { verifyRender } from './verify.js';
 import { planInventoryFromSpec, buildPlanPrompt, PLAN_SURVEY_PROMPT } from './plan.js';
 import { isInteriorSpec, interiorInventoryFromSpec, buildInteriorRenderPrompt, buildInteriorMaterialsPassPrompt, INTERIOR_SURVEY_PROMPT, dressedInventory, countPlacedDecor } from './interior.js';
 
+/**
+ * Google's analysis model sometimes answers 503 "This model is currently
+ * experiencing high demand" - 24 Sep 2026, an Interior Render import failed
+ * on it with "Auto-detect failed". It passes in seconds, so a survey is
+ * tried three times on the analysis model with a pause between, then once on
+ * the lighter model, before it is reported. Anything that is not a capacity
+ * error (a bad image, a bad key) is thrown at once.
+ */
+const BUSY = /\b(429|500|502|503|504)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded/i;
+const isBusy = (e) => BUSY.test(`${e?.status ?? ''} ${e?.message ?? ''}`);
+const FALLBACK_ANALYSIS_MODEL = 'gemini-3.5-flash-lite';
+async function analyseWithRetry(ai, request, label) {
+    const tries = [[request.model, 0], [request.model, 1500], [request.model, 4000], [FALLBACK_ANALYSIS_MODEL, 0]];
+    let last;
+    for (const [model, wait] of tries) {
+        if (wait) await new Promise(r => setTimeout(r, wait));
+        try {
+            return { response: await ai.models.generateContent({ ...request, model }), model };
+        } catch (e) {
+            last = e;
+            if (!isBusy(e)) throw e;
+            console.warn(`[RENDER] ${label}: ${model} busy (${e?.status ?? 'error'}), trying again`);
+        }
+    }
+    throw last;
+}
+
 const stripDataUrl = (s) => (typeof s === 'string' ? s.replace(/^data:[^;]+;base64,/, '') : '');
 
 /** The real type of a base64 image, from its first bytes; never trust the label. */
@@ -240,7 +267,7 @@ export function mountRender(app, deps) {
             if (!image) return res.status(400).json({ error: 'No image.' });
             const access = await enforceRenderAccess(req, CREDIT_COSTS.ANALYSIS);
             if (!access.allowed) return res.status(access.status).json(access.body);
-            const response = await ai.models.generateContent({
+            const { response, model: usedModel } = await analyseWithRetry(ai, {
                 model: ANALYSIS_MODEL,
                 contents: { parts: [{ inlineData: { data: image, mimeType: sniffMime(image) } }, { text: PLAN_SURVEY_PROMPT }] },
                 config: {
@@ -253,13 +280,14 @@ export function mountRender(app, deps) {
                         }, required: ['group', 'label', 'text'] } },
                     }, required: ['items'] },
                 },
-            });
+            }, 'plan survey');
             const json = JSON.parse(response.text || '{}');
             const items = inventoryFromItems((json.items || []).map((x, i) => ({ ...x, id: `${String(x.group || 'item').toLowerCase()}-${i + 1}` })));
-            logRender(req, 'floor-plan-survey', ANALYSIS_MODEL, 'n/a', { items: items.length });
+            logRender(req, 'floor-plan-survey', usedModel, 'n/a', { items: items.length });
             res.json({ items });
         } catch (error) {
             console.error('[PLAN] survey failed:', error);
+            if (isBusy(error)) return res.status(503).json({ error: "Google's analysis service is very busy right now. Please try again in a minute." });
             res.status(500).json({ error: 'Could not read the plan. Please try again.' });
         }
     });
@@ -280,7 +308,7 @@ export function mountRender(app, deps) {
             // A capture from inside the room is surveyed as a room, not as a
             // building seen from the garden (Interior Render Engine, 22 Sep 2026).
             const interiorView = req.body.view === 'interior';
-            const response = await ai.models.generateContent({
+            const { response, model: usedModel } = await analyseWithRetry(ai, {
                 model: ANALYSIS_MODEL,
                 contents: { parts: [{ inlineData: { data: image, mimeType: sniffMime(image) } }, { text: interiorView ? INTERIOR_SURVEY_PROMPT : SURVEY_PROMPT }] },
                 config: {
@@ -293,13 +321,14 @@ export function mountRender(app, deps) {
                         }, required: ['group', 'label', 'text'] } },
                     }, required: ['items'] },
                 },
-            });
+            }, 'survey');
             const json = JSON.parse(response.text || '{}');
             const items = inventoryFromItems((json.items || []).map((x, i) => ({ ...x, id: `${String(x.group || 'item').toLowerCase()}-${i + 1}` })));
-            logRender(req, 'render-survey', ANALYSIS_MODEL, 'n/a', { items: items.length, view: interiorView ? 'interior' : 'exterior' });
+            logRender(req, 'render-survey', usedModel, 'n/a', { items: items.length, view: interiorView ? 'interior' : 'exterior' });
             res.json({ items });
         } catch (error) {
             console.error('[RENDER] survey failed:', error);
+            if (isBusy(error)) return res.status(503).json({ error: "Google's analysis service is very busy right now. Please try again in a minute." });
             res.status(500).json({ error: 'Could not survey the image. Please try again.' });
         }
     });

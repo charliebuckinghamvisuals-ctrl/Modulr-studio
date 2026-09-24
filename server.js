@@ -171,10 +171,11 @@ const VIDEO_MODELS = {
  *
  * A clip is one animation unless it costs us more than ANIMATION_COST_CAP to
  * make, at Higgsfield's LIST rate: then it is two, or three. Pack prices
- * include VAT, so an animation brings in £2.78; the cap keeps every clip at a
- * third or more of that. In practice: any Kling clip up to 8s, Seedance up to
+ * are + VAT since 24 Sep 2026, so an animation brings in the full £3.33 (it
+ * was £2.78 when they included VAT); the cap keeps every clip at under 56%
+ * of that. In practice: any Kling clip up to 8s, Seedance up to
  * 5s at 720p or 10s at 480p = 1; an 8-10s Seedance 720p = 2 (at 1 it would
- * cost £2.92 against £2.78 - a loss on every one); 15s Seedance 720p = 3.
+ * cost £2.92 of the £3.33 - next to no margin); 15s Seedance 720p = 3.
  * Both figures can be moved with env vars without a deploy of the UI.
  */
 const ANIMATION_PENCE = Number(process.env.ANIMATION_PENCE) > 0 ? Math.round(Number(process.env.ANIMATION_PENCE)) : 333;
@@ -5146,7 +5147,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
          */
         if (process.env.BILLING_ENABLED !== 'true') {
             return res.status(503).json({
-                error: 'Subscriptions are not open yet. Modulr Studio is currently in private beta.',
+                error: "We're not accepting payments at the moment.",
                 billingClosed: true,
             });
         }
@@ -5181,7 +5182,10 @@ app.post('/api/create-checkout-session', async (req, res) => {
             payment_method_types: ['card'],
             line_items: [{ price: priceId, quantity: 1 }],
             mode: entry.mode,
+            // Prices are + VAT (24 Sep 2026): Stripe adds VAT at checkout, and
+            // a company can put its VAT number on the invoice.
             automatic_tax: { enabled: true },
+            tax_id_collection: { enabled: true },
             success_url: `${origin}/account?success=true`,
             cancel_url: `${origin}/pricing?canceled=true`,
             client_reference_id: req.user.uid,

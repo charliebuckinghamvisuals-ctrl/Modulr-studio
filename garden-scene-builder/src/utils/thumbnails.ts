@@ -24,8 +24,9 @@ const SIZE = 256;
 // kept showing their old picture from the cache.
 // v7 (24 Sep 2026): the woven fabric on the newer seating changed the
 // MATERIALS, not the file - "Armchair (Low)" kept its old satin picture.
+// v8 (24 Sep 2026): the acoustic panel's slats became a real veneer.
 // Bump this whenever materialFixes changes how a model looks.
-const STORAGE_PREFIX = 'modulr_thumb_v7:';
+const STORAGE_PREFIX = 'modulr_thumb_v8:';
 
 const memory = new Map<string, string>();
 const pending = new Map<string, Promise<string | null>>();

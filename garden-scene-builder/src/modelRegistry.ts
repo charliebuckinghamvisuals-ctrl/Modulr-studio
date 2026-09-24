@@ -73,6 +73,34 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   decor_clock: 'models/decor_clock.glb',
   decor_stone_bowl: 'models/decor_stone_bowl.glb',
   decor_coral: 'models/decor_coral.glb',
+  // 24 Sep 2026 (afternoon): the acoustic panel (laid out by
+  // components/3d/AcousticPanel, not stretched), and the dressing table,
+  // desk setup and second decor set, each cut into separate pieces.
+  acoustic_panel: 'models/acoustic_panel.glb',
+  dressing_table: 'models/dressing_table.glb',
+  round_mirror: 'models/round_mirror.glb',
+  spindle_chair: 'models/spindle_chair.glb',
+  desk_standing: 'models/desk_standing.glb',
+  desk_pedestal: 'models/desk_pedestal.glb',
+  office_chair_2: 'models/office_chair_2.glb',
+  decor_art_large: 'models/decor_art_large.glb',
+  monitor: 'models/monitor.glb',
+  keyboard_set: 'models/keyboard_set.glb',
+  decor_marble_bowl: 'models/decor_marble_bowl.glb',
+  decor_vase_tall: 'models/decor_vase_tall.glb',
+  decor_vase_small: 'models/decor_vase_small.glb',
+  decor_vase_ceramic: 'models/decor_vase_ceramic.glb',
+  decor_vase_stems: 'models/decor_vase_stems.glb',
+  decor_marble_sculpture: 'models/decor_marble_sculpture.glb',
+  decor_knot: 'models/decor_knot.glb',
+  decor_novels: 'models/decor_novels.glb',
+  decor_vanity_mirror: 'models/decor_vanity_mirror.glb',
+  decor_soap_dispenser: 'models/decor_soap_dispenser.glb',
+  decor_candle: 'models/decor_candle.glb',
+  decor_glass_bottle: 'models/decor_glass_bottle.glb',
+  decor_house: 'models/decor_house.glb',
+  decor_letter_a: 'models/decor_letter_a.glb',
+  decor_soap_stones: 'models/decor_soap_stones.glb',
   rug: 'models/rug.glb',
   rug_2: 'models/rug_2.glb',
   footstool: 'models/footstool.glb',
@@ -361,6 +389,8 @@ export const NATIVE_WIDTH_MM: Partial<Record<ObjectType, number>> = {
   // a run of wall cupboards can be sized to the run of floor cupboards.
   kitchen_wall_unit_600: 600,
   kitchen_wall_unit_1200: 1200,
+  // Sized in whole slats, not stretched - see utils/acousticPanel.
+  acoustic_panel: 1250,
 };
 
 /** Allowed width range per type, in mm. */
@@ -374,6 +404,7 @@ export const WIDTH_RANGE_MM: Partial<Record<ObjectType, [number, number]>> = {
   kitchen_sink_1200: [900, 1800],
   kitchen_wall_unit_600: [400, 900],
   kitchen_wall_unit_1200: [900, 1800],
+  acoustic_panel: [350, 3590],
 };
 
 export const isWidthAdjustable = (type: ObjectType) => NATIVE_WIDTH_MM[type] !== undefined;
@@ -481,6 +512,9 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   // coffee table's 457mm top, and the shelf set at the height its lowest
   // shelf was modelled at.
   wall_art: 1100,
+  // The underside of the frame, from the floor.
+  round_mirror: 1050,
+  decor_art_large: 950,
   toilet: 100,
 };
 
@@ -514,10 +548,10 @@ export const EXTRACTOR_FLUE_H = 0.955;    // native flue height, m
  * worktop, a table or a shelf, it sits on top (utils/surfaceTop). A Height
  * slider can still set it by hand.
  */
-export const SURFACE_DECOR: ObjectType[] = ['books_decor', 'shelf_decor', 'kitchen_decor', 'kitchen_glass_jar', 'kitchen_boards', 'kitchen_utensils', 'kitchen_vase', 'kitchen_mortar', 'decor_book_row', 'decor_book_stack', 'decor_books_flat', 'decor_books_upright', 'decor_books_bookends', 'decor_books_box', 'decor_books_sculpture', 'decor_photo_frame', 'decor_framed_map', 'decor_clock', 'decor_stone_bowl', 'decor_coral'];
+export const SURFACE_DECOR: ObjectType[] = ['books_decor', 'shelf_decor', 'kitchen_decor', 'kitchen_glass_jar', 'kitchen_boards', 'kitchen_utensils', 'kitchen_vase', 'kitchen_mortar', 'decor_book_row', 'decor_book_stack', 'decor_books_flat', 'decor_books_upright', 'decor_books_bookends', 'decor_books_box', 'decor_books_sculpture', 'decor_photo_frame', 'decor_framed_map', 'decor_clock', 'decor_stone_bowl', 'decor_coral', 'monitor', 'keyboard_set', 'decor_marble_bowl', 'decor_vase_tall', 'decor_vase_small', 'decor_vase_ceramic', 'decor_vase_stems', 'decor_marble_sculpture', 'decor_knot', 'decor_novels', 'decor_vanity_mirror', 'decor_soap_dispenser', 'decor_candle', 'decor_glass_bottle', 'decor_house', 'decor_letter_a', 'decor_soap_stones'];
 
 /** Every decor type with a Height slider: the table-top pieces and the prints. */
-export const DECOR_TYPES: ObjectType[] = ['wall_art', ...SURFACE_DECOR];
+export const DECOR_TYPES: ObjectType[] = ['wall_art', 'round_mirror', 'decor_art_large', ...SURFACE_DECOR];
 
 export const mountHeight = (type: ObjectType) => (MOUNT_HEIGHT_MM[type] ?? 0) / 1000;
 /** The height a PLACED object is fixed at: its own setting, or the type's default. */
@@ -697,6 +731,10 @@ export const TIMBER_MATERIAL: Partial<Record<ObjectType, {
   chest_of_drawers: { materials: [''], grain: 'x' },
   desk_single: { materials: [''], grain: 'x' },
   bed_2: { materials: ['Veneer A02 120cm'], grain: 'x' },
+  // The acoustic panel's slats (24 Sep: Charlie, "wood texture is terrible"):
+  // a real veneer projected life-size up each slat, natural oak until one
+  // is picked. The felt behind keeps its own black.
+  acoustic_panel: { materials: ['4083 Honey Oak'], def: VENEERS.find(v => v.id === 'natural_oak_veneer') },
   // The low stool's legs are turned oak ("Eiken" in the export), not metal.
   bar_stool: { materials: ['033132_S_Eiken_Stroken'] },
   // The hot tub cabinet (10 Sep, Charlie's re-export with the cabinet under
@@ -883,6 +921,30 @@ export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
   // 24 Sep: timber, fabric and paint at the exporter's half-metal. The
   // appliances, the vanity's mirror and the decor's chrome keep theirs.
   shoe_rack: true,
+  // 24 Sep afternoon: everything new but the two mirrors.
+  acoustic_panel: true,
+  dressing_table: true,
+  spindle_chair: true,
+  desk_standing: true,
+  desk_pedestal: true,
+  office_chair_2: true,
+  decor_art_large: true,
+  monitor: true,
+  keyboard_set: true,
+  decor_marble_bowl: true,
+  decor_vase_tall: true,
+  decor_vase_small: true,
+  decor_vase_ceramic: true,
+  decor_vase_stems: true,
+  decor_marble_sculpture: true,
+  decor_knot: true,
+  decor_novels: true,
+  decor_soap_dispenser: true,
+  decor_candle: true,
+  decor_glass_bottle: true,
+  decor_house: true,
+  decor_letter_a: true,
+  decor_soap_stones: true,
   sideboard: true,
   tv_cabinet: true,
   rug_3: true,
@@ -1198,6 +1260,31 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   decor_clock: 'Desk Clock',
   decor_stone_bowl: 'Stone Bowl',
   decor_coral: 'Coral Sculpture',
+  acoustic_panel: 'Acoustic Slat Panel',
+  dressing_table: 'Dressing Table',
+  round_mirror: 'Round Wall Mirror',
+  spindle_chair: 'Spindle Chair',
+  desk_standing: 'Desk (White, 1400)',
+  desk_pedestal: 'Desk Pedestal',
+  office_chair_2: 'Office Chair (High Back)',
+  decor_art_large: 'Framed Art (Large)',
+  monitor: 'Monitor (32 inch)',
+  keyboard_set: 'Keyboard, Mouse & Mat',
+  decor_marble_bowl: 'Marble Bowl',
+  decor_vase_tall: 'Tall Bottle Vase',
+  decor_vase_small: 'Small Bottle Vase',
+  decor_vase_ceramic: 'Ceramic Vase',
+  decor_vase_stems: 'Vase with Stems',
+  decor_marble_sculpture: 'Marble Sculpture',
+  decor_knot: 'Wooden Knot',
+  decor_novels: 'Stack of Novels',
+  decor_vanity_mirror: 'Table Mirror',
+  decor_soap_dispenser: 'Soap Dispenser',
+  decor_candle: 'Candle Jar',
+  decor_glass_bottle: 'Glass Bottle',
+  decor_house: 'Wooden House',
+  decor_letter_a: 'Letter A',
+  decor_soap_stones: 'Soap Stones',
   rug: 'Rug (Patterned)',
   rug_2: 'Rug (Sand)',
   footstool: 'Footstool',

@@ -18,6 +18,7 @@ import { WorktopRuns } from './WorktopRuns';
 import { isOutdoorType, bayFloorTop } from '../../utils/bay';
 import { PartitionOpenings } from './PartitionOpenings';
 import { GardenSteps, GardenRamp } from './GardenPieces';
+import { AcousticPanel } from './AcousticPanel';
 
 /**
  * Generic GLB object - any type registered in modelRegistry renders through
@@ -759,6 +760,9 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   const meshContent = (() => {
     // GLB-backed objects take priority: a type registered in modelRegistry
     // renders its real model even if a procedural builder exists below.
+    // The acoustic panel is rebuilt at its size from its model's parts:
+    // more slats when wider, longer ones when taller - never stretched.
+    if (obj.type === 'acoustic_panel') return <Suspense fallback={<ModelFallback />}><AcousticPanel obj={obj} /></Suspense>;
     const modelUrl = MODEL_URLS[obj.type];
     if (modelUrl) {
       const base = MODEL_SCALES[obj.type] ?? [1, 1, 1];
