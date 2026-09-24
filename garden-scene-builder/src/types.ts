@@ -56,7 +56,12 @@ export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 
  // Wall-hung: the TV lifted out of the media unit, and a dart board.
  | 'wall_tv' | 'dart_board'
  // L-shaped corner base unit (10 Sep).
- | 'kitchen_corner_unit';
+ | 'kitchen_corner_unit'
+ // Charlie's 22-23 Sep exports (wired 24 Sep): appliances, storage, rugs,
+ // a vanity with its mirror, and decor.
+ | 'washing_machine' | 'fridge_freestanding' | 'shoe_rack' | 'sideboard' | 'tv_cabinet'
+ | 'rug_3' | 'rug_4' | 'vanity_mirror'
+ | 'wall_art' | 'books_decor' | 'shelf_decor' | 'kitchen_decor';
 
 /** 'solid' is doors-only (entrance door); the window UI never offers it. */
 export type GlazingStyle = 'standard' | 'crittall' | 'solid';
@@ -134,12 +139,17 @@ export interface InteriorDoorData {
  *  a painted frame; the others are modelled door sets (see
  *  INTERIOR_DOOR_STYLES in modelRegistry). */
 export type InteriorDoorStyle = 'oak_country' | 'white_country';
+/** An internal door's handle: the lever on a backplate (Charlie's handle,
+ *  the default), the door model's own lever on a round rose, or a knob. */
+export type InteriorDoorHandle = 'plate' | 'rose' | 'knob';
 
 export interface PartitionDoor {
   id: string;
   style?: InteriorDoorStyle;
-  /** Hinge and handle finish - a METAL_FINISHES hex. Undefined = chrome. */
+  /** Hinge and handle finish - a METAL_FINISHES hex. Undefined = matte black. */
   ironmongery?: string;
+  /** Which handle. Undefined = 'plate'. */
+  handle?: InteriorDoorHandle;
   /** Which side of the wall the leaf swings into: +1 (default) is the
    *  wall's local +Z face, -1 the other. The set is turned round with it,
    *  so the hinges are always on the face the door opens towards. */

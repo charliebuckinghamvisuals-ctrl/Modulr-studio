@@ -16,10 +16,10 @@
  *   month-one coupon: same price, for trial users converting in their
  *   first month (expires on the date you set below).
  *
- * Stripe prices are immutable. If the 17 Sep prices (£59.99 / £199.99) were
- * already created under these lookup keys, this script will find and keep
- * them: archive those prices in the Stripe dashboard first (or move their
- * lookup keys), then re-run so the new amounts are created.
+ * Stripe prices are immutable. A price already under one of these lookup
+ * keys at a different amount (the 17 Sep £59.99 / £199.99) is replaced: a
+ * new price takes the lookup key and the old one is archived (24 Sep 2026 -
+ * this used to be a manual step in the dashboard).
  */
 import Stripe from 'stripe';
 
@@ -32,20 +32,51 @@ console.log(`Stripe ${live ? 'LIVE' : 'TEST'} mode`);
 /** The founding month-one coupon's expiry: the last day trial converts can still get it. */
 const MONTH_ONE_ENDS = process.env.MONTH_ONE_ENDS || '2026-12-31';
 
+/**
+ * What the customer reads on the Stripe checkout page, receipts and invoices
+ * (24 Sep 2026). The first three are sold in the app; the rest are invoiced
+ * from the dashboard, with the amount set on each invoice (they are quoted),
+ * so they are created without a price.
+ */
 const PRODUCTS = [
-    { key: 'standard', name: 'Modulr Studio Configurator', description: 'Full 3D configurator, walk inside and outside, projects, saved designs, clients and PDFs. No AI tools.' },
-    { key: 'business', name: 'Modulr Studio The Hub',      description: 'Everything in Configurator plus 250 renders a month, the Render Engine, material close-ups, Line Converter, 4K and Animation Studio.' },
-    { key: 'video',    name: 'Modulr Video Credits',       description: 'Pay-as-you-go credit for Animation Studio clips.' },
+    {
+        key: 'standard', name: 'Modulr Studio - Configurator',
+        description: 'The design side of Modulr Studio for garden room and annexe providers: the full 3D Configurator with interiors, kitchens and walk inside and outside, and Jobs & Quotes - your price book, quotes built from the design, the lead-to-won pipeline and branded PDF quotes and proposals. No AI renders.',
+    },
+    {
+        key: 'business', name: 'Modulr Studio - The Hub',
+        description: 'Everything in Configurator, plus the AI studio: 250 renders a month across the Render Engine, Interior Render, Detail Studio, Material Editor, Line Converter and Weather Lab, 50 4K exports a month, and Animation Studio and Floor Plan Studio as they launch.',
+    },
+    {
+        key: 'video', name: 'Modulr Studio - Animations',
+        description: 'Animations for Animation Studio, The Hub: a finished render turned into a short clip. One animation is one clip; the longest cinematic clips count as two or three, always shown before you generate. A failed clip is refunded automatically. Credit lasts 12 months.',
+    },
+    {
+        key: 'managed_package', name: 'Design Package - Modulr Managed Service', invoiceOnly: true,
+        description: 'A Modulr designer builds the scheme for you from your brief: 3D Configurator build with the interior, walk inside and outside, a render set, a material specification and a client PDF, with one round of changes. Delivered as files plus a client link. No subscription needed.',
+    },
+    {
+        key: 'managed_design', name: 'Managed design - The Hub members', invoiceOnly: true,
+        description: 'A Modulr designer builds the scheme from your brief, straight into your own Jobs & Quotes: 3D Configurator build with the interior, a render set, a material specification and a client PDF, with one round of changes.',
+    },
+    {
+        key: 'website_config_setup', name: 'Website Configurator - setup', invoiceOnly: true,
+        description: 'Your own 3D configurator, built for your website: your set designs, your finishes and your prices, in your branding, added to your site with one line of code. Quoted per company.',
+    },
+    {
+        key: 'website_config_monthly', name: 'Website Configurator - monthly', invoiceOnly: true,
+        description: 'Hosting, updates and support for your Website Configurator, with every design a homeowner sends arriving as a lead.',
+    },
 ];
 
 const PRICES = [
-    { env: 'STRIPE_PRICE_STANDARD_MONTHLY', lookup: 'standard_monthly', product: 'standard', pence: 4999,   recurring: { interval: 'month' } },
-    { env: 'STRIPE_PRICE_STANDARD_YEARLY',  lookup: 'standard_yearly',  product: 'standard', pence: 49990,  recurring: { interval: 'year' } },
-    { env: 'STRIPE_PRICE_BUSINESS_MONTHLY', lookup: 'business_monthly', product: 'business', pence: 19900,  recurring: { interval: 'month' } },
-    { env: 'STRIPE_PRICE_BUSINESS_YEARLY',  lookup: 'business_yearly',  product: 'business', pence: 199000, recurring: { interval: 'year' } },
-    { env: 'STRIPE_PRICE_VIDEO_25',         lookup: 'video_25',         product: 'video',    pence: 2500 },
-    { env: 'STRIPE_PRICE_VIDEO_50',         lookup: 'video_50',         product: 'video',    pence: 5000 },
-    { env: 'STRIPE_PRICE_VIDEO_100',        lookup: 'video_100',        product: 'video',    pence: 10000 },
+    { env: 'STRIPE_PRICE_STANDARD_MONTHLY', lookup: 'standard_monthly', product: 'standard', pence: 4999,   recurring: { interval: 'month' }, nickname: 'Configurator, monthly' },
+    { env: 'STRIPE_PRICE_STANDARD_YEARLY',  lookup: 'standard_yearly',  product: 'standard', pence: 49990,  recurring: { interval: 'year' },  nickname: 'Configurator, yearly' },
+    { env: 'STRIPE_PRICE_BUSINESS_MONTHLY', lookup: 'business_monthly', product: 'business', pence: 19900,  recurring: { interval: 'month' }, nickname: 'The Hub, monthly' },
+    { env: 'STRIPE_PRICE_BUSINESS_YEARLY',  lookup: 'business_yearly',  product: 'business', pence: 199000, recurring: { interval: 'year' },  nickname: 'The Hub, yearly' },
+    { env: 'STRIPE_PRICE_VIDEO_25',         lookup: 'video_25',         product: 'video',    pence: 2500,  nickname: '7 animations' },
+    { env: 'STRIPE_PRICE_VIDEO_50',         lookup: 'video_50',         product: 'video',    pence: 5000,  nickname: '15 animations' },
+    { env: 'STRIPE_PRICE_VIDEO_100',        lookup: 'video_100',        product: 'video',    pence: 10000, nickname: '30 animations' },
 ];
 
 // £199 -> £140 is £59.00 off a month for 12 months.
@@ -59,25 +90,42 @@ const out = [];
 const products = {};
 for (const p of PRODUCTS) {
     const found = await stripe.products.search({ query: `metadata['modulr_key']:'${p.key}'` });
-    products[p.key] = found.data[0] || await stripe.products.create({ name: p.name, description: p.description, metadata: { modulr_key: p.key } });
-    console.log(`product ${p.key}: ${products[p.key].id}${found.data[0] ? ' (existing)' : ' (created)'}`);
+    const existing = found.data[0];
+    // Existing products take the current name and description, so re-running
+    // the script is how the checkout wording is kept up to date.
+    products[p.key] = existing
+        ? await stripe.products.update(existing.id, { name: p.name, description: p.description, active: true })
+        : await stripe.products.create({ name: p.name, description: p.description, metadata: { modulr_key: p.key } });
+    console.log(`product ${p.key}: ${products[p.key].id}${existing ? ' (updated)' : ' (created)'}${p.invoiceOnly ? ' - invoice only, no price' : ''}`);
 }
 
 for (const pr of PRICES) {
     const found = await stripe.prices.list({ lookup_keys: [pr.lookup], limit: 1 });
     let price = found.data[0];
-    if (!price) {
-        price = await stripe.prices.create({
+    const stale = price && (price.unit_amount !== pr.pence || !price.active || price.product !== products[pr.product].id);
+    if (!price || stale) {
+        // Prices cannot be edited. A price at an old amount (the 17 Sep
+        // £59.99 / £199.99, say) is replaced: the new one takes over its
+        // lookup key and the old one is archived. Existing subscribers stay
+        // on the price they signed up at until they are moved.
+        const created = await stripe.prices.create({
             product: products[pr.product].id,
             currency: 'gbp',
             unit_amount: pr.pence,
             tax_behavior: 'inclusive',
             lookup_key: pr.lookup,
+            transfer_lookup_key: true,
+            nickname: pr.nickname,
             ...(pr.recurring ? { recurring: pr.recurring } : {}),
             metadata: { modulr_key: pr.lookup },
         });
+        if (stale && price.active) await stripe.prices.update(price.id, { active: false });
+        if (stale) console.log(`  replaced ${pr.lookup} ${price.id} (£${(price.unit_amount / 100).toFixed(2)}), archived`);
+        price = created;
+    } else if (price.nickname !== pr.nickname) {
+        await stripe.prices.update(price.id, { nickname: pr.nickname });
     }
-    console.log(`price ${pr.lookup}: ${price.id} £${(pr.pence / 100).toFixed(2)}${found.data[0] ? ' (existing)' : ' (created)'}`);
+    console.log(`price ${pr.lookup}: ${price.id} £${(pr.pence / 100).toFixed(2)}${found.data[0] && !stale ? ' (existing)' : ' (created)'}`);
     out.push(`${pr.env}=${price.id}`);
 }
 
@@ -94,4 +142,6 @@ for (const c of COUPONS) {
 
 console.log('\nAdd these to Render (Environment) and to the local .env:\n');
 console.log(out.join('\n'));
-console.log('\nAlso needed: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET (from the webhook endpoint for /webhook/stripe), and BILLING_ENABLED=true when you are ready to sell.');
+console.log('\nAlso needed: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and, when you are ready to sell, BILLING_ENABLED=true.');
+console.log('Webhook endpoint: https://www.modulrstudio.co.uk/webhook/stripe (with www - the bare domain redirects and Stripe does not follow redirects).');
+console.log('Webhook events: checkout.session.completed, invoice.paid, invoice.payment_failed, customer.subscription.deleted');

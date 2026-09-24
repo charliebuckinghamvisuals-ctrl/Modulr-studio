@@ -22,7 +22,10 @@ const SIZE = 256;
 // Bump when the render/framing changes so cached images are regenerated.
 // v4: models re-exported under the same file name (corner unit, hot tub)
 // kept showing their old picture from the cache.
-const STORAGE_PREFIX = 'modulr_thumb_v6:';
+// v7 (24 Sep 2026): the woven fabric on the newer seating changed the
+// MATERIALS, not the file - "Armchair (Low)" kept its old satin picture.
+// Bump this whenever materialFixes changes how a model looks.
+const STORAGE_PREFIX = 'modulr_thumb_v7:';
 
 const memory = new Map<string, string>();
 const pending = new Map<string, Promise<string | null>>();

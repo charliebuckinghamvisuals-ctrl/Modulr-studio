@@ -11,7 +11,7 @@ import { PATH_SURFACES, pathLength, describePath } from './3d/Paths';
 import { DECK_MATERIALS, deckArea, describeDeck } from './3d/Decks';
 import { ClaudeSketchUpPrompt } from './ClaudeSketchUpPrompt';
 import { DimensionSlider } from './DimensionSlider';
-import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS, INTERIOR_DOOR_STYLES } from '../modelRegistry';
+import { GLB_OBJECT_TYPES, GLB_OBJECT_LABELS, INTERIOR_DOOR_STYLES, INTERIOR_DOOR_HANDLES } from '../modelRegistry';
 import { describeExteriorLights, describeInterior, describePlanItems } from '../utils/placement';
 import { cropToInk } from '../utils/renderInputs';
 import { DOOR_KINDS, LEAF_RANGE, doorKind, clampLeaves, changesForKind } from '../utils/doors';
@@ -1668,6 +1668,13 @@ export function Sidebar() {
                             <option value="">Opening</option>
                             {Object.entries(INTERIOR_DOOR_STYLES).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
                           </select>
+                          {dr.style && (
+                            <select value={dr.handle || 'plate'} title="Handle"
+                              onChange={(e) => wrap(store.updatePartitionDoor)(part.id, dr.id, { handle: e.target.value as any })}
+                              className="bg-white border border-gray-200 rounded px-1 py-1 text-[10px] text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#3b4d4a]">
+                              {Object.entries(INTERIOR_DOOR_HANDLES).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
+                            </select>
+                          )}
                           <button onClick={(e) => { e.stopPropagation(); wrap(store.removePartitionDoor)(part.id, dr.id); }} className="ml-auto text-red-400 hover:text-red-500">
                             <Trash2 size={12} />
                           </button>
@@ -1819,6 +1826,7 @@ export function Sidebar() {
                   'kitchen_hob_gas', 'kitchen_hob_induction', 'kitchen_extractor',
                   'external_extraction_fan',
                   'kitchen_tall_fridge', 'kitchen_tall_oven_single', 'kitchen_tall_oven_double',
+                  'fridge_freestanding', 'washing_machine',
                   'kitchen_tap_straight', 'kitchen_tap_curved',
                   'bar_stool', 'bar_stool_tall',
                 ] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
@@ -1860,7 +1868,7 @@ export function Sidebar() {
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Rugs</label>
               <div className="grid grid-cols-2 gap-2.5">
-                {(['rug', 'rug_2'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['rug', 'rug_2', 'rug_3', 'rug_4'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
@@ -1869,7 +1877,7 @@ export function Sidebar() {
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Tables & Storage</label>
               <div className="grid grid-cols-2 gap-2.5">
-                {(['dining_table', 'dining_table_round', 'coffee_table', 'coffee_table_black', 'tv_unit', 'wall_tv', 'desk', 'desk_single', 'shelving_unit', 'wardrobe', 'chest_of_drawers', 'bedside_table'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['dining_table', 'dining_table_round', 'coffee_table', 'coffee_table_black', 'tv_unit', 'wall_tv', 'desk', 'desk_single', 'shelving_unit', 'sideboard', 'tv_cabinet', 'shoe_rack', 'wardrobe', 'chest_of_drawers', 'bedside_table'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>
@@ -1898,7 +1906,19 @@ export function Sidebar() {
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Bathroom</label>
               <div className="grid grid-cols-2 gap-2.5">
-                {(['toilet', 'vanity', 'basin_tap_mixer', 'basin_tap_widespread', 'basin_tap_wall', 'shower', 'shower_corner', 'shower_small', 'towel_heater'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['toilet', 'vanity', 'vanity_mirror', 'basin_tap_mixer', 'basin_tap_widespread', 'basin_tap_wall', 'shower', 'shower_corner', 'shower_small', 'towel_heater'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
+                ))}
+              </div>
+            </section>
+
+            {/* Decor (24 Sep 2026): the finishing pieces. Each stands at the
+                height of what it usually sits on, with a Height slider. */}
+            <section>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-1 block">Decor</label>
+              <p className="text-[10px] text-gray-400 mb-2 leading-snug">Set the height in the object panel to sit it on a shelf, a table or the worktop.</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                {(['wall_art', 'books_decor', 'shelf_decor', 'kitchen_decor'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>

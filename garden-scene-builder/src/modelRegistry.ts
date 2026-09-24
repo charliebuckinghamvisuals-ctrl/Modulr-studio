@@ -1,4 +1,4 @@
-import type { ObjectType, InteriorDoorStyle } from './types';
+import type { ObjectType, InteriorDoorStyle, InteriorDoorHandle } from './types';
 
 /**
  * GLB-backed placeable objects - the single place new SketchUp models get
@@ -36,6 +36,22 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   outdoor_chair: 'models/outdoor_chair.glb',
   outdoor_table: 'models/outdoor_table.glb',
   bbq: 'models/bbq_grill.glb',
+  // 24 Sep 2026: Charlie's 22-23 Sep exports, each on its own in the file -
+  // baked to metres, centred on the floor, textures to 512px, quantised. The
+  // TV cabinet's 1,077 per-panel wood materials are one material (one draw
+  // call); the sideboard was modelled side-on and is turned to face +Z.
+  washing_machine: 'models/washing_machine.glb',
+  fridge_freestanding: 'models/fridge_freestanding.glb',
+  shoe_rack: 'models/shoe_rack.glb',
+  sideboard: 'models/sideboard.glb',
+  tv_cabinet: 'models/tv_cabinet.glb',
+  rug_3: 'models/rug_3.glb',
+  rug_4: 'models/rug_4.glb',
+  vanity_mirror: 'models/vanity_mirror.glb',
+  wall_art: 'models/wall_art.glb',
+  books_decor: 'models/books_decor.glb',
+  shelf_decor: 'models/shelf_decor.glb',
+  kitchen_decor: 'models/kitchen_decor.glb',
   rug: 'models/rug.glb',
   rug_2: 'models/rug_2.glb',
   footstool: 'models/footstool.glb',
@@ -438,6 +454,15 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   // at the regulation 1730.
   wall_tv: 950,
   dart_board: 1420,
+  // Decor stands on something, so it starts at that something's height and
+  // each placed piece has a Height slider: the canvas's bottom edge at
+  // 1100, kitchen accessories on the 900mm worktop, the books on the oak
+  // coffee table's 457mm top, and the shelf set at the height its lowest
+  // shelf was modelled at.
+  wall_art: 1100,
+  kitchen_decor: 900,
+  books_decor: 457,
+  shelf_decor: 590,
   toilet: 100,
 };
 
@@ -447,6 +472,12 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
  * door; the white option is the same door painted.
  */
 export const INTERIOR_DOOR_URL = 'models/interior_door_country.glb';
+export const INTERIOR_DOOR_HANDLES: Record<InteriorDoorHandle, { name: string }> = {
+  plate: { name: 'Lever on plate' },
+  rose: { name: 'Lever on rose' },
+  knob: { name: 'Knob' },
+};
+
 export const INTERIOR_DOOR_STYLES: Record<InteriorDoorStyle, { name: string; paint?: string }> = {
   oak_country: { name: 'Oak country' },
   white_country: { name: 'White country', paint: '#f1efe9' },
@@ -460,6 +491,10 @@ export const EXTRACTOR_FLUE_H = 0.955;    // native flue height, m
 
 /** Height (m) an object sits at above the finished floor - 0 for anything
  *  that stands on it. */
+/** Decor that sits ON something - a table, a shelf, the worktop, the wall -
+ *  so each placed piece gets a Height slider (ObjectEditorPanel). */
+export const DECOR_TYPES: ObjectType[] = ['wall_art', 'books_decor', 'shelf_decor', 'kitchen_decor'];
+
 export const mountHeight = (type: ObjectType) => (MOUNT_HEIGHT_MM[type] ?? 0) / 1000;
 /** The height a PLACED object is fixed at: its own setting, or the type's default. */
 export const objectMountHeight = (obj: { type: ObjectType; mountHeightMm?: number }) => ((obj.mountHeightMm ?? MOUNT_HEIGHT_MM[obj.type]) ?? 0) / 1000;
@@ -821,6 +856,15 @@ export const UNMIRROR_NORMALS: Partial<Record<ObjectType, true>> = {
 };
 
 export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
+  // 24 Sep: timber, fabric and paint at the exporter's half-metal. The
+  // appliances, the vanity's mirror and the decor's chrome keep theirs.
+  shoe_rack: true,
+  sideboard: true,
+  tv_cabinet: true,
+  rug_3: true,
+  rug_4: true,
+  wall_art: true,
+  books_decor: true,
   bar_stool: true,
   bar_stool_tall: true,
   dining_table: true,
@@ -1051,6 +1095,9 @@ export const UNIT_COLOURS: { name: string; hex: string }[] = [
  *  ceiling of a standard-height room. */
 export const MODEL_SCALES: Partial<Record<ObjectType, [number, number, number]>> = {
   wardrobe: [1, 2.0 / 2.44, 1],
+  // Four framed calligraphy prints in a 1.7m square block; 1m suits a
+  // garden room wall.
+  wall_art: [1 / 1.7, 1 / 1.7, 1],
   // Shower enclosures modelled taller than a standard room - capped to 2.0m.
   shower: [1, 2.0 / 2.515, 1],
   shower_small: [1, 2.0 / 2.335, 1],
@@ -1098,6 +1145,18 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   outdoor_chair: 'Garden Armchair',
   outdoor_table: 'Garden Coffee Table',
   bbq: 'BBQ',
+  washing_machine: 'Washing Machine',
+  fridge_freestanding: 'Fridge Freezer',
+  shoe_rack: 'Shoe Rack',
+  sideboard: 'Sideboard',
+  tv_cabinet: 'TV Cabinet',
+  rug_3: 'Rug (5 x 8 ft)',
+  rug_4: 'Rug (Large)',
+  vanity_mirror: 'Vanity & Mirror',
+  wall_art: 'Wall Art (4 Prints)',
+  books_decor: 'Books & Chess',
+  shelf_decor: 'Shelf Decor',
+  kitchen_decor: 'Kitchen Accessories',
   rug: 'Rug (Patterned)',
   rug_2: 'Rug (Sand)',
   footstool: 'Footstool',

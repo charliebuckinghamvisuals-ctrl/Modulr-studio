@@ -142,6 +142,8 @@ export const INTERIOR_TYPES: ObjectType[] = [
   // see OUTDOOR_TYPES in utils/bay for where it is allowed to go.
   'hot_tub',
   'pool_table', 'arcade_machine', 'wall_tv', 'dart_board',
+  'washing_machine', 'fridge_freestanding', 'shoe_rack', 'sideboard', 'tv_cabinet',
+  'rug_3', 'rug_4', 'vanity_mirror', 'wall_art', 'books_decor', 'shelf_decor', 'kitchen_decor',
   // aircon_outdoor is the condenser on the OUTSIDE wall, like the extract terminal.
   // external_extraction_fan is deliberately NOT here - it is the outside
   // terminal of the extract run, so it has to be placeable on an outside wall.
@@ -173,6 +175,8 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
   garden_ramp: 1.2,
   wall_light_sconce: 0.3, wall_light_angled: 0.3, wall_light_box: 0.3, wall_light_slim: 0.3,
   pool_table: 1.35, arcade_machine: 0.55, wall_tv: 0.75, dart_board: 0.4,
+  washing_machine: 0.5, fridge_freestanding: 0.55, shoe_rack: 0.9, sideboard: 0.65, tv_cabinet: 1.1,
+  rug_3: 1.5, rug_4: 1.65, vanity_mirror: 0.5, wall_art: 0.6, books_decor: 0.3, shelf_decor: 0.7, kitchen_decor: 1.25,
 };
 
 /**

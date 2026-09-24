@@ -4,7 +4,7 @@ import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore } from '../../store';
 import { INTERIOR_DOOR_URL, INTERIOR_DOOR_STYLES, METAL_FINISHES } from '../../modelRegistry';
-import type { InteriorDoorStyle } from '../../types';
+import type { InteriorDoorStyle, InteriorDoorHandle } from '../../types';
 import { BLACK_METAL, buildHandle, useHandleScene } from './DoorHandleModel';
 
 /**
@@ -49,10 +49,43 @@ const finishFor = (hex?: string) => {
   return METAL_FINISHES.find(f => f.hex.toLowerCase() === h) ?? BLACK_METAL;
 };
 
-export function InteriorDoorModel({ doorId, style, ironmongery, swing = 1, widthMm, heightMm, thicknessM }: {
+/**
+ * A round door knob on a rose, in one metal, built rather than modelled:
+ * rose 54mm across, a short neck, a 56mm knob slightly flattened. Origin at
+ * the centre of the rose on the door face, projecting towards +Z - the same
+ * frame buildHandle() gives the lever, so it is placed the same way.
+ */
+function buildKnob(): { group: THREE.Group; material: THREE.MeshStandardMaterial } {
+  const material = new THREE.MeshStandardMaterial({ color: BLACK_METAL.hex, metalness: 1, roughness: BLACK_METAL.roughness, envMapIntensity: 1.1 });
+  material.name = 'door-knob-metal';
+  const group = new THREE.Group();
+  group.name = 'door-knob';
+  const part = (geo: THREE.BufferGeometry, z: number, scaleZ = 1) => {
+    const m = new THREE.Mesh(geo, material);
+    m.rotation.x = Math.PI / 2; // cylinder axis along Z, out of the door
+    m.position.z = z;
+    m.scale.set(1, scaleZ, 1);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    group.add(m);
+  };
+  part(new THREE.CylinderGeometry(0.027, 0.027, 0.008, 40), 0.004);
+  part(new THREE.CylinderGeometry(0.009, 0.011, 0.032, 24), 0.024);
+  // The knob: a sphere squashed along its depth, the rotation making the
+  // cylinder's Y the door's Z, so the squash is in scale Y.
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.028, 40, 24), material);
+  knob.position.z = 0.058;
+  knob.scale.set(1, 1, 0.8);
+  knob.castShadow = true;
+  group.add(knob);
+  return { group, material };
+}
+
+export function InteriorDoorModel({ doorId, style, ironmongery, handle = 'plate', swing = 1, widthMm, heightMm, thicknessM }: {
   doorId: string;
   style: InteriorDoorStyle;
   ironmongery?: string;
+  handle?: InteriorDoorHandle;
   swing?: 1 | -1;
   widthMm: number;
   heightMm: number;
@@ -108,18 +141,35 @@ export function InteriorDoorModel({ doorId, style, ironmongery, swing = 1, width
      */
     let leafForHandles: THREE.Object3D | null = null;
     root.traverse(o => { if (!leafForHandles && o.name === LEAF_NODE) leafForHandles = o; });
+    // One handle on each face, both called DoorHandle_1 in the file - but
+    // GLTFLoader makes node names unique, so the second arrives as
+    // DoorHandle_1_1. Matching the exact name only ever swapped the first:
+    // one face of every door had the plate lever and the other the model's
+    // own rose lever (Charlie, 24 Sep 2026: "the handles are different").
     const originals: THREE.Object3D[] = [];
-    root.traverse(o => { if (o.name === HANDLE_NODE) originals.push(o); });
+    root.traverse(o => { if (o.name === HANDLE_NODE || o.name.startsWith(`${HANDLE_NODE}_`)) originals.push(o); });
     root.updateMatrixWorld(true);
-    if (handleScene) originals.forEach(n => {
-      const c = new THREE.Box3().setFromObject(n).getCenter(new THREE.Vector3());
+    /*
+     * The handle is a choice (Charlie, 24 Sep 2026): 'rose' keeps the door
+     * model's own lever on a round rose - its metal is already in the
+     * ironmongery list, so the finish still applies; 'plate' (the default)
+     * swaps in the lever on a backplate once that file has loaded; 'knob'
+     * fits a built knob at the rose, which sits at the lever's door-edge
+     * end rather than the middle of the lever.
+     */
+    const replace = handle === 'knob' || (handle !== 'rose' && !!handleScene);
+    if (replace) originals.forEach(n => {
+      const box = new THREE.Box3().setFromObject(n);
+      const c = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
       n.visible = false;
-      const { group, material } = buildHandle(handleScene);
+      const { group, material } = handle === 'knob' ? buildKnob() : buildHandle(handleScene!);
       metals.push(material);
       const onFront = c.z > HINGE_Z;
       const towardsCentre = c.x < 0 ? 1 : -1;
       const mirror = (onFront ? towardsCentre : -towardsCentre) < 0 ? -1 : 1;
-      group.position.set(c.x, c.y, onFront ? HINGE_Z + 0.025 : HINGE_Z - 0.025);
+      const x = handle === 'knob' ? c.x - towardsCentre * Math.max(0, size.x / 2 - 0.027) : c.x;
+      group.position.set(x, c.y, onFront ? HINGE_Z + 0.025 : HINGE_Z - 0.025);
       group.rotation.y = onFront ? 0 : Math.PI;
       group.scale.set(mirror, 1, 1);
       root.add(group);
@@ -154,7 +204,7 @@ export function InteriorDoorModel({ doorId, style, ironmongery, swing = 1, width
     // group the hinge is placed in.
     root.remove(hinge);
     return { root, hinge, metals };
-  }, [scene, handleScene, style]);
+  }, [scene, handleScene, style, handle]);
 
   useEffect(() => { pivot.current = model.hinge; }, [model]);
 

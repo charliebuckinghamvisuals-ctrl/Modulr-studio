@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp, DoorOpen, DoorClosed } from 'lucide-react';
 import { useStore } from '../../store';
 import { resumeWalking } from '../../utils/walk';
-import { INTERIOR_DOOR_STYLES, METAL_FINISHES } from '../../modelRegistry';
-import type { InteriorDoorStyle } from '../../types';
+import { INTERIOR_DOOR_STYLES, INTERIOR_DOOR_HANDLES, METAL_FINISHES } from '../../modelRegistry';
+import { BLACK_METAL } from '../3d/DoorHandleModel';
+import type { InteriorDoorStyle, InteriorDoorHandle } from '../../types';
 
 /**
  * An internal wall's doors, edited by clicking the wall in the walkthrough.
@@ -49,6 +50,8 @@ export function WalkDoorPanel() {
   const addPartitionDoor = useStore(s => s.addPartitionDoor);
   const openIds = useStore(s => s.openDoorIds);
   const toggleDoorOpen = useStore(s => s.toggleDoorOpen);
+  const matchInteriorDoorHandles = useStore(s => s.matchInteriorDoorHandles);
+  const totalDoors = useStore(s => (s.scene.room.partitions || []).reduce((n, p) => n + (p.doors || []).length, 0));
   const [collapsed, setCollapsed] = useState(false);
 
   if (!open || !part) return null;
@@ -92,7 +95,9 @@ export function WalkDoorPanel() {
           )}
           {doors.map((dr, i) => {
             const isOpen = openIds.includes(dr.id);
-            const finish = (dr.ironmongery ?? METAL_FINISHES[0].hex).toLowerCase();
+            // No finish set renders matte black (InteriorDoorModel), so that
+            // is the swatch shown as chosen - it used to show chrome.
+            const finish = (dr.ironmongery ?? BLACK_METAL.hex).toLowerCase();
             return (
               <div key={dr.id} className={`flex flex-col gap-2 ${i > 0 ? 'pt-2 border-t border-black/5' : ''}`}>
                 <div className="flex items-center gap-1.5">
@@ -114,8 +119,16 @@ export function WalkDoorPanel() {
                   );
                 })()}
                 {dr.style && (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 w-14">Handle</span>
+                    {(Object.entries(INTERIOR_DOOR_HANDLES) as [InteriorDoorHandle, { name: string }][]).map(([k, v]) => (
+                      <button key={k} onClick={() => updatePartitionDoor(part.id, dr.id, { handle: k })} className={chip((dr.handle ?? 'plate') === k)}>{v.name}</button>
+                    ))}
+                  </div>
+                )}
+                {dr.style && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 w-14">Finish</span>
                     {METAL_FINISHES.map(f => (
                       <button
                         key={f.hex}
@@ -138,6 +151,15 @@ export function WalkDoorPanel() {
                       {isOpen ? 'Close' : 'Open'}
                     </button>
                   </div>
+                )}
+                {dr.style && totalDoors > 1 && (
+                  <button
+                    onClick={() => matchInteriorDoorHandles(dr.handle ?? 'plate', dr.ironmongery)}
+                    className="self-start text-[10px] font-semibold text-[#3b4d4a] underline decoration-[#3b4d4a]/30 hover:decoration-[#3b4d4a]"
+                    title="Give every internal door in the building this handle and finish"
+                  >
+                    Use this handle on every door
+                  </button>
                 )}
               </div>
             );

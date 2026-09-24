@@ -192,6 +192,8 @@ interface AppState {
   addPartitionDoor: (partitionId: string) => void;
   updatePartitionDoor: (partitionId: string, doorId: string, updates: Partial<PartitionDoor>) => void;
   removePartitionDoor: (partitionId: string, doorId: string) => void;
+  /** Give every internal door in the room the same handle and finish. */
+  matchInteriorDoorHandles: (handle: PartitionDoor['handle'], ironmongery: string | undefined) => void;
   
     addInteriorDoor: () => void;
   updateInteriorDoor: (id: string, updates: Partial<InteriorDoorData>) => void;
@@ -1115,6 +1117,19 @@ export const useStore = create<AppState>((set, get) => ({
           : p)
       }
     }
+  })); },
+
+  matchInteriorDoorHandles: (handle, ironmongery) => { get().saveState(); return set((state) => ({
+    scene: {
+      ...state.scene,
+      room: {
+        ...state.scene.room,
+        partitions: (state.scene.room.partitions || []).map(p => ({
+          ...p,
+          doors: (p.doors || []).map(dr => ({ ...dr, handle, ironmongery })),
+        })),
+      },
+    },
   })); },
 
   removePartitionDoor: (partitionId, doorId) => { get().saveState(); return set((state) => ({
