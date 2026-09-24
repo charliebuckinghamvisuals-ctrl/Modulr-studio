@@ -53,7 +53,7 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
           // The full room spec, restorable via the My Designs picker or Projects.
           scene3d,
         });
-        toast.success('Design saved to a new project');
+        toast.success('Design saved to a new job');
       } else {
         const target = allProjects.find(p => p.id === saveTarget);
         await updateProject(saveTarget, { scene3d, estimateValue: pendingSave.price });
@@ -115,7 +115,7 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
         setSaveTarget('__new__');
         setPendingSave({
           room,
-          scene: { v: 2, room, objects: scene?.objects || [], fences: scene?.fences || [], paths: scene?.paths || [], garden: scene?.garden },
+          scene: { v: 2, room, objects: scene?.objects || [], fences: scene?.fences || [], paths: scene?.paths || [], decks: scene?.decks || [], garden: scene?.garden },
           price: typeof price === 'number' ? Math.round(price) : null,
         });
         return;
@@ -133,7 +133,7 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
           client: str(d.project?.client, 120),
           address: str(d.project?.address, 200),
           price: typeof d.price === 'number' && d.price > 0 ? Math.round(d.price) : null,
-          scene3d: scene ? JSON.stringify({ v: 2, room: scene.room || {}, objects: scene.objects || [], fences: scene.fences || [], paths: scene.paths || [], garden: scene.garden }) : null,
+          scene3d: scene ? JSON.stringify({ v: 2, room: scene.room || {}, objects: scene.objects || [], fences: scene.fences || [], paths: scene.paths || [], decks: scene.decks || [], garden: scene.garden }) : null,
         });
         return;
       }
@@ -358,15 +358,15 @@ export const DesignerView: React.FC<{ engine: any }> = ({ engine }) => {
       {pendingSave && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-80">
-            <h3 className="text-sm font-bold text-[#3b4d4a] mb-1">Save design to Projects</h3>
-            <p className="text-xs text-slate-400 mb-3">Add it to an existing project, or start a new one.</p>
+            <h3 className="text-sm font-bold text-[#3b4d4a] mb-1">Save design to a job</h3>
+            <p className="text-xs text-slate-400 mb-3">Add it to an existing job, or start a new one.</p>
             <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Save to</label>
             <select
               value={saveTarget}
               onChange={e => setSaveTarget(e.target.value)}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-[#3b4d4a] focus:outline-none focus:ring-2 focus:ring-accent/40 mb-3 bg-white"
             >
-              <option value="__new__">+ New project</option>
+              <option value="__new__">+ New job</option>
               {allProjects.map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}

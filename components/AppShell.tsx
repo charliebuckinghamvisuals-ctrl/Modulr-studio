@@ -135,7 +135,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeStage, onNav
   // and Gallery as a dropdown; everything else is a flat link.
   const navItemsBeforeTools = [
     { id: AppStage.HOME, label: 'Home' },
-    { id: AppStage.PROJECTS, label: 'Projects' },
+    { id: AppStage.PROJECTS, label: 'Jobs & Quotes' },
   ];
 
   const navItemsAfterTools = [

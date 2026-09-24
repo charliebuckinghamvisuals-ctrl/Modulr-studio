@@ -127,7 +127,7 @@ export const SaveToProjectDialog: React.FC<SaveToProjectDialogProps> = ({
                 {!canUseProjects ? (
                     <p className="text-xs text-slate-500 mt-3 flex items-start gap-2">
                         <Lock size={14} className="shrink-0 mt-0.5" />
-                        Projects is included on Configurator and The Hub. Subscribe to keep your work filed against the client it belongs to.
+                        Jobs & Quotes is included on Configurator and The Hub. Subscribe to keep your work filed against the client it belongs to.
                     </p>
                 ) : (
                     <>

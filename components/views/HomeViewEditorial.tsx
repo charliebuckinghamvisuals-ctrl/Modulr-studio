@@ -52,9 +52,9 @@ const REASONS = [
     { title: 'Planning built in, by planning people', body: 'Made by NAPC, the UK planning consultancy for garden rooms and annexes. Permitted development is flagged as you design.' },
 ];
 
-/** The tools, by name. Each has its own page under Tools - except one that is
- *  announced before it is built, which has no stage and so does not click. */
-const TOOLS: { label: string; line: string; stage?: AppStage; badge?: string }[] = [
+/** The tools, by name. Each has its own page under Tools; the Website
+ *  Configurator is built per company, so it scrolls to its section here. */
+const TOOLS: { label: string; line: string; stage?: AppStage; anchor?: string; badge?: string }[] = [
     { label: '3D Configurator', line: 'Design to real dimensions', stage: AppStage.DESIGNER },
     { label: 'Render Engine', line: 'Pro-level CGI from the design', stage: AppStage.RENDER_ENGINE },
     { label: 'Detail Studio', line: 'The finish, up close', stage: AppStage.DETAIL_STUDIO },
@@ -62,10 +62,20 @@ const TOOLS: { label: string; line: string; stage?: AppStage; badge?: string }[]
     { label: 'Weather Lab', line: 'Same scheme, any season', stage: AppStage.WEATHER_LAB },
     { label: 'Floor Plan Studio', line: 'Rendered and CAD plans', stage: AppStage.FLOOR_PLAN_STUDIO, badge: 'Coming soon' },
     { label: 'Animation Studio', line: 'A render, brought to life', stage: AppStage.ANIMATION_STUDIO, badge: 'Coming soon' },
-    { label: 'Projects', line: 'One job, one place, one link', stage: AppStage.PROJECTS },
-    { label: 'Quoting Studio', line: 'The design, priced', badge: 'Coming soon' },
+    { label: 'Jobs & Quotes', line: 'The design, priced and won', stage: AppStage.PROJECTS },
+    { label: 'Website Configurator', line: 'Your designs, priced on your site', anchor: 'website-configurator', badge: 'Built for you' },
     { label: 'Planning Checker', line: 'Will it need permission?', stage: AppStage.PLANNING_CHECKER, badge: 'Free' },
 ];
+
+/** What the Website Configurator is, as outcomes - the same hairline list
+ *  as the Lock System. */
+const WEBSITE_POINTS = [
+    { title: 'Only your range', body: 'Your set designs and the options you actually offer, in your finishes. Nothing you do not sell.' },
+    { title: 'Your prices, live', body: 'Priced from your own price book as they design, so the number they see is the number you quote.' },
+    { title: 'Straight into your pipeline', body: 'Every design arrives in Jobs & Quotes as a lead, with the design attached, ready to quote.' },
+];
+
+const WEBSITE_ENQUIRY = `mailto:info@napc.uk?subject=${encodeURIComponent('Website Configurator enquiry')}&body=${encodeURIComponent('Hi Modulr,\n\nI would like to talk about a Website Configurator for my site.\n\nCompany:\nWebsite:\nHow many set designs:\nDo you have a Modulr plan already:\n')}`;
 
 const SHOWCASE = ['/gallery-6.jpg', '/gallery-5.jpg', '/gallery-9.jpg', '/gallery-12.jpg'];
 
@@ -98,8 +108,8 @@ const useReveal = () => {
 };
 
 /** One band: the background runs edge to edge, the content sits on the 1400px grid. */
-const Band: React.FC<{ tone?: 'white' | 'pale' | 'dark'; className?: string; inner?: string; children: React.ReactNode }> = ({ tone = 'white', className = '', inner = '', children }) => (
-    <section className={`w-full ${tone === 'dark' ? 'bg-accent text-white' : tone === 'pale' ? 'bg-[#f6f7f5]' : 'bg-white'} ${className}`}>
+const Band: React.FC<{ tone?: 'white' | 'pale' | 'dark'; className?: string; inner?: string; id?: string; children: React.ReactNode }> = ({ tone = 'white', className = '', inner = '', id, children }) => (
+    <section id={id} className={`w-full ${tone === 'dark' ? 'bg-accent text-white' : tone === 'pale' ? 'bg-[#f6f7f5]' : 'bg-white'} ${className}`}>
         <div className={`max-w-[1400px] mx-auto px-5 sm:px-8 lg:px-12 ${inner}`}>{children}</div>
     </section>
 );
@@ -388,15 +398,15 @@ export const HomeViewEditorial: React.FC<HomeViewProps> = ({ onOpenEngine, onNav
                 <Step
                     n="06" name="Deliver" flip
                     title="One job, one place, one link."
-                    body="Every render, detail, drawing and clip is filed against the client in Projects. Send a link the homeowner opens on their phone, and a PDF with the design, the finishes and the drawings in one document."
-                    action={{ label: 'Open Projects', onClick: go(AppStage.PROJECTS) }}
+                    body="Every render, detail, drawing and clip is filed against the client in Jobs & Quotes. Send a link the homeowner opens on their phone, and a PDF with the design, the finishes and the drawings in one document."
+                    action={{ label: 'Open Jobs & Quotes', onClick: go(AppStage.PROJECTS) }}
                 >
                     <div className="relative aspect-[16/10] overflow-hidden bg-[#eef0ec]">
                         <img src="/sauna-hero.jpg" alt="" aria-hidden loading="lazy" className="absolute inset-0 w-full h-full object-cover object-[50%_45%]" />
                         <div className="absolute inset-0 bg-gradient-to-t from-[#141a19]/85 via-[#141a19]/30 to-transparent" />
                         <div className="absolute inset-x-0 bottom-0 p-6 sm:p-10 grid grid-cols-3 gap-6 text-white">
                             {[
-                                ['Projects', 'Every asset, filed against the client'],
+                                ['Jobs & Quotes', 'Priced from the design, filed against the client'],
                                 ['Client link', 'A page they open on their phone'],
                                 ['PDF & spec', 'Design, finishes and drawings, in one'],
                             ].map(([t, b]) => (
@@ -481,15 +491,18 @@ export const HomeViewEditorial: React.FC<HomeViewProps> = ({ onOpenEngine, onNav
                     <h2 className="text-2xl sm:text-3xl text-accent mt-4 mb-10">Purpose-built for garden rooms</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-16 border-t border-slate-200">
                         {TOOLS.map(t => {
-                            const Row = t.stage ? 'button' : 'div';
+                            const click = t.stage ? go(t.stage)
+                                : t.anchor ? () => document.getElementById(t.anchor!)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                                : undefined;
+                            const Row = click ? 'button' : 'div';
                             return (
                             <Row
                                 key={t.label}
-                                {...(t.stage ? { type: 'button' as const, onClick: go(t.stage) } : {})}
+                                {...(click ? { type: 'button' as const, onClick: click } : {})}
                                 className="text-left flex items-baseline justify-between gap-6 py-5 border-b border-slate-200 group"
                             >
                                 <span className="flex items-baseline gap-3 min-w-0">
-                                    <span className={`text-accent font-semibold text-base ${t.stage ? 'group-hover:underline underline-offset-[6px] decoration-1 decoration-accent/40' : ''}`}>{t.label}</span>
+                                    <span className={`text-accent font-semibold text-base ${click ? 'group-hover:underline underline-offset-[6px] decoration-1 decoration-accent/40' : ''}`}>{t.label}</span>
                                     {t.badge && <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-accent/80 border border-accent/25 px-1.5 py-0.5">{t.badge}</span>}
                                 </span>
                                 <span className="text-secondary text-sm font-light text-right shrink-0">{t.line}</span>
@@ -497,6 +510,42 @@ export const HomeViewEditorial: React.FC<HomeViewProps> = ({ onOpenEngine, onNav
                             );
                         })}
                     </div>
+                </div>
+            </Band>
+
+            {/* 7b. Website Configurator (Charlie, 24 Sep 2026): a configurator
+                built for the provider's own site, sold by conversation, so the
+                action is an email, not a checkout. Laid out like the Lock
+                System: the pitch on the left, three outcomes on hairlines. */}
+            <Band tone="pale" inner="py-20 sm:py-28" id="website-configurator" className="scroll-mt-16">
+                <div data-reveal className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
+                    <div className="lg:col-span-5">
+                        <Eyebrow>For your website</Eyebrow>
+                        <h2 className="text-2xl sm:text-3xl lg:text-[2.4rem] text-accent leading-tight mt-4">Your designs, priced on your own site.</h2>
+                        <p className="text-secondary text-base lg:text-lg font-light leading-relaxed mt-6 max-w-md">
+                            We build a configurator for your website with your set designs, your finishes and your prices, in your branding. Homeowners design their garden room, see what it costs and send it to you.
+                        </p>
+                        <p className="text-secondary text-sm font-light leading-relaxed mt-4 max-w-md">
+                            Built and quoted for each company. Keep your Modulr plan for designing, rendering and quoting, or take it on its own.
+                        </p>
+                        <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-4">
+                            <a href={WEBSITE_ENQUIRY}>
+                                <Button className="px-10 py-4 text-sm tracking-wide">Talk to us</Button>
+                            </a>
+                            {onNavigate && <TextLink onClick={go(AppStage.PRICING)}>See the prices</TextLink>}
+                        </div>
+                    </div>
+                    <ol className="lg:col-span-7 border-t border-slate-300/70">
+                        {WEBSITE_POINTS.map((p, i) => (
+                            <li key={p.title} className="py-7 grid grid-cols-[3.5rem_1fr] gap-4 border-b border-slate-300/70">
+                                <span className="text-accent/60 text-2xl font-light tabular-nums leading-none pt-1">0{i + 1}</span>
+                                <div>
+                                    <p className="text-accent font-semibold text-base">{p.title}</p>
+                                    <p className="text-secondary text-base font-light mt-2 leading-relaxed max-w-xl">{p.body}</p>
+                                </div>
+                            </li>
+                        ))}
+                    </ol>
                 </div>
             </Band>
 

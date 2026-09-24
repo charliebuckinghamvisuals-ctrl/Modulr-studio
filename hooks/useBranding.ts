@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../services/firebase';
+import { clearPriceBookCache } from '../services/priceBookService';
 
 export type PdfTemplate = 'classic' | 'minimal' | 'bold';
 
@@ -72,6 +73,9 @@ export function useBranding() {
                 // Clear the cache on sign-out so the next person to use this
                 // browser does not inherit the previous user's branding.
                 clearCache();
+                // The configurator reads the price book from the same kind of
+                // mirror; it goes with the account too.
+                clearPriceBookCache();
                 setBrandingState(DEFAULT_BRANDING);
                 setIsLoaded(true);
                 return;

@@ -152,7 +152,7 @@ export const ROUTES: Record<AppStage, RouteMeta> = {
         path: '/pricing',
         title: 'Pricing',
         description:
-            'Free 7-day tester access with 40 renders and no card. Plans for garden room and annexe providers with the 3D Configurator, walkthrough, Render Engine and Projects.',
+            'Free 7-day tester access with 40 renders and no card. Plans for garden room and annexe providers with the 3D Configurator, walkthrough, Render Engine and Jobs & Quotes.',
         keywords: `garden room software pricing, render software pricing UK, garden room design software free trial, ${COMMON_KEYWORDS}`,
         indexable: true,
     },
@@ -189,9 +189,9 @@ export const ROUTES: Record<AppStage, RouteMeta> = {
         indexable: true,
     },
     [AppStage.PROJECTS]: {
-        path: '/projects',
-        title: 'Projects',
-        description: 'Your clients, jobs, saved designs and renders in one place.',
+        path: '/jobs',
+        title: 'Jobs & Quotes',
+        description: 'Your jobs, quotes, price book and pipeline: every garden room priced from its design, and every client, render and proposal in one place.',
         keywords: COMMON_KEYWORDS,
         indexable: false,
     },
@@ -219,6 +219,8 @@ const LEGACY_PATHS: Record<string, AppStage> = {
     // Material Studio was split on 21 Sep 2026: the material swap it was
     // indexed for became the Material Editor; close-ups moved to Detail Studio.
     '/material-studio': AppStage.MATERIAL_EDITOR,
+    // Projects became Jobs & Quotes on 24 Sep 2026, when quoting moved in.
+    '/projects': AppStage.PROJECTS,
 };
 
 /** The stage a URL path opens, or null when the path is not a page. */

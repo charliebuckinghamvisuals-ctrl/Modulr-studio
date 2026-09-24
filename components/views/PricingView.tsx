@@ -53,7 +53,7 @@ const STANDARD_PRICE_ID: Record<'monthly' | 'yearly', string> = {
  * webhook, and renaming them would be a migration for a label.
  */
 interface BillingPrice { priceId: string | null; label: string; pence: number; plan: string | null; mode: string }
-interface BillingInfo { billingEnabled: boolean; founding: boolean; prices: Record<string, BillingPrice>; videoModels: Record<string, { label: string; pricePence: number; available: boolean }> }
+interface BillingInfo { billingEnabled: boolean; founding: boolean; prices: Record<string, BillingPrice>; videoModels: Record<string, { label: string; pricePence: number; available: boolean; animations8s?: number }>; animationPence?: number }
 const DECIDED_PENCE: Record<string, number> = { standard_monthly: 4999, standard_yearly: 49990, business_monthly: 19900, business_yearly: 199000, video_25: 2500, video_50: 5000, video_100: 10000 };
 /** The founding coupon is £59 off The Hub for 12 months (scripts/stripe-setup.mjs). */
 const FOUNDING_DISCOUNT_PENCE = 5900;
@@ -82,7 +82,7 @@ const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: s
      */
     { label: '3D Configurator',              trial: 'Full version', standard: 'Full version', business: 'Full version' },
     { label: 'Walk inside & walk outside',   trial: true,  standard: true,  business: true },
-    { label: 'Projects & saved designs',     trial: true,  standard: true,  business: true },
+    { label: 'Jobs & Quotes: quoting, price book, pipeline',     trial: true,  standard: true,  business: true },
     { label: 'Client organisation',          trial: true,  standard: true,  business: true },
     { label: 'Project & PDF outputs',        trial: true,  standard: true,  business: true },
     // Every generated image counts as a render - a configurator render, a
@@ -149,6 +149,8 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
         }).catch(() => { /* the decided figures still show */ });
     }, []);
     const priceOf = (key: string) => billing?.prices?.[key];
+    /** One animation, in pence - 30 for £100 (24 Sep 2026). */
+    const animationPence = billing?.animationPence ?? 333;
     const penceOf = (key: string) => priceOf(key)?.pence ?? DECIDED_PENCE[key];
     const priceIdOf = (key: string, fallback: string) => priceOf(key)?.priceId || fallback;
     const standardId = priceIdOf(`standard_${billingCycle}`, STANDARD_PRICE_ID[billingCycle]);
@@ -443,7 +445,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                 A studio animation of a garden room is made by hand: a 3D artist models it, lights it, plots the camera and renders every frame. It is accurate to the millimetre, and it costs £600 to £1,500 for ten seconds and £1,500 to £5,000 for thirty, with one to three weeks' turnaround and a fresh invoice for every change.
                             </p>
                             <p className="text-sm text-secondary leading-relaxed mb-4">
-                                Animation Studio uses Seedance and Kling, the world's leading video models, to turn the design you built in the configurator into a moving visual in about two minutes. It is the next best thing to a hand-made animation, and it costs from {pounds(billing?.videoModels?.kling?.pricePence ?? 150)} a clip.
+                                Animation Studio uses Seedance and Kling, the world's leading video models, to turn the design you built in the configurator into a moving visual in about two minutes. It is the next best thing to a hand-made animation, and it costs {pounds(animationPence)} an animation: 30 for £100.
                             </p>
                             <p className="text-sm text-secondary leading-relaxed">
                                 <span className="font-bold text-primary">For a small business:</span> a ten second clip of the client's actual building on every quote, a thirty second walkthrough for the website, a new clip every time the design changes, for less than the price of a coffee.
@@ -457,15 +459,15 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                     </thead>
                                     <tbody className="text-primary/85">
                                         <tr className="border-t border-border"><td className="p-3 text-secondary">Accuracy</td><td className="p-3">Frame-perfect, every time</td><td className="p-3">Held to your drawing, the next best thing</td></tr>
-                                        <tr className="border-t border-border"><td className="p-3 text-secondary">10 second clip</td><td className="p-3">£600 to £1,500</td><td className="p-3 font-bold">from {pounds(billing?.videoModels?.kling?.pricePence ?? 150)}</td></tr>
-                                        <tr className="border-t border-border"><td className="p-3 text-secondary">30 second clip</td><td className="p-3">£1,500 to £5,000</td><td className="p-3 font-bold">from {pounds((billing?.videoModels?.kling?.pricePence ?? 150) * 4)}</td></tr>
+                                        <tr className="border-t border-border"><td className="p-3 text-secondary">10 second clip</td><td className="p-3">£600 to £1,500</td><td className="p-3 font-bold">from {pounds(animationPence)}</td></tr>
+                                        <tr className="border-t border-border"><td className="p-3 text-secondary">30 second clip</td><td className="p-3">£1,500 to £5,000</td><td className="p-3 font-bold">from {pounds(animationPence * 3)}</td></tr>
                                         <tr className="border-t border-border"><td className="p-3 text-secondary">Turnaround</td><td className="p-3">1 to 3 weeks</td><td className="p-3">about 2 minutes</td></tr>
                                         <tr className="border-t border-border"><td className="p-3 text-secondary">Design change</td><td className="p-3">New job, new invoice</td><td className="p-3">Send it again</td></tr>
                                     </tbody>
                                 </table>
                             </div>
                             <div>
-                                <div className="text-[11px] font-bold uppercase tracking-widest text-secondary mb-2">Video credits, The Hub</div>
+                                <div className="text-[11px] font-bold uppercase tracking-widest text-secondary mb-2">Animations, The Hub</div>
                                 <div className="grid grid-cols-3 gap-3">
                                     {(['video_25', 'video_50', 'video_100'] as const).map(key => (
                                         <button
@@ -473,16 +475,16 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                             onClick={() => handleUpgrade('video_credits', priceIdOf(key, key), penceOf(key), true)}
                                             disabled={loadingPlan !== null || plan !== 'business' && plan !== 'master'}
                                             className="rounded-2xl border border-border bg-surface/40 hover:bg-surface/70 disabled:opacity-50 p-4 text-center transition-colors"
-                                            title={plan === 'business' || plan === 'master' ? 'Buy video credits' : 'Video credits are part of The Hub'}
+                                            title={plan === 'business' || plan === 'master' ? 'Buy animations' : 'Animations are part of The Hub'}
                                         >
-                                            <div className="text-2xl font-bold text-primary">{pounds(penceOf(key))}</div>
-                                            <div className="text-[11px] text-secondary">{Math.floor(penceOf(key) / (billing?.videoModels?.kling?.pricePence ?? 150))} Kling clips</div>
-                                            <div className="text-[11px] text-secondary">or {Math.floor(penceOf(key) / (billing?.videoModels?.seedance?.pricePence ?? 300))} Seedance clips</div>
+                                            <div className="text-2xl font-bold text-primary">{Math.floor(penceOf(key) / animationPence)}</div>
+                                            <div className="text-[11px] font-semibold text-secondary uppercase tracking-wider">animations</div>
+                                            <div className="text-sm font-bold text-accent mt-1">{pounds(penceOf(key))}</div>
                                         </button>
                                     ))}
                                 </div>
                                 <p className="text-[11px] text-secondary mt-2">
-                                    Kling 2.6 Pro {pounds(billing?.videoModels?.kling?.pricePence ?? 150)} a clip at 1080p, Seedance 2.5 {pounds(billing?.videoModels?.seedance?.pricePence ?? 300)} a clip at 720p, both based on 8 second clips. Longer clips are priced by the second. A failed clip is refunded automatically. Credits last 12 months.
+                                    One animation is one clip: Kling up to 10 seconds at 1080p, or Seedance up to 5 seconds at 720p (10 seconds at 480p). Longer Seedance clips at 720p count as two or three, and Animation Studio shows the count before you generate. A failed clip is refunded automatically. Credits last 12 months.
                                 </p>
                             </div>
                         </div>
@@ -574,6 +576,92 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                 <Button className="px-10 py-4 text-xs font-bold uppercase tracking-wider w-full">Request a design</Button>
                             </a>
                             <p className="text-[11px] text-secondary mt-3">Invoiced on delivery. Larger or unusual schemes are quoted before any work starts.</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/*
+                  * Website Configurator (Charlie, 24 Sep 2026): a configurator
+                  * on the PROVIDER'S own website, for their customers - only
+                  * their set designs, finishes and prices. Built per company,
+                  * so the setup is quoted ("talk to us"), then a monthly fee:
+                  * it is hosted, served and kept up to date for as long as it
+                  * is live, and it earns them leads every month. The provider
+                  * still has their own plan for designing, quoting and
+                  * rendering - or takes the website one on its own.
+                  *
+                  * FIGURES ARE PLACEHOLDERS until Charlie sets them: setup from
+                  * £995 (up to 4 designs), £200 a further design, £99 a month
+                  * on a plan, £149 a month on its own.
+                  */}
+                <div id="website-configurator" className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-xl shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
+                    <div className="max-w-3xl mb-10">
+                        <div className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-accent border border-accent/25 px-2 py-1 mb-4">New · built for you</div>
+                        <h4 className="text-2xl font-bold text-accent mb-3">Website Configurator</h4>
+                        <p className="text-sm text-secondary leading-relaxed mb-4">
+                            A 3D configurator on your own website, for your customers. Only your set designs, your finishes and your prices: a homeowner picks a design, changes it within the options you offer, sees what it costs and sends it straight to you.
+                        </p>
+                        <p className="text-sm text-secondary leading-relaxed mb-5">
+                            We build it from your range, in your branding, and you add it to your site with one line of code. Keep your own Modulr plan for designing, quoting and rendering, or take the website configurator on its own.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
+                            {[
+                                'Your set designs and options only',
+                                'Your prices, live as they design',
+                                'Your logo and colours, on your site',
+                                'Every design arrives as a lead',
+                                'Works on phones and tablets',
+                                'Hosting, updates and support included',
+                            ].map(item => (
+                                <div key={item} className="flex items-start gap-2.5">
+                                    <Check size={16} className="text-accent shrink-0 mt-0.5" strokeWidth={3} />
+                                    <span className="text-sm leading-tight text-primary/85">{item}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                        {/* Route 1: on top of a plan - leads into Jobs & Quotes. */}
+                        <div className="rounded-2xl border border-accent/30 bg-gradient-to-b from-surface/80 to-accent/5 p-6 flex flex-col">
+                            <div className="text-[10px] font-bold text-accent uppercase tracking-[0.2em] mb-2">With your Modulr plan</div>
+                            <div className="text-4xl font-bold text-primary drop-shadow-md mb-1">from £995 <span className="text-xs font-bold text-secondary uppercase">setup, inc VAT</span></div>
+                            <p className="text-sm text-secondary leading-relaxed mb-4">On a Configurator or Hub plan. Leads land in your Jobs & Quotes with the design attached, priced from your own price book, ready to quote.</p>
+                            <div className="overflow-hidden rounded-xl border border-border mb-5">
+                                <table className="w-full text-sm">
+                                    <tbody className="text-primary/85">
+                                        <tr><td className="p-2.5 text-secondary">Setup, up to four designs</td><td className="p-2.5 font-bold text-right">from £995</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Each further design</td><td className="p-2.5 font-bold text-right">£200</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Monthly, on top of your plan</td><td className="p-2.5 font-bold text-right">£99</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Price changes</td><td className="p-2.5 font-bold text-right">You, from your price book</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <a className="mt-auto" href={`mailto:info@napc.uk?subject=${encodeURIComponent('Website Configurator enquiry')}&body=${encodeURIComponent('Hi Modulr,\n\nI would like a Website Configurator for my site, alongside my Modulr plan.\n\nCompany:\nWebsite:\nMy Modulr account email:\nHow many set designs:\nAnything else we should know:\n')}`}>
+                                <Button className="px-10 py-4 text-xs font-bold uppercase tracking-wider w-full">Talk to us</Button>
+                            </a>
+                            <p className="text-[11px] text-secondary mt-3">Every build is quoted before any work starts.</p>
+                        </div>
+
+                        {/* Route 2: the website configurator alone - leads by email. */}
+                        <div className="rounded-2xl border border-border bg-surface/40 p-6 flex flex-col">
+                            <div className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em] mb-2">On its own</div>
+                            <div className="text-4xl font-bold text-primary drop-shadow-md mb-1">from £995 <span className="text-xs font-bold text-secondary uppercase">setup, inc VAT</span></div>
+                            <p className="text-sm text-secondary leading-relaxed mb-4">Just the configurator for your customers, no Modulr plan. Each design they send reaches you by email, with the specification and the price.</p>
+                            <div className="overflow-hidden rounded-xl border border-border mb-5">
+                                <table className="w-full text-sm">
+                                    <tbody className="text-primary/85">
+                                        <tr><td className="p-2.5 text-secondary">Setup, up to four designs</td><td className="p-2.5 font-bold text-right">from £995</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Each further design</td><td className="p-2.5 font-bold text-right">£200</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Monthly</td><td className="p-2.5 font-bold text-right">£149</td></tr>
+                                        <tr className="border-t border-border"><td className="p-2.5 text-secondary">Price changes</td><td className="p-2.5 font-bold text-right">Sent to us, done in 2 days</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <a className="mt-auto" href={`mailto:info@napc.uk?subject=${encodeURIComponent('Website Configurator enquiry')}&body=${encodeURIComponent('Hi Modulr,\n\nI would like a Website Configurator for my site, on its own.\n\nCompany:\nWebsite:\nHow many set designs:\nAnything else we should know:\n')}`}>
+                                <Button variant="outline" className="px-10 py-4 text-xs font-bold uppercase tracking-wider w-full">Talk to us</Button>
+                            </a>
+                            <p className="text-[11px] text-secondary mt-3">Every build is quoted before any work starts.</p>
                         </div>
                     </div>
                 </div>

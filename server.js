@@ -114,9 +114,9 @@ const BILLING_PRICES = {
     standard_yearly:  { env: 'STRIPE_PRICE_STANDARD_YEARLY',  plan: 'standard', mode: 'subscription', label: 'Configurator, yearly',  pence: 49990 },
     business_monthly: { env: 'STRIPE_PRICE_BUSINESS_MONTHLY', plan: 'business', mode: 'subscription', label: 'The Hub, monthly',      pence: 19900 },
     business_yearly:  { env: 'STRIPE_PRICE_BUSINESS_YEARLY',  plan: 'business', mode: 'subscription', label: 'The Hub, yearly',       pence: 199000 },
-    video_25:         { env: 'STRIPE_PRICE_VIDEO_25',         plan: null, mode: 'payment', label: '£25 video credits',  pence: 2500,  videoCreditsPence: 2500 },
-    video_50:         { env: 'STRIPE_PRICE_VIDEO_50',         plan: null, mode: 'payment', label: '£50 video credits',  pence: 5000,  videoCreditsPence: 5000 },
-    video_100:        { env: 'STRIPE_PRICE_VIDEO_100',        plan: null, mode: 'payment', label: '£100 video credits', pence: 10000, videoCreditsPence: 10000 },
+    video_25:         { env: 'STRIPE_PRICE_VIDEO_25',         plan: null, mode: 'payment', label: '7 animations (£25)',  pence: 2500,  videoCreditsPence: 2500 },
+    video_50:         { env: 'STRIPE_PRICE_VIDEO_50',         plan: null, mode: 'payment', label: '15 animations (£50)',  pence: 5000,  videoCreditsPence: 5000 },
+    video_100:        { env: 'STRIPE_PRICE_VIDEO_100',        plan: null, mode: 'payment', label: '30 animations (£100)', pence: 10000, videoCreditsPence: 10000 },
 };
 for (const [key, p] of Object.entries(BILLING_PRICES)) {
     const id = process.env[p.env];
@@ -136,15 +136,13 @@ const MONTH_ONE_COUPON = process.env.STRIPE_COUPON_MONTH_ONE || null;
 /**
  * Video models through the Higgsfield API (17 Sep 2026), priced per second
  * from Higgsfield's LIST rates (the console shows 30-50% promo rates; plan
- * on list) times VIDEO_MARGIN, rounded up to 5p:
+ * on list), which set how many animations a clip counts as (below):
  *   Seedance 2.5 image-to-video: token-metered, tokens = s x w x h x 24 /
  *     1024 at $0.0214 per 1,000 -> $0.2056/s at 480p, $0.4625/s at 720p.
  *   Kling 3.0 Pro image-to-video: $0.168/s list for 3-15s clips.
- * USD to GBP at 0.79. Charlie sets VIDEO_MARGIN (default 2.4) and the
- * prices follow; the UI always shows the price before the button.
+ * USD to GBP at 0.79. The UI always shows the price before the button.
  * HF_CREDENTIALS = "KEY_ID:KEY_SECRET" from the Higgsfield console.
  */
-const VIDEO_MARGIN = Number(process.env.VIDEO_MARGIN) > 1 ? Number(process.env.VIDEO_MARGIN) : 2.4;
 const USD_TO_GBP = 0.79;
 const hfReady = () => !!process.env.HF_CREDENTIALS;
 const VIDEO_MODELS = {
@@ -165,19 +163,44 @@ const VIDEO_MODELS = {
         blurb: 'Sharp, faithful camera moves. The everyday clip.',
     },
 };
-/** What the customer pays for a clip, in pence, rounded up to 5p. */
-const videoPricePence = (modelKey, seconds, resolution) => {
-    const m = VIDEO_MODELS[modelKey];
-    const cost = m.costUsdPerSecond(resolution) * seconds * USD_TO_GBP * 100;
-    return Math.max(50, Math.ceil(cost * VIDEO_MARGIN / 5) * 5);
-};
-/** The pricing table the UI shows: pence per second per resolution. */
-const videoPricing = () => Object.fromEntries(Object.entries(VIDEO_MODELS).map(([k, m]) => [k, {
-    label: m.label, vendor: m.vendor, blurb: m.blurb, available: m.available(), audio: m.audio,
-    minSeconds: m.minSeconds, maxSeconds: m.maxSeconds, defaultSeconds: m.defaultSeconds, resolutions: m.resolutions, defaultResolution: m.defaultResolution,
-    pencePerSecond: Object.fromEntries(m.resolutions.map(r => [r, videoPricePence(k, 1, r)])),
-    priceFor: Object.fromEntries(m.resolutions.map(r => [r, Object.fromEntries([3, 4, 5, 6, 8, 10, 12, 15].filter(s => s >= m.minSeconds && s <= m.maxSeconds).map(s => [s, videoPricePence(k, s, r)]))])),
-}]));
+/**
+ * Clips are sold as ANIMATIONS (Charlie, 24 Sep 2026: "14 Seedance clips for
+ * £100 is outrageous - I'd rather they have 30"). One animation is £3.33, so
+ * the £100 pack is 30 of them, £50 is 15 and £25 is 7. The balance stays in
+ * pence, so nothing already bought changes value.
+ *
+ * A clip is one animation unless it costs us more than ANIMATION_COST_CAP to
+ * make, at Higgsfield's LIST rate: then it is two, or three. Pack prices
+ * include VAT, so an animation brings in £2.78; the cap keeps every clip at a
+ * third or more of that. In practice: any Kling clip up to 8s, Seedance up to
+ * 5s at 720p or 10s at 480p = 1; an 8-10s Seedance 720p = 2 (at 1 it would
+ * cost £2.92 against £2.78 - a loss on every one); 15s Seedance 720p = 3.
+ * Both figures can be moved with env vars without a deploy of the UI.
+ */
+const ANIMATION_PENCE = Number(process.env.ANIMATION_PENCE) > 0 ? Math.round(Number(process.env.ANIMATION_PENCE)) : 333;
+const ANIMATION_COST_CAP = Number(process.env.ANIMATION_COST_CAP_PENCE) > 0 ? Number(process.env.ANIMATION_COST_CAP_PENCE) : 185;
+/** Our list cost of a clip, in pence. */
+const videoCostPence = (modelKey, seconds, resolution) =>
+    VIDEO_MODELS[modelKey].costUsdPerSecond(resolution) * seconds * USD_TO_GBP * 100;
+/** How many animations a clip counts as. */
+const videoAnimations = (modelKey, seconds, resolution) =>
+    Math.max(1, Math.ceil(videoCostPence(modelKey, seconds, resolution) / ANIMATION_COST_CAP));
+/** What the customer pays for a clip, in pence. */
+const videoPricePence = (modelKey, seconds, resolution) => videoAnimations(modelKey, seconds, resolution) * ANIMATION_PENCE;
+/** The pricing table the UI shows, per model, resolution and length. */
+const VIDEO_LENGTHS = [3, 4, 5, 6, 8, 10, 12, 15];
+const videoPricing = () => Object.fromEntries(Object.entries(VIDEO_MODELS).map(([k, m]) => {
+    const lengths = VIDEO_LENGTHS.filter(s => s >= m.minSeconds && s <= m.maxSeconds);
+    return [k, {
+        label: m.label, vendor: m.vendor, blurb: m.blurb, available: m.available(), audio: m.audio,
+        minSeconds: m.minSeconds, maxSeconds: m.maxSeconds, defaultSeconds: m.defaultSeconds, resolutions: m.resolutions, defaultResolution: m.defaultResolution,
+        animationPence: ANIMATION_PENCE,
+        // Kept for older clients: the price of a one-second clip.
+        pencePerSecond: Object.fromEntries(m.resolutions.map(r => [r, videoPricePence(k, 1, r)])),
+        priceFor: Object.fromEntries(m.resolutions.map(r => [r, Object.fromEntries(lengths.map(s => [s, videoPricePence(k, s, r)]))])),
+        animationsFor: Object.fromEntries(m.resolutions.map(r => [r, Object.fromEntries(lengths.map(s => [s, videoAnimations(k, s, r)]))])),
+    }];
+}));
 
 // ---- Higgsfield API (https://api.higgsfield.ai) ---------------------------
 const hfHeaders = () => ({ Authorization: `Key ${process.env.HF_CREDENTIALS}`, 'Content-Type': 'application/json' });
@@ -2297,6 +2320,105 @@ app.post('/api/projects/:projectId/assets', assetLimiter, verifyFirebaseToken,
     }
 });
 
+/**
+ * The company's price book - its rates for quoting (services/quoteEngine.ts).
+ *
+ * Saved through the server, not straight from the browser: users/{uid} is the
+ * record the entitlement system trusts, and the Firestore rules let the client
+ * write only materialLibrary and branding there. Widening that list would need
+ * a rules deploy in step with this code; a route ships with the server.
+ *
+ * The book is plain data the client shapes and normalises on read. Here it is
+ * only size-capped and required to be an object with an items array, so a
+ * malformed or oversized write cannot bloat the account record.
+ */
+const PRICE_BOOK_MAX = 250 * 1024;
+const priceBookLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 400,
+    keyGenerator: (req) => ipKeyGenerator(req.ip) || 'unknown',
+    message: { error: 'Too many saves. Please try again shortly.' },
+    validate: { ip: false, xForwardedForHeader: false }
+});
+
+app.get('/api/price-book', priceBookLimiter, verifyFirebaseToken, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Price book is not available right now.' });
+        const snap = await db.collection('users').doc(req.user.uid).get();
+        const book = snap.exists ? snap.data().priceBook : null;
+        res.json({ priceBook: book && typeof book === 'object' ? book : null });
+    } catch (e) {
+        console.error('price book read error:', e);
+        res.status(500).json({ error: 'Your price book could not be loaded.' });
+    }
+});
+
+/**
+ * A picture of one of the company's set designs, for the price book and the
+ * top of a quote. Stored through the server for the same reason project
+ * files can be (the Storage rules' cross-service check, see the assets
+ * route). The client shrinks it to a JPEG first; the cap is a backstop.
+ */
+const PRICE_BOOK_IMAGE_MAX = 6 * 1024 * 1024;
+app.post('/api/price-book/images', priceBookLimiter, verifyFirebaseToken,
+    express.raw({ type: () => true, limit: PRICE_BOOK_IMAGE_MAX }), async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Images are not available right now.' });
+        const uid = req.user.uid;
+        const contentType = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+        const body = Buffer.isBuffer(req.body) ? req.body : null;
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(contentType)) return res.status(415).json({ error: 'Use a PNG, JPEG or WebP image.' });
+        if (!body || body.length === 0) return res.status(400).json({ error: 'The image was empty.' });
+        if (body.length >= PRICE_BOOK_IMAGE_MAX) return res.status(413).json({ error: 'That image is too large.' });
+        if (!looksLike(body, contentType)) return res.status(415).json({ error: 'That file is not the image type it says it is.' });
+
+        const account = await db.collection('users').doc(uid).get();
+        if (!account.exists || account.data().projectsEnabled !== true) {
+            return res.status(403).json({ error: 'Quoting is not included on your plan.' });
+        }
+        const { randomUUID } = await import('crypto');
+        const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
+        const storagePath = `pricebook/${uid}/${randomUUID()}.${ext}`;
+        const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'modulr-studio.firebasestorage.app';
+        const token = randomUUID();
+        await admin.storage().bucket(bucketName).file(storagePath).save(body, {
+            resumable: false,
+            contentType,
+            metadata: { contentType, metadata: { firebaseStorageDownloadTokens: token } },
+        });
+        res.json({ url: `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}` });
+    } catch (e) {
+        console.error('price book image error:', e);
+        res.status(500).json({ error: 'The image could not be saved. Please try again in a moment.' });
+    }
+});
+
+app.put('/api/price-book', priceBookLimiter, verifyFirebaseToken, async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Price book is not available right now.' });
+        const book = req.body?.priceBook;
+        if (!book || typeof book !== 'object' || Array.isArray(book) || !Array.isArray(book.items)) {
+            return res.status(400).json({ error: 'That price book could not be read.' });
+        }
+        if (Buffer.byteLength(JSON.stringify(book)) > PRICE_BOOK_MAX) {
+            return res.status(413).json({ error: 'The price book is too large to save.' });
+        }
+        // Quoting is part of Projects; the same entitlement the rules check.
+        const ref = db.collection('users').doc(req.user.uid);
+        const account = await ref.get();
+        if (!account.exists || account.data().projectsEnabled !== true) {
+            return res.status(403).json({ error: 'Quoting is not included on your plan.' });
+        }
+        // update, not set-merge: merge would deep-merge the nested maps and
+        // keep fields the user has cleared.
+        await ref.update({ priceBook: { ...book, updatedAt: Date.now() } });
+        res.json({ ok: true });
+    } catch (e) {
+        console.error('price book save error:', e);
+        res.status(500).json({ error: 'Your price book could not be saved. Please try again in a moment.' });
+    }
+});
+
 
 // Protect all API routes and enforce master lock
 /**
@@ -2310,7 +2432,7 @@ app.get('/api/public/billing-prices', (_req, res) => {
     const vp = videoPricing();
     res.json({ billingEnabled: process.env.BILLING_ENABLED === 'true', prices, founding: !!FOUNDING_COUPON,
         // The pricing page quotes the 8 second clip.
-        videoModels: Object.fromEntries(Object.entries(vp).map(([k, v]) => [k, { label: v.label, available: v.available, resolution: v.defaultResolution, pricePence: videoPricePence(k, 8, v.defaultResolution) }])) });
+        videoModels: Object.fromEntries(Object.entries(vp).map(([k, v]) => [k, { label: v.label, available: v.available, resolution: v.defaultResolution, pricePence: videoPricePence(k, 8, v.defaultResolution), animations8s: videoAnimations(k, 8, v.defaultResolution) }])), animationPence: ANIMATION_PENCE });
 });
 
 app.use('/api', verifyFirebaseToken, enforceMasterLock);

@@ -1,3 +1,5 @@
+import type { Quote } from './services/quoteEngine';
+
 export enum AppStage {
   HOME = 'home',
   UPLOAD = 'upload', // Legacy upload, maps to Render Engine Entry
@@ -144,6 +146,10 @@ export interface Project {
    *  shared. Possession of the token is the authorisation, so it is generated
    *  client-side with crypto randomness and revoked by clearing the field. */
   shareToken?: string | null;
+  /** Quotes for this job, newest version last (services/quoteEngine). Kept on
+   *  the project: a quote belongs to the job it prices, and the project's
+   *  estimateValue follows the current one. */
+  quotes?: Quote[];
   assets: ProjectAsset[];
   createdAt: number;
   updatedAt: number;
@@ -153,7 +159,7 @@ export interface Project {
 export type ProjectDraft = Pick<
   Project,
   'name' | 'clientName' | 'clientEmail' | 'address' | 'estimateValue' | 'status'
-  | 'quotedAt' | 'wonAt' | 'notes' | 'scene3d' | 'shareToken'
+  | 'quotedAt' | 'wonAt' | 'notes' | 'scene3d' | 'shareToken' | 'quotes'
 >;
 
 export interface HistoryItem {

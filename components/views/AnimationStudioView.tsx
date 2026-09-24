@@ -108,6 +108,17 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
     }, [info]);
 
     const pricePence = info ? (info.priceFor?.[resolution]?.[String(duration)] ?? (info.pencePerSecond?.[resolution] ?? 0) * duration) : 0;
+    // Clips are sold as animations (30 for £100); the balance is still pence.
+    const unitPence = info?.animationPence ?? 333;
+    const clipAnimations = info?.animationsFor?.[resolution]?.[String(duration)] ?? Math.max(1, Math.round(pricePence / unitPence));
+    const balanceAnimations = Math.floor(videoCreditsPence / unitPence);
+    const animCount = (n: number) => `${n} animation${n === 1 ? '' : 's'}`;
+    /** The longest clip a model makes for one animation at its usual resolution. */
+    const oneAnimationUpTo = (m: VideoModelInfo) => {
+        const t = m.animationsFor?.[m.defaultResolution];
+        const secs = t ? Object.entries(t).filter(([, n]) => n === 1).map(([s]) => Number(s)) : [];
+        return secs.length ? Math.max(...secs) : null;
+    };
     const includedApplies = model === 'kling' && duration <= includedClipSeconds && (animationsLeft ?? 0) > 0;
     const canAfford = includedApplies || videoCreditsPence >= pricePence;
 
@@ -244,10 +255,10 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
                                     <p className="text-[11px] text-slate-400 mt-1">Kling, up to {includedClipSeconds}s</p>
                                 </div>
                             )}
-                            <button onClick={() => onNavigate?.(AppStage.PRICING)} className="px-5 py-3 rounded-2xl bg-white border border-slate-200 text-right hover:border-accent/40 transition-colors" title="Buy video credits">
-                                <p className={labelClass}>Video credits</p>
-                                <p className="text-2xl font-bold text-accent leading-none mt-1">{pounds(videoCreditsPence)}</p>
-                                <p className="text-[11px] text-slate-400 mt-1 inline-flex items-center gap-1"><Wallet size={11} /> top up</p>
+                            <button onClick={() => onNavigate?.(AppStage.PRICING)} className="px-5 py-3 rounded-2xl bg-white border border-slate-200 text-right hover:border-accent/40 transition-colors" title="Buy animations - 30 for £100">
+                                <p className={labelClass}>Animations</p>
+                                <p className="text-2xl font-bold text-accent leading-none mt-1">{balanceAnimations}</p>
+                                <p className="text-[11px] text-slate-400 mt-1 inline-flex items-center gap-1"><Wallet size={11} /> {pounds(videoCreditsPence)} · top up</p>
                             </button>
                         </div>
                     </div>
@@ -275,7 +286,7 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
                                                 </div>
                                                 <p className="text-[10px] text-slate-500 leading-snug">{m?.blurb ?? ''}</p>
                                                 <p className="text-[10px] font-bold text-accent/80 mt-1.5">
-                                                    {off ? 'Coming soon' : `from ${pounds(m!.pencePerSecond[m!.defaultResolution] ?? 0)} a second`}
+                                                    {off ? 'Coming soon' : oneAnimationUpTo(m!) ? `1 animation, up to ${oneAnimationUpTo(m!)}s` : `from ${pounds(m!.pencePerSecond[m!.defaultResolution] ?? 0)} a second`}
                                                 </p>
                                             </button>
                                         );
@@ -353,12 +364,12 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
                                 <div>
                                     <p className={labelClass}>This clip</p>
                                     <p className="text-lg font-bold text-accent leading-tight mt-0.5">
-                                        {includedApplies ? 'Included' : pounds(pricePence)}
+                                        {includedApplies ? 'Included' : <>{animCount(clipAnimations)} <span className="text-xs font-semibold text-slate-400">{pounds(pricePence)}</span></>}
                                     </p>
                                 </div>
                                 <p className="text-[11px] text-slate-500 text-right leading-snug">
                                     {info?.label} · {duration}s · {resolution}{sound ? ' · audio' : ''}<br />
-                                    {includedApplies ? `${animationsLeft} included left` : canAfford ? `${pounds(videoCreditsPence - pricePence)} left after` : 'Top up video credits'}
+                                    {includedApplies ? `${animationsLeft} included left` : canAfford ? `${animCount(Math.floor((videoCreditsPence - pricePence) / unitPence))} left after` : 'Top up: 30 animations for £100'}
                                 </p>
                             </div>
 
@@ -368,7 +379,7 @@ export const AnimationStudioView: React.FC<AnimationStudioViewProps> = ({ onNavi
                                 className="w-full justify-center"
                                 icon={busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                             >
-                                {busy ? 'Generating…' : !canAfford ? 'Buy video credits' : includedApplies ? 'Generate, included' : `Generate for ${pounds(pricePence)}`}
+                                {busy ? 'Generating…' : !canAfford ? 'Buy animations' : includedApplies ? 'Generate, included' : `Generate · ${animCount(clipAnimations)}`}
                             </Button>
 
                             <p className="text-[10px] text-slate-400 text-center leading-snug">

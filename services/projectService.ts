@@ -19,6 +19,7 @@ import {
 } from 'firebase/storage';
 import { db, storage, auth } from './firebase';
 import { Project, ProjectDraft, ProjectAsset, ProjectAssetKind, ProjectStatus } from '../types';
+import { normalizeQuote, Quote } from './quoteEngine';
 
 const PROJECTS = 'projects';
 
@@ -64,6 +65,7 @@ const emptyDraft = (): ProjectDraft => ({
     notes: '',
     scene3d: null,
     shareToken: null,
+    quotes: [],
 });
 
 const toMillis = (v: any): number | null =>
@@ -98,6 +100,7 @@ const toProject = (id: string, data: any): Project => {
         notes: data.notes || '',
         scene3d: typeof data.scene3d === 'string' ? data.scene3d : null,
         shareToken: typeof data.shareToken === 'string' ? data.shareToken : null,
+        quotes: Array.isArray(data.quotes) ? data.quotes.map(normalizeQuote).filter((q: Quote | null): q is Quote => !!q) : [],
         assets: Array.isArray(data.assets) ? data.assets : [],
         createdAt,
         updatedAt: toMillis(data.updatedAt) ?? Date.now(),
@@ -169,8 +172,11 @@ export const updateProject = async (
     changes: Partial<ProjectDraft>
 ): Promise<void> => {
     requireUid();
+    // Quotes carry optional fields left undefined, which Firestore refuses
+    // outright; a JSON round trip drops them.
+    const data = 'quotes' in changes ? { ...changes, quotes: JSON.parse(JSON.stringify(changes.quotes ?? [])) } : changes;
     await updateDoc(doc(db, PROJECTS, projectId), {
-        ...changes,
+        ...data,
         updatedAt: serverTimestamp(),
     });
 };

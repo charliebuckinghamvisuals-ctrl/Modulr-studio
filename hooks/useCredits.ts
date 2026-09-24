@@ -25,6 +25,10 @@ export interface VideoModelInfo {
     defaultResolution: string;
     pencePerSecond: Record<string, number>;
     priceFor: Record<string, Record<string, number>>;
+    /** The price of one animation, in pence (£3.33 - 30 for £100). */
+    animationPence?: number;
+    /** How many animations a clip counts as, by resolution and seconds. */
+    animationsFor?: Record<string, Record<string, number>>;
 }
 
 interface CreditsData {

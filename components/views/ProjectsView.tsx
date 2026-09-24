@@ -4,8 +4,11 @@ import {
     FolderOpen, Folder, Plus, Trash2, MapPin, User, FileText, Image as ImageIcon,
     Upload, Loader2, ArrowLeft, Paperclip, Trophy, Lock, Box,
     Share2, Link2Off, Search, KanbanSquare, LayoutGrid, BarChart3, Check, XCircle,
-    PenTool, Download, ExternalLink,
+    PenTool, Download, ExternalLink, BookOpen, Calculator,
 } from 'lucide-react';
+import { usePriceBook } from '../../hooks/usePriceBook';
+import { PriceBookEditor } from '../quoting/PriceBookEditor';
+import { QuoteBuilder } from '../quoting/QuoteBuilder';
 import { DraftingBackground } from '../DraftingBackground';
 import { Button } from '../Button';
 import { ProjectsDashboard } from '../ProjectsDashboard';
@@ -141,19 +144,22 @@ const latestImage = (p: Project) => imagesOf(p).sort((a, b) => b.createdAt - a.c
 const proposalsOf = (p: Project) => p.assets.filter(a => a.kind === 'proposal');
 
 const VIEW_KEY = 'modulr_projects_view';
-type View = 'pipeline' | 'folders' | 'reports';
+type View = 'pipeline' | 'folders' | 'reports' | 'pricebook';
 const savedView = (): View => {
     try {
         const v = localStorage.getItem(VIEW_KEY);
-        return v === 'folders' || v === 'reports' ? v : 'pipeline';
+        return v === 'folders' || v === 'reports' || v === 'pricebook' ? v : 'pipeline';
     } catch { return 'pipeline'; }
 };
+
+/** The latest quote on a job, for the cards. */
+const latestQuote = (p: Project) => (p.quotes && p.quotes.length ? p.quotes[p.quotes.length - 1] : null);
 
 /** Shared chrome for the locked states, so a signed-out visitor lands on a page
  *  that looks like the rest of the site rather than a bare message. */
 const Gate: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar">
-        <DraftingBackground pageName="PROJECTS" />
+        <DraftingBackground pageName="JOBS & QUOTES" />
         <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[150px] pointer-events-none" />
         <div className="flex-1 flex items-center justify-center p-6 md:p-12 relative z-10">
             <div className="max-w-lg w-full text-center p-8 md:p-10 rounded-3xl bg-white border border-slate-200 shadow-sm">
@@ -233,6 +239,7 @@ const BoardCard: React.FC<{ project: Project; onOpen: () => void; dragging: bool
                     <div className="flex items-center justify-between mt-1">
                         <span className="text-[13px] font-bold text-accent">{formatCurrency(project.estimateValue)}</span>
                         <span className="flex items-center gap-2 text-[10px] text-slate-400">
+                            {latestQuote(project) && <span className="font-semibold text-slate-500" title="Latest quote">{latestQuote(project)!.number}</span>}
                             {proposalsOf(project).length > 0 && <FileText size={11} aria-label="Has a proposal" />}
                             <span>{new Date(project.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
                         </span>
@@ -256,6 +263,8 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
      * source, so the button and the write can never disagree.
      */
     const { canUseProjects, loading: planLoading } = useCredits();
+    // The company's rates, shared by the Price book tab and every quote.
+    const priceBook = usePriceBook(!!user && canUseProjects === true);
 
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -281,8 +290,15 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
         if (!kinds.includes(uploadKind)) setUploadKind(kinds[0]);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [folder]);
-    // Opening a different job starts at All files.
-    useEffect(() => { setFolder('all'); }, [activeId]);
+    // Opening a different job starts at All files, and on its quote when it
+    // has one.
+    const [projectTab, setProjectTab] = useState<'quote' | 'details'>('details');
+    useEffect(() => {
+        setFolder('all');
+        const p = projects.find(x => x.id === activeId);
+        setProjectTab(p && (p.quotes?.length || p.scene3d) ? 'quote' : 'details');
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeId]);
 
     const active = projects.find(p => p.id === activeId) || null;
 
@@ -362,7 +378,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
             const created = await createProject(status === 'lead' ? undefined : { status, ...statusChanges({ quotedAt: null, wonAt: null }, status) });
             setProjects(prev => [created, ...prev]);
             setActiveId(created.id);
-            toast.success('Project created');
+            toast.success('Job created');
         } catch (e: any) {
             toast.error(e?.message || 'Could not create the project.');
         }
@@ -478,6 +494,14 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
         }
     };
 
+    /** A quote PDF, filed in the job's Proposals folder. */
+    const attachQuotePdf = async (file: File) => {
+        if (!active) return;
+        const asset = await uploadAsset(active.id, file, 'proposal');
+        setProjects(prev => prev.map(p => (p.id === active.id ? { ...p, assets: [...p.assets, asset] } : p)));
+        toast.success('Saved in Proposals');
+    };
+
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         e.target.value = '';
@@ -508,7 +532,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                 <div className="w-14 h-14 mx-auto rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center mb-6">
                     <FolderOpen size={24} className="text-accent" />
                 </div>
-                <h1 className="text-2xl font-bold text-accent tracking-tight mb-3">Projects</h1>
+                <h1 className="text-2xl font-bold text-accent tracking-tight mb-3">Jobs & Quotes</h1>
                 <p className="text-sm text-slate-600 leading-relaxed mb-8">
                     Keep every client, address, quote value and file with the job it belongs to,
                     and see what you have quoted and won at a glance. Sign in to your Hub
@@ -542,7 +566,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                     Included on every paid plan
                 </p>
                 <h1 className="text-2xl font-bold text-accent tracking-tight mb-3">
-                    Projects comes with a subscription
+                    Jobs & Quotes comes with a subscription
                 </h1>
                 <p className="text-sm text-slate-600 leading-relaxed mb-8">
                     Store clients, addresses, quote values, renders and documents against every
@@ -581,7 +605,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                         onClick={() => setActiveId(null)}
                         className="flex items-center gap-2 text-sm text-slate-600 hover:text-accent transition-colors"
                     >
-                        <ArrowLeft size={16} /> All projects
+                        <ArrowLeft size={16} /> All jobs
                     </button>
                     <div className="flex items-center gap-4">
                         {saving && (
@@ -651,6 +675,11 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                             <div className="text-right">
                                 <div className={labelClass}>Quote value</div>
                                 <div className="text-3xl font-bold text-accent mt-1">{formatCurrency(p.estimateValue)}</div>
+                                {latestQuote(p) && (
+                                    <button onClick={() => setProjectTab('quote')} className="text-[11px] text-slate-400 hover:text-accent mt-0.5">
+                                        {latestQuote(p)!.number}{latestQuote(p)!.version > 1 ? ` v${latestQuote(p)!.version}` : ''} · {{ draft: 'draft', sent: 'sent', accepted: 'accepted', declined: 'declined' }[latestQuote(p)!.status]}
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -695,6 +724,42 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                     </div>
                 </div>
 
+                {/* The job's two halves: its price, and its paperwork. */}
+                <div className="flex items-center gap-1 border-b border-slate-200">
+                    {([
+                        ['quote', 'Quote', <Calculator size={15} key="q" />, p.quotes?.length ? String(p.quotes.length) : ''],
+                        ['details', 'Client & files', <FolderOpen size={15} key="d" />, String(p.assets.length)],
+                    ] as const).map(([k, label, icon, n]) => (
+                        <button
+                            key={k}
+                            onClick={() => setProjectTab(k)}
+                            className={`flex items-center gap-2 px-5 py-3 -mb-px border-b-2 text-sm font-bold transition-colors ${projectTab === k ? 'border-accent text-accent' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        >
+                            {icon} {label}
+                            {n && n !== '0' && <span className="text-[10px] font-bold text-slate-400 bg-slate-100 rounded-full px-1.5 py-0.5">{n}</span>}
+                        </button>
+                    ))}
+                </div>
+
+                {projectTab === 'quote' && (
+                    <QuoteBuilder
+                        project={p}
+                        book={priceBook.book}
+                        bookLoading={priceBook.loading}
+                        setBook={priceBook.setBook}
+                        onChange={handleFields}
+                        onStatus={handleStatus}
+                        onOpenPriceBook={() => { setActiveId(null); setView('pricebook'); }}
+                        onOpenDesigner={() => {
+                            if (p.scene3d) setPendingDesign(p.scene3d);
+                            setCurrentProject({ id: p.id, name: p.name });
+                            onNavigate?.(AppStage.DESIGNER);
+                        }}
+                        onAttachPdf={attachQuotePdf}
+                    />
+                )}
+
+                {projectTab === 'details' && (
                 <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
                     {/* Details */}
                     <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-5 h-fit">
@@ -713,13 +778,22 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                         </div>
                         <div className="space-y-1.5">
                             <label className={labelClass}>Quote value (£)</label>
-                            <input
-                                type="number"
-                                min={0}
-                                className={inputClass}
-                                value={p.estimateValue ?? ''}
-                                onChange={e => handleField('estimateValue', e.target.value === '' ? null : Number(e.target.value))}
-                            />
+                            {latestQuote(p) ? (
+                                // A quote sets the value; typing one here would be
+                                // overwritten by the next change to the quote.
+                                <button onClick={() => setProjectTab('quote')} className={`${inputClass} text-left flex items-center justify-between hover:border-accent/40`}>
+                                    <span className="font-semibold">{formatCurrency(p.estimateValue)}</span>
+                                    <span className="text-[11px] text-slate-400">from {latestQuote(p)!.number} →</span>
+                                </button>
+                            ) : (
+                                <input
+                                    type="number"
+                                    min={0}
+                                    className={inputClass}
+                                    value={p.estimateValue ?? ''}
+                                    onChange={e => handleField('estimateValue', e.target.value === '' ? null : Number(e.target.value))}
+                                />
+                            )}
                         </div>
                         {/* Dates the totals are counted by. Only shown once they
                             mean something - a lead has no quote date to correct. */}
@@ -865,6 +939,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                         </div>
                     </div>
                 </div>
+                )}
             </div>
         );
     };
@@ -875,7 +950,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
 
     return (
         <div className="h-full flex flex-col bg-background relative overflow-y-auto custom-scrollbar">
-            <DraftingBackground pageName="PROJECTS" />
+            <DraftingBackground pageName="JOBS & QUOTES" />
             <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[150px] pointer-events-none" />
 
             <div className="flex-1 p-6 md:p-12 relative z-10 w-full">
@@ -885,19 +960,19 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                             <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
                                 <div className="space-y-2">
                                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-none bg-accent/5 border border-accent/15 text-accent text-[11px] font-bold uppercase tracking-[0.2em]">
-                                        <FolderOpen size={14} />
-                                        Project Directory
+                                        <Calculator size={14} />
+                                        Jobs & Quotes
                                     </div>
                                     <h1 className="text-3xl md:text-5xl font-bold text-accent tracking-tight leading-tight">
-                                        Projects
+                                        Jobs & Quotes
                                     </h1>
                                     <p className="text-slate-600 text-sm max-w-xl">
-                                        Every job as a folder - its client, value, proposals, renders and plans -
-                                        moved from lead to quoted to won as it goes.
+                                        Every job in one place: priced from its design against your price book, quoted,
+                                        and moved from lead to won - with its client, renders, plans and proposals.
                                     </p>
                                 </div>
                                 <Button onClick={() => handleCreate()} icon={<Plus size={16} />}>
-                                    New Project
+                                    New job
                                 </Button>
                             </div>
 
@@ -908,6 +983,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                                         ['pipeline', 'Pipeline', <KanbanSquare size={15} key="p" />],
                                         ['folders', 'Folders', <LayoutGrid size={15} key="f" />],
                                         ['reports', 'Reports', <BarChart3 size={15} key="r" />],
+                                        ['pricebook', 'Price book', <BookOpen size={15} key="b" />],
                                     ] as const).map(([k, l, icon]) => (
                                         <button
                                             key={k}
@@ -918,7 +994,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                                         </button>
                                     ))}
                                 </div>
-                                {view !== 'reports' && (
+                                {view !== 'reports' && view !== 'pricebook' && (
                                     <div className="flex items-center gap-4">
                                         {projects.length > 0 && (
                                             <span className="hidden md:block text-xs text-slate-500">
@@ -938,17 +1014,25 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                                 )}
                             </div>
 
-                            {loading ? (
+                            {view === 'pricebook' ? (
+                                <PriceBookEditor
+                                    book={priceBook.book}
+                                    setBook={priceBook.setBook}
+                                    saving={priceBook.saving}
+                                    savedAt={priceBook.savedAt}
+                                    loading={priceBook.loading}
+                                />
+                            ) : loading ? (
                                 <div className="flex items-center justify-center py-24 text-slate-500 gap-3">
                                     <Loader2 className="animate-spin" size={20} />
-                                    <span className="text-sm">Loading projects…</span>
+                                    <span className="text-sm">Loading jobs…</span>
                                 </div>
                             ) : projects.length === 0 ? (
                                 <div className="text-center py-24 rounded-3xl bg-white/70 border border-slate-200">
                                     <FolderOpen size={40} className="mx-auto text-slate-300 mb-4" />
-                                    <h2 className="text-lg font-bold text-slate-700">No projects yet</h2>
+                                    <h2 className="text-lg font-bold text-slate-700">No jobs yet</h2>
                                     <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
-                                        Start one with New Project, or save a design or a PDF proposal from the
+                                        Start one with New job, or save a design or a PDF proposal from the
                                         3D Configurator - it lands here as a folder.
                                     </p>
                                 </div>
@@ -1016,7 +1100,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                                                     className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold border transition-colors ${on ? 'bg-accent text-white border-accent' : 'bg-white text-slate-600 border-slate-200 hover:border-accent/40'}`}
                                                 >
                                                     {s !== 'all' && <span className={`w-2 h-2 rounded-full ${STATUS_TAB[s]}`} />}
-                                                    {s === 'all' ? 'All projects' : STAGE_TITLES[s]}
+                                                    {s === 'all' ? 'All jobs' : STAGE_TITLES[s]}
                                                     <span className={on ? 'text-white/70' : 'text-slate-400'}>{n}</span>
                                                 </button>
                                             );
@@ -1024,7 +1108,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onNavigate }) => {
                                     </div>
                                     {folderList.length === 0 ? (
                                         <div className="text-center py-20 rounded-3xl bg-white/70 border border-slate-200 text-sm text-slate-500">
-                                            {search ? `Nothing matches "${search}".` : 'No projects at this stage.'}
+                                            {search ? `Nothing matches "${search}".` : 'No jobs at this stage.'}
                                         </div>
                                     ) : (
                                         <div className="grid gap-x-5 gap-y-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
