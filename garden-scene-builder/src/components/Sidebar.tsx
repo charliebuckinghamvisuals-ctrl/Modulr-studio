@@ -1916,9 +1916,19 @@ export function Sidebar() {
                 height of what it usually sits on, with a Height slider. */}
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-1 block">Decor</label>
-              <p className="text-[10px] text-gray-400 mb-2 leading-snug">Set the height in the object panel to sit it on a shelf, a table or the worktop.</p>
+              <p className="text-[10px] text-gray-400 mb-2 leading-snug">Place it over a unit, worktop, table or shelf and it sits on top.</p>
               <div className="grid grid-cols-2 gap-2.5">
-                {(['wall_art', 'books_decor', 'shelf_decor', 'kitchen_decor'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['wall_art', 'books_decor', 'decor_book_row', 'decor_book_stack', 'decor_books_flat', 'decor_books_upright', 'decor_books_bookends', 'decor_books_box', 'decor_books_sculpture', 'decor_photo_frame', 'decor_framed_map', 'decor_clock', 'decor_stone_bowl', 'decor_coral'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-1 block">Kitchen Accessories</label>
+              <p className="text-[10px] text-gray-400 mb-2 leading-snug">Place them on the worktop.</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                {(['kitchen_glass_jar', 'kitchen_boards', 'kitchen_utensils', 'kitchen_vase', 'kitchen_mortar'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>

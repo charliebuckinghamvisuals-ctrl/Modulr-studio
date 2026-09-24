@@ -144,6 +144,7 @@ export const INTERIOR_TYPES: ObjectType[] = [
   'pool_table', 'arcade_machine', 'wall_tv', 'dart_board',
   'washing_machine', 'fridge_freestanding', 'shoe_rack', 'sideboard', 'tv_cabinet',
   'rug_3', 'rug_4', 'vanity_mirror', 'wall_art', 'books_decor', 'shelf_decor', 'kitchen_decor',
+  'kitchen_glass_jar', 'kitchen_boards', 'kitchen_utensils', 'kitchen_vase', 'kitchen_mortar', 'decor_book_row', 'decor_book_stack', 'decor_books_flat', 'decor_books_upright', 'decor_books_bookends', 'decor_books_box', 'decor_books_sculpture', 'decor_photo_frame', 'decor_framed_map', 'decor_clock', 'decor_stone_bowl', 'decor_coral',
   // aircon_outdoor is the condenser on the OUTSIDE wall, like the extract terminal.
   // external_extraction_fan is deliberately NOT here - it is the outside
   // terminal of the extract run, so it has to be placeable on an outside wall.
@@ -177,6 +178,7 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
   pool_table: 1.35, arcade_machine: 0.55, wall_tv: 0.75, dart_board: 0.4,
   washing_machine: 0.5, fridge_freestanding: 0.55, shoe_rack: 0.9, sideboard: 0.65, tv_cabinet: 1.1,
   rug_3: 1.5, rug_4: 1.65, vanity_mirror: 0.5, wall_art: 0.6, books_decor: 0.3, shelf_decor: 0.7, kitchen_decor: 1.25,
+  kitchen_glass_jar: 0.25, kitchen_boards: 0.35, kitchen_utensils: 0.25, kitchen_vase: 0.25, kitchen_mortar: 0.25, decor_book_row: 0.45, decor_book_stack: 0.25, decor_books_flat: 0.25, decor_books_upright: 0.25, decor_books_bookends: 0.35, decor_books_box: 0.25, decor_books_sculpture: 0.35, decor_photo_frame: 0.25, decor_framed_map: 0.25, decor_clock: 0.25, decor_stone_bowl: 0.25, decor_coral: 0.25,
 };
 
 /**

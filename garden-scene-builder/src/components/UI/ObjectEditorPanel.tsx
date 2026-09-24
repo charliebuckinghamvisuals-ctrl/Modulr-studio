@@ -1,7 +1,7 @@
 import { useStore } from '../../store';
 import { useEffect, useState } from 'react';
 import { Trash2, RotateCw, Copy, ChevronDown, ChevronUp } from 'lucide-react';
-import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS, hasTimber, VENEERS, isVeneerFinish, metalUsesColour, isTintableTimber, COMPOSITE_COLOURS, TIMBER_MATERIAL, isWallLight, MOUNT_HEIGHT_MM, DECOR_TYPES } from '../../modelRegistry';
+import { unitFamily, FAMILY_LABEL, isWidthAdjustable, NATIVE_WIDTH_MM, WIDTH_RANGE_MM, TINT_MATERIAL, UNIT_COLOURS, hasMetalFinish, METAL_FINISHES, DEFAULT_FINISH, hasFabric, FABRIC_COLOURS, hasWorktop, WORKTOPS, isLightFitting, LIGHT_COLOURS, hasTimber, VENEERS, isVeneerFinish, metalUsesColour, isTintableTimber, COMPOSITE_COLOURS, TIMBER_MATERIAL, isWallLight, MOUNT_HEIGHT_MM, DECOR_TYPES, SURFACE_DECOR } from '../../modelRegistry';
 import { DimensionSlider } from '../DimensionSlider';
 import { DECK_MATERIALS } from '../3d/Decks';
 import { useSavedColours, addSavedColour, removeSavedColour } from '../../utils/savedColours';
@@ -548,7 +548,30 @@ export function ObjectEditorPanel() {
         {/* Decor: how high it sits - on a coffee table, a shelf, the
             worktop, or the wall - measured from the floor. */}
         {!finishesOnly && DECOR_TYPES.includes(obj.type) && (
-          <DimensionSlider label="Height" min={0} max={2400} step={10} value={obj.mountHeightMm ?? MOUNT_HEIGHT_MM[obj.type] ?? 0} onChange={(v) => updateObject(obj.id, { mountHeightMm: v })} />
+          SURFACE_DECOR.includes(obj.type) && obj.mountHeightMm === undefined ? (
+            // Automatic: it stands on whatever it is over (utils/surfaceTop).
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2">
+              <span className="text-[11px] text-gray-500 leading-snug">Sits on the unit, worktop or table under it</span>
+              <button
+                onClick={() => updateObject(obj.id, { mountHeightMm: 900 })}
+                className="shrink-0 text-[10px] font-semibold text-[#3b4d4a] hover:underline"
+              >
+                Set height
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <DimensionSlider label="Height" min={0} max={2400} step={10} value={obj.mountHeightMm ?? MOUNT_HEIGHT_MM[obj.type] ?? 0} onChange={(v) => updateObject(obj.id, { mountHeightMm: v })} />
+              {SURFACE_DECOR.includes(obj.type) && (
+                <button
+                  onClick={() => updateObject(obj.id, { mountHeightMm: undefined })}
+                  className="text-[10px] font-semibold text-[#3b4d4a] hover:underline"
+                >
+                  Snap back onto the surface below
+                </button>
+              )}
+            </div>
+          )
         )}
 
         {/* Garden steps and ramp: how far they climb, how long a ramp runs,

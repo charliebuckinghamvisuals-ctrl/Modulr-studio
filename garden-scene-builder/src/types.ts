@@ -61,7 +61,9 @@ export type ObjectType = 'tree' | 'conifer' | 'hedge' | 'shrub' | 'flowerbed' | 
  // a vanity with its mirror, and decor.
  | 'washing_machine' | 'fridge_freestanding' | 'shoe_rack' | 'sideboard' | 'tv_cabinet'
  | 'rug_3' | 'rug_4' | 'vanity_mirror'
- | 'wall_art' | 'books_decor' | 'shelf_decor' | 'kitchen_decor';
+ | 'wall_art' | 'books_decor' | 'shelf_decor' | 'kitchen_decor'
+ // The two decor sets as separate pieces, so each can be placed on its own.
+ | 'kitchen_glass_jar' | 'kitchen_boards' | 'kitchen_utensils' | 'kitchen_vase' | 'kitchen_mortar' | 'decor_book_row' | 'decor_book_stack' | 'decor_books_flat' | 'decor_books_upright' | 'decor_books_bookends' | 'decor_books_box' | 'decor_books_sculpture' | 'decor_photo_frame' | 'decor_framed_map' | 'decor_clock' | 'decor_stone_bowl' | 'decor_coral';
 
 /** 'solid' is doors-only (entrance door); the window UI never offers it. */
 export type GlazingStyle = 'standard' | 'crittall' | 'solid';

@@ -3,12 +3,13 @@ import { useShallow } from 'zustand/react/shallow';
 import { SceneObject, Room } from '../../types';
 import * as THREE from 'three';
 import { useRef, useState, useEffect, useMemo, Suspense, Component, type ReactNode } from 'react';
-import { useThree } from '@react-three/fiber';
+import { useThree, useFrame } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from './SafeCsg';
 import { useGLTF, Html } from '@react-three/drei';
 import { MODEL_URLS, MODEL_SCALES, NATIVE_WIDTH_MM, hasWorktop, mountHeight, objectMountHeight, EXTRACTOR_FLUE_URL, EXTRACTOR_CANOPY_H, EXTRACTOR_FLUE_H, CEILING_MOUNTED, isCeilingMounted, isLightFitting, LIGHT_COLOURS, isVeneerFinish, isEndPanel, metalUsesColour, isCornerUnit, CORNER_UNIT, UNIT_FAMILY, isWallLight } from '../../modelRegistry';
 import { applyModelMaterials, retintModel, resurfaceWorktop, refinishUnits, refinishMetal } from '../../utils/materialFixes';
 import { isGardenFurniture, groundTopAt } from '../../utils/groundTop';
+import { isSurfaceDecor, surfaceTopAt } from '../../utils/surfaceTop';
 import { isInteriorType, clampToRoomInterior, roomLocal, interiorCeilingHeight, ceilingHeightAt, canopySoffitAt, clampToCanopy, FOOTPRINT_RADIUS, snapEndPanel, snapTap, isKitchenTap, settleAgainstWalls, snapToOutsideWall } from '../../utils/placement';
 import { wallpaperProps } from '../../utils/wallpaper';
 import { createWorldScaleBoxGeometry } from '../../utils/geometry';
@@ -487,9 +488,32 @@ function ObjectMesh({ obj }: { obj: SceneObject }) {
   // the floor, so they are lifted by their mount height as well.
   // A ceiling fitting hangs from the ceiling, which moves with the wall
   // height - so it is placed DOWN from there rather than up from the floor.
+  /*
+   * Decor with no height set by hand stands on whatever is under it (see
+   * utils/surfaceTop). Found by looking down at the drawn scene, so it is
+   * re-checked when the piece moves and every half second otherwise - the
+   * furniture under it may still be loading, or be moved itself.
+   */
+  const autoSurface = isSurfaceDecor(obj.type) && obj.mountHeightMm === undefined;
+  const [surfaceY, setSurfaceY] = useState<number | null>(null);
+  const surfaceCheck = useRef({ frames: 0, dirty: true });
+  useEffect(() => { surfaceCheck.current.dirty = true; }, [obj.x, obj.z, autoSurface]);
+  useFrame(({ scene }) => {
+    if (!autoSurface) return;
+    const c = surfaceCheck.current;
+    if (!c.dirty && ++c.frames < 30) return;
+    c.frames = 0;
+    c.dirty = false;
+    const top = surfaceTopAt(scene, useStore.getState().scene.objects, obj.x, obj.z, obj.id);
+    const next = top ?? null;
+    setSurfaceY(prev => (prev === next || (prev !== null && next !== null && Math.abs(prev - next) < 0.0005) ? prev : next));
+  });
+
   const pos: [number, number, number] = isCeilingMounted(obj.type)
     ? [obj.x, baseH + soffitAt(room, obj) - (CEILING_MOUNTED[obj.type] ?? 0), obj.z]
-    : [obj.x, baseH + objectMountHeight(obj), obj.z];
+    : autoSurface
+      ? [obj.x, surfaceY ?? baseH, obj.z]
+      : [obj.x, baseH + objectMountHeight(obj), obj.z];
 
   const handlePointerDown = (e: any) => {
     /**

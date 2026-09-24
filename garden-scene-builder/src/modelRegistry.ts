@@ -52,6 +52,27 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   books_decor: 'models/books_decor.glb',
   shelf_decor: 'models/shelf_decor.glb',
   kitchen_decor: 'models/kitchen_decor.glb',
+  // The kitchen accessories and the shelf set, one piece each (Charlie:
+  // "they need to be individual models so I can add whichever one I want").
+  // Cut from the same exports; parts that touch are one piece - a stack of
+  // books, a vase and its branches. The two sets above stay for saved designs.
+  kitchen_glass_jar: 'models/kitchen_glass_jar.glb',
+  kitchen_boards: 'models/kitchen_boards.glb',
+  kitchen_utensils: 'models/kitchen_utensils.glb',
+  kitchen_vase: 'models/kitchen_vase.glb',
+  kitchen_mortar: 'models/kitchen_mortar.glb',
+  decor_book_row: 'models/decor_book_row.glb',
+  decor_book_stack: 'models/decor_book_stack.glb',
+  decor_books_flat: 'models/decor_books_flat.glb',
+  decor_books_upright: 'models/decor_books_upright.glb',
+  decor_books_bookends: 'models/decor_books_bookends.glb',
+  decor_books_box: 'models/decor_books_box.glb',
+  decor_books_sculpture: 'models/decor_books_sculpture.glb',
+  decor_photo_frame: 'models/decor_photo_frame.glb',
+  decor_framed_map: 'models/decor_framed_map.glb',
+  decor_clock: 'models/decor_clock.glb',
+  decor_stone_bowl: 'models/decor_stone_bowl.glb',
+  decor_coral: 'models/decor_coral.glb',
   rug: 'models/rug.glb',
   rug_2: 'models/rug_2.glb',
   footstool: 'models/footstool.glb',
@@ -460,9 +481,6 @@ export const MOUNT_HEIGHT_MM: Partial<Record<ObjectType, number>> = {
   // coffee table's 457mm top, and the shelf set at the height its lowest
   // shelf was modelled at.
   wall_art: 1100,
-  kitchen_decor: 900,
-  books_decor: 457,
-  shelf_decor: 590,
   toilet: 100,
 };
 
@@ -491,9 +509,15 @@ export const EXTRACTOR_FLUE_H = 0.955;    // native flue height, m
 
 /** Height (m) an object sits at above the finished floor - 0 for anything
  *  that stands on it. */
-/** Decor that sits ON something - a table, a shelf, the worktop, the wall -
- *  so each placed piece gets a Height slider (ObjectEditorPanel). */
-export const DECOR_TYPES: ObjectType[] = ['wall_art', 'books_decor', 'shelf_decor', 'kitchen_decor'];
+/**
+ * Decor that stands on something, and finds it: placed over a unit, a
+ * worktop, a table or a shelf, it sits on top (utils/surfaceTop). A Height
+ * slider can still set it by hand.
+ */
+export const SURFACE_DECOR: ObjectType[] = ['books_decor', 'shelf_decor', 'kitchen_decor', 'kitchen_glass_jar', 'kitchen_boards', 'kitchen_utensils', 'kitchen_vase', 'kitchen_mortar', 'decor_book_row', 'decor_book_stack', 'decor_books_flat', 'decor_books_upright', 'decor_books_bookends', 'decor_books_box', 'decor_books_sculpture', 'decor_photo_frame', 'decor_framed_map', 'decor_clock', 'decor_stone_bowl', 'decor_coral'];
+
+/** Every decor type with a Height slider: the table-top pieces and the prints. */
+export const DECOR_TYPES: ObjectType[] = ['wall_art', ...SURFACE_DECOR];
 
 export const mountHeight = (type: ObjectType) => (MOUNT_HEIGHT_MM[type] ?? 0) / 1000;
 /** The height a PLACED object is fixed at: its own setting, or the type's default. */
@@ -1157,6 +1181,23 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   books_decor: 'Books & Chess',
   shelf_decor: 'Shelf Decor',
   kitchen_decor: 'Kitchen Accessories',
+  kitchen_glass_jar: 'Glass Jar',
+  kitchen_boards: 'Chopping Boards',
+  kitchen_utensils: 'Utensil Jar',
+  kitchen_vase: 'Vase with Branches',
+  kitchen_mortar: 'Pestle & Mortar',
+  decor_book_row: 'Row of Books',
+  decor_book_stack: 'Book Stack',
+  decor_books_flat: 'Stacked Books',
+  decor_books_upright: 'Three Books',
+  decor_books_bookends: 'Books & Bookends',
+  decor_books_box: 'Books & Box',
+  decor_books_sculpture: 'Books & Sculpture',
+  decor_photo_frame: 'Framed Print',
+  decor_framed_map: 'Framed Map',
+  decor_clock: 'Desk Clock',
+  decor_stone_bowl: 'Stone Bowl',
+  decor_coral: 'Coral Sculpture',
   rug: 'Rug (Patterned)',
   rug_2: 'Rug (Sand)',
   footstool: 'Footstool',
