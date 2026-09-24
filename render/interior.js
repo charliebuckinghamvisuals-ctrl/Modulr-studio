@@ -11,7 +11,8 @@
  *                               every piece of furniture - and what is NOT
  *                               there, so nothing is invented
  *   buildInteriorRenderPrompt   the contract: no set dressing inside the
- *                               room, light from the drawn openings and
+ *                               room (bar the opt-in DRESSING allowance),
+ *                               light from the drawn openings and
  *                               fittings, the garden only through the glass
  *   buildInteriorMaterialsPass  the retry's surfaces-only pass, in interior
  *                               terms (plaster, floor grain, fabric, worktop)
@@ -177,11 +178,66 @@ export const INTERIOR_SURVEY_PROMPT = [
 ].join('\n');
 
 /**
+ * DRESS THE SCENE (24 Sep 2026, Charlie): an opt-in on the Interior Render
+ * page. The engine may add a FEW small accessories - books, a plant, a vase,
+ * kitchen bits on the worktop - standing on surfaces the design already has.
+ * Nothing in the design changes: no furniture, nothing on the walls, no
+ * colour or material touched. How many it adds depends on how much decor
+ * the user has already placed, so a dressed room is left alone.
+ */
+const DECOR_WORDS = /\b(books?|prints?|maps?|clocks?|bowls?|coral|sculptures?|jars?|boards|vases?|mortar|decor|accessories|art|chess|plants?|candles?)\b/i;
+
+/** Decor pieces the user placed: from the design when there is one, else the inventory's labels. */
+export function countPlacedDecor(spec, items) {
+    const pieces = Array.isArray(spec?.interior?.items) ? spec.interior.items : null;
+    if (pieces) return pieces.reduce((n, p) => n + (DECOR_WORDS.test(String(p?.label || '')) ? Math.max(1, parseInt(p.count) || 1) : 0), 0);
+    return (items || []).filter(it => it?.group === 'interior' && DECOR_WORDS.test(String(it.label || ''))).length;
+}
+
+/**
+ * The inventory as written forbids every accessory (furniture-total, the
+ * kitchen's worktop line, the view outside). With dressing on, those
+ * sentences would contradict the DRESSING section and fail the verifier,
+ * so they are reworded - only when they still read as generated.
+ */
+export function dressedInventory(items) {
+    return (items || []).map(it => {
+        let text = it.text;
+        if (it.id === 'furniture-total') text = text.replace(/Nothing else is in the room:.*$/,
+            'Nothing else is in the room except the few small accessories allowed under DRESSING: no extra furniture, rugs, lamps, artwork, mirrors, curtains or blinds. Empty floor in the drawing stays empty floor, bar at most one potted plant in a clear corner; a bare wall stays bare.');
+        if (it.id === 'kitchen') text = text.replace('No open shelving, splashback tiling, utensils, crockery, bottles or plants on the worktop unless drawn.',
+            'No open shelving or splashback tiling unless drawn; the worktop carries what is drawn plus, at most, the few accessories allowed under DRESSING.');
+        if (it.id === 'outside') text = text.replace('It is the only thing that may be dressed, and it stays outside', 'It is dressed as the setting and stays outside');
+        return text === it.text ? it : { ...it, text };
+    });
+}
+
+function dressingSection(decorCount) {
+    const n = Math.max(0, decorCount | 0);
+    const budget = n >= 7
+        ? `The user has already dressed this room with ${n} decor pieces. Add at most ONE or TWO more, and only where a surface is conspicuously bare - adding nothing is fine.`
+        : n >= 3
+        ? `The user has already placed ${n} decor pieces. Add at most THREE more, only where a surface is conspicuously bare.`
+        : 'Add between THREE and SIX small pieces in the whole view - no more.';
+    return [
+        'DRESSING - the one thing you may add inside the room, and only this:',
+        '- ' + budget,
+        '- Small, loose accessories only, each standing ON a surface the drawing already has: a worktop, table, desk, sideboard, TV unit, shelf, bedside table or window sill. Also allowed: at most two cushions on a drawn sofa or bed, and at most ONE potted plant on the floor in an empty corner, clear of every door, window and piece of furniture.',
+        '- Suited to what each zone is: on a kitchen worktop a chopping board, a bowl of fruit, a small herb pot or a utensil jar; in a living space or office a few books, a small plant, a vase with stems, a candle or a bowl; on a bedside a book or a small plant; in a bathroom a folded towel or a soap dispenser.',
+        '- Quiet and neutral: white, cream, natural linen, clay, stone, timber and green foliage, chosen to sit with the colours the design already has. Nothing bright, patterned or branded.',
+        '- Considered, not cluttered: most surfaces stay clear, each piece has space around it, and not every surface gets something - the restraint of a brochure photograph.',
+        '- Dressing never changes the design: it does not cover, hide, move or recolour any listed item, opening, wall, floor, worktop or unit, and never stands in front of a window or door. Every piece the user placed stays exactly as drawn.',
+        '- Never added, even as dressing: furniture, rugs, lamps or light fittings, artwork, mirrors, clocks or shelves on any wall, curtains, blinds, a throw over furniture, anything hung from the ceiling.',
+    ].join('\n');
+}
+
+/**
  * The interior render prompt. Same four-part contract as the exterior
  * (render/prompt.js): HARD RULES, INVENTORY, FORBIDDEN, LOOK. The setting
- * exists only through the glass.
+ * exists only through the glass - unless `dress` is on, when a small
+ * DRESSING allowance sits between the inventory and FORBIDDEN.
  */
-export function buildInteriorRenderPrompt({ inventoryText, hasLine, lineOnly = false, scenePreset, timePreset, weatherPreset, sceneText }) {
+export function buildInteriorRenderPrompt({ inventoryText, hasLine, lineOnly = false, scenePreset, timePreset, weatherPreset, sceneText, dress = false, decorCount = 0 }) {
     const inputs = lineOnly
         ? 'Image 1 is an exact LINE DRAWING of a finished room interior: every edge in it is real geometry, and it is the ONLY geometry there is. There is NO colour reference: every colour and material comes from the inventory below. Keep the camera, framing and crop exactly.'
         : hasLine
@@ -194,16 +250,20 @@ export function buildInteriorRenderPrompt({ inventoryText, hasLine, lineOnly = f
     return [
         'HARD RULES - these override everything below.',
         inputs,
-        'You are an offline render engine given a finished INTERIOR scene: you light and shade the geometry you were handed. You cannot add, remove, move, resize or restyle anything. Every wall, ceiling line, floor edge, opening, frame, partition, kitchen unit and piece of furniture is exactly where the drawing has it. A wall the drawing shows as blank is a blank painted wall: never cut a window or door into it to let light in, even if that leaves no opening in view. The floor meets each wall in a plain line: no skirting board is drawn, so none is rendered.',
+        'You are an offline render engine given a finished INTERIOR scene: you light and shade the geometry you were handed. ' + (dress ? 'You cannot remove, move, resize or restyle anything, and you add nothing except the few small accessories allowed under DRESSING below.' : 'You cannot add, remove, move, resize or restyle anything.') + ' Every wall, ceiling line, floor edge, opening, frame, partition, kitchen unit and piece of furniture is exactly where the drawing has it. A wall the drawing shows as blank is a blank painted wall: never cut a window or door into it to let light in, even if that leaves no opening in view. The floor meets each wall in a plain line: no skirting board is drawn, so none is rendered.',
         '',
-        'INVENTORY - everything in the room. Each item is rendered exactly where and how the drawing shows it:',
+        (dress ? 'INVENTORY - everything the design puts in the room.' : 'INVENTORY - everything in the room.') + ' Each item is rendered exactly where and how the drawing shows it:',
         inventoryText || '(no inventory supplied - the drawing is the complete list)',
         '',
+        ...(dress ? [dressingSection(decorCount), ''] : []),
         'FORBIDDEN: ' + (lightsOn ? 'any ceiling or wall light fitting left OFF - every drawn fitting is ON, warm and glowing; ' : 'any light fitting switched ON - the drawn fittings are OFF and the room is lit by daylight through its openings; ')
-            + 'any furniture, rug, cushion, throw, lamp, plant, artwork, mirror, book, vase, ornament, curtain, blind, shelf or accessory not in the drawing - the room holds ONLY the listed items; any door, window, rooflight or opening not in the drawing; any skirting, coving, beam, column, alcove or ceiling feature not in the drawing; moving the camera, zooming, cropping tighter or pulling back; people or pets; changing a wall, floor, frame, worktop or unit colour; wear, dirt, scuffs or clutter - everything is newly fitted and clean.',
+            + (dress
+                ? 'any furniture, rug, lamp, artwork, mirror, curtain, blind, shelf or wall-hung item not in the drawing, and any accessory beyond the DRESSING allowance; '
+                : 'any furniture, rug, cushion, throw, lamp, plant, artwork, mirror, book, vase, ornament, curtain, blind, shelf or accessory not in the drawing - the room holds ONLY the listed items; ')
+            + 'any door, window, rooflight or opening not in the drawing; any skirting, coving, beam, column, alcove or ceiling feature not in the drawing; moving the camera, zooming, cropping tighter or pulling back; people or pets; changing a wall, floor, frame, worktop or unit colour; wear, dirt, scuffs or clutter - everything is newly fitted and clean.',
         '',
         'LOOK: a photorealistic interior architectural visualisation, sharp from front to back, no depth of field, natural exposure, neutral white balance. Materials rendered as real: matt emulsion on smooth plaster, timber flooring with grain and board joints, fabric with visible weave, painted cabinet doors with crisp edges and fine shadow gaps, stone worktops with a soft sheen, clear glass with light reflections. Soft global illumination: daylight from the drawn openings bounces off the walls and floor, with gentle contact shadows under every piece of furniture and where the floor meets each wall. ' + time,
-        `THROUGH THE GLAZING - the only thing you may dress, and only OUTSIDE the room: ${setting || 'a simple lawn with a few shrubs beyond.'} It is seen through the windows and doors, a little brighter than the room, and it never comes inside the drawing.`,
+        `THROUGH THE GLAZING - ${dress ? 'the setting' : 'the only thing you may dress'}, and only OUTSIDE the room: ${setting || 'a simple lawn with a few shrubs beyond.'} It is seen through the windows and doors, a little brighter than the room, and it never comes inside the drawing.`,
         'OUTPUT: 2K, the same aspect ratio as image 1.',
     ].join('\n');
 }

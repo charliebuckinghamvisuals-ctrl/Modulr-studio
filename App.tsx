@@ -1,6 +1,7 @@
 import React from 'react';
 import { Zap, Grid, Layers, Sparkles, PenTool, Image as ImageIcon, Settings, History, ChevronDown, Loader2, Upload, CloudSun, Aperture, Home, Box } from 'lucide-react';
 import { ToggleSwitch } from './components/ToggleSwitch';
+import { Toggle } from './components/quoting/fields';
 import { MaintenanceView, maintenanceActive } from './components/views/MaintenanceView';
 import { getImageQuality, setImageQuality, type ImageQuality } from './services/geminiService';
 import { Toaster, toast } from 'react-hot-toast';
@@ -380,6 +381,27 @@ const App: React.FC = () => {
                     </div>
                 ))}
             </div>
+
+            {/* DRESS THE SCENE (24 Sep 2026) - interior only, off by default.
+                The engine may add a few small accessories on surfaces the
+                design already has, fewer the more decor is placed; nothing
+                in the design changes (render/interior.js DRESSING). */}
+            {engine.activeStage === AppStage.INTERIOR_RENDER && (
+                <div className="space-y-3 pt-6 border-t border-slate-200">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/60 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+                        Dress the scene
+                    </label>
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                        <Toggle
+                            on={!!engine.sceneSetting.dress}
+                            onChange={(v) => engine.setSceneSetting(prev => ({ ...prev, dress: v }))}
+                            label="Add a few finishing touches"
+                            hint="Books, a plant, a vase, a board on the worktop, placed on surfaces you've left bare. Fewer if you've added decor yourself. Your design, colours and materials stay exactly as they are."
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* THE SETTING - the one thing the engine may dress, and only
                 outside the inventory: sky, light, lawn, planting, what lies

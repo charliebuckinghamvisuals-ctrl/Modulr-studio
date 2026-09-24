@@ -244,6 +244,9 @@ export interface SceneSetting {
     /** summer | winter | overcast | rain | snow (server WEATHER_PRESETS). */
     weather: string;
     text: string;
+    /** Interior only: let the engine add a few small accessories on
+     *  existing surfaces (render/interior.js DRESSING). Off by default. */
+    dress?: boolean;
 }
 
 /**
@@ -267,6 +270,7 @@ export const renderScene = async (o: {
         body: JSON.stringify({
             shaded: o.shaded, line: o.line || null, spec: o.spec || null, items: o.items?.length ? o.items : undefined, ratio, view: o.view || 'exterior',
             scenePreset: o.setting.preset, timePreset: o.setting.time, weatherPreset: o.setting.weather, sceneText: o.setting.text, seed: o.seed,
+            dress: o.view === 'interior' && o.setting.dress === true,
         }),
     });
     if (!response.ok) {

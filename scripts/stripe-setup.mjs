@@ -41,11 +41,11 @@ const MONTH_ONE_ENDS = process.env.MONTH_ONE_ENDS || '2026-12-31';
 const PRODUCTS = [
     {
         key: 'standard', name: 'Modulr Studio - Configurator',
-        description: 'The design side of Modulr Studio for garden room and annexe providers: the full 3D Configurator with interiors, kitchens and walk inside and outside, and Jobs & Quotes - your price book, quotes built from the design, the lead-to-won pipeline and branded PDF quotes and proposals. No AI renders.',
+        description: 'The design side of Modulr Studio for garden room and annexe providers: the full 3D Configurator with interiors, kitchens and walk inside and outside, and Jobs & Quotes - your price book, quotes built from the design, the lead-to-won pipeline and branded PDF quotes and proposals. Includes a 1-to-1 online training session with Charlie, who built Modulr Studio. No AI renders.',
     },
     {
         key: 'business', name: 'Modulr Studio - The Hub',
-        description: 'Everything in Configurator, plus the AI studio: 250 renders a month across the Render Engine, Interior Render, Detail Studio, Material Editor, Line Converter and Weather Lab, 50 4K exports a month, and Animation Studio and Floor Plan Studio as they launch.',
+        description: 'Everything in Configurator, plus the AI studio: 250 renders a month across the Render Engine, Interior Render, Detail Studio, Material Editor, Line Converter and Weather Lab, 50 4K exports a month, and Animation Studio and Floor Plan Studio as they launch. Includes a 1-to-1 online training session with Charlie, who built Modulr Studio.',
     },
     {
         key: 'video', name: 'Modulr Studio - Animations',

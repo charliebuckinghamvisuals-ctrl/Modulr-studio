@@ -85,9 +85,11 @@ const PLAN_FEATURES: Array<{ label: string; trial: string | boolean; standard: s
     { label: 'Jobs & Quotes: quoting, price book, pipeline',     trial: true,  standard: true,  business: true },
     { label: 'Client organisation',          trial: true,  standard: true,  business: true },
     { label: 'Project & PDF outputs',        trial: true,  standard: true,  business: true },
+    // 24 Sep 2026 (Charlie): every paying company gets a session with him.
+    { label: '1-to-1 training with Charlie, who built Modulr', trial: false, standard: 'Online, booked when you join', business: 'Online, booked when you join' },
     // Every generated image counts as a render - a configurator render, a
     // material close-up sheet, a line drawing, a weather variant, a floor plan.
-    { label: 'Renders, any tool',            trial: '40 over 7 days, 10 a day', standard: false, business: '250 a month' },
+    { label: 'Renders, any tool',            trial: '40 renders to use within 7 days (max 10 a day)', standard: false, business: '250 a month' },
     { label: 'Render Engine',                trial: true,  standard: false, business: true },
     { label: 'Material close-ups',           trial: true,  standard: false, business: true },
     // "Coming soon" here matches the Tools menu and the home page: Floor Plan

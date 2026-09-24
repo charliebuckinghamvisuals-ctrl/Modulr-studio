@@ -82,6 +82,8 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
     };
 
     const isTester = plan === 'tester';
+    // Stripe's success_url is /account?success=true (server.js).
+    const [justSubscribed] = React.useState(() => new URLSearchParams(window.location.search).get('success') === 'true');
 
     const getPlanName = (p: string | null) => {
         if (p === null) return "Free Trial"; // null = loaded but no plan set
@@ -159,6 +161,32 @@ export const AccountView: React.FC<AccountViewProps> = ({ onNavigate }) => {
                         </button>
                     </div>
                 </div>
+
+                {/* 1-to-1 TRAINING (24 Sep 2026, Charlie): every paying company,
+                    both plans, gets an online session with him. Stripe
+                    checkout lands here with ?success=true, so that visit
+                    reads as the welcome; after that the card stays until
+                    they book. */}
+                {(isConfigurator || plan?.includes('business')) && (
+                    <div className="glass-panel p-8 rounded-xl border border-accent/25 bg-white shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                        <div className="space-y-2 max-w-2xl">
+                            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-secondary">
+                                {justSubscribed ? `Welcome to ${userDisplay.plan}` : `Included with ${userDisplay.plan}`}
+                            </div>
+                            <h2 className="text-2xl font-bold text-accent tracking-tight">Your 1-to-1 training with Charlie</h2>
+                            <p className="text-sm text-secondary leading-relaxed">
+                                An online session with Charlie, who built Modulr Studio. Bring your set designs and prices: you'll leave with your price book set up, your first design built and a clear run through everything your plan includes.
+                            </p>
+                        </div>
+                        <a
+                            href={`mailto:info@modulrstudio.co.uk?subject=${encodeURIComponent(`Book my 1-to-1 training (${userDisplay.plan})`)}`}
+                            className="shrink-0 inline-flex items-center justify-center gap-2 px-6 py-3 bg-accent text-white text-xs font-bold uppercase tracking-widest hover:bg-accent/90 transition-colors"
+                        >
+                            <Calendar size={16} />
+                            Book your session
+                        </a>
+                    </div>
+                )}
 
                 {/* Top Row: Quick Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">

@@ -34,6 +34,15 @@ const JUDGING = {
         added: 'a short list of things PLACED or BUILT inside the room in image 2 that are NOT in image 1 - extra furniture, rugs, cushions, throws, lamps, plants, artwork, mirrors, books, vases, curtains, blinds, skirting, coving, beams, columns, openings - or an empty list. Whatever is seen OUTSIDE through the glazing - garden, lawn, planting, sky, fences, buildings - is the setting and is ALLOWED; never list it as added.',
     },
 };
+// 24 Sep 2026: an interior rendered with "Dress the scene" on. Items are
+// judged exactly as before; only the added list changes - small accessories
+// on existing surfaces are the dressing the user asked for, and the one
+// thing still reported about them is too many.
+JUDGING['interior-dressed'] = {
+    examples: JUDGING.interior.examples,
+    added: 'a short list of things PLACED or BUILT inside the room in image 2 that are NOT in image 1 - extra furniture, rugs, lamps, artwork, mirrors, shelves, curtains, blinds, skirting, coving, beams, columns, openings - or an empty list. Small loose accessories standing on surfaces image 1 already has - books, a small plant, a vase, a bowl, a candle, a tray, a chopping board, fruit, a utensil jar, a folded towel - up to two cushions on a sofa or bed, and at most one potted plant on the floor, are the DRESSING the user asked for and are ALLOWED: never list them, unless one covers or replaces an inventory item or stands in front of a window or door. If MORE than eight such accessories were added in the whole view, add the single entry "over-dressed". Whatever is seen OUTSIDE through the glazing is the setting and is ALLOWED; never list it as added.',
+};
+OPENING['interior-dressed'] = OPENING.interior;
 JUDGING.plan = JUDGING.render;
 JUDGING.cad = JUDGING.render;
 

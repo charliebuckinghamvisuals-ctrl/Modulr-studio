@@ -22,7 +22,7 @@ import { buildRenderPrompt, buildMaterialsPassPrompt, LINE_CONVERSION_PROMPT, SU
 import { drawImage, GEOMETRY_MODEL, FINISH_MODEL, safeRatio } from './providers/gemini.js';
 import { verifyRender } from './verify.js';
 import { planInventoryFromSpec, buildPlanPrompt, PLAN_SURVEY_PROMPT } from './plan.js';
-import { isInteriorSpec, interiorInventoryFromSpec, buildInteriorRenderPrompt, buildInteriorMaterialsPassPrompt, INTERIOR_SURVEY_PROMPT } from './interior.js';
+import { isInteriorSpec, interiorInventoryFromSpec, buildInteriorRenderPrompt, buildInteriorMaterialsPassPrompt, INTERIOR_SURVEY_PROMPT, dressedInventory, countPlacedDecor } from './interior.js';
 
 const stripDataUrl = (s) => (typeof s === 'string' ? s.replace(/^data:[^;]+;base64,/, '') : '');
 
@@ -58,16 +58,24 @@ export function mountRender(app, deps) {
             // Same engine, different knowledge: inventory, prompt, materials
             // pass and the verifier's judging all switch (render/interior.js).
             const interior = isInteriorSpec(req.body.spec) || req.body.view === 'interior';
-            const verifyKind = interior ? 'interior' : 'render';
+            // "Dress the scene" (interior only, opt-in): a few small
+            // accessories on existing surfaces, judged by its own rules.
+            const dress = interior && req.body.dress === true;
+            const verifyKind = interior ? (dress ? 'interior-dressed' : 'interior') : 'render';
 
             // ---- inventory: the user's confirmed items win over the raw spec
             let items = inventoryFromItems(req.body.items);
             let inventorySource = 'items';
             if (!items.length) { items = interior ? interiorInventoryFromSpec(req.body.spec) : inventoryFromSpec(req.body.spec); inventorySource = items.length ? 'spec' : 'none'; }
+            // The client keeps the undressed items: its bar feeds the next
+            // render, which may have dressing off.
+            const baseItems = items;
+            const decorCount = dress ? countPlacedDecor(req.body.spec, items) : 0;
+            if (dress) items = dressedInventory(items);
             const inventoryText = inventoryToText(items);
             // The whole brief, in the log, so a wrong render can be read back
             // against exactly what the engine was told.
-            console.log(`[RENDER] ${interior ? 'INTERIOR ' : ''}inventory (${inventorySource}, ${items.length} items):\n` + inventoryText);
+            console.log(`[RENDER] ${interior ? 'INTERIOR ' : ''}${dress ? `DRESSED (${decorCount} decor placed) ` : ''}inventory (${inventorySource}, ${items.length} items):\n` + inventoryText);
 
             // ---- an upload has no drawing: draw one --------------------------
             let lineSource = line ? 'configurator' : 'none';
@@ -87,7 +95,7 @@ export function mountRender(app, deps) {
             const verifyAgainst = line ? { b64: line, mime: lineMime } : { b64: shaded, mime: shadedMime };
 
             // ---- pass 1: FINISH model on the drawing -------------------------
-            const prompt = (interior ? buildInteriorRenderPrompt : buildRenderPrompt)({ inventoryText, hasLine: !!line, lineOnly, scenePreset, timePreset, weatherPreset, sceneText });
+            const prompt = (interior ? buildInteriorRenderPrompt : buildRenderPrompt)({ inventoryText, hasLine: !!line, lineOnly, scenePreset, timePreset, weatherPreset, sceneText, dress, decorCount });
             let image = await drawImage(ai, { model: FINISH_MODEL, images: references, prompt, ratio, seed, label: 'pass1' });
             imageCalls++;
             if (!image) return res.status(502).json({ error: 'The render engine produced no image. Please try again.' });
@@ -119,15 +127,15 @@ export function mountRender(app, deps) {
             logRender(req, interior ? 'render-interior' : 'render', FINISH_MODEL, '2K', {
                 imageCalls, qaCalls: attempts.length, shipped, lineSource, inventorySource, inventoryItems: items.length,
                 verified: verification.passed, verificationChecked: verification.checked, failures: verification.failures.map(f => `${f.id}: ${f.problem}`).slice(0, 12),
-                scenePreset: scenePreset || null, timePreset: timePreset || null, weatherPreset: weatherPreset || null, seconds: Math.round((Date.now() - t0) / 1000),
+                scenePreset: scenePreset || null, timePreset: timePreset || null, weatherPreset: weatherPreset || null, dress, seconds: Math.round((Date.now() - t0) / 1000),
             });
 
             res.json({
                 image,
                 line: lineSource === 'engine' ? line : undefined,
-                items,
+                items: baseItems,
                 inventoryText,
-                engine: { finish: FINISH_MODEL, geometry: GEOMETRY_MODEL, shipped, lineSource, inventorySource, view: interior ? 'interior' : 'exterior' },
+                engine: { finish: FINISH_MODEL, geometry: GEOMETRY_MODEL, shipped, lineSource, inventorySource, view: interior ? 'interior' : 'exterior', dressed: dress },
                 verification: { ...verification, attempts: attempts.map(a => ({ pass: a.pass, checked: a.checked, passed: a.passed, failures: a.failures })) },
                 rendersLeft: access.rendersLeft,
                 seconds: Math.round((Date.now() - t0) / 1000),
