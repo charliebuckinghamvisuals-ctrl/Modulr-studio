@@ -349,7 +349,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         {/* Same fixed height as the paid cards' price blocks so the three
                             buttons sit on one line. */}
                         <div className="mb-8 min-h-[96px] flex flex-col justify-start">
-                            <div className="font-bold text-5xl text-primary dark:text-white drop-shadow-md">7 Days</div>
+                            <div className="font-bold text-5xl text-primary drop-shadow-md">7 Days</div>
                             <span className="text-secondary font-medium">40 free renders, no card</span>
                         </div>
 
@@ -408,11 +408,11 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         {/* No extra top margin: it pushed this card's button 6px below
                             the other two (QA 21 Sep 2026); the badge hangs outside the card. */}
                         <div className="mb-6">
-                            <h3 className="text-2xl font-bold text-accent dark:text-accent mb-2 flex items-center gap-2">The Hub</h3>
+                            <h3 className="text-2xl font-bold text-accent mb-2 flex items-center gap-2">The Hub</h3>
                             <p className="text-sm text-secondary min-h-[40px]">Everything in Configurator, plus 250 renders a month and every studio tool.</p>
                         </div>
                         <div className="mb-8 min-h-[96px] flex flex-col justify-start text-white">
-                            <div className="text-5xl font-bold text-primary dark:text-white drop-shadow-md">
+                            <div className="text-5xl font-bold text-primary drop-shadow-md">
                                 {billingCycle === 'monthly' ? pounds(penceOf('business_monthly')) : pounds(Math.round(penceOf('business_yearly') / 12))}
                                 <span className="text-lg font-bold text-secondary"> / month</span>
                             </div>
@@ -433,7 +433,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                         </Button>
 
                         <div className="space-y-3 flex-1">
-                            <div className="text-xs font-bold uppercase tracking-widest text-primary dark:text-white mb-2">Everything in Configurator, plus:</div>
+                            <div className="text-xs font-bold uppercase tracking-widest text-primary mb-2">Everything in Configurator, plus:</div>
                             <FeatureList plan="business" />
                         </div>
                     </div>
@@ -441,7 +441,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                 </div>
 
                 {/* Animation Studio: pay as you go, and what it replaces */}
-                <div className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-xl shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
+                <div className="w-full max-w-6xl mx-auto mb-20 bg-white rounded-xl shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
                         <div>
                             <h4 className="text-2xl font-bold text-accent mb-3">Animation, without the animator.</h4>
@@ -505,7 +505,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                   * managed_service subscription price stays in PRICE_CATALOG
                   * so the server keeps honouring anyone who already holds it.
                   */}
-                <div className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-xl shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
+                <div className="w-full max-w-6xl mx-auto mb-20 bg-white rounded-xl shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
                         <div>
                             <h4 className="text-2xl font-bold text-accent mb-3">Modulr Managed Service</h4>
@@ -554,7 +554,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                   * no Modulr plan needed. Leads arrive by email, and in Jobs &
                   * Quotes as well for a company that is on a plan.
                   */}
-                <div id="website-configurator" className="w-full max-w-6xl mx-auto mb-20 bg-white dark:bg-slate-900 rounded-xl shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
+                <div id="website-configurator" className="w-full max-w-6xl mx-auto mb-20 bg-white rounded-xl shadow-[0_50px_100px_rgba(0,0,0,0.08)] border border-border p-8 md:p-16">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
                         <div>
                             <div className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-accent border border-accent/25 px-2 py-1 mb-4">New · built for you</div>

@@ -44,8 +44,8 @@ export const Button: React.FC<ButtonProps> = ({
   }
   const variants = {
     secondary: "bg-white text-accent border border-accent/40 hover:border-accent hover:bg-background",
-    glass: "bg-surface/30 backdrop-blur-2xl border border-border text-primary dark:text-white shadow-[0_0_20px_rgba(139,92,246,0.1)] hover:shadow-[0_0_25px_rgba(139,92,246,0.25)] hover:border-accent/40",
-    outline: "bg-transparent border border-border/50 text-secondary hover:text-primary dark:hover:text-white shadow-[0_0_15px_rgba(139,92,246,0.05)] hover:shadow-[0_0_20px_rgba(139,92,246,0.2)] hover:border-accent/50",
+    glass: "bg-surface/30 backdrop-blur-2xl border border-border text-primary shadow-[0_0_20px_rgba(139,92,246,0.1)] hover:shadow-[0_0_25px_rgba(139,92,246,0.25)] hover:border-accent/40",
+    outline: "bg-transparent border border-border/50 text-secondary hover:text-primary shadow-[0_0_15px_rgba(139,92,246,0.05)] hover:shadow-[0_0_20px_rgba(139,92,246,0.2)] hover:border-accent/50",
     primary: "",
   };
 

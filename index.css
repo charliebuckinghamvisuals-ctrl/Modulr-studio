@@ -5,6 +5,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@300..900&family=Archivo+Black&family=DM+Serif+Display&display=swap');
 @import "tailwindcss";
 
+/* The site is light-only (AppShell removes the `dark` class). Tailwind v4's
+ * `dark:` follows the OS setting by default, so a visitor in Windows/macOS
+ * dark mode got navy panels and white text on the pricing page (25 Sep 2026).
+ * Tie `dark:` to the class instead, which is never set. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Build-time Tailwind (v4). The app previously shipped NO compiled CSS and
  * relied on the cdn.tailwindcss.com runtime compiler — which is why first
  * paint took 10-20s (blank white until the CDN script downloaded, ran, and

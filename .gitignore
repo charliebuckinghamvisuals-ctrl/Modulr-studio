@@ -52,3 +52,6 @@ test-designs/*/out_*
 test-designs/*/compare.html
 .design-sync/
 brand-templates/
+
+# Stripe env for pasting into Render (holds the live secret key)
+render-stripe-env.txt
