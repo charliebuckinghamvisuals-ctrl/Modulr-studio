@@ -122,9 +122,8 @@ for (const [key, p] of Object.entries(BILLING_PRICES)) {
     const id = process.env[p.env];
     if (id) PRICE_CATALOG[id] = { key, plan: p.plan, credits: 0, mode: p.mode, videoCreditsPence: p.videoCreditsPence || 0 };
 }
-/** The founding coupons: first five companies (max_redemptions 5) and month-one trial converts (dated). */
-const FOUNDING_COUPON = process.env.STRIPE_COUPON_FOUNDING || null;
-const MONTH_ONE_COUPON = process.env.STRIPE_COUPON_MONTH_ONE || null;
+// The founding coupons (FOUNDING5, FOUNDINGM1) were withdrawn on 25 Sep 2026:
+// every checkout is at the list price. The coupons still exist in Stripe.
 
 /**
  * Animation, pay as you go. Business includes ANIMATION_MONTHLY_LIMIT Kling
@@ -2431,7 +2430,7 @@ app.put('/api/price-book', priceBookLimiter, verifyFirebaseToken, async (req, re
 app.get('/api/public/billing-prices', (_req, res) => {
     const prices = Object.fromEntries(Object.entries(BILLING_PRICES).map(([key, p]) => [key, { priceId: process.env[p.env] || null, label: p.label, pence: p.pence, plan: p.plan, mode: p.mode }]));
     const vp = videoPricing();
-    res.json({ billingEnabled: process.env.BILLING_ENABLED === 'true', prices, founding: !!FOUNDING_COUPON,
+    res.json({ billingEnabled: process.env.BILLING_ENABLED === 'true', prices, founding: false,
         // The pricing page quotes the 8 second clip.
         videoModels: Object.fromEntries(Object.entries(vp).map(([k, v]) => [k, { label: v.label, available: v.available, resolution: v.defaultResolution, pricePence: videoPricePence(k, 8, v.defaultResolution), animations8s: videoAnimations(k, 8, v.defaultResolution) }])), animationPence: ANIMATION_PENCE });
 });
@@ -5202,34 +5201,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
         // payment must create one - the balance is keyed on the Stripe customer.
         if (entry.mode === 'payment') sessionPayload.customer_creation = 'always';
 
-        /**
-         * Founding price on Business: the first five companies, and any trial
-         * user converting within a month of starting. Stripe enforces the five
-         * (max_redemptions) and the date; if a coupon is spent or expired the
-         * checkout is retried without it rather than failing.
-         */
-        const coupons = [];
-        if (entry.plan === 'business' && entry.mode === 'subscription') {
-            if (FOUNDING_COUPON) coupons.push(FOUNDING_COUPON);
-            if (MONTH_ONE_COUPON && db) {
-                try {
-                    const snap = await db.collection('users').doc(req.user.uid).get();
-                    const started = snap.exists ? (snap.data().testerStartedAt || snap.data().trialStartTimestamp) : null;
-                    if (started && Date.now() - started < 31 * 86400000) coupons.push(MONTH_ONE_COUPON);
-                } catch (e) { console.warn('[STRIPE] month-one lookup failed:', e.message || e); }
-            }
-        }
-        let session = null;
-        for (const coupon of [...coupons, null]) {
-            try {
-                session = await stripe.checkout.sessions.create(coupon ? { ...sessionPayload, discounts: [{ coupon }] } : sessionPayload);
-                if (coupon) console.log('[STRIPE] founding coupon applied:', coupon, 'uid:', req.user.uid);
-                break;
-            } catch (e) {
-                if (!coupon) throw e;
-                console.warn('[STRIPE] coupon not applied (' + coupon + '):', e.message || e);
-            }
-        }
+        const session = await stripe.checkout.sessions.create(sessionPayload);
 
         res.json({ sessionId: session.id, url: session.url });
     } catch (error) {

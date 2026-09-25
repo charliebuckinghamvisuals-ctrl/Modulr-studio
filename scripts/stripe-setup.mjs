@@ -100,11 +100,9 @@ const PRICES = [
     { env: null, lookup: 'website_config_update',  product: 'website_config_update',  pence: 5000,  nickname: 'Website Configurator, update or fix' },
 ];
 
-// £199 -> £140 is £59.00 off a month for 12 months.
-const COUPONS = [
-    { env: 'STRIPE_COUPON_FOUNDING',  id: 'FOUNDING5',  name: 'Founding price (first 5 companies)', amount_off: 5900, currency: 'gbp', duration: 'repeating', duration_in_months: 12, max_redemptions: 5 },
-    { env: 'STRIPE_COUPON_MONTH_ONE', id: 'FOUNDINGM1', name: 'Founding price (trial, first month)', amount_off: 5900, currency: 'gbp', duration: 'repeating', duration_in_months: 12, redeem_by: Math.floor(new Date(MONTH_ONE_ENDS + 'T23:59:59Z').getTime() / 1000) },
-];
+// Founding coupons withdrawn 25 Sep 2026 (Charlie): every checkout is at the
+// list price. FOUNDINGM1 still exists in Stripe but nothing applies it.
+const COUPONS = [];
 
 const out = [];
 

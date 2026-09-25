@@ -101,6 +101,12 @@ export const MODEL_URLS: Partial<Record<ObjectType, string>> = {
   decor_house: 'models/decor_house.glb',
   decor_letter_a: 'models/decor_letter_a.glb',
   decor_soap_stones: 'models/decor_soap_stones.glb',
+  // 25 Sep 2026: Charlie's single-item exports - a freestanding bath with
+  // its floor tap, and three floor plants in pots.
+  bathtub: 'models/bathtub.glb',
+  floor_plant_tall: 'models/floor_plant_tall.glb',
+  floor_plant_bop: 'models/floor_plant_bop.glb',
+  floor_plant_3: 'models/floor_plant_3.glb',
   rug: 'models/rug.glb',
   rug_2: 'models/rug_2.glb',
   footstool: 'models/footstool.glb',
@@ -798,6 +804,8 @@ export const METAL_MATERIALS: Partial<Record<ObjectType, string[]>> = {
   // Charlie's basin taps (8 Sep). The mixer was exported with no material at
   // all - one unnamed mesh - so the empty name is the whole tap.
   basin_tap_mixer: [''],
+  // The freestanding bath's floor tap; the enamel bath keeps its white.
+  bathtub: ['M707_vray_Chrome'],
   basin_tap_widespread: ['Metal_06_1K'],
   basin_tap_wall: ['<auto>1', '*'],
   shelving_unit: ['[Steel Brushed Stainless]'],
@@ -945,6 +953,11 @@ export const FORCE_DIELECTRIC: Partial<Record<ObjectType, true>> = {
   decor_house: true,
   decor_letter_a: true,
   decor_soap_stones: true,
+  // 25 Sep: the bath's enamel and the three plants (leaves, pots, stones).
+  bathtub: true,
+  floor_plant_tall: true,
+  floor_plant_bop: true,
+  floor_plant_3: true,
   sideboard: true,
   tv_cabinet: true,
   rug_3: true,
@@ -1285,6 +1298,10 @@ export const GLB_OBJECT_LABELS: Partial<Record<ObjectType, string>> = {
   decor_house: 'Wooden House',
   decor_letter_a: 'Letter A',
   decor_soap_stones: 'Soap Stones',
+  bathtub: 'Freestanding Bath',
+  floor_plant_tall: 'Tall Branch Plant',
+  floor_plant_bop: 'Bird of Paradise',
+  floor_plant_3: 'Potted Plant',
   rug: 'Rug (Patterned)',
   rug_2: 'Rug (Sand)',
   footstool: 'Footstool',

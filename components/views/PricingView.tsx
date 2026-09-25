@@ -55,8 +55,6 @@ const STANDARD_PRICE_ID: Record<'monthly' | 'yearly', string> = {
 interface BillingPrice { priceId: string | null; label: string; pence: number; plan: string | null; mode: string }
 interface BillingInfo { billingEnabled: boolean; founding: boolean; prices: Record<string, BillingPrice>; videoModels: Record<string, { label: string; pricePence: number; available: boolean; animations8s?: number }>; animationPence?: number }
 const DECIDED_PENCE: Record<string, number> = { standard_monthly: 4999, standard_yearly: 49990, business_monthly: 19900, business_yearly: 199000, video_25: 2500, video_50: 5000, video_100: 10000 };
-/** The founding coupon is £59 off The Hub for 12 months (scripts/stripe-setup.mjs). */
-const FOUNDING_DISCOUNT_PENCE = 5900;
 const pounds = (pence: number) => (pence % 100 === 0 ? `£${pence / 100}` : `£${(pence / 100).toFixed(2)}`);
 
 type PlanKey = 'trial' | 'standard' | 'business';
@@ -417,11 +415,6 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                                 <span className="text-lg font-bold text-secondary"> / month</span>
                             </div>
                             <span className="text-secondary font-medium">{billingCycle === 'monthly' ? '+ VAT, cancel any time' : `${pounds(penceOf('business_yearly'))} a year + VAT, 2 months free`}</span>
-                            {billing?.founding && billingCycle === 'monthly' && (
-                                <span className="mt-2 inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-none bg-amber-100 text-amber-800 text-[11px] font-bold">
-                                    Founding price {pounds(penceOf('business_monthly') - FOUNDING_DISCOUNT_PENCE)} + VAT a month for your first year, first 5 companies
-                                </span>
-                            )}
                         </div>
 
                         <Button

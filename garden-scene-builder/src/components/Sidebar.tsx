@@ -1875,6 +1875,15 @@ export function Sidebar() {
             </section>
 
             <section>
+              <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Plants</label>
+              <div className="grid grid-cols-2 gap-2.5">
+                {(['floor_plant_tall', 'floor_plant_bop', 'floor_plant_3'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                  <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
+                ))}
+              </div>
+            </section>
+
+            <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Tables & Storage</label>
               <div className="grid grid-cols-2 gap-2.5">
                 {(['dining_table', 'dining_table_round', 'coffee_table', 'coffee_table_black', 'tv_unit', 'wall_tv', 'desk', 'desk_single', 'desk_standing', 'desk_pedestal', 'shelving_unit', 'sideboard', 'tv_cabinet', 'shoe_rack', 'wardrobe', 'chest_of_drawers', 'dressing_table', 'bedside_table'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
@@ -1906,7 +1915,7 @@ export function Sidebar() {
             <section>
               <label className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 block">Bathroom</label>
               <div className="grid grid-cols-2 gap-2.5">
-                {(['toilet', 'vanity', 'vanity_mirror', 'basin_tap_mixer', 'basin_tap_widespread', 'basin_tap_wall', 'shower', 'shower_corner', 'shower_small', 'towel_heater'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
+                {(['toilet', 'vanity', 'vanity_mirror', 'basin_tap_mixer', 'basin_tap_widespread', 'basin_tap_wall', 'shower', 'shower_corner', 'shower_small', 'bathtub', 'towel_heater'] as const).filter(t => GLB_OBJECT_TYPES.includes(t)).map(type => (
                   <ObjectTile key={type} type={type} label={GLB_OBJECT_LABELS[type] || type} />
                 ))}
               </div>

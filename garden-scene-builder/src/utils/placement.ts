@@ -146,6 +146,7 @@ export const INTERIOR_TYPES: ObjectType[] = [
   'rug_3', 'rug_4', 'vanity_mirror', 'wall_art', 'books_decor', 'shelf_decor', 'kitchen_decor',
   'kitchen_glass_jar', 'kitchen_boards', 'kitchen_utensils', 'kitchen_vase', 'kitchen_mortar', 'decor_book_row', 'decor_book_stack', 'decor_books_flat', 'decor_books_upright', 'decor_books_bookends', 'decor_books_box', 'decor_books_sculpture', 'decor_photo_frame', 'decor_framed_map', 'decor_clock', 'decor_stone_bowl', 'decor_coral',
   'acoustic_panel', 'dressing_table', 'round_mirror', 'spindle_chair', 'desk_standing', 'desk_pedestal', 'office_chair_2', 'decor_art_large', 'monitor', 'keyboard_set', 'decor_marble_bowl', 'decor_vase_tall', 'decor_vase_small', 'decor_vase_ceramic', 'decor_vase_stems', 'decor_marble_sculpture', 'decor_knot', 'decor_novels', 'decor_vanity_mirror', 'decor_soap_dispenser', 'decor_candle', 'decor_glass_bottle', 'decor_house', 'decor_letter_a', 'decor_soap_stones',
+  'bathtub', 'floor_plant_tall', 'floor_plant_bop', 'floor_plant_3',
   // aircon_outdoor is the condenser on the OUTSIDE wall, like the extract terminal.
   // external_extraction_fan is deliberately NOT here - it is the outside
   // terminal of the extract run, so it has to be placeable on an outside wall.
@@ -181,6 +182,7 @@ export const FOOTPRINT_RADIUS: Partial<Record<ObjectType, number>> = {
   rug_3: 1.5, rug_4: 1.65, vanity_mirror: 0.5, wall_art: 0.6, books_decor: 0.3, shelf_decor: 0.7, kitchen_decor: 1.25,
   kitchen_glass_jar: 0.25, kitchen_boards: 0.35, kitchen_utensils: 0.25, kitchen_vase: 0.25, kitchen_mortar: 0.25, decor_book_row: 0.45, decor_book_stack: 0.25, decor_books_flat: 0.25, decor_books_upright: 0.25, decor_books_bookends: 0.35, decor_books_box: 0.25, decor_books_sculpture: 0.35, decor_photo_frame: 0.25, decor_framed_map: 0.25, decor_clock: 0.25, decor_stone_bowl: 0.25, decor_coral: 0.25,
   acoustic_panel: 0.7, dressing_table: 1.1, round_mirror: 0.4, spindle_chair: 0.35, desk_standing: 0.8, desk_pedestal: 0.35, office_chair_2: 0.5, decor_art_large: 0.5, monitor: 0.4, keyboard_set: 0.45, decor_marble_bowl: 0.25, decor_vase_tall: 0.25, decor_vase_small: 0.25, decor_vase_ceramic: 0.25, decor_vase_stems: 0.35, decor_marble_sculpture: 0.25, decor_knot: 0.25, decor_novels: 0.25, decor_vanity_mirror: 0.25, decor_soap_dispenser: 0.25, decor_candle: 0.25, decor_glass_bottle: 0.25, decor_house: 0.25, decor_letter_a: 0.25, decor_soap_stones: 0.25,
+  bathtub: 0.9, floor_plant_tall: 0.6, floor_plant_bop: 0.35, floor_plant_3: 0.37,
 };
 
 /**
